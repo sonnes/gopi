@@ -12,25 +12,28 @@ import (
 
 func TestUsage_Add(t *testing.T) {
 	a := ai.Usage{
-		Input:      1,
-		Output:     2,
-		CacheRead:  3,
-		CacheWrite: 4,
-		Cost:       ai.Cost{Input: 0.5, Output: 1},
+		Input:          1,
+		Output:         2,
+		CacheRead:      3,
+		CacheWrite:     4,
+		CacheWriteLong: 1,
+		Cost:           ai.Cost{Input: 0.5, Output: 1},
 	}
 	b := ai.Usage{
-		Input:      10,
-		Output:     20,
-		CacheRead:  30,
-		CacheWrite: 40,
-		Cost:       ai.Cost{Input: 0.25, CacheRead: 2},
+		Input:          10,
+		Output:         20,
+		CacheRead:      30,
+		CacheWrite:     40,
+		CacheWriteLong: 10,
+		Cost:           ai.Cost{Input: 0.25, CacheRead: 2},
 	}
 	assert.Equal(t, ai.Usage{
-		Input:      11,
-		Output:     22,
-		CacheRead:  33,
-		CacheWrite: 44,
-		Cost:       ai.Cost{Input: 0.75, Output: 1, CacheRead: 2},
+		Input:          11,
+		Output:         22,
+		CacheRead:      33,
+		CacheWrite:     44,
+		CacheWriteLong: 11,
+		Cost:           ai.Cost{Input: 0.75, Output: 1, CacheRead: 2},
 	}, a.Add(b))
 }
 
@@ -87,6 +90,23 @@ func TestPricing_Cost(t *testing.T) {
 			assert.InDelta(t, tt.want.CacheWrite, got.CacheWrite, 1e-9)
 		})
 	}
+}
+
+func TestPricing_CostLongCacheWrite(t *testing.T) {
+	pricing := ai.Pricing{
+		CacheWrite:     2.5,
+		CacheWriteLong: 4,
+		Tiers: []ai.PriceTier{
+			{InputAbove: 500_000, CacheWrite: 5, CacheWriteLong: 8},
+		},
+	}
+
+	// CacheWriteLong is a part of CacheWrite at its own price.
+	got := pricing.Cost(ai.Usage{CacheWrite: 300_000, CacheWriteLong: 100_000})
+	assert.InDelta(t, 2.5*0.2+4*0.1, got.CacheWrite, 1e-9)
+
+	got = pricing.Cost(ai.Usage{CacheWrite: 600_000, CacheWriteLong: 600_000})
+	assert.InDelta(t, 8*0.6, got.CacheWrite, 1e-9, "the tier price")
 }
 
 func TestPricing_CostWithNoPrices(t *testing.T) {

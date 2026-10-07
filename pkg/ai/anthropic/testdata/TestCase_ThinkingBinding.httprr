@@ -1,0 +1,268 @@
+httprr trace v1
+677 10450
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 399
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":4096,"messages":[{"content":[{"text":"Compute 982451653 multiplied by 961748941. Return only the integer.","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"low"},"role":"system"}],"model":"claude-fable-5-1","output_config":{"effort":"high"},"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"error"}},"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 4000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 4000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:46:00Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 800000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 800000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:46:00Z
+Anthropic-Ratelimit-Requests-Limit: 4000
+Anthropic-Ratelimit-Requests-Remaining: 3999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:46:00Z
+Anthropic-Ratelimit-Tokens-Limit: 4800000
+Anthropic-Ratelimit-Tokens-Remaining: 4800000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:46:00Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca9b04c418431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:46:02 GMT
+Request-Id: req_011CfnpaCSGsdJELwwxWigsx
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-a4cdbc77a1de8d6caf87be9d69b4e443-c2a45e3a70c6e5e6-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-fable-5-1","id":"msg_011CfnpaCqLWmNnER7kkyBkd","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":33,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":9,"service_tier":"standard","inference_geo":"global"},"input_transformations":[],"diagnostics":null}             }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}         }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I'm mult"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"iplying 982451653 "}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"by"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 961748941 using a dif"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ference-from-10^9 "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"trick, exp"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ressing each fact"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"or as 10^9"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" minus a"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" small number"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" to"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" simplify the multiplication"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":", then working out the c"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ross ter"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ms and product"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" of those"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" small"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" differences."}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Comb"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ining all the"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" pieces,"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" the final result com"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"es to 944,871,836"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":",856,449,473, which"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" chec"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ks out given both"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" num"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"bers are roughly 9"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":".8×"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"10^8 and"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 9.6×10^8"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":", so"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" the product should land near"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 9.45×10^17"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"."}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"CAQSvQwKEAgSGAI4AUIIdGhpbmtpbmcSDOP2QkvlHugFB6sq3xoMJV/kL5M8Y+sXdYgbIjA0Jyf7lSmd+I5VWyA+2xsCCg/D086RIcVo8ur87i0C1fsW3sbAmXeamFUebcpg22Iq2gtwdGWFP5hXw3QEEbAn/CNsuhfhuyG37Bt/G9qQ+wNj1cIreulGx9eR3tb/YByiOeSYmNECVp3rTExFAjsxG3AGfx0f96dFI/tWLWWkQjtjpbBTGOvmtzNJwqf9aav7bolFJ4Qcf93h712ZKgIYa8ETAyURHqdGJXkzZa9SReY2T6YhDTwGRQWHWVIEC6EiNVCADdH8qdlhXG2W4F5GrB26CTH0dMqsYLWNoDrBSLb2gqwDAN3PiXKyT0nQHjjzLT0jsgGqzMmUOFz/jMCMYSc++67Wwit0pmv8musXtY3KoybwvBLkWb5yotmLXvZ/M9McWjeN+9S/HB6L6r4p3VEryyIW/nHo0nDeTHFSXBN7FIROsAmlhbuCba1r7aHlrKTqwbgWkqYSCvLxpR4v+QVsbsycpY6dEsRVzFxHsRJk3qgsgT0VUfqxHvgSGH3nMqV645zkxY7fyCrRJYHNs6dHxdXipnyPuz+Ruwnl28fpzNJs7knGWu+GRfFRUakqW2IhoGrdrybLHVrCA+WTqCdc7v7a/2S7qKL+XX5NSN9qQJ4rqlA5ybx+fQiISfDohlUQfb4av8IETluA8i+7IzuQ1x4uorl+ECGnIvlpi9JmQWjIwv+EekzYG+ZCy4FkNQ8YsK0R/XSJa+kdIjtKqd6/S1aBpVi/UWMdKZxNS8NRZ+YjTOvDfco1+XZ7YyMg/x/MihEHxm7G+K4fplQHTiA3mk1589n2F6fX+4KGoIs7mdl1zrhlUHRiN1jLjshxLVYGtkGQrDEY7ItNIJ6G7C080XjfKpi/vWY9cJrvjr4W1wTioX1UW+A7qjW2VbRWQQjX68I4G5bVNTrK+VC1RK3MhOJHauwO44Lm2meByqMsy0kVwaMZl+p/qoGBEIC/qWDICXoeiUJPR7F/Kd98Z2BKZ6EoTU726uGPGN+KpYqDQ7cwwuZnj3ql/wSHyvL7OJMjuAvGsgTje5JVqXBbgnPkNnkcfriOPlWQX1SwxU1sqmFAgIa0tL717aVchST5Ql1JgDZELnf9pkkuDHHCsxSrDTzyTTEBu/DAyoD+WMYs7afur2o+h7ZFBjg3/7HLbjXSXhooEy8dUcB/2qt01b2LBRJCUxxg1XDqTMrfm5A1Xvz1ysLkcyqrllbcfwJNGSEhhf9AAN2TxJhsAmSdYD9vHhNkjr/0drBMNw4dI1pCbeazC9klSMUG867fdAz28CFy8kTVq8uuhxqlaqC1KOQZ0+FqRvHF2tFnnzsWC3P6sTV35ea0as9rSLHJcMqTIG0Ieyq8ctSqM/yYm7vb8kuD7oNdpMLjsQ2vnv8Vt4h9l2XbqHVeFG7sR3G4xqxWDK934/6wDl6v/U3CwJ6rDvcQttN0vZsqDDLUYvl3vfDRVCgkhRt+Ez7anCRXpsQPY+9vPcSeKTTBPSBIVofyTdGjIqpCGei2xmQLKCz1HxEhNYJWoiJhugiWHk6eDKiDeb9/k4lHrzs6mBdZOTY2RGdhaUuL3PMtfuXK1DJO27qW1yYPMyrE/DZiLpYvke74fPKGjdyNbmj5ePOaJnOO4T5ajR2sn+TJ/kkQoQS7YBMWH/DtS6031/C1ALCHvW07Iy8pqQX/RBzVWMi6b9HkkKlLNAWfj0aq44QQaNhVLEJo2ST17/IEymOwX/2bLpziJU9xOwJvpr5PlykvzzDQvOZkEz2deBXqNNLpMVtwX3rUs0jnY0gol9HM/Q+x58Mw2ML5OQi090W3d0civekm3Zsx+AOrl2NUTjwXxaWob9/S7ulqj3P0vF4hJT1OV3VIU9CIdcrWOxfNK3/Ui9qCV/HBa1GTZbAdElEykG19UPkrj9gjpaOtop9s6zvjLj3ynzo0KBL+gDBJf4i0juwUpSp2UMgm9qfPSf2SSOyHZ7Un9rETLv/z1OwGsmCdim2W7gZZKhrcwf4l17Vh/l8gTUx6N8tqtL4FAtO/ON7hpinH8/2aZakFlDJJEcHK+LewTIymRxRJkCOYfChMGAE="}              }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0               }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"944"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"871836856449473"}         }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1    }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":33,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":569,"output_tokens_details":{"thinking_tokens":561}}      }
+
+event: message_stop
+data: {"type":"message_stop"}
+
+3518 2527
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 3239
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":4096,"messages":[{"content":[{"text":"Compute 982451653 multiplied by 961748941. Return only the integer.","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"low"},"role":"system"},{"content":[{"signature":"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","thinking":"I'm multiplying 982451653 by 961748941 using a difference-from-10^9 trick, expressing each factor as 10^9 minus a small number to simplify the multiplication, then working out the cross terms and product of those small differences.\n\nCombining all the pieces, the final result comes to 944,871,836,856,449,473, which checks out given both numbers are roughly 9.8×10^8 and 9.6×10^8, so the product should land near 9.45×10^17.\n\n","type":"thinking"},{"text":"944871836856449473","type":"text"}],"role":"assistant"},{"content":[{"text":"Reply with exactly: ok","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-fable-5-1","output_config":{"effort":"high"},"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"error"}},"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 4000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 4000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:46:10Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 800000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 800000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:46:10Z
+Anthropic-Ratelimit-Requests-Limit: 4000
+Anthropic-Ratelimit-Requests-Remaining: 3999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:46:10Z
+Anthropic-Ratelimit-Tokens-Limit: 4800000
+Anthropic-Ratelimit-Tokens-Remaining: 4800000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:46:10Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca9ed7f2f8431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:46:14 GMT
+Request-Id: req_011CfnpavNQmXDpM3L9GJK79
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-98c68c39339994f76c2b06f1ae5d2176-b70801ca623dc4b8-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-fable-5-1","id":"msg_011CfnpavmiuYPB7wcz9ecuV","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":616,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":4,"service_tier":"standard","inference_geo":"global"},"input_transformations":[],"diagnostics":null}              }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}              }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ok"}         }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0    }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":616,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":4,"output_tokens_details":{"thinking_tokens":0}}         }
+
+event: message_stop
+data: {"type":"message_stop"}
+
+3454 1396
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 3175
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":4096,"messages":[{"content":[{"text":"Compute 982451653 multiplied by 961748941. Return only the integer.","type":"text"}],"role":"user"},{"content":[{"signature":"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","thinking":"I'm multiplying 982451653 by 961748941 using a difference-from-10^9 trick, expressing each factor as 10^9 minus a small number to simplify the multiplication, then working out the cross terms and product of those small differences.\n\nCombining all the pieces, the final result comes to 944,871,836,856,449,473, which checks out given both numbers are roughly 9.8×10^8 and 9.6×10^8, so the product should land near 9.45×10^17.\n\n","type":"thinking"},{"text":"944871836856449473","type":"text"}],"role":"assistant"},{"content":[{"text":"Reply with exactly: ok","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-fable-5-1","output_config":{"effort":"high"},"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"error"}},"stream":true}HTTP/2.0 400 Bad Request
+Connection: close
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Thinking-Prefix-Mismatch: kind=blocks_removed; pattern=first_message_rewritten; block=messages.1.content.0; sections=messages; changed_validated=messages.0.content.0; position=after; item=mid_conv_system; removed=1; inserted=0; modified=0; messages_delta=0; thinking_total=1; rejected_blocks=1; rejected_turns=1
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46caa0b7cf98431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: application/json
+Date: Wed, 07 Oct 2026 11:46:15 GMT
+Request-Id: req_011CfnpbGpDro1bZob9PtYyD
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-7f4655f419a2bac45927d474bd300691-2118b7ca379f749d-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+X-Should-Retry: false
+
+{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation. Remove the block, or set `thinking.block_binding.prefix_mismatch_behavior` to \"drop_block\". Content that preceded this block when it was created is missing from this request, starting at `messages.0.content.0`."},"request_id":"req_011CfnpbGpDro1bZob9PtYyD"}

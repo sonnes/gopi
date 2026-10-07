@@ -1,0 +1,132 @@
+httprr trace v1
+467 6614
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 302
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"How many r's are in strawberry? Think it through.","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"}],"model":"claude-sonnet-5","output_config":{"effort":"high"},"thinking":{"display":"summarized","type":"adaptive"},"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:45:30Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:45:30Z
+Anthropic-Ratelimit-Requests-Limit: 10000
+Anthropic-Ratelimit-Requests-Remaining: 9999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:45:30Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:45:30Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca8f39c978431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:45:31 GMT
+Request-Id: req_011CfnpXySsetN93gRHSwcH1
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-306f52146ffb2d969501f21d7e8eb181-4a7229d96b8be3f3-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-sonnet-5","id":"msg_011CfnpXyphCfLi3MsQSq8C9","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":22,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":2,"service_tier":"standard","inference_geo":"global"},"diagnostics":null}       }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}     }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Spelling out"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" \"strawberry\" letter"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" by letter, I count the r"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"'s: position"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" 3, "}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"8, and 9 — that"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"'s three r's total."}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EtoDCqQBCBIYAipAuI2khh2axEkrnamA7OZqFz4JqsFME4gr0cBuJGwWyaUP7viz4RaT7ZEaVxSonU5U0VCUvmkB2nO3MkrPeVyuXjIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiRmOGQ1M2ViYS02MzY0LTQ4YmMtODY5OC0xNzRlYzYzMDM4YjOaAREKD2NsYXVkZS1zb25uZXQtNagB3OGY1gYSDPAf4C/XEHVIb7WS7xoMeOunJBKmSD2gW5CkIjAcYOzifEGTfoXsmsMTkFoxjin2+FiV4CqiKpfU5BGLmCsXmLhSIZxt6P4kwdtMe8Aq4gEO0xRaUZ1AdHK2exKkRuPdsBTCe3hSaVGn3zpDmz6f9gk33QhRGsizWYjbemj2FnRQMg/KI6d5rDp7wQ6CczuEYQ106Vbq0aYI+xHwM84z3T3DfP59YQkul6Ubg2mcL1PnaYmhi04XMQq/sZtAm/XiCPYGpEJh0uwVAvMNSEunsWwtGtZcC2CwUlZzb205It1ox3lA34oLYwQd85h2vVzsvjuRsKFS9aRYh1Gs/ebZG3xskRyQrBXsc6I2KuIsr7vYSVAjUl2FsQUbiAZ/i4aNAia+4UwGEkhtEGU9pcC47jGTGAE="}   }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0 }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Let me spell it out letter"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" by letter: **s-t"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"-r-a-w-b"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"-e-r-r-y"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"**\n\nNow I'll find"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" each \"r\":\n-"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" s-t-**r**"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"-a-w-b-e"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"-**r**-**"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"r**-y\n\nThat g"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"ives me r"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"'s at positions 3, "}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"8, and 9.\n\n**"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"There are 3 r's in"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" \"strawberry.\"**"}               }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1         }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":22,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":225,"output_tokens_details":{"thinking_tokens":114}}               }
+
+event: message_stop
+data: {"type":"message_stop"               }
+

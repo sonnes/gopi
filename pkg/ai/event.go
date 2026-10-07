@@ -13,7 +13,16 @@ const (
 	StopReasonToolUse StopReason = "tool_use"
 	// StopReasonRefusal is a stop by a safety classifier. The message can
 	// hold partial content, and a caller must not run its tool calls.
+	// [Message.StopDetail] holds the explanation, if the API gives one.
 	StopReasonRefusal StopReason = "refusal"
+	// StopReasonAborted is a stop because the caller canceled the call. A
+	// provider never sets it. A caller that keeps a partial message sets
+	// it, so a later reader knows that the message is incomplete.
+	StopReasonAborted StopReason = "aborted"
+	// StopReasonError is a stop because the call failed. A provider never
+	// sets it. A caller that keeps a partial message sets it, and puts
+	// the error in [Message.StopDetail].
+	StopReasonError StopReason = "error"
 )
 
 // EventType names what happened in a stream.

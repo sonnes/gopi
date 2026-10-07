@@ -1,0 +1,117 @@
+httprr trace v1
+673 5262
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 508
+Content-Type: application/json
+
+{"max_tokens":160,"messages":[{"content":[{"text":"Before replying, carefully solve 36863 * 5279 internally. Then reply with the word pong repeated exactly 40 times, separated by single spaces. Do not add any other text.","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"}],"model":"claude-sonnet-5","system":[{"text":"You are a precise assistant. Follow the requested output format exactly.","cache_control":{"type":"ephemeral"},"type":"text"}],"thinking":{"type":"disabled"},"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:48:05Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:48:05Z
+Anthropic-Ratelimit-Requests-Limit: 10000
+Anthropic-Ratelimit-Requests-Remaining: 9999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:48:05Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:48:05Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46cacbe2ca67faf-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:48:06 GMT
+Request-Id: req_011CfnpjRT7eMMVdStErabiY
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-fdcb254a00b452818b9755dc9d425535-85e41d88e259685a-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-sonnet-5","id":"msg_011CfnpjRqRg24tPUQjbfVfb","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":86,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":2,"service_tier":"standard","inference_geo":"global"},"diagnostics":null}       }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}       }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I'"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ll calculate 36863 "}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"* 5279 first."}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n\n36863 * 5279 "}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"= 36863 * 5"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"000 + 36863 *"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" 279\n= 184,315"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",000 + 10,284"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",777"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n= 194,599"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",777\n\npong pong p"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong pong pong p"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ong pong"}          }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0 }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":86,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":151,"output_tokens_details":{"thinking_tokens":0}}           }
+
+event: message_stop
+data: {"type":"message_stop"         }
+

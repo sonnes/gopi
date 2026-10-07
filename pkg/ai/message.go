@@ -22,10 +22,18 @@ type Message struct {
 	Role    Role      `json:"role"`
 	Content []Content `json:"content"`
 
-	// Model, Usage, and StopReason apply to an assistant message.
+	// Model, Usage, StopReason, StopDetail, and Effort apply to an
+	// assistant message.
 	Model      string     `json:"model,omitempty"`
 	Usage      Usage      `json:"usage,omitzero"`
 	StopReason StopReason `json:"stop_reason,omitempty"`
+	// StopDetail is the explanation of the stop, if the API gives one.
+	// A refusal can carry one.
+	StopDetail string `json:"stop_detail,omitempty"`
+	// Effort is the effort that the model used, in the words of the
+	// API of the provider. A provider sends it back with the message,
+	// so a change of level does not change the cached prefix.
+	Effort string `json:"effort,omitempty"`
 
 	// ToolCallID and IsError apply to a tool result message.
 	ToolCallID string `json:"tool_call_id,omitempty"`

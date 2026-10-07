@@ -1,0 +1,159 @@
+httprr trace v1
+1256 6957
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1090
+Content-Type: application/json
+
+{"max_tokens":64000,"messages":[{"content":[{"text":"Use the test tool","type":"text"}],"role":"user"},{"content":[{"id":"test_1","input":{},"name":"test_tool","type":"tool_use"}],"role":"assistant"},{"content":[{"tool_use_id":"test_1","content":[{"text":"Test with emoji 🙈 and other characters:\n- Thumbs up: 👍\n- Heart: ❤️\n- Thinking face: 🤔\n- Rocket: 🚀\n- Mixed text: Mario Zechner wann? Wo? Bin grad äußersr eventuninformiert 🙈\n- Japanese: こんにちは\n- Chinese: 你好\n- Mathematical symbols: ∑∫∂√\n- Special quotes: \"curly\" 'quotes'","type":"text"}],"type":"tool_result"}],"role":"user"},{"content":[{"text":"Summarize the tool result briefly.","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"}],"model":"claude-haiku-4-5","system":[{"text":"You are a helpful assistant.","cache_control":{"type":"ephemeral"},"type":"text"}],"tools":[{"input_schema":{"type":"object","additionalProperties":false},"name":"test_tool","eager_input_streaming":true,"description":"A test tool","cache_control":{"type":"ephemeral"}}],"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:45:51Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:45:51Z
+Anthropic-Ratelimit-Requests-Limit: 10000
+Anthropic-Ratelimit-Requests-Remaining: 9999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:45:51Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:45:51Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca974f88a8431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:45:51 GMT
+Request-Id: req_011CfnpZVsEtfj5LhvFKFCCH
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-59fc8880078a351422bd03f41b6f87d3-6201cde3bfa5d76e-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-haiku-4-5-20251001","id":"msg_011CfnpZWF43H1XDT8BXjFKy","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":738,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1,"service_tier":"standard","inference_geo":"not_available"},"diagnostics":null}    }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" test tool returned a"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" sample"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" output"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" containing"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" various text"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" elements"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" including:\n-"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" Common"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" emojis ("}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"👍, "}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"❤️,"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" 🤔"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":", "}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"🚀)"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n- Mixed"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" language text ("}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"German"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":", Japanese, Chinese"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":")"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n- Mathematical symbols"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" (∑"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"∫∂√"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":")\n- Special"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" punct"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"uation and"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" quotes\n\nIt appears"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" to be a test"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" demonst"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"rating the tool's"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" ability to handle diverse"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" character"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" sets and Unicode"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" content"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"."}        }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0        }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":738,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":95}      }
+
+event: message_stop
+data: {"type":"message_stop"   }
+

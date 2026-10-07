@@ -4,7 +4,7 @@ gopi is a Go SDK for building AI agents.
 
 ## Project Map
 
-- `pkg/` - the SDK. One directory per package.
+- `pkg/` - the SDK. One directory per package. Each provider under `pkg/ai/` is its own module, and `go.work` joins the modules.
 - `cmd/gopi/` - the CLI, a test drive of the SDK. Build output goes to `.bin/`.
 - `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout.
 - `.claude/rules/` - path-scoped rules for Go code, tests, and `docs/`
@@ -21,6 +21,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make build` | Build the binaries to `.bin/`                                   |
 | `make tidy`  | Run `go mod tidy`                                               |
 | `make fmt`   | Run `gofmt -w` on every Go file                                 |
+| `make record` | Re-record the fixtures of one provider. Set `PKG` and `RUN`. |
 
 Put all binaries in `.bin/`.
 </important>

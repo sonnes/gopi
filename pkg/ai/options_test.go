@@ -2,6 +2,7 @@ package ai_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -93,4 +94,37 @@ func TestGetOption_Tools(t *testing.T) {
 
 	_, ok = ai.GetOption(ai.MaxTokens(1), ai.Tools)
 	assert.False(t, ok, "unset")
+}
+
+func TestGetOption_ToolChoice(t *testing.T) {
+	opts := ai.JoinOptions(
+		ai.ToolChoice(ai.ToolChoiceAny),
+		ai.ToolChoice(ai.ToolChoiceTool("read")),
+	)
+
+	got, ok := ai.GetOption(opts, ai.ToolChoice)
+	assert.True(t, ok)
+	assert.Equal(t, ai.ToolChoiceMode{Type: "tool", Name: "read"}, got)
+}
+
+func TestGetOption_CallSettings(t *testing.T) {
+	opts := ai.JoinOptions(
+		ai.MaxRetries(3),
+		ai.MaxRetryDelay(time.Second),
+		ai.Temperature(0.2),
+		ai.Headers(map[string]string{"x-team": "infra"}),
+		ai.CacheRetention(ai.CacheLong),
+	)
+
+	retries, _ := ai.GetOption(opts, ai.MaxRetries)
+	delay, _ := ai.GetOption(opts, ai.MaxRetryDelay)
+	temperature, _ := ai.GetOption(opts, ai.Temperature)
+	headers, _ := ai.GetOption(opts, ai.Headers)
+	retention, _ := ai.GetOption(opts, ai.CacheRetention)
+
+	assert.Equal(t, 3, retries)
+	assert.Equal(t, time.Second, delay)
+	assert.InDelta(t, 0.2, temperature, 1e-9)
+	assert.Equal(t, map[string]string{"x-team": "infra"}, headers)
+	assert.Equal(t, ai.CacheLong, retention)
 }

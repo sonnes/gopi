@@ -39,6 +39,16 @@ func TestMessage_JSONRoundTrip(t *testing.T) {
 				Model:      "claude-opus-5",
 				Usage:      ai.Usage{Input: 10, Output: 5, CacheRead: 3, CacheWrite: 2},
 				StopReason: ai.StopReasonToolUse,
+				Effort:     "xhigh",
+			},
+		},
+		{
+			name: "refusal",
+			msg: ai.Message{
+				Role:       ai.RoleAssistant,
+				Content:    []ai.Content{ai.Text{Text: "I"}},
+				StopReason: ai.StopReasonRefusal,
+				StopDetail: "The request asks for harmful content.",
 			},
 		},
 		{

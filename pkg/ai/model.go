@@ -42,12 +42,14 @@ const tokensPerPriceUnit = 1_000_000
 
 // Pricing is the price of each category of [Usage], in US dollars for
 // one million tokens. CacheWrite is the price of the cache that a
-// provider writes by default.
+// provider writes by default. CacheWriteLong is the price of the long
+// cache, which [CacheLong] asks for.
 type Pricing struct {
-	Input      float64 `json:"input,omitempty"`
-	Output     float64 `json:"output,omitempty"`
-	CacheRead  float64 `json:"cache_read,omitempty"`
-	CacheWrite float64 `json:"cache_write,omitempty"`
+	Input          float64 `json:"input,omitempty"`
+	Output         float64 `json:"output,omitempty"`
+	CacheRead      float64 `json:"cache_read,omitempty"`
+	CacheWrite     float64 `json:"cache_write,omitempty"`
+	CacheWriteLong float64 `json:"cache_write_long,omitempty"`
 	// Tiers holds the prices of a large request, in order of InputAbove.
 	Tiers []PriceTier `json:"tiers,omitempty"`
 }
@@ -57,23 +59,27 @@ type Pricing struct {
 // CacheWrite. The tier prices the whole request, not only the tokens
 // above the threshold, because that is how the providers bill.
 type PriceTier struct {
-	InputAbove int     `json:"input_above"`
-	Input      float64 `json:"input,omitempty"`
-	Output     float64 `json:"output,omitempty"`
-	CacheRead  float64 `json:"cache_read,omitempty"`
-	CacheWrite float64 `json:"cache_write,omitempty"`
+	InputAbove     int     `json:"input_above"`
+	Input          float64 `json:"input,omitempty"`
+	Output         float64 `json:"output,omitempty"`
+	CacheRead      float64 `json:"cache_read,omitempty"`
+	CacheWrite     float64 `json:"cache_write,omitempty"`
+	CacheWriteLong float64 `json:"cache_write_long,omitempty"`
 }
 
 // Cost returns the cost of u at these prices. It uses the last tier
 // whose threshold the input passes, or the base prices if there is
-// none. Zero prices give a zero cost.
+// none. Zero prices give a zero cost. The long cache writes in
+// CacheWriteLong cost the CacheWriteLong price, and the rest of
+// CacheWrite costs the CacheWrite price.
 func (p Pricing) Cost(u Usage) Cost {
 	input := u.Input + u.CacheRead + u.CacheWrite
 	price := PriceTier{
-		Input:      p.Input,
-		Output:     p.Output,
-		CacheRead:  p.CacheRead,
-		CacheWrite: p.CacheWrite,
+		Input:          p.Input,
+		Output:         p.Output,
+		CacheRead:      p.CacheRead,
+		CacheWrite:     p.CacheWrite,
+		CacheWriteLong: p.CacheWriteLong,
 	}
 	for _, tier := range p.Tiers {
 		if input > tier.InputAbove {
@@ -81,10 +87,11 @@ func (p Pricing) Cost(u Usage) Cost {
 		}
 	}
 	return Cost{
-		Input:      dollars(u.Input, price.Input),
-		Output:     dollars(u.Output, price.Output),
-		CacheRead:  dollars(u.CacheRead, price.CacheRead),
-		CacheWrite: dollars(u.CacheWrite, price.CacheWrite),
+		Input:     dollars(u.Input, price.Input),
+		Output:    dollars(u.Output, price.Output),
+		CacheRead: dollars(u.CacheRead, price.CacheRead),
+		CacheWrite: dollars(u.CacheWrite-u.CacheWriteLong, price.CacheWrite) +
+			dollars(u.CacheWriteLong, price.CacheWriteLong),
 	}
 }
 
@@ -128,21 +135,25 @@ func (c Cost) Add(other Cost) Cost {
 //
 // The JSON tags are the wire format. [Message] stores usage with them.
 type Usage struct {
-	Input      int  `json:"input,omitempty"`
-	Output     int  `json:"output,omitempty"`
-	CacheRead  int  `json:"cache_read,omitempty"`
-	CacheWrite int  `json:"cache_write,omitempty"`
-	Cost       Cost `json:"cost,omitzero"`
+	Input      int `json:"input,omitempty"`
+	Output     int `json:"output,omitempty"`
+	CacheRead  int `json:"cache_read,omitempty"`
+	CacheWrite int `json:"cache_write,omitempty"`
+	// CacheWriteLong is the part of CacheWrite that the long cache
+	// wrote. It costs more, so [Pricing.Cost] counts it apart.
+	CacheWriteLong int  `json:"cache_write_long,omitempty"`
+	Cost           Cost `json:"cost,omitzero"`
 }
 
 // Add returns the sum of two usage values, category by category. It is
 // the accumulator for usage across turns and across runs.
 func (u Usage) Add(other Usage) Usage {
 	return Usage{
-		Input:      u.Input + other.Input,
-		Output:     u.Output + other.Output,
-		CacheRead:  u.CacheRead + other.CacheRead,
-		CacheWrite: u.CacheWrite + other.CacheWrite,
-		Cost:       u.Cost.Add(other.Cost),
+		Input:          u.Input + other.Input,
+		Output:         u.Output + other.Output,
+		CacheRead:      u.CacheRead + other.CacheRead,
+		CacheWrite:     u.CacheWrite + other.CacheWrite,
+		CacheWriteLong: u.CacheWriteLong + other.CacheWriteLong,
+		Cost:           u.Cost.Add(other.Cost),
 	}
 }

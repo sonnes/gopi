@@ -13,7 +13,7 @@ One page for each abstraction in gopi. A page holds the decisions behind the abs
 | ---------------------------- | ---------------------------------------------------------------------------- |
 | [Message](ai/message.md)     | How one turn of a conversation is typed, stored, and sent to a model.        |
 | [Stream](ai/stream.md)       | How one model call reports its events and its final message.                 |
-| [Provider](ai/provider.md)   | How a provider serves a model call, and what each capability of a provider asks. |
+| [Provider](ai/provider.md)   | How a provider serves a model call, and how the Anthropic provider builds its requests. |
 
 ## tool
 

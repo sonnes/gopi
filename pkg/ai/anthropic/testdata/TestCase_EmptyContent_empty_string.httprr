@@ -1,0 +1,26 @@
+httprr trace v1
+225 774
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 61
+Content-Type: application/json
+
+{"max_tokens":64000,"model":"claude-haiku-4-5","stream":true}HTTP/2.0 400 Bad Request
+Connection: close
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca9406cf18431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: application/json
+Date: Wed, 07 Oct 2026 11:45:42 GMT
+Request-Id: req_011CfnpYsvGZDyqD3CJpP1PG
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-7f543482f65dcb3e4b2fd83b6dc80a45-c1c97d80c1ed88b2-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+X-Should-Retry: false
+
+{"type":"error","error":{"type":"invalid_request_error","message":"messages: Field required"},"request_id":"req_011CfnpYsvGZDyqD3CJpP1PG"}

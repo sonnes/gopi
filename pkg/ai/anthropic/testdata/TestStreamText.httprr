@@ -1,0 +1,81 @@
+httprr trace v1
+464 3920
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 299
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"Say hi in Portuguese","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"}],"model":"claude-sonnet-5","system":[{"text":"You are a helpful assistant. Be concise.","cache_control":{"type":"ephemeral"},"type":"text"}],"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-07T11:45:24Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-07T11:45:24Z
+Anthropic-Ratelimit-Requests-Limit: 10000
+Anthropic-Ratelimit-Requests-Remaining: 9999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-07T11:45:24Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-07T11:45:24Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a46ca8d03b548431-MAA
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Wed, 07 Oct 2026 11:45:25 GMT
+Request-Id: req_011CfnpXZNX96YXkZwU3NcyW
+Server: cloudflare
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-7c8cc4a3d514822d1c09809d702df081-35484c60b401aea9-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-sonnet-5","id":"msg_011CfnpXZvmHK8aN8Kei4vRc","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":32,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":5,"service_tier":"standard","inference_geo":"global"},"diagnostics":null}     }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}          }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"Eq0CCqQBCBIYAipAr3BYfvJoBZgL/v+Rx/N8qrVdWxKCjuKpe7MgWHhVqMLBvbZ2TMHbq3LL7/toUa9OlMWpOvWFlnYluHYd7t23eDIPY2xhdWRlLXNvbm5ldC01OABCCHRoaW5raW5nWiRmOGQ1M2ViYS02MzY0LTQ4YmMtODY5OC0xNzRlYzYzMDM4YjOaAREKD2NsYXVkZS1zb25uZXQtNagB1eGY1gYSDOi+VeUkEku+ml+B8RoMCpOjBaOUqW3XDkNGIjDrsBD1pY0HVhyThXjKAsM4ioA/1ESFssTLfeV7e/aco1P5FtbEfZfCPBwZGRKCBIwqNsQOBsXUIu6byR4gSCyx61SjtJKmezrpbDl9NM8wT47CpawiyirpMeObbQGagCV7g2uvmzeswxgB"}    }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0         }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"**"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Oi!** (or"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" more"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" formally: **Olá!"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"**)"}         }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1      }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":32,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":38,"output_tokens_details":{"thinking_tokens":17}}              }
+
+event: message_stop
+data: {"type":"message_stop"          }
+

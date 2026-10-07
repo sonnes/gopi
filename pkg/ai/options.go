@@ -1,5 +1,7 @@
 package ai
 
+import "time"
+
 // Options is one option or a joined set of options. The zero value is no
 // options. A setter such as [MaxTokens], or a setter from [NewOption],
 // makes one option. [JoinOptions] merges options.
@@ -123,3 +125,72 @@ var ImageSize = NewOption[string]()
 
 // ImageCount sets the number of images to generate.
 var ImageCount = NewOption[int]()
+
+// MaxRetries sets how many times a provider sends a request again after
+// an error that can pass, such as a rate limit or an overload. A
+// provider retries only before the first event of the stream. If it is
+// unset, a provider does not retry.
+var MaxRetries = NewOption[int]()
+
+// MaxRetryDelay caps the wait that a server can ask for before a retry.
+// If the server asks for a longer wait, the provider returns the error
+// at once. Zero removes the cap. If it is unset, a provider uses 60
+// seconds.
+var MaxRetryDelay = NewOption[time.Duration]()
+
+// Temperature sets the sampling temperature. A provider does not send
+// it to a model that rejects it.
+var Temperature = NewOption[float64]()
+
+// Headers adds HTTP headers to each request of a call. A header with the
+// same name as one that the provider sets replaces it.
+var Headers = NewOption[map[string]string]()
+
+// ToolChoiceMode says if the model must call a tool. The setter has the
+// name ToolChoice, so the type takes a suffix.
+type ToolChoiceMode struct {
+	// Type is "auto", "any", "none", or "tool".
+	Type string `json:"type"`
+	// Name is the tool that the model must call, for the type "tool".
+	Name string `json:"name,omitempty"`
+}
+
+// The tool choices that name no tool.
+var (
+	// ToolChoiceAuto lets the model decide.
+	ToolChoiceAuto = ToolChoiceMode{Type: "auto"}
+	// ToolChoiceAny makes the model call one of the tools.
+	ToolChoiceAny = ToolChoiceMode{Type: "any"}
+	// ToolChoiceNone stops the model from a tool call.
+	ToolChoiceNone = ToolChoiceMode{Type: "none"}
+)
+
+// ToolChoiceTool makes the model call the tool with name.
+func ToolChoiceTool(name string) ToolChoiceMode {
+	return ToolChoiceMode{
+		Type: "tool",
+		Name: name,
+	}
+}
+
+// ToolChoice sets the tool choice of a call. If it is unset, the model
+// decides. Some models reject a forced tool, and a provider does not
+// check.
+var ToolChoice = NewOption[ToolChoiceMode]()
+
+// Retention is how long a provider keeps the cached prefix of a call.
+type Retention string
+
+const (
+	// CacheNone sends no cache marker.
+	CacheNone Retention = "none"
+	// CacheShort keeps the prefix for the short time of the provider.
+	CacheShort Retention = "short"
+	// CacheLong keeps the prefix for the long time of the provider. A
+	// long write costs more, and [Usage.CacheWriteLong] counts it.
+	CacheLong Retention = "long"
+)
+
+// CacheRetention sets how long a provider keeps the cached prefix. If it
+// is unset, a provider uses [CacheShort].
+var CacheRetention = NewOption[Retention]()
