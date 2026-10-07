@@ -1,0 +1,30 @@
+# Binaries
+.bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Environment
+.env
+.env.*
+.envrc
+
+# site
+web/node_modules/
+web/dist/
+web/.astro/
