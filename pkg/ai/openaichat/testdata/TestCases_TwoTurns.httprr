@@ -1,0 +1,73 @@
+httprr trace v1
+437 2798
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 270
+Content-Type: application/json
+
+{"messages":[{"content":"You are a helpful assistant. Be concise.","role":"system"},{"content":"Reply with exactly: 'Hello test successful'","role":"user"}],"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d19ce886df399-MAA
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 13:02:34 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=ikkbwlRzQIv.8kFpDhPm_l8XqytCHqaJLPPcxCbfkoU-1791378152.72235-1.0.1.1-r1BZ86oh5kUmTM9hg1NMXl2v.H_7os7.5Beb23hjnKjnPxOT7Zz5JyBVQ8hfzXrRxc6RKA8OktysjHqNZfehJqpI7zmChjroL0KV1znGSz2HnuIlCAACYRG9MR8IDOAD; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:32:34 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378153-jwiGm0OxPTOZ3Bql54aW
+
+data: {"id":"gen-1791378153-jwiGm0OxPTOZ3Bql54aW","object":"chat.completion.chunk","created":1791378153,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"Hello","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378153-jwiGm0OxPTOZ3Bql54aW","object":"chat.completion.chunk","created":1791378153,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" test","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378153-jwiGm0OxPTOZ3Bql54aW","object":"chat.completion.chunk","created":1791378153,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" successful","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378153-jwiGm0OxPTOZ3Bql54aW","object":"chat.completion.chunk","created":1791378153,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"completed"}]}
+
+data: {"id":"gen-1791378153-jwiGm0OxPTOZ3Bql54aW","object":"chat.completion.chunk","created":1791378153,"model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"completed"}],"usage":{"prompt_tokens":28,"completion_tokens":7,"total_tokens":35,"cost":0.0000063,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"cost_details":{"upstream_inference_cost":0.0000063,"upstream_inference_prompt_cost":0.0000028,"upstream_inference_completions_cost":0.0000035},"completion_tokens_details":{"reasoning_tokens":0,"image_tokens":0,"audio_tokens":0}}}
+
+data: [DONE]
+
+554 5032
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 387
+Content-Type: application/json
+
+{"messages":[{"content":"You are a helpful assistant. Be concise.","role":"system"},{"content":"Reply with exactly: 'Hello test successful'","role":"user"},{"content":"Hello test successful","role":"assistant"},{"content":"Now say 'Goodbye test successful'","role":"user"}],"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d19da3bf0f399-MAA
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 13:02:35 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=crjiKAtNwMLC8EzfokcBdH_ef_.OyYGFSjR.NcC.Xg4-1791378154.5906534-1.0.1.1-mGjDvGJmjd_OsHyz2.i_Qx_bD_kHGywK3zcv84b9AVwNZKq3j0NqWsSxcftc_Uc9rUgIYe8sADMW9A4YJB9ISZp7lXTPJ.chAp46ujyptTStZIzLhxVDKvhU_Zt0TD4g; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:32:35 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378154-wzjYkzSnn2nv1tjkEpYl
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null,"reasoning_details":[{"type":"reasoning.encrypted","data":"gAAAAABqxkLr6FFx7OOHzzScV072yVuOtefY2vz_mFjyiSgIGRGEA07f4ckl7XLJ-IHTcfdn-gi6BQ2xoeHKLAYPoqqu2w2-qFCknFEZwaRqciT6SZE21j1HIPgmvPWBOK25AveRPG2HojRwd3QDmsK52UFkTKKaAMvcar_lCvT06_QUUcIbKQOFXkU0lBpgx8KWVR3fYZL1Bn0h5B0Q-oyFZIGXSofzFjMTJOdL9KUkwCTyvNz4_UCUmth6IH-hA95zqiQbkIH0346gyR1rJi99MyttRO8AjOeVYlOE3lErsTxw-jDOBhK4UFPGFtQL0whKpPcylcX5sRpRXb2UjanalTCGYtG3AdZBB2in7mub-VGBRSyJITo2zcQfwDemxttKDDAjdOTJGmadRC-dAVoLUwMcROsCxPN4vvJEWEH_zWIONoobwx5ER89CSKRme0LlYWQeZLgaQKXr-vjfIqrM6JCLGlsLkPkdoLYFU1331aAQtZCWSKo9RimlXpz3kcvIqDvyqT0PYjqFs9l7XcLFydmEAH9ym1MMQokfyz1HOzYT42j2U6ZxEVe4pPCfeVBUybmCSRMbtk2duD_r-Z1gwtAdwieuhAJaCCc6Ocr1Bju2fKELVK-qM5cxeEFc5CAiNX63uWzsxbFvZIBxZJj2C9jDTO4e5foLnA2zExBbNyzVTqVK-wbZYNZICsZe9wfomC4qf-lX8lDU_v_uCeVmDjMLGPc-kxKw10p0rKRa7RngZmE5Po1bNvomrI-WzIRV6hRE2t6COAC22UnbGcvuha9raJVumOF2Z1mcu01FPEEGtnOt_Mq9UD5MsfmcOOP0Z7aXeMBDeUqQZMWX8fS5lV8FYj2X-gvFQsGhnQ7dMkiX0JVa2t3E5LyBHLPhhvrnuTZBsD5eO7-CsU4rlJnlXb-YYdKJEUOR1Ex64dz3gaZGRtiVNgy5YcHcbeXIkAb1NZrDqqvMNAHE2svJoqVo6g7VoJYKqojVSZkfQ4WsqZFU9XBDFimdDGTWp4I8R4Zs2MuVRXqpW7rFhPn2RaAS2ojPbl_TjLFXISjOjboSAKFGfblBoU2Ps9Cg2Db7yLu8zQR3Jt0wL6Sc0e5OdCaHH_b4caA4XZJsOQP1ZYD8wKgzHV1IZNuQkFVe5d9L_85R430hOoais_J-tiILcU6PVI5n4J4Tsuwnzha3Osxx1XUDvq8HZSI4-ShBWieR-ybS6jE_-6Yd_1e3fHHqAIQMeIKGR4jYZaDc0u-KR0qomsmW_q_OUNN5vSyylg_5TUSl3nrQPp5L5VHFfa7a6hm5KVyK__3YnGEzvSqxBUMuUu1zvmpuVUzJNlnYU6C1Yr4KVgjrRdl5c_4uWO57dCVKWOmwagE2ZN5AkLloEj60a74MMk1wS-RB18-QFUcQXfLMQhp7uejQ.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1","id":"rs_0ea6a25637bb7bad016ac642eb371087d18f61baea74dd6b65","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"Good","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"bye","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" test","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" successful","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null},"finish_reason":"stop","native_finish_reason":"completed"}]}
+
+data: {"id":"gen-1791378154-wzjYkzSnn2nv1tjkEpYl","object":"chat.completion.chunk","created":1791378154,"model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"completed"}],"usage":{"prompt_tokens":49,"completion_tokens":22,"total_tokens":71,"cost":0.0000159,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"cost_details":{"upstream_inference_cost":0.0000159,"upstream_inference_prompt_cost":0.0000049,"upstream_inference_completions_cost":0.000011},"completion_tokens_details":{"reasoning_tokens":12,"image_tokens":0,"audio_tokens":0}}}
+
+data: [DONE]
+

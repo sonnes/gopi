@@ -183,67 +183,6 @@ func TestSystemMessage(t *testing.T) {
 	}, msg.Content, "the blocks keep their order")
 }
 
-func TestCurrentTools(t *testing.T) {
-	read := ai.ToolInfo{Name: "read"}
-	bash := ai.ToolInfo{Name: "bash"}
-	weather := ai.ToolInfo{Name: "weather"}
-	newRead := ai.ToolInfo{Name: "read", Description: "Read a file"}
-
-	tests := []struct {
-		name     string
-		messages []ai.Message
-		want     []ai.ToolInfo
-	}{
-		{
-			name: "no changes",
-			messages: []ai.Message{
-				ai.UserMessage("hi"),
-			},
-			want: []ai.ToolInfo{read, bash},
-		},
-		{
-			name: "add and remove",
-			messages: []ai.Message{
-				ai.SystemMessage(ai.ToolRemoved{Name: "bash"}, ai.ToolAdded{Tool: weather}),
-			},
-			want: []ai.ToolInfo{read, weather},
-		},
-		{
-			name: "replace in place",
-			messages: []ai.Message{
-				ai.SystemMessage(ai.ToolAdded{Tool: newRead}),
-			},
-			want: []ai.ToolInfo{newRead, bash},
-		},
-		{
-			name: "remove then add again",
-			messages: []ai.Message{
-				ai.SystemMessage(ai.ToolRemoved{Name: "read"}),
-				ai.UserMessage("hi"),
-				ai.SystemMessage(ai.ToolAdded{Tool: read}),
-			},
-			want: []ai.ToolInfo{bash, read},
-		},
-		{
-			name: "blocks outside a system message",
-			messages: []ai.Message{
-				{
-					Role:    ai.RoleUser,
-					Content: []ai.Content{ai.ToolRemoved{Name: "bash"}},
-				},
-			},
-			want: []ai.ToolInfo{read, bash},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := ai.CurrentTools([]ai.ToolInfo{read, bash}, tt.messages)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func TestMessage_SectionWireShape(t *testing.T) {
 	msg := ai.SystemMessage(ai.SectionRemoved{Name: "todos"}, ai.Section{Name: "rules", Text: "Be brief."})
 

@@ -46,7 +46,7 @@ func (ToolCall) content() {}
 // names the format, for example image/png or application/pdf.
 //
 // A tool result carries a File, so that a tool can show the model an
-// image or a document. A provider drops a File in another message.
+// image or a document. A user message can also carry a File.
 type File struct {
 	MediaType string
 	Data      []byte
@@ -75,9 +75,9 @@ func (ToolRemoved) content() {}
 
 // Section is a named part of the system prompt. The [SystemPrompt]
 // option sets the first sections, and a system message sets one from its
-// place. A provider sends Text as it is and does not read Name. The name
-// lets a layer above match a later change to the section, and that layer
-// writes any framing, such as an "updated" note, as a [Text] block.
+// place. The first sections go as they are. A provider frames a section
+// in a later system message by its name, so the model can match the
+// change to the section that it replaces.
 //
 // Wrap Text in a tag or start it with a heading, so that the model can
 // match an update to the section.
@@ -90,8 +90,8 @@ func (Section) content() {}
 
 // SectionRemoved is a section that the system prompt does not have from
 // the place of a system message. Name is the name of the section. A
-// provider sends no text for it. The layer that removes a section also
-// adds a [Text] block that tells the model.
+// provider sends a frame that tells the model the name of the removed
+// section.
 type SectionRemoved struct {
 	Name string
 }

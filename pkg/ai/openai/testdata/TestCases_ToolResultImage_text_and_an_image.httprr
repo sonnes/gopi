@@ -1,0 +1,121 @@
+httprr trace v1
+838 5153
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 678
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant that uses tools when asked.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Use the get_circle_with_description tool and tell me what you learned. Also say what color the shape is.","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"type":"object"},"name":"get_circle_with_description","description":"Returns a circle image","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d12c37f9b3d3f-BOM
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 12:57:44 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=e8Dpl.qXtaBJo2OzyzI0.w8216whsbUSRtDiqTkkuaw-1791377864.2407799-1.0.1.1-AuZ_GPYTwg2UObtQ4ZMyjCOUa6Czz737CZtZsSUaCG4mVtfzlzEJOTLUTT0DGpIBFyVeFw96TjPKpKXiKHcIkGZNDJqhAHT_msWdNF2lnxp_neiFnyGNGgSGIusqDuBy; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:44 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791377864-UN4DhDcuBdWJUFW3JsLU
+
+data: {"type":"response.created","response":{"id":"gen-1791377864-UN4DhDcuBdWJUFW3JsLU","object":"response","created_at":1791377864,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1791377864-UN4DhDcuBdWJUFW3JsLU","object":"response","created_at":1791377864,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_tmp_hvj8jvnbyx6","type":"function_call","status":"in_progress","call_id":"call_GQIV5cID6CzGxP4P9l3DDkXS","name":"get_circle_with_description","arguments":""},"sequence_number":2}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_hvj8jvnbyx6","delta":"{}","sequence_number":3}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_tmp_hvj8jvnbyx6","name":"get_circle_with_description","arguments":"{}","sequence_number":4}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_tmp_hvj8jvnbyx6","type":"function_call","status":"completed","call_id":"call_GQIV5cID6CzGxP4P9l3DDkXS","name":"get_circle_with_description","arguments":"{}"},"sequence_number":5}
+
+data: {"type":"response.completed","response":{"id":"gen-1791377864-UN4DhDcuBdWJUFW3JsLU","object":"response","created_at":1791377864,"model":"openai/gpt-6-luna","status":"completed","completed_at":1791377865,"output":[{"id":"fc_tmp_hvj8jvnbyx6","type":"function_call","status":"completed","call_id":"call_GQIV5cID6CzGxP4P9l3DDkXS","name":"get_circle_with_description","arguments":"{}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"detailed","context":"all_turns","effort":"medium","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":74,"input_tokens_details":{"cached_tokens":0},"output_tokens":16,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":90,"cost":0.0000154,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000154,"upstream_inference_input_cost":0.0000074,"upstream_inference_output_cost":0.000008}}},"sequence_number":6}
+
+data: [DONE]
+
+4641 9120
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 4480
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant that uses tools when asked.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Use the get_circle_with_description tool and tell me what you learned. Also say what color the shape is.","type":"input_text"}],"role":"user"},{"arguments":"{}","call_id":"call_GQIV5cID6CzGxP4P9l3DDkXS","name":"get_circle_with_description","type":"function_call"},{"output":[{"text":"This is a geometric shape with specific properties: it has a diameter of 100 pixels.","type":"input_text"},{"image_url":"data:image/png;base64,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","type":"input_image"}],"call_id":"call_GQIV5cID6CzGxP4P9l3DDkXS","type":"function_call_output"}],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"type":"object"},"name":"get_circle_with_description","description":"Returns a circle image","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d12caaa8f3d3f-BOM
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 12:57:47 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=GnDLAvjU7Azt2PoHY.oGlpVphVokMyMJd4Ds25hQZ1k-1791377865.3891397-1.0.1.1-KcI885qeTUT9vYx1.wb572lqcdUm9sdoE3NlIW3DD44pztfJfr0GJoMjX6_64jg_BAv5Sz.Dv8Ltri4nYSbLovPGdCi68DNpqBlK_yVtNJaWsYOUy63IA6fdJprUGzJZ; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:47 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791377865-OI06HfVlIMWWeC14geQg
+
+data: {"type":"response.created","response":{"id":"gen-1791377865-OI06HfVlIMWWeC14geQg","object":"response","created_at":1791377865,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1791377865-OI06HfVlIMWWeC14geQg","object":"response","created_at":1791377865,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_tmp_ukk6ao99ns","type":"message","status":"in_progress","role":"assistant","content":[],"phase":"final_answer"},"sequence_number":2}
+
+data: {"type":"response.content_part.added","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"part":{"type":"output_text","text":"","annotations":[],"logprobs":[]},"sequence_number":3}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":"I","logprobs":[],"sequence_number":4}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" learned","logprobs":[],"sequence_number":5}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" that","logprobs":[],"sequence_number":6}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" the","logprobs":[],"sequence_number":7}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" shape","logprobs":[],"sequence_number":8}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" is","logprobs":[],"sequence_number":9}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" a","logprobs":[],"sequence_number":10}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" geometric","logprobs":[],"sequence_number":11}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" circle","logprobs":[],"sequence_number":12}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" with","logprobs":[],"sequence_number":13}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" a","logprobs":[],"sequence_number":14}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" diameter","logprobs":[],"sequence_number":15}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" of","logprobs":[],"sequence_number":16}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" ","logprobs":[],"sequence_number":17}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":"100","logprobs":[],"sequence_number":18}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" pixels","logprobs":[],"sequence_number":19}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":".","logprobs":[],"sequence_number":20}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" It","logprobs":[],"sequence_number":21}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" is","logprobs":[],"sequence_number":22}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":" red","logprobs":[],"sequence_number":23}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"delta":".","logprobs":[],"sequence_number":24}
+
+data: {"type":"response.output_text.done","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"text":"I learned that the shape is a geometric circle with a diameter of 100 pixels. It is red.","logprobs":[],"sequence_number":25}
+
+data: {"type":"response.content_part.done","output_index":0,"item_id":"msg_tmp_ukk6ao99ns","content_index":0,"part":{"type":"output_text","text":"I learned that the shape is a geometric circle with a diameter of 100 pixels. It is red.","annotations":[],"logprobs":[]},"sequence_number":26}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_tmp_ukk6ao99ns","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"I learned that the shape is a geometric circle with a diameter of 100 pixels. It is red.","annotations":[],"logprobs":[]}],"phase":"final_answer"},"sequence_number":27}
+
+data: {"type":"response.completed","response":{"id":"gen-1791377865-OI06HfVlIMWWeC14geQg","object":"response","created_at":1791377865,"model":"openai/gpt-6-luna","status":"completed","completed_at":1791377868,"output":[{"id":"msg_tmp_ukk6ao99ns","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"I learned that the shape is a geometric circle with a diameter of 100 pixels. It is red.","annotations":[],"logprobs":[]}],"phase":"final_answer"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_circle_with_description","description":"Returns a circle image","strict":false,"parameters":{"additionalProperties":false,"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"detailed","context":"all_turns","effort":"medium","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":180,"input_tokens_details":{"cached_tokens":0},"output_tokens":25,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":205,"cost":0.0000305,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000305,"upstream_inference_input_cost":0.000018,"upstream_inference_output_cost":0.0000125}}},"sequence_number":28}
+
+data: [DONE]
+

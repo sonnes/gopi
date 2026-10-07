@@ -3,11 +3,11 @@ package anthropic
 import (
 	"encoding/base64"
 	"slices"
-	"strings"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
+	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -37,7 +37,7 @@ type convertConfig struct {
 // last or before an assistant message. The last block of the last user
 // or system message carries the cache marker.
 func convertMessages(messages []ai.Message, cfg convertConfig) []sdk.MessageParam {
-	messages = closeToolCalls(messages)
+	messages = transcript.CloseToolCalls(messages)
 
 	var out []sdk.MessageParam
 	var pending []sdk.MessageParam
@@ -65,10 +65,10 @@ func convertMessages(messages []ai.Message, cfg convertConfig) []sdk.MessagePara
 
 		switch msg.Role {
 		case ai.RoleSystem:
-			text := systemText(msg.Content)
+			text := transcript.SystemText(msg.Content)
 			if !cfg.systemMessages {
 				if text != "" {
-					reminders = append(reminders, sdk.NewTextBlock(systemReminder(text)))
+					reminders = append(reminders, sdk.NewTextBlock(transcript.Reminder(text)))
 				}
 			} else if blocks := systemBlocks(msg, text, cfg.toolChanges); len(blocks) > 0 {
 				pending = append(pending, rawMessage("system", blocks))
@@ -119,59 +119,6 @@ func convertMessages(messages []ai.Message, cfg convertConfig) []sdk.MessagePara
 	return out
 }
 
-// noResultText is the text of a tool result that the provider adds for
-// a call with no result. The text is the text of pi-mono.
-const noResultText = "No result provided"
-
-// closeToolCalls adds an error result for each tool call with no result.
-// The API rejects a tool_use without its tool_result, and a call loses
-// its result when a user message interrupts the tools or the
-// conversation stops. The added results go after the last result of
-// the calls, so they join the same user message.
-func closeToolCalls(messages []ai.Message) []ai.Message {
-	var out []ai.Message
-	var open []ai.ToolCall
-	answered := map[string]bool{}
-	insertAt := 0
-
-	closeCalls := func() {
-		var added []ai.Message
-		for _, call := range open {
-			if answered[call.ID] {
-				continue
-			}
-			result := ai.ToolResultMessage(call.ID, ai.Text{Text: noResultText})
-			result.IsError = true
-			added = append(added, result)
-		}
-		out = slices.Insert(out, insertAt, added...)
-		open = nil
-		answered = map[string]bool{}
-	}
-
-	for _, msg := range messages {
-		switch msg.Role {
-		case ai.RoleAssistant:
-			closeCalls()
-			out = append(out, msg)
-			open = msg.ToolCalls()
-			insertAt = len(out)
-		case ai.RoleUser:
-			closeCalls()
-			out = append(out, msg)
-		case ai.RoleToolResult:
-			answered[msg.ToolCallID] = true
-			out = append(out, msg)
-			insertAt = len(out)
-		default:
-			out = append(out, msg)
-		}
-	}
-	closeCalls()
-
-	return out
-}
-
 // isUserMessage reports if m is a user message that the SDK built. A
 // raw message is a system message.
 func isUserMessage(m sdk.MessageParam) bool {
@@ -219,38 +166,6 @@ func rawMessage(role string, blocks []any) sdk.MessageParam {
 // inlineToolsBeta is the beta of the API that reads tool_addition and
 // tool_removal blocks in a system message.
 const inlineToolsBeta = "inline-tools-2026-09-15"
-
-// systemSep joins the parts of the text of a system message.
-const systemSep = "\n\n"
-
-// systemText returns the text of a system message, with the parts
-// joined by a blank line. A [ai.Text] block goes as it is. A
-// [ai.Section] or [ai.SectionRemoved] block goes with a frame that names
-// the section, so the model can relate it to the system prompt. The
-// frame needs no state of earlier sections. The text of the frame is
-// the text of pi-mono.
-func systemText(content []ai.Content) string {
-	var parts []string
-	for _, c := range content {
-		switch v := c.(type) {
-		case ai.Text:
-			parts = append(parts, v.Text)
-		case ai.Section:
-			parts = append(parts, `Updated system prompt section "`+v.Name+`":`+systemSep+v.Text)
-		case ai.SectionRemoved:
-			parts = append(parts, `Removed system prompt section "`+v.Name+`".`)
-		}
-	}
-	parts = slices.DeleteFunc(parts, func(p string) bool { return p == "" })
-	return strings.Join(parts, systemSep)
-}
-
-// systemReminder wraps the text of a system message for a model that
-// takes no system messages. The system prompt does not change, so its
-// cache stays.
-func systemReminder(text string) string {
-	return "<system-reminder>\n" + text + "\n</system-reminder>"
-}
 
 // systemBlocks returns the blocks of a system message: text first, then
 // the tool changes if toolChanges is true. A tool_addition replaces a

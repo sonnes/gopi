@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/stretchr/testify/assert"
@@ -138,24 +137,6 @@ func TestStreamText_RetryDelayCap(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "retry")
 	assert.Equal(t, int32(1), api.calls.Load(), "a wait over the cap fails at once")
-}
-
-func TestRetryDelay(t *testing.T) {
-	header := func(k, v string) http.Header {
-		h := http.Header{}
-		h.Set(k, v)
-		return h
-	}
-
-	assert.Equal(t, 250*time.Millisecond, serverDelay(header("retry-after-ms", "250")))
-	assert.Equal(t, 3*time.Second, serverDelay(header("retry-after", "3")))
-	assert.Zero(t, serverDelay(http.Header{}))
-
-	for i := range 6 {
-		d := backoff(i)
-		assert.LessOrEqual(t, d, maxBackoff)
-		assert.Positive(t, d)
-	}
 }
 
 func TestStreamText_Headers(t *testing.T) {

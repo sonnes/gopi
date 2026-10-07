@@ -1,0 +1,93 @@
+httprr trace v1
+792 5019
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 625
+Content-Type: application/json
+
+{"messages":[{"content":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","role":"system"},{"content":"Please calculate 25 * 18 using the calculate tool.","role":"user"}],"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"tools":[{"function":{"name":"calculate","description":"Evaluate a mathematical expression","parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}},"type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d1a59d89bf399-MAA
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 13:02:55 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=1VH75TJox37QKk.ho0bNQAHnWvsQdMPPGyafymTLk_0-1791378175.0171175-1.0.1.1-.SNTCxeFLS8vJ4rJ6KQ55Iz2vC7GVvUAPTL8XPPTu2AzNJ9hso9NNnFmExIh4hIFnuxw_G_Z9symWKJPydAoyoqk.ns_9dYA5j6h8QmEEVWqVJOTowWVFSGY6EO28vtD; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:32:55 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378175-osHYYsTARD63KLiBVuyf
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"id":"call_mPMVexuvteb4kHFombtvHVB0","type":"function","function":{"name":"calculate","arguments":""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"{\""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"expression"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"\":\""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"25"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"*"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"18"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"\"}"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"tool_calls","native_finish_reason":"completed"}]}
+
+data: {"id":"gen-1791378175-osHYYsTARD63KLiBVuyf","object":"chat.completion.chunk","created":1791378175,"model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"tool_calls","native_finish_reason":"completed"}],"usage":{"prompt_tokens":79,"completion_tokens":19,"total_tokens":98,"cost":0.0000174,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"cost_details":{"upstream_inference_cost":0.0000174,"upstream_inference_prompt_cost":0.0000079,"upstream_inference_completions_cost":0.0000095},"completion_tokens_details":{"reasoning_tokens":0,"image_tokens":0,"audio_tokens":0}}}
+
+data: [DONE]
+
+1118 5018
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 951
+Content-Type: application/json
+
+{"messages":[{"content":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","role":"system"},{"content":"Please calculate 25 * 18 using the calculate tool.","role":"user"},{"tool_calls":[{"id":"call_mPMVexuvteb4kHFombtvHVB0","function":{"arguments":"{\"expression\":\"25*18\"}","name":"calculate"},"type":"function"}],"role":"assistant"},{"content":"No result provided","tool_call_id":"call_mPMVexuvteb4kHFombtvHVB0","role":"tool"},{"content":"Never mind, just tell me what is 2+2?","role":"user"}],"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"tools":[{"function":{"name":"calculate","description":"Evaluate a mathematical expression","parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}},"type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d1a60bc1bf399-MAA
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 13:02:56 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=e7qFvtjJKZovmttmwTr8TeDZQFVgW5miiTUxdMfP7uk-1791378176.111409-1.0.1.1-keQBelk75NXyvA.MmCXbLaPpIU9OAbzRyFnQeOVi1vQGd7HjzJ9JXX17hkjo3ke9RivlD4wdRTsTTaJqwAzuT7vcBlH7EXqicwjgXDGzFj3eEZrGRsAofCWrSvite7HM; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:32:56 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378176-idVPHuUuXW01zbt1yTKx
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"id":"call_hDRn5gzHcjBUg89GB8bWCZXl","type":"function","function":{"name":"calculate","arguments":""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"{\""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"expression"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"\":\""}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"2"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"+"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"2"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":null,"role":"assistant","tool_calls":[{"index":0,"function":{"arguments":"\"}"}}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"tool_calls","native_finish_reason":"completed"}]}
+
+data: {"id":"gen-1791378176-idVPHuUuXW01zbt1yTKx","object":"chat.completion.chunk","created":1791378176,"model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"tool_calls","native_finish_reason":"completed"}],"usage":{"prompt_tokens":128,"completion_tokens":19,"total_tokens":147,"cost":0.0000223,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"cost_details":{"upstream_inference_cost":0.0000223,"upstream_inference_prompt_cost":0.0000128,"upstream_inference_completions_cost":0.0000095},"completion_tokens_details":{"reasoning_tokens":0,"image_tokens":0,"audio_tokens":0}}}
+
+data: [DONE]
+

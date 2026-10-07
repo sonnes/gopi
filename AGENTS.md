@@ -5,6 +5,7 @@ gopi is a Go SDK for building AI agents.
 ## Project Map
 
 - `pkg/` - the SDK. One directory per package. Each provider under `pkg/ai/` is its own module, and `go.work` joins the modules.
+- `internal/` - the code that every provider shares: the retry loop, the message rules, and the test cases.
 - `cmd/gopi/` - the CLI, a test drive of the SDK. Build output goes to `.bin/`.
 - `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout.
 - `.claude/rules/` - path-scoped rules for Go code, tests, and `docs/`

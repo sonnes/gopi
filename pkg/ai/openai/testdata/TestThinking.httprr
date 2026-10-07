@@ -1,0 +1,251 @@
+httprr trace v1
+452 30361
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 292
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"How many r's are in strawberry? Think it through.","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"effort":"high","summary":"auto"},"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a3f9a161b972d85b-BOM
+Content-Type: text/event-stream
+Date: Wed, 23 Sep 2026 12:42:39 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=e4uK7am9VzZJ1zr.TVx12sSfDCRvFPOgCDsaKPKjTqE-1790167357.7119815-1.0.1.1-3O9E8vDOQJEPz0EnbSdZp9kZOTV9e8fGAuE3b1dPIGBYzaljrICkC68LJFujxuCWLvFjSj50wpkAakVY5wozN7h9PEiF_kGYbVrbqiAbL1lRetktP56EIjQcRGRzQwLB; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 23 Sep 2026 13:12:39 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1790167357-DKi5PjxDiGOj88IdMAal
+
+data: {"type":"response.created","response":{"id":"gen-1790167357-DKi5PjxDiGOj88IdMAal","object":"response","created_at":1790167357,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"high","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1790167357-DKi5PjxDiGOj88IdMAal","object":"response","created_at":1790167357,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"high","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","type":"reasoning","status":"in_progress","summary":[]},"sequence_number":2}
+
+data: {"type":"response.reasoning_summary_part.added","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"part":{"type":"summary_text","text":""},"sequence_number":3}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"**Counting letters in strawberry**\n\nI","sequence_number":4}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" need","sequence_number":5}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" to","sequence_number":6}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" count","sequence_number":7}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" the","sequence_number":8}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" letters","sequence_number":9}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" in","sequence_number":10}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" \"","sequence_number":11}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"st","sequence_number":12}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"raw","sequence_number":13}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"berry","sequence_number":14}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":".\"","sequence_number":15}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" When","sequence_number":16}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" I","sequence_number":17}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" look","sequence_number":18}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" closely","sequence_number":19}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":",","sequence_number":20}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" I","sequence_number":21}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" see","sequence_number":22}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" it's","sequence_number":23}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" spelled","sequence_number":24}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" s","sequence_number":25}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-t","sequence_number":26}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-r","sequence_number":27}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-a","sequence_number":28}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-w","sequence_number":29}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-b","sequence_number":30}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-e","sequence_number":31}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-r","sequence_number":32}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-r","sequence_number":33}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"-y","sequence_number":34}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":".","sequence_number":35}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" Oh","sequence_number":36}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":",","sequence_number":37}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" there","sequence_number":38}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" are","sequence_number":39}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" indeed","sequence_number":40}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" three","sequence_number":41}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" r","sequence_number":42}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"'s","sequence_number":43}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" in","sequence_number":44}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" \"","sequence_number":45}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"st","sequence_number":46}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"raw","sequence_number":47}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"berry","sequence_number":48}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":".\"","sequence_number":49}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" So","sequence_number":50}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":",","sequence_number":51}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" my","sequence_number":52}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" answer","sequence_number":53}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" will","sequence_number":54}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" be","sequence_number":55}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" that","sequence_number":56}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" \"","sequence_number":57}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"st","sequence_number":58}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"raw","sequence_number":59}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"berry","sequence_number":60}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"\"","sequence_number":61}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" contains","sequence_number":62}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" 10","sequence_number":63}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" letters","sequence_number":64}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" in","sequence_number":65}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" total","sequence_number":66}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":",","sequence_number":67}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" and","sequence_number":68}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" I","sequence_number":69}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" want","sequence_number":70}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" to","sequence_number":71}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" keep","sequence_number":72}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" my","sequence_number":73}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" response","sequence_number":74}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" clear","sequence_number":75}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" and","sequence_number":76}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" concise","sequence_number":77}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":".","sequence_number":78}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" So","sequence_number":79}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" let's","sequence_number":80}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" make","sequence_number":81}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" sure","sequence_number":82}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" I","sequence_number":83}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" include","sequence_number":84}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" that","sequence_number":85}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" detail","sequence_number":86}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" in","sequence_number":87}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" the","sequence_number":88}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":" reply","sequence_number":89}
+
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"delta":"!","sequence_number":90}
+
+data: {"type":"response.reasoning_summary_text.done","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"text":"**Counting letters in strawberry**\n\nI need to count the letters in \"strawberry.\" When I look closely, I see it's spelled s-t-r-a-w-b-e-r-r-y. Oh, there are indeed three r's in \"strawberry.\" So, my answer will be that \"strawberry\" contains 10 letters in total, and I want to keep my response clear and concise. So let's make sure I include that detail in the reply!","sequence_number":91}
+
+data: {"type":"response.reasoning_summary_part.done","output_index":0,"item_id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","summary_index":0,"part":{"type":"summary_text","text":"**Counting letters in strawberry**\n\nI need to count the letters in \"strawberry.\" When I look closely, I see it's spelled s-t-r-a-w-b-e-r-r-y. Oh, there are indeed three r's in \"strawberry.\" So, my answer will be that \"strawberry\" contains 10 letters in total, and I want to keep my response clear and concise. So let's make sure I include that detail in the reply!"},"sequence_number":92}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"**Counting letters in strawberry**\n\nI need to count the letters in \"strawberry.\" When I look closely, I see it's spelled s-t-r-a-w-b-e-r-r-y. Oh, there are indeed three r's in \"strawberry.\" So, my answer will be that \"strawberry\" contains 10 letters in total, and I want to keep my response clear and concise. So let's make sure I include that detail in the reply!"}],"encrypted_content":"gAAAAABqs8lBlieQqKaess9dPeFMtckfZYqgj0LikUpfmczfBzm3ckMjLF8PlybPcHAlpdcgLsUoKLF36vbuAoV9S0wTREagYpi8seGE5ROfYt3R7kvkceCocn2gqowQUmhDYTXcI5DBDbHDoRlXS-qk2Tr0K_KZsiz_DA_E_ZArF7H9XP72rJ4dGSsmRsgqIuSeuN2me5BY9etyuqpCKtQgWM2DSztvA28nvZiYeFH04H-4stL43CJgEXO-eF0yMcGCy1WY6NK45sdwkB6DxmPYp7q3KwOv3TIW_TqTpoUoD3Sp862YoVvV-eKXP0xJhKGqEEPPVIttVmzEQVI_4hZMLpU0J6wSguygetxr0cYET5sG1L7-uiIlOErXsJIPac9wntloHletpF4Mk_zO-VudN32LERcFsG5kqTtD6Ut7av_F9l1LVaFVdintQPQcxLhlul1N-jd3X2RZny49gavB672NoxvvUQqaDktfMhqcUWt_I1P0HmYMbVUjHkKDurfUiA0GbAq4GoiMkHwPb0TcFmXQmCzFRwRkZr-N-UwCGqzAozrI9_nhfUtsOLszjNkLPD8eVYcEEEthVCwbUrWfY2EmMTwcv4jKHd5NivLhC_dYDINtXLo_50D_DKmkj75i2oBUjk1MjWAO4hcpOP1amAf2vpl1ICwRjjWu_L8F9EEDv3XxbFUjZMWAraSOmBxdglOv3qO-m3l_aL4pcgV1TWhIdDQl14xvVYg9naAgWUFJgDOdQhaYl1QsCaVWicJsr4gV-RQC77gr9cuGBt1W5_HHCZOTlJsiZZFaz0mDaVaofPI7PxQmT3GTYbU3jh7Dhs5OrT9hDxc2FBFV4GqsLLVv7JspYEbBfCrDdtvKtk8f_PfufMuBe4yVXmCTmTxnRnf-OAbmMJlqpwYUq2AX8ZvxmEz8XoVHwOckq1ldlrQ2lmMjFCoPAY_Ukw9l-taHBCP72l-TW4ia-3KOIAuR4yZZOjTcFbTSCIaGdQrpsUVBu23-l42F2uKnAzlNno3cA17YaTQ0Sk8cQV4cdhaUENyRPxSygj-vQrxSjiga6pBYy5H_4tTynX3MR3dJSdskKSuQxVBZsNvWkoN0K5FqRvvOx9WUZxg128rbzkZ5F_P_SJp4-e6rrCaAeTVoQMsIbOnrt1BrDx2Rto0vOANkRhoVw7hAUAff9P5irWUPUov4gTWEPAK0VqaMR_7W4FX9vO1n9WDM3YOxsGsFcXS1LGFfdMYieS5UcOk4I93HmIND5-Y5WH-WTDrIqgUlVsu-b4HlonsbRDlLWnyAvP4KvbJMvTDdlTrZb_creO2p2cqoS8VW0Xqs55vS7em2f9Ly0OJuXPW8D8s4NDRNwKeJ8a2CyWuKk85jqRU4_TsQslBPlKR0W2iTtDzbYqY3lwl1zgR0oHV5HjA0u-lIPT1mIcOnuK5QBhEBBBqwDwpnY7UQ_gQQyiXNzikyUPkmrQ6V-rSskHZyMtaqyz4gdqJSlWBxdtlo_k46eo8RLBy_w3ingmxDPUzAyY6qWWPtK29_8kVE-mEUkJYysYuq0LYYXjXSydMDLH2PrhH_an7rbLl9j8tIeTkRxiFYp-ft9cUcEuu-QURgUgHCLfElnRtjxCfxwFep_9V4cQPVZ6EmVCq0vrcwPe3ixDxvmcxaV3jL_e_zpZArrQt3krKevpd1Hemm0kDhHw==.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1"},"sequence_number":93}
+
+data: {"type":"response.output_item.added","output_index":1,"item":{"id":"msg_tmp_fyeg5z72jf8","type":"message","status":"in_progress","role":"assistant","content":[],"phase":"final_answer"},"sequence_number":94}
+
+data: {"type":"response.content_part.added","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"part":{"type":"output_text","text":"","annotations":[],"logprobs":[]},"sequence_number":95}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"There","logprobs":[],"sequence_number":96}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":" are","logprobs":[],"sequence_number":97}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":" **","logprobs":[],"sequence_number":98}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"3","logprobs":[],"sequence_number":99}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"**","logprobs":[],"sequence_number":100}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":" r","logprobs":[],"sequence_number":101}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"’s","logprobs":[],"sequence_number":102}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":" in","logprobs":[],"sequence_number":103}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":" “","logprobs":[],"sequence_number":104}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"st","logprobs":[],"sequence_number":105}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"raw","logprobs":[],"sequence_number":106}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":"berry","logprobs":[],"sequence_number":107}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"delta":".”","logprobs":[],"sequence_number":108}
+
+data: {"type":"response.output_text.done","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"text":"There are **3** r’s in “strawberry.”","logprobs":[],"sequence_number":109}
+
+data: {"type":"response.content_part.done","output_index":1,"item_id":"msg_tmp_fyeg5z72jf8","content_index":0,"part":{"type":"output_text","text":"There are **3** r’s in “strawberry.”","annotations":[],"logprobs":[]},"sequence_number":110}
+
+data: {"type":"response.output_item.done","output_index":1,"item":{"id":"msg_tmp_fyeg5z72jf8","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"There are **3** r’s in “strawberry.”","annotations":[],"logprobs":[]}],"phase":"final_answer"},"sequence_number":111}
+
+data: {"type":"response.completed","response":{"id":"gen-1790167357-DKi5PjxDiGOj88IdMAal","object":"response","created_at":1790167357,"model":"openai/gpt-6-luna","status":"completed","completed_at":1790167361,"output":[{"id":"rs_0595da771a22dd36016ab3c93fa3f087d18be59b91c23cee44","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"**Counting letters in strawberry**\n\nI need to count the letters in \"strawberry.\" When I look closely, I see it's spelled s-t-r-a-w-b-e-r-r-y. Oh, there are indeed three r's in \"strawberry.\" So, my answer will be that \"strawberry\" contains 10 letters in total, and I want to keep my response clear and concise. So let's make sure I include that detail in the reply!"}],"encrypted_content":"gAAAAABqs8lBlieQqKaess9dPeFMtckfZYqgj0LikUpfmczfBzm3ckMjLF8PlybPcHAlpdcgLsUoKLF36vbuAoV9S0wTREagYpi8seGE5ROfYt3R7kvkceCocn2gqowQUmhDYTXcI5DBDbHDoRlXS-qk2Tr0K_KZsiz_DA_E_ZArF7H9XP72rJ4dGSsmRsgqIuSeuN2me5BY9etyuqpCKtQgWM2DSztvA28nvZiYeFH04H-4stL43CJgEXO-eF0yMcGCy1WY6NK45sdwkB6DxmPYp7q3KwOv3TIW_TqTpoUoD3Sp862YoVvV-eKXP0xJhKGqEEPPVIttVmzEQVI_4hZMLpU0J6wSguygetxr0cYET5sG1L7-uiIlOErXsJIPac9wntloHletpF4Mk_zO-VudN32LERcFsG5kqTtD6Ut7av_F9l1LVaFVdintQPQcxLhlul1N-jd3X2RZny49gavB672NoxvvUQqaDktfMhqcUWt_I1P0HmYMbVUjHkKDurfUiA0GbAq4GoiMkHwPb0TcFmXQmCzFRwRkZr-N-UwCGqzAozrI9_nhfUtsOLszjNkLPD8eVYcEEEthVCwbUrWfY2EmMTwcv4jKHd5NivLhC_dYDINtXLo_50D_DKmkj75i2oBUjk1MjWAO4hcpOP1amAf2vpl1ICwRjjWu_L8F9EEDv3XxbFUjZMWAraSOmBxdglOv3qO-m3l_aL4pcgV1TWhIdDQl14xvVYg9naAgWUFJgDOdQhaYl1QsCaVWicJsr4gV-RQC77gr9cuGBt1W5_HHCZOTlJsiZZFaz0mDaVaofPI7PxQmT3GTYbU3jh7Dhs5OrT9hDxc2FBFV4GqsLLVv7JspYEbBfCrDdtvKtk8f_PfufMuBe4yVXmCTmTxnRnf-OAbmMJlqpwYUq2AX8ZvxmEz8XoVHwOckq1ldlrQ2lmMjFCoPAY_Ukw9l-taHBCP72l-TW4ia-3KOIAuR4yZZOjTcFbTSCIaGdQrpsUVBu23-l42F2uKnAzlNno3cA17YaTQ0Sk8cQV4cdhaUENyRPxSygj-vQrxSjiga6pBYy5H_4tTynX3MR3dJSdskKSuQxVBZsNvWkoN0K5FqRvvOx9WUZxg128rbzkZ5F_P_SJp4-e6rrCaAeTVoQMsIbOnrt1BrDx2Rto0vOANkRhoVw7hAUAff9P5irWUPUov4gTWEPAK0VqaMR_7W4FX9vO1n9WDM3YOxsGsFcXS1LGFfdMYieS5UcOk4I93HmIND5-Y5WH-WTDrIqgUlVsu-b4HlonsbRDlLWnyAvP4KvbJMvTDdlTrZb_creO2p2cqoS8VW0Xqs55vS7em2f9Ly0OJuXPW8D8s4NDRNwKeJ8a2CyWuKk85jqRU4_TsQslBPlKR0W2iTtDzbYqY3lwl1zgR0oHV5HjA0u-lIPT1mIcOnuK5QBhEBBBqwDwpnY7UQ_gQQyiXNzikyUPkmrQ6V-rSskHZyMtaqyz4gdqJSlWBxdtlo_k46eo8RLBy_w3ingmxDPUzAyY6qWWPtK29_8kVE-mEUkJYysYuq0LYYXjXSydMDLH2PrhH_an7rbLl9j8tIeTkRxiFYp-ft9cUcEuu-QURgUgHCLfElnRtjxCfxwFep_9V4cQPVZ6EmVCq0vrcwPe3ixDxvmcxaV3jL_e_zpZArrQt3krKevpd1Hemm0kDhHw==.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1"},{"id":"msg_tmp_fyeg5z72jf8","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"There are **3** r’s in “strawberry.”","annotations":[],"logprobs":[]}],"phase":"final_answer"}],"error":null,"incomplete_details":null,"tools":[],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"high","summary":"detailed","context":"all_turns","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":18,"input_tokens_details":{"cached_tokens":0},"output_tokens":93,"output_tokens_details":{"reasoning_tokens":74},"total_tokens":111,"cost":0.0000483,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000483,"upstream_inference_input_cost":0.0000018,"upstream_inference_output_cost":0.0000465}}},"sequence_number":112}
+
+data: [DONE]
+

@@ -1,0 +1,43 @@
+httprr trace v1
+1033 5530
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 866
+Content-Type: application/json
+
+{"messages":[{"content":"You are a helpful assistant.","role":"system"},{"content":"Use the test tool","role":"user"},{"tool_calls":[{"id":"test_1","function":{"arguments":"{}","name":"linkedin_skill"},"type":"function"}],"role":"assistant"},{"content":"Post: Hab einen \"Generative KI für Nicht-Techniker\" Workshop gebaut.\nComments: [{\"author\": \"Mario Zechner\", \"text\": \"Wann? Wo? Bin grad äußersr eventuninformiert 🙈\"},\n{\"author\": \"Anna\", \"text\": \"Klingt spannend! 👍\"}]","tool_call_id":"test_1","role":"tool"},{"content":"How many comments are there?","role":"user"}],"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"tools":[{"function":{"name":"linkedin_skill","description":"A test tool","parameters":{"additionalProperties":false,"type":"object"}},"type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d1a7abe67f399-MAA
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 13:03:00 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=1xz1u2z74glq9ANsKZ1MERtktwb.2JAMl8Oa7fhbYco-1791378180.2724123-1.0.1.1-e0MsCkJ847yY1T5IlrmrhRxR8g2qkW0KbLW4SQ61cDhyeOO6EeWqkiUl2ir89GGglksuNjyp_dfafBMug2YP5dPxo9rxa0DoLPhcijTrNSe_lPBjtQjpdzlGjNsjaRm6; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:33:00 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378180-Ed3NOFrazEeiI8B031Nm
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null,"reasoning_details":[{"type":"reasoning.encrypted","data":"gAAAAABqxkMFCzaWkOmJLVe767mDMz80CtaxhgrvVeBumSbY-62Onuhw3hL0_PZIH0KZ2SEr7scVQBkoMOcfNTaezvw3dpVuIdqI1p1W_6JVAkBzWIiVgnaX3sryq_oE3YsVdgani6Iwrr5TSt0D4L2y5SnLJTUONFBLxDd_-rT3UeOM-y0z0Ls7S5IBXt2WyyiwHr_keJZpu9JP62bRR40VZYuQlR-106Ze3Sp8rKlbfXMlDPVdJLnTByeDkRd-ullni6KH4K4s-7Wqs6MKsPZnWOML25x608ojNY_nJaQABfbr1K0dCcMQV5eemNSREAcyPptgEu49x0HuvnRz17isysPKutga49AYy7x5PBDsMZ7wxcMWZ98PDl5luu0wP84iF104flvxlbne95HI7DFvX0Tnvak___-gzOst0jGYYUZgGkWghKrbr-3L6ZTMy_dbByrrHJp23ab-b0yUrJf9slo3gF7PKuDIVhs6vkXaw85T6zE2iLPlfEPe-WQQMcvkpxMabKqgNRa0VFvGZPHg7ZxCuTfuj74u39zBwdOH0PRz0_daljAJzMh33o7mvjlbbfN1XJD0HhTjDisaVFeY0Jjnl6dXHVeU7kkzuHuhV_1xIdoCBYLhk6rbuDTtcQ4Lw08M3MnPTU3vH6ZQdH_HjUYDfz6Pz0MLlWHu8itBZeTDa6ekRu7j_1E2JbZ7foeBBlux8z0EHcHXIwjyh8lYhBEFFoP-GBUwDsUnS6mO0ZuLiGP-YbBFyXwKwpE9DOfgPXaoBOsdXXnWyBphIFygrAksnhuKsruckMuLsPcf18adB1Y389UtBTdRxHPhigLGlK1RaGKBJqrpBBWG--LMMvg9Z648hSnU8VAXffPz6jMf7brRiCkbwB0B-dOzxXNKxsFG2jGobON8dkotymLezNoPJ8KWmajHfQTx6sQp2yNIOlqTqKWKHy4Vhoiza1Vu1eQs6UQR7vaeCMKRk3maim-V182rZo_IHU9DxVC7_ELHBHY1dZXb730BOzYLwirhupZJuY5TDQ_CcUksRzcxaGGiTFNpAOCLwk2ZQyXgvznGpBPkJ3Uv8EcPMGAGkOFdfPSV5mBCUe6GU5sL_6jKHbVfxUNpwwWF-rdHZJXU94sWCHk9K7bhAFunUnGm57ta4oT9CxK5pIXlpzfKhnZiB360HOEFZTKuAzbCGtGvJdAFu_EYVYgNcm9DXjbloXgZwtwDTbTTHlQiFFOIbwVGxZMoiziAGgSzpYoo67oYycDElJECzUX8xRxbBDSczkgTYr-EDqEQTkNwmxvuN5fko0aLpq1GwHZGxV9gUZI_ccmXxy9coB1sWEa8TCaa-vsKctjG8JQ3YH_xw6WAKoRFOuGfP90ZhQ==.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1","id":"rs_07e75473e858a22a016ac64305532087d1b2576bb6d89f9817","index":0}]},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"There","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" are","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" ","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"2","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":" comments","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":".","role":"assistant"},"finish_reason":null,"native_finish_reason":null}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","choices":[{"index":0,"delta":{"content":"","role":"assistant","reasoning":null},"finish_reason":"stop","native_finish_reason":"completed"}]}
+
+data: {"id":"gen-1791378180-Ed3NOFrazEeiI8B031Nm","object":"chat.completion.chunk","created":1791378180,"model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default","choices":[{"index":0,"delta":{"content":"","role":"assistant"},"finish_reason":"stop","native_finish_reason":"completed"}],"usage":{"prompt_tokens":147,"completion_tokens":21,"total_tokens":168,"cost":0.0000252,"is_byok":false,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0,"audio_tokens":0,"video_tokens":0},"cost_details":{"upstream_inference_cost":0.0000252,"upstream_inference_prompt_cost":0.0000147,"upstream_inference_completions_cost":0.0000105},"completion_tokens_details":{"reasoning_tokens":9,"image_tokens":0,"audio_tokens":0}}}
+
+data: [DONE]
+

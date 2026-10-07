@@ -34,6 +34,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -339,7 +340,7 @@ func (p *Provider) StreamText(
 			}
 		}
 
-		stream, err := p.openStream(ctx, req.params, retryPolicyOf(opts), reqOpts)
+		stream, err := p.openStream(ctx, req.params, retry.PolicyOf(opts), reqOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -403,7 +404,7 @@ func (p *Provider) GenerateObject(
 	stream, err := p.openStream(
 		ctx,
 		req.params,
-		retryPolicyOf(opts),
+		retry.PolicyOf(opts),
 		requestOptions(req.betas, opts),
 	)
 	if err != nil {

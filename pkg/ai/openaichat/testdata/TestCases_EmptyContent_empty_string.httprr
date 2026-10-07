@@ -1,0 +1,23 @@
+httprr trace v1
+281 1058
+POST https://api.openai.com/v1/chat/completions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 114
+Content-Type: application/json
+
+{"model":"openai/gpt-6-luna","max_completion_tokens":128000,"stream_options":{"include_usage":true},"stream":true}HTTP/2.0 400 Bad Request
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cf-Ray: a46d19fbccbef399-MAA
+Content-Type: application/json
+Date: Wed, 07 Oct 2026 13:02:39 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=M8dbObbkTrC46hwZ2ohvNxL7yEZHNpSg8tqXEv03Ks0-1791378159.9623148-1.0.1.1-qCoCz2Ihl3y45ZCw5qJ7fqcH2fg8wOQZ1mG0.OHehsQIoA18J2U2.ciutf72V.YHM6nK3zZcDxlzLUe2b0rQtsFXT0izDX87WrFfWNRclnMPMACiyWk4c5AgBXIDoMO4; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:32:39 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791378159-qqvyYCDLgHPb7xwcAg7F
+
+{"error":{"message":"Input required: specify \"prompt\" or \"messages\"","code":400},"user_id":"user_3AVjBgxrrbL5Bi0gauvEtDZodXt"}

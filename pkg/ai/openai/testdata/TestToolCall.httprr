@@ -1,0 +1,47 @@
+httprr trace v1
+871 5987
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 711
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"Use the get_weather tool to answer questions about the weather.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"What is the weather in Paris?","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"effort":"low","summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"},"name":"get_weather","description":"Get the current weather in a city","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a3f9a124ad17d85b-BOM
+Content-Type: text/event-stream
+Date: Wed, 23 Sep 2026 12:42:28 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=W9U2tHQ7_zHOmYNHMmu.1e2hl1stJKs_C_jzG5d5vWk-1790167347.950017-1.0.1.1-jeNKPybA_AlUVJei.FN.l4kcYGRSO1a4XpJL5R4OtPfZtZlzJCQfhho_EEJyemA3AIMsT12oN8s5SWdZxzqDEH6g0KpAEVMML9gXXqu1idzgh0w6d_mXFiR.mjzcuVcW; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 23 Sep 2026 13:12:28 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1790167347-2QZMO9z0Ki2LI9W7iZgp
+
+data: {"type":"response.created","response":{"id":"gen-1790167347-2QZMO9z0Ki2LI9W7iZgp","object":"response","created_at":1790167347,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1790167347-2QZMO9z0Ki2LI9W7iZgp","object":"response","created_at":1790167347,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_tmp_uzs57roxoao","type":"function_call","status":"in_progress","call_id":"call_gwO85iaDjBYM9jtyuMCnOvKl","name":"get_weather","arguments":""},"sequence_number":2}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_uzs57roxoao","delta":"{\"","sequence_number":3}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_uzs57roxoao","delta":"city","sequence_number":4}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_uzs57roxoao","delta":"\":\"","sequence_number":5}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_uzs57roxoao","delta":"Paris","sequence_number":6}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_uzs57roxoao","delta":"\"}","sequence_number":7}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_tmp_uzs57roxoao","name":"get_weather","arguments":"{\"city\":\"Paris\"}","sequence_number":8}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_tmp_uzs57roxoao","type":"function_call","status":"completed","call_id":"call_gwO85iaDjBYM9jtyuMCnOvKl","name":"get_weather","arguments":"{\"city\":\"Paris\"}"},"sequence_number":9}
+
+data: {"type":"response.completed","response":{"id":"gen-1790167347-2QZMO9z0Ki2LI9W7iZgp","object":"response","created_at":1790167347,"model":"openai/gpt-6-luna","status":"completed","completed_at":1790167349,"output":[{"id":"fc_tmp_uzs57roxoao","type":"function_call","status":"completed","call_id":"call_gwO85iaDjBYM9jtyuMCnOvKl","name":"get_weather","arguments":"{\"city\":\"Paris\"}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"detailed","context":"all_turns","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":72,"input_tokens_details":{"cached_tokens":0},"output_tokens":18,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":90,"cost":0.0000162,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000162,"upstream_inference_input_cost":0.0000072,"upstream_inference_output_cost":0.000009}}},"sequence_number":10}
+
+data: [DONE]
+

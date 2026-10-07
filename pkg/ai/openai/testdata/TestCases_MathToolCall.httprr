@@ -1,0 +1,63 @@
+httprr trace v1
+861 7634
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 701
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"Calculate 15 + 27 using the math_operation tool.","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"a":{"description":"The first number","type":"number"},"b":{"description":"The second number","type":"number"},"operation":{"description":"One of add, subtract, multiply, divide","type":"string"}},"required":["a","b","operation"],"type":"object"},"name":"math_operation","description":"Perform a basic arithmetic operation","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a46d127348c33d3f-BOM
+Content-Type: text/event-stream
+Date: Wed, 07 Oct 2026 12:57:32 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=hO3vVhATdqlxzPHd96VkY5Dr04Zs94Cyz9EtP20RKSE-1791377851.4070768-1.0.1.1-A8F4Sf0NGZHqnhvacgEcxsU.0jbKYXRt7gQyptx71VYsWnZB2IhV1KggnRYQT29NN.anjtUHEPXcXGWsJfEi6WZ_vM1jNXQQD84pzoDRE6VGgN15LuD7FGI1kW_wLnag; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:32 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1791377851-qHuKiaNaHYbpG2L8440a
+
+data: {"type":"response.created","response":{"id":"gen-1791377851-qHuKiaNaHYbpG2L8440a","object":"response","created_at":1791377851,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"math_operation","description":"Perform a basic arithmetic operation","strict":false,"parameters":{"additionalProperties":false,"properties":{"a":{"description":"The first number","type":"number"},"b":{"description":"The second number","type":"number"},"operation":{"description":"One of add, subtract, multiply, divide","type":"string"}},"required":["a","b","operation"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1791377851-qHuKiaNaHYbpG2L8440a","object":"response","created_at":1791377851,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"math_operation","description":"Perform a basic arithmetic operation","strict":false,"parameters":{"additionalProperties":false,"properties":{"a":{"description":"The first number","type":"number"},"b":{"description":"The second number","type":"number"},"operation":{"description":"One of add, subtract, multiply, divide","type":"string"}},"required":["a","b","operation"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_tmp_9rzf5c7rpa7","type":"function_call","status":"in_progress","call_id":"call_hJkGH0rzJ24I2d5Uxdz0BzGN","name":"math_operation","arguments":""},"sequence_number":2}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"{\"","sequence_number":3}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"a","sequence_number":4}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"\":","sequence_number":5}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"15","sequence_number":6}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":",\"","sequence_number":7}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"b","sequence_number":8}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"\":","sequence_number":9}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"27","sequence_number":10}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":",\"","sequence_number":11}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"operation","sequence_number":12}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"\":\"","sequence_number":13}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"add","sequence_number":14}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","delta":"\"}","sequence_number":15}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_tmp_9rzf5c7rpa7","name":"math_operation","arguments":"{\"a\":15,\"b\":27,\"operation\":\"add\"}","sequence_number":16}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_tmp_9rzf5c7rpa7","type":"function_call","status":"completed","call_id":"call_hJkGH0rzJ24I2d5Uxdz0BzGN","name":"math_operation","arguments":"{\"a\":15,\"b\":27,\"operation\":\"add\"}"},"sequence_number":17}
+
+data: {"type":"response.completed","response":{"id":"gen-1791377851-qHuKiaNaHYbpG2L8440a","object":"response","created_at":1791377851,"model":"openai/gpt-6-luna","status":"completed","completed_at":1791377852,"output":[{"id":"fc_tmp_9rzf5c7rpa7","type":"function_call","status":"completed","call_id":"call_hJkGH0rzJ24I2d5Uxdz0BzGN","name":"math_operation","arguments":"{\"a\":15,\"b\":27,\"operation\":\"add\"}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"math_operation","description":"Perform a basic arithmetic operation","strict":false,"parameters":{"additionalProperties":false,"properties":{"a":{"description":"The first number","type":"number"},"b":{"description":"The second number","type":"number"},"operation":{"description":"One of add, subtract, multiply, divide","type":"string"}},"required":["a","b","operation"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"detailed","context":"all_turns","effort":"medium","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":81,"input_tokens_details":{"cached_tokens":0},"output_tokens":26,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":107,"cost":0.0000211,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000211,"upstream_inference_input_cost":0.0000081,"upstream_inference_output_cost":0.000013}}},"sequence_number":18}
+
+data: [DONE]
+

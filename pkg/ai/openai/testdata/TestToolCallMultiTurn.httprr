@@ -1,0 +1,107 @@
+httprr trace v1
+871 5988
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 711
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"Use the get_weather tool to answer questions about the weather.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"What is the weather in Paris?","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"effort":"low","summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"},"name":"get_weather","description":"Get the current weather in a city","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a3f9a3d67b5a79f5-HYD
+Content-Type: text/event-stream
+Date: Wed, 23 Sep 2026 12:44:20 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=5y1epT42tnxSfJIdt_i39Vq4WQvB_J3tLnbzLfUN0bA-1790167458.3174963-1.0.1.1-xPZ_t.McWTXY0kgwHA4WAPmyXocHfsra51xu5LO3zTmzbiAkI8q8HIIwBmVD9qsrdyA5E2XrjeCwZRW1fie6AE7H8kLqV7P33iiAt7hT3sPaIXRfbPGwiwseZkEAeiHb; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 23 Sep 2026 13:14:20 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1790167458-44Ae9xAAIKKKqiBIPRJM
+
+data: {"type":"response.created","response":{"id":"gen-1790167458-44Ae9xAAIKKKqiBIPRJM","object":"response","created_at":1790167458,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1790167458-44Ae9xAAIKKKqiBIPRJM","object":"response","created_at":1790167458,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_tmp_w3y7t6i64br","type":"function_call","status":"in_progress","call_id":"call_04Ht4FARnm6zFealIH86yrU7","name":"get_weather","arguments":""},"sequence_number":2}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","delta":"{\"","sequence_number":3}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","delta":"city","sequence_number":4}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","delta":"\":\"","sequence_number":5}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","delta":"Paris","sequence_number":6}
+
+data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","delta":"\"}","sequence_number":7}
+
+data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_tmp_w3y7t6i64br","name":"get_weather","arguments":"{\"city\":\"Paris\"}","sequence_number":8}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_tmp_w3y7t6i64br","type":"function_call","status":"completed","call_id":"call_04Ht4FARnm6zFealIH86yrU7","name":"get_weather","arguments":"{\"city\":\"Paris\"}"},"sequence_number":9}
+
+data: {"type":"response.completed","response":{"id":"gen-1790167458-44Ae9xAAIKKKqiBIPRJM","object":"response","created_at":1790167458,"model":"openai/gpt-6-luna","status":"completed","completed_at":1790167461,"output":[{"id":"fc_tmp_w3y7t6i64br","type":"function_call","status":"completed","call_id":"call_04Ht4FARnm6zFealIH86yrU7","name":"get_weather","arguments":"{\"city\":\"Paris\"}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"detailed","context":"all_turns","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":72,"input_tokens_details":{"cached_tokens":0},"output_tokens":18,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":90,"cost":0.0000162,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000162,"upstream_inference_input_cost":0.0000072,"upstream_inference_output_cost":0.000009}}},"sequence_number":10}
+
+data: [DONE]
+
+1099 7409
+POST https://api.openai.com/v1/responses HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 939
+Content-Type: application/json
+
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"Use the get_weather tool to answer questions about the weather.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"What is the weather in Paris?","type":"input_text"}],"role":"user"},{"arguments":"{\"city\":\"Paris\"}","call_id":"call_04Ht4FARnm6zFealIH86yrU7","name":"get_weather","type":"function_call"},{"output":"Sunny, 22C in Paris","call_id":"call_04Ht4FARnm6zFealIH86yrU7","type":"function_call_output"}],"model":"openai/gpt-6-luna","reasoning":{"effort":"low","summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"},"name":"get_weather","description":"Get the current weather in a city","type":"function"}],"stream":true}HTTP/2.0 200 OK
+Connection: close
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
+Cache-Control: no-cache
+Cf-Ray: a3f9a3e9999779f5-HYD
+Content-Type: text/event-stream
+Date: Wed, 23 Sep 2026 12:44:22 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Set-Cookie: __cf_bm=bVaN3GpyzWm1XHIgcKBfj_haDboMl74S8UBPPwYtbUA-1790167461.37918-1.0.1.1-yWCThPKfDtwQ0hUletXPj3RyZFc9Uv6TS9TaBw4d8xAnUnC_iLfY1m0qRp69vPUVT1CUND6zLDq2vBbGSLVtfDMwIKq3TfAxKBNxLJVifDD1q6WJu8PV_rFo5L7AAkVg; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 23 Sep 2026 13:14:22 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-1790167461-1UZpFkmZFD07vGc198r4
+
+data: {"type":"response.created","response":{"id":"gen-1790167461-1UZpFkmZFD07vGc198r4","object":"response","created_at":1790167461,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+
+data: {"type":"response.in_progress","response":{"id":"gen-1790167461-1UZpFkmZFD07vGc198r4","object":"response","created_at":1790167461,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_tmp_8hs4at3v82i","type":"message","status":"in_progress","role":"assistant","content":[],"phase":"final_answer"},"sequence_number":2}
+
+data: {"type":"response.content_part.added","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"part":{"type":"output_text","text":"","annotations":[],"logprobs":[]},"sequence_number":3}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":"It","logprobs":[],"sequence_number":4}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":"’s","logprobs":[],"sequence_number":5}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":" sunny","logprobs":[],"sequence_number":6}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":" and","logprobs":[],"sequence_number":7}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":" ","logprobs":[],"sequence_number":8}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":"22","logprobs":[],"sequence_number":9}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":"°C","logprobs":[],"sequence_number":10}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":" in","logprobs":[],"sequence_number":11}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":" Paris","logprobs":[],"sequence_number":12}
+
+data: {"type":"response.output_text.delta","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"delta":".","logprobs":[],"sequence_number":13}
+
+data: {"type":"response.output_text.done","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"text":"It’s sunny and 22°C in Paris.","logprobs":[],"sequence_number":14}
+
+data: {"type":"response.content_part.done","output_index":0,"item_id":"msg_tmp_8hs4at3v82i","content_index":0,"part":{"type":"output_text","text":"It’s sunny and 22°C in Paris.","annotations":[],"logprobs":[]},"sequence_number":15}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_tmp_8hs4at3v82i","type":"message","status":"completed","role":"assistant","content":[{"type":"output_text","text":"It’s sunny and 22°C in Paris.","annotations":[],"logprobs":[]}],"phase":"final_answer"},"sequence_number":16}
+
+data: {"type":"response.completed","response":{"id":"gen-1790167461-1UZpFkmZFD07vGc198r4","object":"response","created_at":1790167461,"model":"openai/gpt-6-luna","status":"completed","completed_at":1790167463,"output":[{"id":"msg_tmp_8hs4at3v82i","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"It’s sunny and 22°C in Paris.","annotations":[],"logprobs":[]}],"phase":"final_answer"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"get_weather","description":"Get the current weather in a city","strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"effort":"low","summary":"detailed","context":"all_turns","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":108,"input_tokens_details":{"cached_tokens":0},"output_tokens":14,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":122,"cost":0.0000178,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000178,"upstream_inference_input_cost":0.0000108,"upstream_inference_output_cost":0.000007}}},"sequence_number":17}
+
+data: [DONE]
+

@@ -3,7 +3,7 @@
 # MODULES lists the directory of each module. go.work joins them, but
 # ./... stops at the root of a nested module, so each target runs in
 # each module.
-MODULES := . pkg/ai/anthropic
+MODULES := . pkg/ai/anthropic pkg/ai/openai pkg/ai/openaichat
 
 # Run the tests. Pass flags to go test with ARGS, for example
 # `make test ARGS="-run TestStreamText -v"`. To test some packages only,
@@ -48,9 +48,17 @@ tidy:
 #               from OpenRouter. ANTHROPIC_BASE_URL selects another
 #               compatible API.
 #
-# Set RUN to record some tests only, for example RUN=TestStreamText.
+#   openai,
+#   openaichat  needs OPENAI_API_KEY, or OPENROUTER_API_KEY to record
+#               from OpenRouter. OPENAI_BASE_URL selects another
+#               compatible API. The Fireworks test of openaichat
+#               needs FIREWORKS_API_KEY.
+#
+# Set RUN to record some tests only, for example RUN=TestStreamText. A
+# recording has the name of its test with each / as _, so the target
+# changes / to _ in the pattern for -httprecord.
 PKG ?= anthropic
 RUN ?= .
 record:
 	@set -a; if [ -f .envrc ]; then . ./.envrc; fi; set +a; \
-	cd pkg/ai/$(PKG) && go test . -httprecord='$(RUN)' -run='$(RUN)'
+	cd pkg/ai/$(PKG) && go test . -httprecord='$(subst /,_,$(RUN))' -run='$(RUN)'

@@ -2,7 +2,6 @@ package ai
 
 import (
 	"encoding/json"
-	"slices"
 	"strings"
 )
 
@@ -52,33 +51,6 @@ func SystemMessage(content ...Content) Message {
 		Role:    RoleSystem,
 		Content: content,
 	}
-}
-
-// CurrentTools returns the tools that the model can call after the
-// messages: tools, then the [ToolAdded] and [ToolRemoved] blocks of the
-// system messages, in order. A ToolAdded block for a tool in the list
-// replaces the tool in its place. A new tool goes at the end.
-func CurrentTools(tools []ToolInfo, messages []Message) []ToolInfo {
-	out := slices.Clone(tools)
-	for _, m := range messages {
-		if m.Role != RoleSystem {
-			continue
-		}
-		for _, c := range m.Content {
-			switch v := c.(type) {
-			case ToolAdded:
-				i := slices.IndexFunc(out, func(t ToolInfo) bool { return t.Name == v.Tool.Name })
-				if i >= 0 {
-					out[i] = v.Tool
-				} else {
-					out = append(out, v.Tool)
-				}
-			case ToolRemoved:
-				out = slices.DeleteFunc(out, func(t ToolInfo) bool { return t.Name == v.Name })
-			}
-		}
-	}
-	return out
 }
 
 // UserMessage returns a user message with one text block.

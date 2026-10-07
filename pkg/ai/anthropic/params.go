@@ -8,6 +8,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -74,7 +75,7 @@ func buildRequest(model ai.Model, messages []ai.Message, opts ai.Options) (reque
 		req.params.Tools = append(convertTools(firstTools), placeholderTool())
 		markLastTool(req.params.Tools[:len(firstTools)], cache)
 		req.betas = append(req.betas, inlineToolsBeta)
-	} else if tools := ai.CurrentTools(firstTools, messages); len(tools) > 0 {
+	} else if tools := transcript.CurrentTools(firstTools, messages); len(tools) > 0 {
 		req.params.Tools = convertTools(tools)
 		markLastTool(req.params.Tools, cache)
 	}
@@ -238,7 +239,7 @@ func markLastTool(tools []sdk.ToolUnionParam, cache *sdk.CacheControlEphemeralPa
 // declares from the first request. The API adds a hidden scaffold for
 // tool changes. With the placeholder, the scaffold is in the cached
 // prefix, so the first tool change does not cause a cache miss.
-// pi-mono measured a full miss without it.
+// Without it, the first tool change misses the whole cache.
 func placeholderTool() sdk.ToolUnionParam {
 	return sdk.ToolUnionParam{OfTool: &sdk.ToolParam{
 		Name:         placeholderName,
