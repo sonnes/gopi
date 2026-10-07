@@ -34,3 +34,5 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | event         | One thing that happened inside a run                         | message, update, signal     |
 | option        | One typed setting of a model call                            | parameter, flag, config     |
 | cost          | What one model response cost, in US dollars                  | price, spend, charge        |
+| deferred tool | A tool that the agent can run but does not send until a change adds it | lazy tool, hidden tool |
+| middleware    | A function that wraps a tool and returns a tool              | wrapper, decorator, hook    |

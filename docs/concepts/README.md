@@ -14,3 +14,9 @@ One page for each abstraction in gopi. A page holds the decisions behind the abs
 | [Message](ai/message.md)     | How one turn of a conversation is typed, stored, and sent to a model.        |
 | [Stream](ai/stream.md)       | How one model call reports its events and its final message.                 |
 | [Provider](ai/provider.md)   | How a provider serves a model call, and what each capability of a provider asks. |
+
+## tool
+
+| Concept                   | Description                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------- |
+| [Tool](tool/tool.md)      | How a tool is defined, deferred, run, and wrapped by middleware.             |
