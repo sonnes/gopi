@@ -1,0 +1,105 @@
+---
+title: Overview
+summary: Model calls, typed tools, and streamed events for AI agents in Go.
+---
+
+import LayerStack from "../../components/figures/LayerStack.astro";
+import AnnotatedCode from "../../components/figures/AnnotatedCode.astro";
+import { Card, CardGrid, Code } from "@astrojs/starlight/components";
+import hello from "../../../../examples/hello/main.go?raw";
+
+gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream.
+
+## The Stack
+
+<LayerStack
+  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/ai and runs the tools of pkg/tool. The providers plug into pkg/ai from the side."
+  layers={[
+    { name: "your application", job: "calls pkg/ai, and runs the tools of pkg/tool" },
+    { name: "pkg/tool", job: "the tools: typed input, deferral, middleware", hue: "wire" },
+    {
+      name: "pkg/ai",
+      job: "the call: model, message, option, stream, tool",
+      hue: "ai",
+      plug: { label: "providers", items: ["anthropic", "openai", "openaichat"] },
+    },
+    { name: "pkg/stream", job: "one producer, one consumer, one result", hue: "outside" },
+  ]}
+/>
+
+## One Call
+
+<AnnotatedCode
+  alt="The call lines of the hello program in three steps. Step 1 binds a model to a provider. Step 2 builds the messages. Step 3 reads the stream with Wait."
+  steps={[
+    {
+      code: `model := ai.LanguageModel{
+\tModel:    anthropic.Sonnet5,
+\tProvider: anthropic.New(),
+}`,
+      title: "bind",
+      type: "ai.LanguageModel",
+      note: "Model + Provider",
+    },
+    {
+      code: `messages := []ai.Message{
+\tai.UserMessage("Say hello in one sentence."),
+}`,
+      title: "build",
+      type: "[]ai.Message",
+      note: "+ ai.Options, if any",
+    },
+    {
+      code: `msg, err := model.StreamText(ctx, messages).Wait()
+if err != nil {
+\tlog.Fatal(err)
+}
+fmt.Println(msg.Text())`,
+      title: "read",
+      type: "Wait() → *ai.Message",
+      note: "Events() gives the deltas",
+    },
+  ]}
+/>
+
+<Code code={hello} lang="go" title="examples/hello/main.go" />
+
+## Find a Page
+
+<CardGrid>
+  <Card title="Get Started" icon="rocket">
+    Install the module, set a key, and run the program above.
+
+    [Get Started](start.mdx)
+  </Card>
+  <Card title="The Abstractions" icon="puzzle">
+    One page for each type that you touch: model, message, option, stream, tool.
+
+    [pkg/ai](ai/index.mdx)
+  </Card>
+  <Card title="Tools" icon="random">
+    The functions that a model can call, and the middleware that wraps them.
+
+    [pkg/tool](tool/index.mdx)
+  </Card>
+  <Card title="Guides" icon="list-format">
+    One page for each job, with snippets for the choices and one complete program that compiles.
+
+    [Call a Model](guides/call-a-model.mdx)
+  </Card>
+  <Card title="Providers" icon="setting">
+    What each provider adds to a call.
+
+    [Anthropic](providers/anthropic.mdx), [OpenAI](providers/openai.mdx), [OpenAI Chat](providers/openai-chat.mdx)
+  </Card>
+  <Card title="Reference" icon="document">
+    Every signature and field.
+
+    [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi)
+  </Card>
+  <Card title="Decisions" icon="github">
+    The alternative that lost, and the reason. For the developers of gopi.
+
+    [docs/concepts](../../../../docs/concepts/README.md)
+  </Card>
+</CardGrid>

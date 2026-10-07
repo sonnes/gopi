@@ -1,0 +1,269 @@
+---
+import wordmark from "../assets/agent-gopi-wordmark.png";
+import gopi from "../assets/agent-gopi.png";
+import Landing from "../layouts/Landing.astro";
+import CodeFrame from "../components/CodeFrame.astro";
+
+const base = import.meta.env.BASE_URL;
+const docs = `${base.replace(/\/$/, "")}/docs/`;
+
+// Layout rules are documented in web/DESIGN.md.
+
+const firstCall = `
+model := ai.LanguageModel{
+    Model:    anthropic.Sonnet5,
+    Provider: anthropic.New(anthropic.APIKey(key)),
+}
+
+messages := []ai.Message{
+    ai.UserMessage("Say hello in one sentence."),
+}
+
+msg, err := model.StreamText(ctx, messages).Wait()
+
+fmt.Println(msg.Text())`;
+
+const streamCode = `
+stream := model.StreamText(ctx, messages,
+    ai.SystemPrompt([]ai.Content{ai.Text{Text: "Answer in one sentence."}}),
+    ai.Thinking(ai.ThinkingHigh),
+    ai.MaxTokens(1024),
+)
+
+for event, err := range stream.Events() {
+    switch event.Type {
+    case ai.EventTextDelta:
+        io.WriteString(w, event.Delta)
+    }
+}
+
+msg, err := stream.Wait()
+fmt.Println(msg.Usage.Output, msg.StopReason)`;
+
+const toolCode = `
+weather := tool.New(
+    "get_weather",
+    func(ctx context.Context, in WeatherIn) (WeatherOut, error) {
+        return WeatherOut{Temp: "22°C"}, nil
+    },
+    tool.Description("Get the current weather for a city"),
+)
+
+tools := ai.Tools([]ai.ToolInfo{weather.Info()})
+
+msg, err := model.StreamText(ctx, messages, tools).Wait()
+
+for _, call := range msg.ToolCalls() {
+    result, err := weather.Run(ctx, call)
+    messages = append(messages,
+        ai.ToolResultMessage(call.ID, result.Content...),
+    )
+}`;
+
+const middlewareCode = `
+// A middleware wraps a tool and returns a tool.
+func deny(reason string) tool.Middleware {
+    return func(next tool.Tool) tool.Tool {
+        run := func(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
+            return ai.ToolResult{
+                Content: []ai.Content{ai.Text{Text: reason}},
+                IsError: true,
+            }, nil
+        }
+        return tool.Wrap(next, run)
+    }
+}
+
+// The first middleware is the outermost one.
+guarded := tool.Chain(weather, deny("not in this region"), logCalls)`;
+
+const providers = [
+  ["anthropic", "http", "key", "the Messages API", "pkg/ai/anthropic"],
+  ["openai", "http", "key", "the Responses API", "pkg/ai/openai"],
+  ["openaichat", "http", "key", "the Chat Completions API", "pkg/ai/openaichat"],
+];
+---
+
+<Landing
+  title="gopi: AI agents in Go"
+  description="Build AI agents in Go with model calls, typed tools, and streamed events."
+>
+  {/* ============ HERO ============ */}
+  <header class="row hero agent-hero">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">Go SDK / AI agents</p>
+        <h1><img class="hero-wordmark" src={wordmark.src} alt="agent gopi" width={wordmark.width} height={wordmark.height} fetchpriority="high" /></h1>
+        <p class="hero-description">Talk to a model from Go.</p>
+        <p class="lede">
+          Build a prompt, give the model Go functions as tools, and read the answer as a
+          stream of typed events. One package, one call.
+        </p>
+
+        <div class="install">
+          <span class="sig">$</span>
+          <code>go get github.com/sonnes/gopi</code>
+          <button class="copy" data-copy aria-label="Copy the command">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+              <rect x="5.5" y="5.5" width="8" height="8"></rect>
+              <path d="M10.5 2.5h-8v8"></path>
+            </svg>
+          </button>
+        </div>
+
+        <p class="hero-actions">
+          <a class="btn btn--primary" href={`${docs}start/`}>Get started</a>
+          <a class="more" href="https://github.com/sonnes/gopi">View on GitHub</a>
+        </p>
+      </div>
+
+      <figure class="agent-portrait">
+        <img src={gopi.src} alt="Agent Gopi, a golden gopher in a cream trench coat, with sunglasses and a coral tie." width={gopi.width} height={gopi.height} loading="eager" fetchpriority="high" />
+        <figcaption class="label"><span>agent gopi</span><span>001 / undercover</span></figcaption>
+      </figure>
+    </div>
+  </header>
+
+  <section class="row" id="first-call">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/ai · first call</p>
+        <h2>Talk to a Model From Go</h2>
+        <p>Build a prompt and read the answer as a stream of typed events.</p>
+        <a class="more" href={`${docs}start/`}>Make your first call</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="first_call.go" code={firstCall}>
+          <pre class="shell shell--out"><span class="p">$</span> go run ./first_call.go
+Hello! How can I help you today?</pre>
+        </CodeFrame>
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 01 · a pair ============ */}
+  <section class="row" id="stream">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/ai</p>
+        <h2>One Prompt, One Stream</h2>
+        <p>
+          <code>StreamText</code> returns at once. The stream yields typed events as the
+          model writes, and <code>Wait</code> returns the final message with its usage.
+        </p>
+        <p>
+          An option is a typed setter. A later value wins, and a provider reads only the
+          options that it knows. Cancel the call through its context.
+        </p>
+        <a class="more" href={docs}>Read the documentation</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="stream.go" code={streamCode} />
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 02 · a pair ============ */}
+  <section class="row" id="tools">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/tool · tools</p>
+        <h2>A Tool Is a Go Function</h2>
+        <p>
+          <code>tool.New</code> takes a Go function and derives the JSON schema from its
+          input type. The function receives the typed input.
+        </p>
+        <p>
+          The model returns tool calls. Your code runs them, appends a tool result for each
+          one, and calls the model again.
+        </p>
+        <a class="more" href={docs}>Read the documentation</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="tools.go" code={toolCode} />
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 03 · a pair ============ */}
+  <section class="row" id="middleware">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/tool · middleware</p>
+        <h2>Wrap a Tool With a Rule</h2>
+        <p>
+          A middleware is a function from a tool to a tool. It can rename the tool, deny a
+          call, or add a note to the result.
+        </p>
+        <p>
+          <code>tool.Chain</code> applies a list of middleware. The first one is the
+          outermost, so it runs first and answers last.
+        </p>
+        <a class="more" href={docs}>Read the documentation</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="middleware.go" code={middlewareCode} />
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 04 · the width of the sheet ============ */}
+  <section class="row row--wide" id="providers">
+    <div class="wide-inner">
+      <div class="wide-head">
+        <div>
+          <p class="label">pkg/ai · providers</p>
+          <h2>The Provider Contract Is One Method</h2>
+        </div>
+        <div class="wide-note">
+          <p>
+            <code>ai.TextProvider</code> requires one method: <code>StreamText</code>. A
+            provider that also generates objects or counts tokens implements a second
+            interface, and the binding asserts it.
+          </p>
+          <a class="more" href={docs}>Read the documentation</a>
+        </div>
+      </div>
+
+      <figure class="artifact">
+        <figcaption class="label">providers</figcaption>
+        <table class="ledger">
+          <colgroup><col /><col /><col /><col /><col /></colgroup>
+          <thead>
+            <tr>
+              <th>provider</th><th>transport</th><th>auth</th><th>it drives</th><th>package</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              providers.map(([id, transport, auth, upstream, pkg]) => (
+                <tr>
+                  <td class="mono">{id}</td>
+                  <td class="mono dim">{transport}</td>
+                  <td class="mono dim">{auth}</td>
+                  <td class="mono dim">{upstream}</td>
+                  <td class="mono dim">{pkg}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </figure>
+    </div>
+  </section>
+
+  {/* ============ THE WAY OUT ============ */}
+  <section class="outro">
+    <div class="outro-inner">
+      <p class="label">the documentation</p>
+      <a class="outro-link" href={docs}>Read the documentation</a>
+      <p class="outro-lede">Start with the overview, or open the guide for your job.</p>
+      <ul class="ways-out">
+        <li><a href={docs}>Overview</a><span>what gopi is</span></li>
+        <li><a href={`${docs}start/`}>Get Started</a><span>install gopi and make one call</span></li>
+        <li><a href={`${docs}ai/`}>The Layer</a><span>the types of one model call</span></li>
+        <li><a href={`${docs}guides/call-a-model/`}>The Guides</a><span>one page for each job</span></li>
+      </ul>
+    </div>
+  </section>
+</Landing>

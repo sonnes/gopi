@@ -1,0 +1,153 @@
+---
+// A fork: one value on the left, and a branch for each value it can take,
+// with the action that follows. One branch can loop back, and one can be
+// a stop. Use it for an enum where each value leads to one action.
+//
+// The branches are rows of equal height, so the curves meet the middle
+// of each row. The SVG stretches to the height of the rows.
+import Figure from "./Figure.astro";
+
+interface Outcome {
+  value: string;
+  action: string;
+  // loop marks the branch that goes back, with a short label.
+  loop?: string;
+  // bad marks the branch that must not go on.
+  bad?: boolean;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  from: string;
+  outcomes: Outcome[];
+}
+
+const { alt, caption, from, outcomes } = Astro.props;
+const n = outcomes.length;
+// One unit of height for each row. The curves start at the middle.
+const h = n * 10;
+const path = (i: number) => `M0 ${h / 2} C 22 ${h / 2}, 22 ${i * 10 + 5}, 44 ${i * 10 + 5}`;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="fork">
+    <div class="node k-assistant src">{from}</div>
+    <svg class="fan" viewBox={`0 0 44 ${h}`} preserveAspectRatio="none" aria-hidden="true">
+      {
+        outcomes.map((o, i) => (
+          <path d={path(i)} class:list={[o.loop ? "edge-accent" : "edge", { bad: o.bad }]} />
+        ))
+      }
+    </svg>
+    <div class="outs" style={`grid-template-rows: repeat(${n}, 1fr)`}>
+      {
+        outcomes.map((o) => (
+          <div class:list={["out", { loop: o.loop, bad: o.bad }]}>
+            <span class:list={["chip", "val", { "k-error": o.bad }]}>{o.value}</span>
+            <div class="act">
+              <span>{o.action}</span>
+              {o.loop && (
+                <small>
+                  <svg class="ico" viewBox="0 0 14 12" aria-hidden="true">
+                    <path d="M11 3 A5 4 0 1 0 12 7" />
+                    <path d="M9 1 L12 3 L9 5" />
+                  </svg>
+                  {o.loop}
+                </small>
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .fork {
+    display: grid;
+    grid-template-columns: max-content 44px minmax(0, 1fr);
+    align-items: center;
+  }
+  .src {
+    font-size: 12px;
+  }
+  /* Two classes and a type beat the global .fig svg, which sets the
+     height from the view box. */
+  .fork svg.fan {
+    align-self: stretch;
+    width: 44px;
+    height: 100%;
+  }
+  .fan path {
+    vector-effect: non-scaling-stroke;
+  }
+  .fork .fan path.bad {
+    stroke: var(--err);
+    stroke-dasharray: 4 3;
+  }
+  .outs {
+    display: grid;
+  }
+  .out {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-block: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .out .chip.val {
+    flex: none;
+    width: 76px;
+    text-align: center;
+    font-size: 12px;
+  }
+  .out.loop .chip.val {
+    border-color: var(--primary);
+    color: var(--link);
+  }
+  .act {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 8px;
+    min-height: 34px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--code-bg);
+  }
+  .act small {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    font-size: 10.5px;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  .out.loop .act {
+    border-color: var(--primary);
+    background: var(--primary-faint);
+  }
+  .out.loop small {
+    color: var(--link);
+  }
+  .out.bad .act {
+    border: 1px dashed var(--err);
+    color: var(--err);
+  }
+  .act svg.ico {
+    display: inline-block;
+    width: 14px;
+    height: 12px;
+  }
+  .ico path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+  }
+</style>

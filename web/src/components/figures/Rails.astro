@@ -1,0 +1,592 @@
+---
+// One scenario of a session: a call, a row of tiles (the entries after
+// the call), and two rails under the tiles. The first rail shows what
+// the model reads. The second shows what is on disk. The slot is one
+// sentence that says what to notice. Use it on a session page to show
+// the effect of one call.
+//
+// The props draw the special cases of one grid: a cut line (an exit or
+// a crash), a second tape with copy arrows above (an edit), lane tags
+// above (two writers), a bracket under the reads rail (an order that a
+// provider rejects), and a value tile (kind "value"). Set legend on the
+// first scenario of a page, so the page has one legend.
+import Figure from "./Figure.astro";
+import CallCode from "./CallCode.astro";
+
+type Kind =
+  | "user"
+  | "assistant"
+  | "tool"
+  | "meta"
+  | "ephemeral"
+  | "error"
+  | "value"
+  | "record"
+  | "next";
+
+interface Tile {
+  // id is the bold name. For a value tile, id is the namespace and text
+  // is the value.
+  id: string;
+  kind: Kind;
+  text?: string;
+  // sub is a muted line under the name.
+  sub?: string;
+  // accent rings the one tile that the scenario is about.
+  accent?: boolean;
+  // who tags the tile with the log that wrote it. Set lanes to draw a
+  // lane for each log above the tiles.
+  who?: "A" | "B";
+  // width is the share of the row that the column takes. The default is 1.
+  width?: number;
+}
+
+// read: the model reads it. run: in this run only. off: not read.
+// bad: read, in an order that a provider can reject.
+type Read = "read" | "run" | "off" | "bad" | null;
+// new: a new line. kept: already on disk. none: not stored.
+// syn: made at read time, never stored.
+type Disk = "new" | "kept" | "none" | "syn" | null;
+
+interface Props {
+  title: string;
+  alt: string;
+  call: string;
+  // tiles has one slot per column. A null slot leaves the column empty.
+  tiles: (Tile | null)[];
+  // label names the tile row, as [name] or [name, a muted line].
+  label?: [string] | [string, string];
+  // from is a tape above the tiles, whose first `copied` tiles are
+  // copied down into the tiles.
+  from?: { label: [string] | [string, string]; tiles: (Tile | null)[]; copied: number; copyLabel?: string };
+  lanes?: boolean;
+  reads: Read[];
+  readsLabel?: string;
+  disk?: Disk[];
+  diskLabel?: string;
+  // cut draws a dashed line before the column at index `before`.
+  cut?: { before: number; label: string };
+  // span draws a note under the reads rail, from column `from` to `to`.
+  // If it covers more than one column, a bracket joins them.
+  span?: { from: number; to: number; text: string };
+  legend?: boolean;
+}
+
+const {
+  title,
+  alt,
+  call,
+  tiles,
+  label,
+  from,
+  lanes,
+  reads,
+  readsLabel = "model reads",
+  disk,
+  diskLabel = "on disk",
+  cut,
+  span,
+  legend,
+} = Astro.props;
+
+const n = tiles.length;
+const width = (i: number) => Math.max(tiles[i]?.width ?? 1, from?.tiles[i]?.width ?? 1);
+const tracks: string[] = ["76px"];
+for (let i = 0; i < n; i++) {
+  if (cut && cut.before === i) tracks.push("28px");
+  tracks.push(`minmax(0, ${width(i)}fr)`);
+}
+const col = (i: number) => 2 + i + (cut && i >= cut.before ? 1 : 0);
+const cols = (a: number, b: number) => `${col(a)} / ${col(b) + 1}`;
+
+// Rows are numbered as they are drawn, so the cut can span all of them.
+let row = 0;
+const next = () => ++row;
+const fromRow = from ? next() : 0;
+const copyRow = from ? next() : 0;
+const laneRows = lanes ? { A: next(), B: next() } : undefined;
+const tileRow = next();
+const readRow = next();
+const bracketRow = span && span.to > span.from ? next() : 0;
+const spanRow = span ? next() : 0;
+const diskRow = disk ? next() : 0;
+
+// A reads segment joins the one next to it, unless the cut is between.
+const on = (r: Read) => r === "read" || r === "run" || r === "bad";
+const joined = (i: number, j: number) =>
+  j >= 0 && j < n && on(reads[i]) && on(reads[j]) && !(cut && Math.max(i, j) === cut.before);
+const readClass = (i: number) => {
+  const r = reads[i];
+  if (!r) return [];
+  return ["rd", r, { first: on(r) && !joined(i, i - 1), end: on(r) && !joined(i, i + 1) }];
+};
+---
+
+<Figure alt={alt} caption={title}>
+  {
+    legend && (
+      <div class="legend">
+        <span><i class="lg read" />model reads</span>
+        <span><i class="lg run" />this run only</span>
+        <span><i class="lg new">+</i>new line on disk</span>
+        <span><i class="lg kept" />already on disk</span>
+        <span><i class="lg none" />not stored</span>
+        <span><i class="lg syn" />made at read time</span>
+      </div>
+    )
+  }
+  <CallCode code={call} />
+  <div class:list={["tape", { "has-cut": cut }]} style={`grid-template-columns:${tracks.join(" ")}`}>
+    {
+      from && (
+        <>
+          <span class="rl" style={`grid-area:${fromRow}/1`}>
+            <b>{from.label[0]}</b>
+            {from.label[1] && <br />}
+            {from.label[1]}
+          </span>
+          {from.tiles.map(
+            (t, i) =>
+              t && (
+                <div class:list={["tile", `k-${t.kind}`, { acc: t.accent }]} style={`grid-area:${fromRow}/${col(i)}`}>
+                  <b>{t.id}</b>
+                  {t.text}
+                  {t.sub && <span class="s">{t.sub}</span>}
+                </div>
+              ),
+          )}
+          <span class="rl" style={`grid-area:${copyRow}/1`}>{from.copyLabel ?? ""}</span>
+          {Array.from({ length: from.copied }, (_, i) => (
+            <div class="copy" style={`grid-area:${copyRow}/${col(i)}`}>↓</div>
+          ))}
+        </>
+      )
+    }
+    {
+      laneRows &&
+        (["A", "B"] as const).map((who) => (
+          <>
+            <span class="rl" style={`grid-area:${laneRows[who]}/1`}>log {who}</span>
+            {tiles.map(
+              (t, i) =>
+                t?.who === who && (
+                  <div class="lane" style={`grid-area:${laneRows[who]}/${col(i)}`}>
+                    <b class={who === "A" ? "la" : "lb"}>{who}</b>
+                  </div>
+                ),
+            )}
+          </>
+        ))
+    }
+
+    {
+      label && (
+        <span class="rl" style={`grid-area:${tileRow}/1`}>
+          <b>{label[0]}</b>
+          {label[1] && <br />}
+          {label[1]}
+        </span>
+      )
+    }
+    {
+      tiles.map(
+        (t, i) =>
+          t &&
+          (t.kind === "value" ? (
+            <div class="vtile" style={`grid-area:${tileRow}/${col(i)}`}>
+              <div class="vh">value</div>
+              <div class="kv">
+                <span>{t.id}</span> {t.text}
+              </div>
+            </div>
+          ) : (
+            <div class:list={["tile", `k-${t.kind}`, { acc: t.accent }]} style={`grid-area:${tileRow}/${col(i)}`}>
+              {t.who && <span class:list={["who", t.who === "A" ? "a" : "b"]}>{t.who}</span>}
+              <b>{t.id}</b>
+              {t.text}
+              {t.sub && <span class="s">{t.sub}</span>}
+            </div>
+          )),
+      )
+    }
+
+    <span class="rl" style={`grid-area:${readRow}/1`}>{readsLabel}</span>
+    {reads.map((r, i) => r && <div class:list={readClass(i)} style={`grid-area:${readRow}/${col(i)}`} />)}
+
+    {bracketRow > 0 && span && <div class="split" style={`grid-row:${bracketRow};grid-column:${cols(span.from, span.to)}`} />}
+    {span && <div class="cap err" style={`grid-row:${spanRow};grid-column:${cols(span.from, span.to)}`}>{span.text}</div>}
+
+    {
+      disk && (
+        <>
+          <span class="rl" style={`grid-area:${diskRow}/1`}>{diskLabel}</span>
+          {disk.map(
+            (d, i) =>
+              d && (
+                <div class={`dk ${d}`} style={`grid-area:${diskRow}/${col(i)}`}>
+                  <i />
+                </div>
+              ),
+          )}
+        </>
+      )
+    }
+
+    {
+      cut && (
+        <div class="cut" style={`grid-row:1 / ${row + 1};grid-column:${col(cut.before) - 1}`}>
+          <span>{cut.label}</span>
+        </div>
+      )
+    }
+  </div>
+  {Astro.slots.has("default") && <div class="note"><slot /></div>}
+</Figure>
+
+<style>
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin-bottom: 14px;
+    padding: 8px 12px;
+    border: 1px dashed var(--line-strong);
+    border-radius: 10px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lg {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    font-style: normal;
+  }
+  .lg.read {
+    width: 22px;
+    height: 4px;
+    background: var(--text);
+    border-radius: 2px;
+  }
+  .lg.run {
+    width: 22px;
+    height: 0;
+    border-top: 3px dotted var(--text);
+  }
+  .lg.new {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--on-primary);
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 1;
+  }
+  .lg.kept {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--muted-strong);
+  }
+  .lg.none {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.4px solid var(--muted);
+  }
+  .lg.syn {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.4px dashed var(--err);
+  }
+
+  .tape {
+    display: grid;
+    row-gap: 6px;
+    align-items: center;
+  }
+  .tape.has-cut {
+    padding-top: 14px;
+  }
+  .rl {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--muted);
+    padding-right: 6px;
+  }
+  .rl b {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .tile {
+    margin: 0 3px;
+    min-width: 0;
+    padding: 4px 7px;
+    border: 1.2px solid var(--k, var(--line-strong));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--k, var(--line-strong)) var(--l-mix), var(--code-bg));
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text);
+    overflow-wrap: anywhere;
+  }
+  .tile b {
+    font-weight: 600;
+    font-size: 10.5px;
+    margin-right: 4px;
+  }
+  .tile .s {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.25;
+  }
+  .tile.k-user {
+    background: var(--code-bg);
+  }
+  .tile:is(.k-meta, .k-error) {
+    border-style: dashed;
+  }
+  .tile.k-error {
+    color: var(--err);
+    background: color-mix(in srgb, var(--err) 6%, var(--code-bg));
+  }
+  .tile.k-error .s {
+    color: var(--err);
+  }
+  .tile.k-ephemeral {
+    border-style: dotted;
+    background: var(--code-bg);
+    color: var(--muted);
+  }
+  .tile.k-record {
+    border-color: var(--text);
+    background: var(--code-bg);
+  }
+  .tile.k-next {
+    border: 1.2px dashed var(--primary);
+    background: var(--primary-faint);
+    color: var(--link);
+  }
+  .tile.acc {
+    box-shadow: 0 0 0 2px var(--primary-line);
+  }
+  .who {
+    display: inline-grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    border-radius: 3px;
+    font-size: 9.5px;
+    font-weight: 700;
+    vertical-align: 1px;
+  }
+  .who.a {
+    background: var(--text);
+    color: var(--ground);
+  }
+  .who.b {
+    border: 1.2px solid var(--text);
+  }
+
+  .vtile {
+    margin: 0 3px 0 10px;
+    min-width: 0;
+    overflow: hidden;
+    border: 1.2px solid var(--l-harness);
+    border-radius: 10px;
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+  }
+  .vh {
+    padding: 1px 7px;
+    font-size: 9.5px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg));
+    border-bottom: 1px solid var(--l-harness);
+  }
+  .vtile .kv {
+    padding: 3px 7px;
+    font-size: 10.5px;
+    color: var(--text);
+  }
+  .vtile .kv span {
+    color: var(--muted);
+  }
+
+  .copy {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1;
+    color: var(--muted-strong);
+  }
+  .lane {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+  }
+  .lane b {
+    display: inline-grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+  }
+  .lane .la {
+    background: var(--text);
+    color: var(--ground);
+  }
+  .lane .lb {
+    border: 1.2px solid var(--text);
+    color: var(--text);
+  }
+
+  .rd {
+    height: 4px;
+    background: var(--text);
+  }
+  .rd.first {
+    margin-left: 3px;
+    border-top-left-radius: 2px;
+    border-bottom-left-radius: 2px;
+  }
+  .rd.end {
+    margin-right: 3px;
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
+  }
+  .rd.run {
+    height: 0;
+    background: none;
+    border-top: 3px dotted var(--text);
+  }
+  .rd.off {
+    height: 0;
+    margin: 0 3px;
+    background: none;
+    border-top: 1px solid var(--line);
+  }
+  .rd.bad {
+    background: var(--err);
+  }
+
+  .split {
+    height: 10px;
+    margin: 0 20px;
+    border: 1.4px solid var(--err);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  .cap {
+    padding: 0 2px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    line-height: 1.25;
+    color: var(--muted);
+  }
+  .cap.err {
+    color: var(--err);
+  }
+
+  .dk {
+    position: relative;
+    height: 18px;
+    display: grid;
+    place-items: center;
+  }
+  .dk::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1px solid var(--line-strong);
+  }
+  .dk.none::before {
+    border-top-style: dotted;
+    border-color: var(--line);
+  }
+  .dk i {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .dk.new i {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  .dk.new i::after {
+    content: "+";
+  }
+  .dk.kept i {
+    width: 10px;
+    height: 10px;
+    background: var(--muted-strong);
+  }
+  .dk.none i {
+    width: 12px;
+    height: 12px;
+    border: 1.4px solid var(--muted);
+    background: var(--panel);
+  }
+  .dk.syn i {
+    width: 12px;
+    height: 12px;
+    border: 1.4px dashed var(--err);
+    background: var(--panel);
+  }
+
+  .cut {
+    position: relative;
+    align-self: stretch;
+    justify-self: center;
+    width: 0;
+    border-left: 1.4px dashed var(--err);
+  }
+  .cut span {
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0 2px;
+    background: var(--panel);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--err);
+    white-space: nowrap;
+  }
+
+  .note {
+    margin-top: 12px;
+    font-family: var(--font-prose);
+    font-size: 12.5px;
+    color: var(--copy);
+  }
+  .note :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    color: var(--text);
+  }
+</style>

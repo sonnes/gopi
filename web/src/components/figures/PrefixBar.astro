@@ -1,0 +1,220 @@
+---
+// A prefix bar: a prompt as one bar of parts, the marks that a provider
+// puts on it for the cache, and brackets under the bar for the prefix
+// that the API caches. Use it to show where a provider marks a prompt.
+// The widths are a sketch, not token counts.
+import Figure from "./Figure.astro";
+
+interface Segment {
+  label: string;
+  // width is the share of the bar, in percent.
+  width: number;
+  // hot fills the part as cached. fresh dashes it as new in this call.
+  state?: "hot" | "fresh";
+  // mark puts a cache mark at the end of the part.
+  mark?: boolean;
+}
+
+interface Bracket {
+  // parts is the number of parts that the bracket spans, from the end
+  // of the bracket before it.
+  parts: number;
+  label: string;
+  // note is a muted tail to the label.
+  note?: string;
+  // auto dashes the bracket, for a prefix that the API finds itself.
+  auto?: boolean;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  provider: string;
+  // says is a muted line next to the provider name.
+  says?: string;
+  segments: Segment[];
+  brackets: Bracket[];
+}
+
+const { alt, caption, provider, says, segments, brackets } = Astro.props;
+
+// The left edge of each mark, as the running sum of the widths.
+const marks: { at: number; last: boolean }[] = [];
+let at = 0;
+segments.forEach((s, i) => {
+  at += s.width;
+  if (s.mark) marks.push({ at, last: i === segments.length - 1 });
+});
+
+// The width of each bracket, as the sum of the widths that it spans.
+let from = 0;
+const spans = brackets.map((b) => {
+  const w = segments
+    .slice(from, from + b.parts)
+    .reduce((sum, s) => sum + s.width, 0);
+  from += b.parts;
+  return { ...b, width: w };
+});
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="cache">
+    <div class="cache-h">
+      <b>{provider}</b>
+      {says && <span>{says}</span>}
+    </div>
+    <div class="bar">
+      {
+        segments.map((s, i) => (
+          <div
+            class:list={[
+              "seg",
+              s.state,
+              { first: i === 0, last: i === segments.length - 1 },
+            ]}
+            style={`width: ${s.width}%`}
+          >
+            {s.label}
+          </div>
+        ))
+      }
+      {
+        marks.map((m) => (
+          <span
+            class:list={["flag", { l: m.last }]}
+            style={m.last ? "left: calc(100% - 2px)" : `left: ${m.at}%`}
+          >
+            <i>mark</i>
+          </span>
+        ))
+      }
+    </div>
+    <div class="brks">
+      {
+        spans.map((b) => (
+          <div style={`width: ${b.width}%`}>
+            <div class:list={["brk", { auto: b.auto }]} />
+            <div class:list={["brklbl", { auto: b.auto }]}>
+              {b.label}
+              {b.note && <span> · {b.note}</span>}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .cache-h {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    margin-bottom: 22px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .cache-h b {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .cache-h span {
+    color: var(--muted);
+    text-align: right;
+  }
+  .bar {
+    display: flex;
+    position: relative;
+    height: 30px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.2px solid var(--line-strong);
+    background: var(--code-bg);
+    color: var(--text);
+    margin-left: -1.2px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .seg.first {
+    border-radius: 8px 0 0 8px;
+    margin-left: 0;
+  }
+  .seg.last {
+    border-radius: 0 8px 8px 0;
+  }
+  .seg.fresh {
+    border-style: dashed;
+    color: var(--muted);
+  }
+  .seg.hot {
+    background: var(--primary-faint);
+  }
+  .flag {
+    position: absolute;
+    top: -18px;
+    bottom: -2px;
+    width: 0;
+    border-left: 2px solid var(--primary);
+  }
+  .flag::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-left: 10px solid var(--primary);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+  }
+  .flag i {
+    position: absolute;
+    left: 12px;
+    top: -3px;
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--link);
+    white-space: nowrap;
+  }
+  /* The mark at the end of the bar points back, so it stays inside. */
+  .flag.l::before {
+    left: auto;
+    right: 0;
+    border-left: 0;
+    border-right: 10px solid var(--primary);
+  }
+  .flag.l i {
+    left: auto;
+    right: 14px;
+  }
+  .brks {
+    display: flex;
+  }
+  .brk {
+    height: 10px;
+    margin-top: 5px;
+    border: 1.2px solid var(--primary);
+    border-top: 0;
+    border-radius: 0 0 6px 6px;
+  }
+  .brk.auto {
+    border-style: dashed;
+    border-top: 0;
+    border-color: var(--line-strong);
+  }
+  .brklbl {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--link);
+    margin-top: 3px;
+    padding-right: 8px;
+  }
+  .brklbl span,
+  .brklbl.auto {
+    color: var(--muted);
+  }
+</style>

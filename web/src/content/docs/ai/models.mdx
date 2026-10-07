@@ -1,0 +1,85 @@
+---
+title: Models
+summary: A model is metadata, a provider holds the credentials, and a binding pairs them.
+---
+
+import BindingEquation from "../../../components/figures/BindingEquation.astro";
+import Nesting from "../../../components/figures/Nesting.astro";
+
+A model is one named model that a provider serves. It holds an ID, a name, its limits, the kinds of input that it reads, its thinking levels, and its prices. It holds no credentials. A provider is one backend that answers a call. It holds the credentials and speaks the wire format. A binding pairs the two, and your code calls the binding.
+
+<BindingEquation
+  alt="An ai.Model holds an ID, a name, its limits, its capabilities, and its prices, and no credentials. An ai.TextProvider holds the credentials and the wire format. Together they make an ai.LanguageModel. It always has StreamText. It has GenerateObject if the provider is an ObjectProvider, and CountTokens if the provider is a TokenCounter."
+  terms={[
+    { type: "ai.Model", fields: ["ID", "Name", "limits", "Pricing"], lacks: "no credentials", example: "anthropic.Sonnet5" },
+    {
+      type: "ai.TextProvider",
+      fields: ["credentials", "wire format", "StreamText(...)"],
+      example: "anthropic.New()",
+      wire: true,
+    },
+  ]}
+  result={{
+    type: "ai.LanguageModel",
+    sub: "{ Model, Provider }",
+    calls: [
+      { name: "StreamText", when: "always", always: true },
+      { name: "GenerateObject", when: "if an ObjectProvider" },
+      { name: "CountTokens", when: "if a TokenCounter" },
+    ],
+    example: "your code calls this",
+  }}
+/>
+
+## Bind
+
+```go
+model := ai.LanguageModel{
+	Model:    anthropic.Sonnet5,
+	Provider: anthropic.New(),
+}
+```
+
+The same model value binds to any provider that serves it. The same provider serves any of its models.
+
+## Read the Metadata
+
+The provider packages fill each model from the docs of their API. A zero field is unknown.
+
+A call without `ai.MaxTokens` uses the output cap of the model. The other fields are for your code: pick a model that reads PDFs, check a request against the context window, or offer only the thinking levels that a model takes. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#Model) lists the fields.
+
+The provider prices each response from `Pricing`, so the usage of a message holds its cost:
+
+```go
+msg, err := model.StreamText(ctx, messages).Wait()
+fmt.Printf("$%.4f\n", msg.Usage.Cost.Total())
+```
+
+## Wrap
+
+The binding is a struct, so a wrapper goes around the provider. A wrapper implements `StreamText` and calls the inner provider.
+
+<Nesting
+  alt="Your code calls StreamText on an ai.LanguageModel. Its model is anthropic.Sonnet5. Its provider is a logging wrapper, and the wrapper holds the Anthropic provider. The call goes in through the wrapper to the Anthropic provider, and the *ai.EventStream comes back out unchanged."
+  caller="your code"
+  layers={[
+    { title: "ai.LanguageModel", chip: "Model: anthropic.Sonnet5" },
+    { title: "Provider: logging{...}", note: "logs the call, returns the inner stream", kind: "accent" },
+    { title: "inner: anthropic.New()", note: "speaks the wire format", kind: "wire" },
+  ]}
+  call="StreamText(ctx, messages)"
+  back="*ai.EventStream, unchanged"
+/>
+
+[Write a Provider](../guides/write-a-provider.mdx) shows the whole shape of a provider.
+
+## Other Bindings
+
+`ai.ImageModel` and `ai.SpeechModel` follow the same pattern with `ImageProvider` and `SpeechProvider`. The [OpenAI](../providers/openai.mdx) provider implements `ImageProvider`. No provider in this repository implements `SpeechProvider`.
+
+## Related
+
+- [Options](options.mdx) carry every setting of a call.
+- [Streams](streams.mdx) are what a call returns.
+
+The decisions are in [docs/concepts/ai/provider.md](../../../../../docs/concepts/ai/provider.md).

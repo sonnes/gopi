@@ -1,0 +1,59 @@
+---
+import { Image } from "astro:assets";
+import TableOfContents from "@astrojs/starlight/components/TableOfContents.astro";
+import peek from "../assets/docs/peek.png";
+import explore from "../assets/docs/explore.png";
+import messages from "../assets/docs/messages.png";
+import tools from "../assets/docs/tools.png";
+import streams from "../assets/docs/streams.png";
+import thinking from "../assets/docs/thinking.png";
+import records from "../assets/docs/records.png";
+import providers from "../assets/docs/providers.png";
+
+const sketches = {
+  peek: { image: peek, alt: "Gopi peeks over a pencil divider with an envelope." },
+  explore: { image: explore, alt: "Gopi studies a folded map." },
+  messages: { image: messages, alt: "Gopi reads a letter beside an envelope." },
+  tools: { image: tools, alt: "Gopi holds a pencil beside a toolbox." },
+  streams: { image: streams, alt: "Gopi catches paper slips as they arrive in order." },
+  thinking: { image: thinking, alt: "Gopi thinks with a pencil against his cheek." },
+  records: { image: records, alt: "Gopi places a document in a filing box." },
+  providers: { image: providers, alt: "Gopi joins two cable ends." },
+};
+
+const topics: Record<string, keyof typeof sketches> = {
+  docs: "explore",
+  "docs/start": "peek",
+  "docs/ai": "explore",
+  "docs/ai/models": "providers",
+  "docs/ai/messages": "peek",
+  "docs/ai/options": "thinking",
+  "docs/ai/streams": "streams",
+  "docs/tool": "tools",
+  "docs/providers/anthropic": "providers",
+  "docs/guides/call-a-model": "messages",
+  "docs/guides/stream-a-response": "streams",
+  "docs/guides/use-tools": "tools",
+  "docs/guides/write-a-provider": "providers",
+};
+const topic = topics[Astro.locals.starlightRoute.entry.id];
+const sketch = topic && sketches[topic];
+
+// The sketch shows at 192px at most. The build writes that width and
+// twice that for a dense screen, in place of the full-size source.
+const WIDTH = 192;
+---
+
+<TableOfContents />
+{sketch && (
+  <figure class="docs-sketch" data-topic={topic}>
+    <Image
+      src={sketch.image}
+      format="png"
+      alt={sketch.alt}
+      width={WIDTH}
+      widths={[WIDTH, WIDTH * 2]}
+      sizes={`${WIDTH}px`}
+    />
+  </figure>
+)}

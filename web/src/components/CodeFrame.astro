@@ -1,0 +1,22 @@
+---
+// A code frame: the repo path in a hairline header, then the snippet.
+// Highlighting comes from Expressive Code with the site's Ember themes,
+// so there is no syntax-colouring JavaScript on the page.
+import { Code } from "@astrojs/starlight/components";
+
+interface Props {
+  path: string;
+  code: string;
+  lang?: string;
+}
+
+const { path, code, lang = "go" } = Astro.props;
+---
+
+<div class="codeframe">
+  <div class="frame-head">
+    <span class="frame-path">{path}</span>
+  </div>
+  <Code code={code.trim()} lang={lang} frame="none" wrap={false} />
+  <slot />
+</div>

@@ -1,0 +1,124 @@
+---
+title: Streams
+summary: A stream is the events of one call, read in order, then the final message.
+---
+
+import Lanes from "../../../components/figures/Lanes.astro";
+import StopOrCancel from "../../../components/figures/StopOrCancel.astro";
+
+`Events` reads the events in order. `Wait` waits for the message. The message and the terminal error are the result, not events.
+
+<Lanes
+  alt="A timeline of eight events. start opens the call. Then ContentIndex 0 gets text_start, two text_delta events, and text_end with Hello. Then ContentIndex 1 gets tool_start, tool_delta, and tool_end with the ToolCall. After the events, stream.Wait returns the message with the two blocks, and an error."
+  steps={8}
+  lanes={[
+    { label: "the call", kind: "user", events: [{ at: 1, type: "start" }] },
+    {
+      name: "ContentIndex 0",
+      label: "a text block",
+      kind: "assistant",
+      events: [
+        { at: 2, type: "text_start" },
+        { at: 3, type: "text_delta", payload: `"Hel"` },
+        { at: 4, type: "text_delta", payload: `"lo"` },
+        { at: 5, type: "text_end", payload: `"Hello"` },
+      ],
+      bufferLabel: "block 0",
+      buffer: [
+        { at: 3, text: "Hel" },
+        { at: 4, text: "Hello" },
+        { at: 5, text: "Hello", done: true },
+      ],
+    },
+    {
+      name: "ContentIndex 1",
+      label: "a tool call block",
+      kind: "tool",
+      events: [
+        { at: 6, type: "tool_start" },
+        { at: 7, type: "tool_delta", payload: `{"ci` },
+        { at: 8, type: "tool_end", payload: "ToolCall" },
+      ],
+      bufferLabel: "block 1",
+      buffer: [
+        { at: 7, text: `{"ci…` },
+        { at: 8, text: "weather", done: true },
+      ],
+    },
+  ]}
+  result={{
+    call: "stream.Wait()",
+    type: "*ai.Message",
+    parts: [
+      { text: "[0] Text", kind: "assistant" },
+      { text: "[1] ToolCall", kind: "tool" },
+    ],
+    tail: ", err",
+  }}
+/>
+
+## Two Ways to Read
+
+```go
+// Only the message.
+msg, err := stream.Wait()
+
+// Each event, then the message.
+for ev, err := range stream.Events() {
+	if err != nil { return err }
+	// ev.Type, ev.ContentIndex, ev.Delta, ev.Content, ev.ToolCall
+}
+msg, err := stream.Wait()
+```
+
+## Events
+
+| Type                                            | Carries                             |
+| ----------------------------------------------- | ----------------------------------- |
+| `start`                                         | Nothing                             |
+| `text_start`, `thinking_start`, `tool_start`    | `ContentIndex`                      |
+| `text_delta`, `thinking_delta`, `tool_delta`    | `ContentIndex`, `Delta`             |
+| `text_end`                                      | `ContentIndex`, `Content`           |
+| `thinking_end`                                  | `ContentIndex`                      |
+| `tool_end`                                      | `ContentIndex`, `ToolCall`          |
+
+`ContentIndex` tells you which block a delta belongs to. A response with thinking and text has two blocks.
+
+## Rules
+
+- A stream has one consumer, on one goroutine.
+- A break out of `Events` does not stop the producer. It runs to its end, and the stream drops the later events. To stop a call, cancel the context.
+- An error from before the request comes on the stream. There is one error path.
+- An event round-trips through JSON with the zero fields omitted. [Stream a Response](../guides/stream-a-response.mdx) forwards one.
+
+<StopOrCancel
+  alt="A break out of Events stops your loop, but the provider runs to its return and the stream drops the later events. A cancel of the context stops the provider, and your loop gets an error."
+  cases={[
+    {
+      code: "break",
+      title: "out of Events",
+      tracks: [
+        { label: "your loop", marks: ["dot", "dot", "dot", "x"] },
+        { label: "provider", marks: ["dot", "dot", "dot", "ghost", "ghost", "ghost", { chip: "return" }] },
+      ],
+      note: "runs to its end,",
+      strong: "later events dropped",
+    },
+    {
+      code: "cancel",
+      title: "the context",
+      tracks: [
+        { label: "your loop", marks: ["dot", "dot", "dot", "gap", { chip: "err", err: true }] },
+        { label: "provider", marks: ["dot", "dot", "dot", "x"] },
+      ],
+      strong: "the call stops",
+    },
+  ]}
+/>
+
+## Related
+
+- [Messages](messages.mdx) is what `Wait` returns.
+- [Tools](../tool/index.mdx) run from the `ToolCall` of a `tool_end` event.
+
+The decisions are in [docs/concepts/ai/stream.md](../../../../../docs/concepts/ai/stream.md).

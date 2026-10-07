@@ -1,0 +1,280 @@
+---
+// A fork with a loop: a caller sends a call, and the call ends in one of
+// two ways. One result stays inside a dashed boundary and loops back to
+// the caller. The other crosses the boundary and ends the run. Use it
+// for two failure channels where the difference is where the failure
+// goes.
+//
+// The drawing is a grid. Every connector is a border on a cell, placed at
+// the middle of its column or its row, so it follows the layout.
+import Figure from "./Figure.astro";
+
+interface Result {
+  // value is what the call returns, such as "ToolResult{}, err".
+  value: string;
+  note: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // from is the caller, such as "the model".
+  from: string;
+  // call is the node that runs, such as "Run(ctx, call)".
+  call: string;
+  // edge labels the arrow from the caller to the call.
+  edge: string;
+  // loop is the result that goes back to the caller.
+  loop: Result & { label: string };
+  // exit is the result that leaves the boundary.
+  exit: Result & { outcome: string; causes: string };
+  // boundary labels the dashed box.
+  boundary: string;
+}
+
+const { alt, caption, from, call, edge, loop, exit, boundary } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="ff">
+    <div class="bnd"><span>{boundary}</span></div>
+
+    <div class="node k-assistant from">{from}</div>
+    <div class="callrow">
+      <div class="arrow"><span>{edge}</span></div>
+      <div class="node call">{call}</div>
+      <div class="pad"></div>
+    </div>
+
+    <div class="up"></div>
+    <div class="down"></div>
+    <div class="fork-b"></div>
+    <div class="fork-c"></div>
+
+    <div class="back"></div>
+    <div class="resrow">
+      <div class="back-in"></div>
+      <div class="node k-tool loopres">
+        {loop.value}
+        <small>{loop.note}</small>
+      </div>
+      <div class="pad"></div>
+    </div>
+    <div class="node exitres">
+      {exit.value}
+      <small>{exit.note}</small>
+    </div>
+
+    <div class="loop-l">{loop.label}</div>
+    <div class="exit-down"></div>
+    <div class="exit-l">
+      <span>{exit.outcome}</span>
+      <small>{exit.causes}</small>
+    </div>
+  </div>
+</Figure>
+
+<style>
+  /* Columns: the caller, the call, and outside the boundary. Rows: the
+     call, the fork, the results, the arrow out, and the labels. */
+  .ff {
+    --in: 14px;
+    --ca: 124px;
+    display: grid;
+    grid-template-columns: [a] var(--ca) [b] minmax(0, 1fr) [c] 176px [end];
+    grid-template-rows: [r1] auto [r2] 34px [r3] auto [r4] 26px [r5] auto;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  small {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .bnd {
+    grid-column: a / c;
+    grid-row: r1 / -1;
+    display: flex;
+    align-items: flex-end;
+    padding: 0 0 8px var(--in);
+    border: 1px dashed var(--line-strong);
+    border-radius: 14px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .from {
+    grid-column: a;
+    grid-row: r1;
+    margin: 16px var(--in) 0;
+    text-align: center;
+  }
+  .callrow {
+    grid-column: b;
+    grid-row: r1;
+    display: flex;
+    align-items: center;
+    margin-top: 16px;
+  }
+  /* A spacer on each side keeps the node in the middle of the column. */
+  .callrow > .arrow,
+  .callrow > .pad,
+  .resrow > .back-in,
+  .resrow > .pad {
+    flex: 1;
+    min-width: 0;
+  }
+  .arrow {
+    position: relative;
+    align-self: center;
+    margin-left: calc(-1 * var(--in));
+    margin-right: 6px;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .arrow::after {
+    content: "";
+    position: absolute;
+    right: -6px;
+    top: -4.6px;
+    border: 4px solid transparent;
+    border-left: 7px solid var(--line-strong);
+    border-right: 0;
+  }
+  .arrow span {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 3px;
+    font-size: 11px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .call {
+    flex: none;
+    text-align: center;
+  }
+
+  /* The loop: up the middle of the caller column into the caller. */
+  .up {
+    grid-column: a;
+    grid-row: r2;
+    position: relative;
+    margin-left: 50%;
+    border-left: 1.4px solid var(--primary);
+  }
+  .up::before {
+    content: "";
+    position: absolute;
+    left: -5px;
+    top: 0;
+    border: 4px solid transparent;
+    border-bottom: 7px solid var(--primary);
+    border-top: 0;
+  }
+  .back {
+    grid-column: a;
+    grid-row: r3;
+    align-self: start;
+    height: 50%;
+    margin-left: 50%;
+    border-left: 1.4px solid var(--primary);
+    border-bottom: 1.4px solid var(--primary);
+    border-bottom-left-radius: 8px;
+  }
+  .back-in {
+    align-self: center;
+    border-top: 1.4px solid var(--primary);
+  }
+
+  /* The fork: down the middle of the call column to the loop result, and
+     across the boundary to the exit result. */
+  .down {
+    grid-column: b;
+    grid-row: r2;
+    position: relative;
+    margin-left: 50%;
+    border-left: 1.4px solid var(--primary);
+  }
+  .down::after {
+    content: "";
+    position: absolute;
+    left: -5px;
+    bottom: 0;
+    border: 4px solid transparent;
+    border-top: 7px solid var(--primary);
+    border-bottom: 0;
+  }
+  .fork-b {
+    grid-column: b;
+    grid-row: r2;
+    align-self: start;
+    height: 50%;
+    margin-left: 50%;
+    border-bottom: 1.3px dashed var(--err);
+  }
+  .fork-c {
+    grid-column: c;
+    grid-row: r2;
+    position: relative;
+    align-self: end;
+    width: 50%;
+    height: 50%;
+    border-top: 1.3px dashed var(--err);
+    border-right: 1.3px dashed var(--err);
+    border-top-right-radius: 8px;
+  }
+  .fork-c::after,
+  .exit-down::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    bottom: 0;
+    border: 4px solid transparent;
+    border-top: 7px solid var(--err);
+    border-bottom: 0;
+  }
+
+  .resrow {
+    grid-column: b;
+    grid-row: r3;
+    display: flex;
+    align-items: center;
+  }
+  .loopres,
+  .exitres {
+    flex: none;
+    text-align: center;
+  }
+  /* Three classes beat the global .fig .node border. */
+  .ff .node.exitres {
+    grid-column: c;
+    grid-row: r3;
+    align-self: center;
+    justify-self: center;
+    border: 1.2px dashed var(--err);
+    color: var(--err);
+  }
+  .loop-l {
+    grid-column: a / c;
+    grid-row: r4;
+    align-self: center;
+    padding-left: calc(var(--ca) / 2 + 10px);
+    font-size: 11px;
+    color: var(--link);
+  }
+  .exit-down {
+    grid-column: c;
+    grid-row: r4;
+    position: relative;
+    width: 50%;
+    border-right: 1.3px dashed var(--err);
+  }
+  .exit-l {
+    grid-column: c;
+    grid-row: r5;
+    padding-top: 4px;
+    text-align: center;
+  }
+  .exit-l small {
+    line-height: 1.35;
+  }
+</style>

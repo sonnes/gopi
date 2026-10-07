@@ -1,0 +1,114 @@
+<section class="page" id="text">
+<style>
+/* Box-drawing glyphs are not in the Google Fonts latin subset of Plex Mono.
+   This text= subset loads them from Plex too, so every column is 0.6em wide. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&text=%E2%94%80%E2%94%82%E2%94%8C%E2%94%90%E2%94%94%E2%94%98%E2%94%9C%E2%94%A4%E2%94%AC%E2%94%B4%E2%94%BC%E2%95%AD%E2%95%AE%E2%95%AF%E2%95%B0%E2%96%B6%E2%97%80%E2%96%BC%E2%96%B2%C2%B7&display=block");
+
+/* 13px Plex Mono: one column is 7.8px, so 72 columns fit in 566px.
+   A line-height of 16px (1.23) joins the vertical strokes. At 1.35 and more
+   they break. */
+#text .tx { margin: 0; max-width: 566px; }
+#text .tx pre {
+  margin: 0; padding: 14px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 13px; line-height: 16px;
+  font-variant-ligatures: none; font-kerning: none;
+  color: var(--text); background: none;
+  white-space: pre; overflow-x: auto; tab-size: 8;
+}
+#text .tx .m { color: var(--muted); }
+#text .tx .a { color: var(--l-ai-deep); }
+#text .tx .d { color: var(--l-durable-deep); }
+#text .tx .g { color: var(--l-agent-deep); }
+#text .tx .b { font-weight: 600; }
+
+#text .prose { font-family: "Noto Sans", var(--font-prose); font-size: 16px; line-height: 1.65;
+  color: var(--copy); max-width: 31rem; margin: 0 0 20px; }
+#text .prose code { font-size: 0.875em; color: var(--text); }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">style</div>
+    <h2>Plain Text</h2>
+    <p class="job">Every figure is monospaced text drawn with box-drawing characters, so a reader can select it and copy it.</p>
+    <p class="now">Borrows from RFC diagrams, Go source comments, and the diagrams in <code>docs/concepts/</code>.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">F1 <span>· Streams</span></h3>
+    <figure class="tx">
+<pre role="img" aria-label="The events of one call in order. text_start, two text_delta events, and text_end feed ContentIndex 0, and the text grows from Hel to Hello. tool_start, tool_delta, and tool_end feed ContentIndex 1. After the events, stream.Wait returns the message with both blocks.">
+<span class="m">Events(), in order</span>          <span class="m">ContentIndex 0</span>        <span class="m">ContentIndex 1</span>
+
+start
+text_start <span class="m">───────────────▶</span> ┬ Text
+text_delta "Hel" <span class="m">─────────▶</span> │ <span class="d">"Hel"</span>
+text_delta "lo" <span class="m">──────────▶</span> │ <span class="d">"Hello"</span>
+text_end "Hello" <span class="m">─────────▶</span> ┴ Text <span class="d">"Hello"</span>
+tool_start <span class="m">─────────────────────────────────────▶</span> ┬ ToolCall
+tool_delta {"ci <span class="m">────────────────────────────────▶</span> │ <span class="d">{"ci</span>
+tool_end <span class="m">───────────────────────────────────────▶</span> ┴ ToolCall weather
+
+<span class="a">stream.Wait()</span> <span class="a">──▶</span> <span class="a b">*ai.Message</span>          <span class="m">a return value, not an event</span>
+                  ├─ [0] Text <span class="d">"Hello"</span>
+                  └─ [1] ToolCall weather</pre>
+    </figure>
+    <p class="why"><b>Reads as:</b> a trace with one lane per block, where each delta lands on its lane and the text grows row by row. <span class="cost">Cost:</span> the lanes stop at <code>tool_end</code>, so the Wait rows have to repeat both blocks.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">F2 <span>· Sessions: Add Context to a Run</span></h3>
+    <figure class="tx">
+<pre role="img" aria-label="a.Run adds a meta skill, a user question, and an ephemeral time. The model reads u1, a1, skill, u2, and time. The store keeps u1, a1, the new skill as injected=meta, and the new u2. The time is not stored.">
+a.Run(ctx,
+    session.Text(skill, <span class="d">session.Meta()</span>),
+    session.Text("next question"),
+    session.Text(now, <span class="m">session.Ephemeral()</span>),
+)
+
+<span class="m">                       │</span> <span class="m">the model reads</span>  <span class="m">│</span> <span class="m">the store keeps</span>
+<span class="m">───────────────────────┼──────────────────┼──────────────────────────</span>
+<span class="m">already in the log     │</span> u1     user      <span class="m">│</span> u1     user
+<span class="m">                       │</span> <span class="g">a1     assistant</span> <span class="m">│</span> <span class="g">a1     assistant</span>
+<span class="m">───────────────────────┼──────────────────┼──────────────────────────</span>
+Text(skill, Meta())    <span class="m">│</span> <span class="d">skill  meta</span>      <span class="m">│</span> <span class="d">skill  injected=meta</span>  <span class="b">new</span>
+Text("next question")  <span class="m">│</span> u2     user      <span class="m">│</span> u2     user           <span class="b">new</span>
+Text(now, Ephemeral()) <span class="m">│ time   ephemeral │ ·      not stored</span>
+
+The next run reads the skill again. It does not read the time.</pre>
+    </figure>
+    <p class="why"><b>Reads as:</b> a table where each argument of the call keeps its row, and the kind appears as a word and as a hue. <span class="cost">Cost:</span> "new" and "not stored" are short words at the right edge, so a skimming reader can miss them.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">F3 <span>· Tools: Two Failure Channels</span></h3>
+    <figure class="tx">
+<pre role="img" aria-label="Run(ctx, call) ends one of two ways. ToolResult with IsError true and a nil error goes back to the model, which corrects the call, and the run goes on. ToolResult with a Go error makes the run fail, for example with a canceled context or a transport that is down.">
+<span class="d">  ╭──── back to the model, which reads it and corrects the call ─╮</span>
+<span class="d">  ▼                                                              │</span>
+model ──▶ Run(ctx, call) ─┬─▶ <span class="d">ToolResult{IsError: true}, nil</span> <span class="d">────╯</span>
+                          │   <span class="m">an error result: the run goes on</span>
+                          │
+                          └─▶ <span class="a">ToolResult{}, err</span> <span class="a">──▶ the run fails</span>
+                              <span class="m">a Go error: a canceled context,</span>
+                              <span class="m">a transport that is down</span></pre>
+    </figure>
+    <p class="why"><b>Reads as:</b> a railroad diagram with one track that bends back to the model and one that leaves. <span class="cost">Cost:</span> the loop spans the full width, so a longer result type or label does not fit in 72 columns.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">On a page</h3>
+    <p class="prose">A tool reports a problem with an error result or with a Go error. The model reads an error result as a normal tool result. Then the model corrects the call, and the run continues. A Go error is for a problem that the model cannot correct, for example a canceled context. A Go error stops the run.</p>
+    <figure class="tx">
+<pre role="img" aria-label="Run(ctx, call) ends one of two ways. ToolResult with IsError true and a nil error goes back to the model, which corrects the call, and the run goes on. ToolResult with a Go error makes the run fail, for example with a canceled context or a transport that is down.">
+<span class="d">  ╭──── back to the model, which reads it and corrects the call ─╮</span>
+<span class="d">  ▼                                                              │</span>
+model ──▶ Run(ctx, call) ─┬─▶ <span class="d">ToolResult{IsError: true}, nil</span> <span class="d">────╯</span>
+                          │   <span class="m">an error result: the run goes on</span>
+                          │
+                          └─▶ <span class="a">ToolResult{}, err</span> <span class="a">──▶ the run fails</span>
+                              <span class="m">a Go error: a canceled context,</span>
+                              <span class="m">a transport that is down</span></pre>
+    </figure>
+  </div>
+</section>

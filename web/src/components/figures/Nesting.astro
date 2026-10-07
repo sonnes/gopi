@@ -1,0 +1,166 @@
+---
+// Nesting: values inside values, with one call that goes in through
+// every layer and a result that comes back out. The layers go from the
+// outside in. The caller sits at the left. Use it to show a wrapper: a
+// value of one type around another value of the same type.
+//
+// The layout is computed from the width of the mono face, 0.6em for
+// each character.
+import Figure from "./Figure.astro";
+
+type Kind = "plain" | "accent" | "wire";
+
+interface Layer {
+  title: string;
+  note?: string;
+  // chip is a field of the layer that the call does not go through.
+  chip?: string;
+  kind?: Kind;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  caller: string;
+  // layers go from the outside in. The call ends at the last one.
+  layers: Layer[];
+  call: string;
+  back: string;
+}
+
+const { alt, caption, caller, layers, call, back } = Astro.props;
+
+const W = 550;
+const CALLER = 80; // the width of the caller
+const X0 = 96; // the left edge of the outer layer
+const IN_X = 22; // the step in from the left, for each layer
+const IN_R = 16; // the step in from the right
+const HEAD = 38; // the height of the title of a layer
+const IN_B = 14; // the step in from the bottom
+const INNER_H = 78; // the height of the last layer
+const ch = (px: number) => px * 0.6;
+
+const n = layers.length;
+const last = layers[n - 1];
+const innerW = Math.ceil(Math.max(last.title.length * ch(12), (last.note ?? "").length * ch(10.5)) + 48);
+const innerY = HEAD * (n - 1) + 20;
+const H = innerY + INNER_H + IN_B * (n - 1) + 2;
+
+const boxes = layers.map((l, i) => {
+  const right = W - IN_R * i;
+  const bottom = H - IN_B * i;
+  if (i === n - 1) {
+    return { ...l, x: right - innerW, y: innerY, w: innerW, h: bottom - innerY - 2 };
+  }
+  const x = X0 + IN_X * i;
+  const y = HEAD * i;
+  return { ...l, x, y, w: right - x, h: bottom - y };
+});
+const inner = boxes[n - 1];
+
+// The call goes in near the top of the last layer, and the result comes
+// back near its foot.
+const callY = inner.y + 16;
+const backY = inner.y + inner.h - 24;
+const labelX = X0 + IN_X * (n - 1);
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="cv" style={`width:${W}px;height:${H}px`}>
+    <div class="bx you" style={`left:0;top:${callY - 34}px;width:${CALLER}px;height:${backY - callY + 56}px`}>
+      {caller}
+    </div>
+    {
+      boxes.map((b) => (
+        <div
+          class:list={["bx", b.kind]}
+          style={`left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px`}
+        >
+          <div class="head">
+            <span class="t">{b.title}</span>
+            {b.chip && <span class="chip">{b.chip}</span>}
+          </div>
+          {b.note && <small>{b.note}</small>}
+        </div>
+      ))
+    }
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
+      <path class="edge-accent" d={`M${CALLER},${callY} H${inner.x - 4}`} />
+      <path class="head-accent" d={`M${inner.x - 10},${callY - 4} L${inner.x - 1},${callY} L${inner.x - 10},${callY + 4} z`} />
+      <text x={labelX} y={callY - 6} class="m">{call}</text>
+      <path class="edge back" d={`M${inner.x},${backY} H${CALLER + 4}`} />
+      <path class="back-head" d={`M${CALLER + 10},${backY - 4} L${CALLER + 1},${backY} L${CALLER + 10},${backY + 4} z`} />
+      <text x={labelX} y={backY + 16} class="n">{back}</text>
+    </svg>
+  </div>
+</Figure>
+
+<style>
+  .cv {
+    position: relative;
+    margin: 0 auto;
+  }
+  .cv > svg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .bx {
+    position: absolute;
+    border: 1.2px solid var(--line-strong);
+    border-radius: 14px;
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    padding: 8px 12px;
+  }
+  .head {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .t {
+    font-weight: 600;
+  }
+  .bx small {
+    display: block;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .bx.accent {
+    border: 2px solid var(--primary);
+    background: color-mix(in srgb, var(--primary) 6%, var(--code-bg));
+  }
+  .bx.wire {
+    border-color: var(--l-wire);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+    border-radius: 10px;
+  }
+  .bx.you {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border-radius: 10px;
+    padding: 0 6px;
+    white-space: normal;
+  }
+  .cv svg .m {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+  .cv svg .n {
+    font-size: 10.5px;
+    fill: var(--muted);
+  }
+  .cv svg .edge.back {
+    stroke: var(--muted);
+  }
+  .cv svg .back-head {
+    fill: var(--muted);
+  }
+</style>

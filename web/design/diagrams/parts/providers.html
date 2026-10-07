@@ -1,0 +1,407 @@
+<section class="page" id="providers">
+<style>
+  /* ---------- slot 1: spec sheet ---------- */
+  #providers .specs { display: grid; gap: 12px; }
+  #providers .spec { background: var(--code-bg); border: 1.2px solid var(--line-strong); border-radius: 12px;
+    padding: 12px 14px; display: grid; gap: 10px; }
+  #providers .spec.here { border: 2px solid var(--primary); }
+  #providers .spec-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  #providers .spec-pkg { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text); }
+  #providers .spec-api { font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+  #providers .badges { display: flex; flex-wrap: wrap; gap: 5px; }
+  #providers .badge { font-family: var(--font-mono); font-size: 10.5px; padding: 1px 7px; border-radius: 5px;
+    border: 1px solid var(--l-wire); color: var(--l-wire-deep);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+  #providers .badge.off { border: 1px dotted var(--line-strong); color: var(--muted); background: transparent;
+    text-decoration: line-through; text-decoration-color: var(--muted-soft); }
+  #providers .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 12px; row-gap: 2px;
+    font-family: var(--font-mono); font-size: 11.5px; border-top: 1px solid var(--line); padding-top: 8px; margin: 0; }
+  #providers .kv dt { color: var(--text); }
+  #providers .kv dd { margin: 0; color: var(--muted); }
+  #providers .kv dd code { color: var(--text); }
+  #providers .models { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  #providers .models .lbl { margin-right: 4px; font-size: 11px; }
+  #providers .bind { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); text-align: center; }
+  #providers .bind b { color: var(--text); font-weight: 500; }
+
+  /* B: badge row + table */
+  #providers .lite { display: grid; gap: 12px; }
+  #providers .lite-line { font-family: var(--font-mono); font-size: 12px; color: var(--copy); }
+  #providers .lite-line b { color: var(--text); font-weight: 600; }
+  #providers table.t { border-collapse: collapse; width: 100%; font-family: var(--font-mono); font-size: 11.5px; }
+  #providers table.t th { text-align: left; font-weight: 400; color: var(--muted); font-size: 11px;
+    border-bottom: 1px solid var(--line-strong); padding: 4px 8px; }
+  #providers table.t td { border-bottom: 1px solid var(--line); padding: 4px 8px; color: var(--text); vertical-align: top; }
+  #providers table.t td.m { color: var(--muted); }
+  #providers table.t tr:last-child td { border-bottom: 0; }
+
+  /* ---------- slot 2: thinking ladder ---------- */
+  #providers .ladder { display: grid; grid-template-columns: 74px repeat(6, 1fr); font-family: var(--font-mono);
+    font-size: 11px; row-gap: 0; }
+  #providers .ladder .cap { grid-column: 1 / -1; display: flex; justify-content: space-between; margin-bottom: 6px; }
+  #providers .ladder .cap code { font-size: 11.5px; color: var(--text); }
+  #providers .tick { text-align: center; font-weight: 600; font-size: 12px; color: var(--text); padding-bottom: 6px;
+    position: relative; }
+  #providers .tick::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 1.4px; height: 9px;
+    background: var(--primary); }
+  #providers .tick.unset { color: var(--muted); font-weight: 400; }
+  #providers .tick.unset::after { background: var(--line-strong); }
+  #providers .rail { grid-column: 2 / -1; height: 0; border-top: 1.6px solid var(--primary); margin: 0 6% 0 6%; }
+  #providers .rail0 { grid-column: 1; height: 0; border-top: 1.2px dashed var(--line-strong); margin: 0 30% 0 30%; }
+  #providers .rowlbl { grid-column: 1 / -1; margin-top: 14px; margin-bottom: 4px; display: flex; gap: 8px; align-items: baseline; }
+  #providers .rowlbl b { color: var(--text); font-weight: 600; font-size: 11.5px; }
+  #providers .rowlbl span { color: var(--muted); }
+  #providers .cell { text-align: center; padding: 3px 2px; }
+  #providers .cell .chip { font-size: 10.5px; padding: 1px 6px; }
+  #providers .cell .none { color: var(--muted); font-size: 10.5px; }
+  #providers .cell.blank { color: var(--line-strong); }
+  #providers .sum { grid-column: 3 / -1; margin: 3px 6% 0; border: 1.2px solid var(--l-wire); border-top: 0;
+    border-radius: 0 0 8px 8px; height: 7px; }
+  #providers .sumlbl { grid-column: 3 / -1; text-align: center; color: var(--l-wire-deep); font-size: 10.5px; margin-top: 2px; }
+  #providers .unsetcell .chip { border-style: dashed; white-space: normal; line-height: 1.25; display: inline-block;
+    padding: 2px 5px; border-radius: 6px; }
+  #providers .warn { color: var(--err); font-size: 10px; display: block; line-height: 1.2; margin-top: 2px; }
+  #providers .foot { margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); font-family: var(--font-mono);
+    font-size: 11px; color: var(--muted); }
+  #providers .foot code { color: var(--text); }
+
+  /* B: matrix */
+  #providers table.mx td, #providers table.mx th { text-align: center; }
+  #providers table.mx td:first-child, #providers table.mx th:first-child { text-align: left; }
+  #providers table.mx td.n { color: var(--muted); }
+  #providers table.mx td.x { color: var(--err); }
+  #providers table.mx .s { color: var(--l-wire-deep); }
+
+  /* ---------- slot 3: hub fan-out ---------- */
+  #providers .fan { display: grid; grid-template-columns: 172px 44px 1fr; align-items: center; }
+  #providers .hub { display: grid; gap: 6px; }
+  #providers .hub .node { font-size: 11.5px; line-height: 1.5; }
+  #providers .hub .node .d { color: var(--muted); }
+  #providers .hub .note { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); line-height: 1.35; }
+  #providers .fan svg { width: 44px; height: 300px; }
+  #providers .servers { display: grid; grid-template-rows: repeat(3, 92px); gap: 12px; }
+  #providers .srv { background: var(--code-bg); border: 1.2px solid var(--l-wire); border-radius: 10px;
+    padding: 7px 11px; display: grid; align-content: start; gap: 3px; font-family: var(--font-mono); font-size: 11px; }
+  #providers .srv-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #providers .srv-h b { font-size: 12px; font-weight: 600; color: var(--text); }
+  #providers .srv-h span { color: var(--muted); font-size: 10.5px; }
+  #providers .srv .r { display: grid; grid-template-columns: 76px 1fr; gap: 6px; }
+  #providers .srv .r .k { color: var(--muted); }
+  #providers .srv .r .v { color: var(--text); }
+  #providers .srv .r .v.m { color: var(--muted); }
+  #providers .srv .bad { color: var(--err); border: 1px dashed var(--err); border-radius: 5px; padding: 0 5px;
+    justify-self: start; font-size: 10.5px; }
+  #providers .fan-foot { margin-top: 12px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; }
+
+  /* ---------- slot 4: caching prefix bar ---------- */
+  #providers .cache { display: grid; gap: 20px; }
+  #providers .cache-h { font-family: var(--font-mono); font-size: 11.5px; margin-bottom: 20px; display: flex;
+    justify-content: space-between; }
+  #providers .cache-h b { font-weight: 600; color: var(--text); }
+  #providers .cache-h span { color: var(--muted); }
+  #providers .bar { display: flex; position: relative; height: 30px; font-family: var(--font-mono); font-size: 11px; }
+  #providers .seg { display: flex; align-items: center; justify-content: center; border: 1.2px solid var(--line-strong);
+    background: var(--code-bg); color: var(--text); margin-left: -1.2px; white-space: nowrap; }
+  #providers .seg:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+  #providers .seg:last-child { border-radius: 0 8px 8px 0; }
+  #providers .seg.new { border-style: dashed; color: var(--muted); }
+  #providers .seg.hot { background: var(--primary-faint); }
+  #providers .flag { position: absolute; top: -18px; bottom: -2px; width: 0; border-left: 2px solid var(--primary); }
+  #providers .flag::before { content: ""; position: absolute; left: 0; top: 0; border-left: 10px solid var(--primary);
+    border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+  #providers .flag i { position: absolute; left: 12px; top: -3px; font-style: normal; font-size: 10.5px; color: var(--link);
+    white-space: nowrap; }
+  #providers .flag.l i { left: auto; right: 5px; }
+  #providers .brk { position: relative; height: 10px; margin-top: 5px; border: 1.2px solid var(--primary);
+    border-top: 0; border-radius: 0 0 6px 6px; }
+  #providers .brk.auto { border-style: dashed; border-top: 0; border-color: var(--line-strong); }
+  #providers .brklbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--link); margin-top: 3px; }
+  #providers .brklbl span { color: var(--muted); }
+  #providers .brklbl.auto { color: var(--muted); }
+  #providers .keychip { margin-top: 8px; display: flex; gap: 8px; align-items: center; font-family: var(--font-mono);
+    font-size: 11px; color: var(--muted); }
+  #providers .keychip .chip { border-color: var(--l-wire); color: var(--l-wire-deep);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+
+  /* B: before/after */
+  #providers .calls { display: grid; gap: 16px; }
+  #providers .call { display: grid; grid-template-columns: 1fr 128px; gap: 12px; align-items: center; }
+  #providers .call .lbl { grid-column: 1 / -1; margin-bottom: -6px; }
+  #providers .seg.read { background: color-mix(in srgb, var(--ok) 16%, var(--code-bg)); border-color: var(--ok); }
+  #providers .seg.write { background: var(--primary-faint); border-color: var(--primary); }
+  #providers .usage { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; display: grid;
+    grid-template-columns: 1fr auto; column-gap: 8px; border-left: 1px solid var(--line); padding-left: 10px; }
+  #providers .usage span { color: var(--muted); }
+  #providers .usage b { font-weight: 600; text-align: right; }
+  #providers .usage b.w { color: var(--link); }
+  #providers .usage b.r { color: var(--ok); }
+  #providers .usage b.z { color: var(--muted); font-weight: 400; }
+  #providers .legend { display: flex; gap: 14px; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+  #providers .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px;
+    margin-right: 4px; border: 1.2px solid; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/providers/*.mdx · anthropic, openai, openai-chat</div>
+    <h2>Providers</h2>
+    <p class="job"><b>Must get across:</b> each provider is one package that calls one API, implements a fixed set of interfaces, and maps the shared <code>ai</code> settings onto that API's own fields.</p>
+    <p class="now">Today: all three pages open with the same flowchart, an options list and a models list with arrows into <code>ai.LanguageModel</code>. It is a list drawn as boxes. The thinking, server, and caching facts sit in tables and prose with no picture.</p>
+  </div>
+
+  <!-- ================= slot 1 ================= -->
+  <div class="slot">
+    <h3 class="slot-title">Anthropic · the header <span>· replaces the top diagram on all three pages</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Spec sheet</span></div>
+        <figure class="fig">
+          <div class="specs">
+            <div class="spec here">
+              <div class="spec-top"><span class="spec-pkg">pkg/ai/anthropic</span><span class="spec-api">Messages API</span></div>
+              <div class="badges"><span class="badge">TextProvider</span><span class="badge">ObjectProvider</span><span class="badge">TokenCounter</span><span class="badge off">ImageProvider</span></div>
+              <dl class="kv">
+                <dt>APIKey(key)</dt><dd>default <code>ANTHROPIC_API_KEY</code></dd>
+                <dt>BaseURL(url)</dt><dd>a proxy or a test server</dd>
+                <dt>HTTPClient(c)</dt><dd>a recording client</dd>
+              </dl>
+              <div class="models"><span class="lbl">models</span><span class="chip k-ai">anthropic.Sonnet5</span><span class="chip k-ai">anthropic.Opus5</span><span class="chip k-ai">anthropic.Opus5_5</span></div>
+            </div>
+            <div class="spec">
+              <div class="spec-top"><span class="spec-pkg">pkg/ai/openai</span><span class="spec-api">Responses API</span></div>
+              <div class="badges"><span class="badge">TextProvider</span><span class="badge">ObjectProvider</span><span class="badge">TokenCounter</span><span class="badge">ImageProvider</span></div>
+              <dl class="kv">
+                <dt>APIKey(key)</dt><dd>default <code>OPENAI_API_KEY</code></dd>
+                <dt>BaseURL(url)</dt><dd>OpenRouter, a proxy, a test server</dd>
+                <dt>HTTPClient(c)</dt><dd>a recording client</dd>
+              </dl>
+              <div class="models"><span class="lbl">models</span><span class="chip k-ai">openai.GPT6Luna</span><span class="chip k-ai">openai.GPT6Sol</span><span class="chip k-ai">openai.GPT6Astra</span><span class="chip k-value">openai.GPTImage2</span></div>
+            </div>
+            <div class="spec">
+              <div class="spec-top"><span class="spec-pkg">pkg/ai/openaichat</span><span class="spec-api">Chat Completions API</span></div>
+              <div class="badges"><span class="badge">TextProvider</span><span class="badge">ObjectProvider</span><span class="badge off">TokenCounter</span><span class="badge off">ImageProvider</span></div>
+              <dl class="kv">
+                <dt>APIKey(key)</dt><dd>default <code>OPENAI_API_KEY</code></dd>
+                <dt>BaseURL(url)</dt><dd>the server</dd>
+                <dt>CacheBreakpoints()</dt><dd>the OpenAI cache mark</dd>
+              </dl>
+              <div class="models"><span class="lbl">models</span><span class="chip k-ephemeral">none · an openai model or your own ai.Model</span></div>
+            </div>
+            <div class="bind">model + <b>New(opts...)</b> → <b>ai.LanguageModel{ Model, Provider }</b></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> the reader sees what the package can do (lit badges) and what it cannot (dim badges) before reading a line. Each page shows only its own card; all three are here to show that the shape is the same. <span class="cost">Cost: one small card component with four props; the page gives no output caps, so models are names only.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Badge row + option table</span></div>
+        <figure class="fig">
+          <div class="lite">
+            <div class="lite-line"><b>pkg/ai/anthropic</b> → Messages API</div>
+            <div class="badges"><span class="badge">TextProvider</span><span class="badge">ObjectProvider</span><span class="badge">TokenCounter</span><span class="badge off">ImageProvider</span></div>
+            <table class="t">
+              <thead><tr><th>anthropic.New(opts...)</th><th>sets</th></tr></thead>
+              <tbody>
+                <tr><td>APIKey(key)</td><td class="m">default ANTHROPIC_API_KEY</td></tr>
+                <tr><td>BaseURL(url)</td><td class="m">a proxy or a test server</td></tr>
+                <tr><td>HTTPClient(c)</td><td class="m">a recording client</td></tr>
+              </tbody>
+            </table>
+            <div class="models"><span class="lbl">models</span><span class="chip k-ai">anthropic.Sonnet5</span><span class="chip k-ai">anthropic.Opus5</span><span class="chip k-ai">anthropic.Opus5_5</span></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> the same facts with less chrome. It reads like the top of a godoc page. <span class="cost">Cost: nearly free (a badge row plus a Markdown table), but it has less visual weight, and a reader can skip it as boilerplate.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= slot 2 ================= -->
+  <div class="slot">
+    <h3 class="slot-title">Thinking levels <span>· replaces the three level tables (Anthropic, OpenAI, OpenAI Chat)</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Ladder</span></div>
+        <figure class="fig">
+          <div class="ladder">
+            <div class="cap"><span class="lbl">ai.Thinking(level)</span><span class="lbl">each tick is <code>ai.Thinking&lt;Name&gt;</code></span></div>
+            <div class="tick unset">unset</div><div class="tick">Off</div><div class="tick">Low</div><div class="tick">Medium</div><div class="tick">High</div><div class="tick">XHigh</div><div class="tick">Max</div>
+            <div class="rail0"></div><div class="rail"></div>
+
+            <div class="rowlbl"><b>anthropic</b><span>effort</span></div>
+            <div class="cell blank"></div>
+            <div class="cell"><span class="none">no thinking</span></div>
+            <div class="cell"><span class="chip">low</span></div><div class="cell"><span class="chip">medium</span></div><div class="cell"><span class="chip">high</span></div><div class="cell"><span class="chip">xhigh</span></div><div class="cell"><span class="chip">max</span></div>
+
+            <div class="rowlbl"><b>openai</b><span>reasoning effort</span></div>
+            <div class="cell unsetcell"><span class="chip">model's effort<br>+ summary</span></div>
+            <div class="cell"><span class="chip">none</span></div>
+            <div class="cell"><span class="chip">low</span></div><div class="cell"><span class="chip">medium</span></div><div class="cell"><span class="chip">high</span></div><div class="cell"><span class="chip">xhigh</span></div><div class="cell"><span class="chip">max</span></div>
+            <div class="sum"></div>
+            <div class="sumlbl">+ a reasoning summary</div>
+
+            <div class="rowlbl"><b>openaichat</b><span>reasoning_effort</span></div>
+            <div class="cell blank"></div>
+            <div class="cell"><span class="chip">none</span><span class="warn">may be rejected</span></div>
+            <div class="cell"><span class="chip">low</span></div><div class="cell"><span class="chip">medium</span></div><div class="cell"><span class="chip">high</span></div><div class="cell"><span class="chip">xhigh</span></div><div class="cell"><span class="chip">max</span></div>
+
+            <div class="foot" style="grid-column: 1 / -1">A level that the provider does not know fails the call before the request.</div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> one scale, three rows. The reader sees that the providers agree on Low to Max and differ only at the ends: Off, unset, and the OpenAI summary. <span class="cost">Cost: a grid with 7 columns; a new level or a new provider means a new column or row in one shared figure, not three tables.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Comparison matrix</span></div>
+        <figure class="fig">
+          <table class="t mx">
+            <thead><tr><th>ai.Thinking…</th><th>anthropic<br>effort</th><th>openai<br>reasoning effort</th><th>openaichat<br>reasoning_effort</th></tr></thead>
+            <tbody>
+              <tr><td class="m">unset</td><td class="n">·</td><td>model's <span class="s">+ summary</span></td><td class="n">·</td></tr>
+              <tr><td>Off</td><td class="n">no thinking</td><td>none</td><td>none <span class="x">⚠</span></td></tr>
+              <tr><td>Low</td><td>low</td><td>low <span class="s">+ summary</span></td><td>low</td></tr>
+              <tr><td>Medium</td><td>medium</td><td>medium <span class="s">+ summary</span></td><td>medium</td></tr>
+              <tr><td>High</td><td>high</td><td>high <span class="s">+ summary</span></td><td>high</td></tr>
+              <tr><td>XHigh</td><td>xhigh</td><td>xhigh <span class="s">+ summary</span></td><td>xhigh</td></tr>
+              <tr><td>Max</td><td>max</td><td>max <span class="s">+ summary</span></td><td>max</td></tr>
+            </tbody>
+          </table>
+          <div class="foot"><span style="color: var(--err)">⚠</span> a model that cannot turn reasoning off rejects <code>none</code>. An unknown level fails before the request.</div>
+        </figure>
+        <p class="why"><b>Why:</b> exact, and the reader can scan it row by row. It is also one table in place of three. <span class="cost">Cost: plain Markdown. It loses the "scale" reading, so the reader must compare the columns cell by cell.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= slot 3 ================= -->
+  <div class="slot">
+    <h3 class="slot-title">OpenAI Chat · one client, three servers <span>· replaces the top diagram and the Servers table</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Hub fan-out</span></div>
+        <figure class="fig">
+          <div class="fan">
+            <div class="hub">
+              <div class="node accent">openaichat.New(<br>&nbsp;&nbsp;APIKey(key),<br>&nbsp;&nbsp;<b>BaseURL(url)</b>,<br>&nbsp;&nbsp;<span class="d">CacheBreakpoints(),</span><br>)</div>
+              <div class="note">one request shape:<br>only the fields that<br>all three accept</div>
+            </div>
+            <svg viewBox="0 0 44 300" preserveAspectRatio="none" aria-hidden="true">
+              <path class="edge-accent" d="M0 150 C 22 150, 22 46, 40 46"/>
+              <path class="edge-accent" d="M0 150 L 40 150"/>
+              <path class="edge-accent" d="M0 150 C 22 150, 22 254, 40 254"/>
+              <path class="head-accent" d="M44 46 l-6 -3.5 v7z"/>
+              <path class="head-accent" d="M44 150 l-6 -3.5 v7z"/>
+              <path class="head-accent" d="M44 254 l-6 -3.5 v7z"/>
+            </svg>
+            <div class="servers">
+              <div class="srv">
+                <div class="srv-h"><b>OpenAI</b><span>api.openai.com</span></div>
+                <div class="r"><span class="k">reasoning</span><span class="v m">none on this API</span></div>
+                <div class="r"><span class="k">cache mark</span><span class="v">with CacheBreakpoints()</span></div>
+              </div>
+              <div class="srv">
+                <div class="srv-h"><b>OpenRouter</b><span>openrouter.ai/api/v1</span></div>
+                <div class="r"><span class="k">reasoning</span><span class="v">reasoning</span></div>
+                <div class="r"><span class="k">cache mark</span><span class="v">with CacheBreakpoints()</span></div>
+              </div>
+              <div class="srv">
+                <div class="srv-h"><b>Fireworks</b><span>api.fireworks.ai/inference/v1</span></div>
+                <div class="r"><span class="k">reasoning</span><span class="v">reasoning_content</span></div>
+                <div class="r"><span class="k">cache mark</span><span class="v">automatic</span></div>
+                <span class="bad">⚠ CacheBreakpoints() fails the call</span>
+              </div>
+            </div>
+          </div>
+          <div class="fan-foot">Fireworks caps a call at 2048 tokens by default · set MaxTokens</div>
+        </figure>
+        <p class="why"><b>Why:</b> the reader sees one client and three targets, and the one trap (the Fireworks cache option) is marked in red on the card where it happens. <span class="cost">Cost: hand-placed connectors against fixed card heights; a fourth server means a new card and a redrawn fan.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Servers × features matrix</span></div>
+        <figure class="fig">
+          <table class="t mx">
+            <thead><tr><th></th><th>OpenAI</th><th>OpenRouter</th><th>Fireworks</th></tr></thead>
+            <tbody>
+              <tr><td class="m">BaseURL</td><td>api.openai.com</td><td>openrouter.ai<br>/api/v1</td><td>api.fireworks.ai<br>/inference/v1</td></tr>
+              <tr><td class="m">reasoning text</td><td class="n">none</td><td>reasoning</td><td>reasoning_content</td></tr>
+              <tr><td class="m">cache mark</td><td>on request</td><td>on request</td><td>automatic</td></tr>
+              <tr><td class="m">CacheBreakpoints()</td><td style="color: var(--ok)">✓</td><td style="color: var(--ok)">✓</td><td class="x">✗ fails the call</td></tr>
+              <tr><td class="m">default max tokens</td><td class="n">·</td><td class="n">·</td><td>2048 · set MaxTokens</td></tr>
+            </tbody>
+          </table>
+        </figure>
+        <p class="why"><b>Why:</b> dense and exact. The CacheBreakpoints row makes the Fireworks exception stand out. <span class="cost">Cost: plain table. It does not show that one client serves all three, which is the point of the page.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= slot 4 ================= -->
+  <div class="slot">
+    <h3 class="slot-title">Caching <span>· new picture for the Caching sections (Anthropic, OpenAI)</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Prefix bar</span></div>
+        <figure class="fig">
+          <div class="cache">
+            <div>
+              <div class="cache-h"><b>anthropic</b><span>marks the system prompt + the last cacheable block</span></div>
+              <div class="bar">
+                <div class="seg hot" style="width: 26%">system prompt</div>
+                <div class="seg hot" style="width: 50%">stable history</div>
+                <div class="seg hot" style="width: 24%">new turn</div>
+                <span class="flag" style="left: 26%"><i>mark</i></span>
+                <span class="flag l" style="left: calc(100% - 2px)"><i>mark</i></span>
+              </div>
+              <div class="brk"></div>
+              <div class="brklbl">cached prefix <span>· needs ≥ 512 to 4096 tokens (per model); shorter: not cached, no error</span></div>
+            </div>
+            <div>
+              <div class="cache-h"><b>openai</b><span>marks the end of the system prompt</span></div>
+              <div class="bar">
+                <div class="seg hot" style="width: 26%">system prompt</div>
+                <div class="seg" style="width: 50%">stable history</div>
+                <div class="seg new" style="width: 24%">new turn</div>
+                <span class="flag" style="left: 26%"><i>mark</i></span>
+              </div>
+              <div style="display: grid; grid-template-columns: 26% 50%; column-gap: 0">
+                <div><div class="brk"></div><div class="brklbl">marked</div></div>
+                <div><div class="brk auto"></div><div class="brklbl auto">the API caches the rest of the history</div></div>
+              </div>
+              <div class="keychip"><span class="chip">openai.PromptCacheKey(conversationID)</span><span>→ one conversation, one cache</span></div>
+            </div>
+            <div class="foot" style="margin-top: 0">Put the stable part first · <code>Usage.CacheRead</code> and <code>Usage.CacheWrite</code> show the effect</div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> "put the stable part first" becomes obvious when the reader sees that the cache is a prefix and the new turn is at the end. The two rows show where each provider puts its mark. <span class="cost">Cost: flex bars with positioned flags; the segment widths are schematic, not token counts.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Before / after calls</span></div>
+        <figure class="fig">
+          <div class="calls">
+            <div class="call">
+              <div class="lbl">call 1</div>
+              <div class="bar">
+                <div class="seg write" style="width: 30%">system</div>
+                <div class="seg write" style="width: 45%">history</div>
+                <div class="seg write" style="width: 25%">turn 1</div>
+              </div>
+              <div class="usage"><span>CacheWrite</span><b class="w">3,200</b><span>CacheRead</span><b class="z">0</b></div>
+            </div>
+            <div class="call">
+              <div class="lbl">call 2 · same prefix</div>
+              <div class="bar">
+                <div class="seg read" style="width: 24%">system</div>
+                <div class="seg read" style="width: 36%">history</div>
+                <div class="seg read" style="width: 20%">turn 1</div>
+                <div class="seg write" style="width: 20%">turn 2</div>
+              </div>
+              <div class="usage"><span>CacheWrite</span><b class="w">450</b><span>CacheRead</span><b class="r">3,200</b></div>
+            </div>
+            <div class="legend"><span><i style="border-color: var(--primary); background: var(--primary-faint)"></i>written to cache</span><span><i style="border-color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, var(--code-bg))"></i>read from cache</span><span>numbers are an example</span></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> it ties the cache to the two <code>Usage</code> fields that the reader will check in their own logs. <span class="cost">Cost: the numbers are made up, and the figure does not show where each provider puts its mark, or the minimum prefix length.</span></p>
+      </div>
+    </div>
+  </div>
+</section>

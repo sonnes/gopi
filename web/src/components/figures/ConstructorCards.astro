@@ -1,0 +1,160 @@
+---
+// Two or more cards side by side, one per way to build a thing: the
+// call, a short list of facts, and a lifetime strip at the bottom. The
+// strip shows what outlives the process. Use it where a page compares
+// constructors whose one real difference is how long their state lives.
+import Figure from "./Figure.astro";
+
+// A segment of a lifetime strip. "proc" is a process, "store" is state
+// that a store keeps, "gone" is state that is lost, and "cut" is the
+// exit of a process.
+type Segment =
+  | { type: "proc" | "store" | "gone"; label: string; grow?: number }
+  | { type: "cut" };
+
+interface Card {
+  call: string;
+  // facts is a list of [term, fact] pairs.
+  facts: [string, string][];
+  // life is the strip: one row of segments per line.
+  life: Segment[][];
+  // durable draws the card in the session hue.
+  durable?: boolean;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  cards: Card[];
+}
+
+const { alt, caption, cards } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="cards" style={`--n:${cards.length}`}>
+    {
+      cards.map((card) => (
+        <div class:list={["card", { durable: card.durable }]}>
+          <code>{card.call}</code>
+          <dl class="facts">
+            {card.facts.map(([term, fact]) => (
+              <>
+                <dt>{term}</dt>
+                <dd>{fact}</dd>
+              </>
+            ))}
+          </dl>
+          <div class="life">
+            {card.life.map((row) => (
+              <div class="row">
+                {row.map((seg) =>
+                  seg.type === "cut" ? (
+                    <span class="x">✕</span>
+                  ) : (
+                    <div class={seg.type} style={`flex:${seg.grow ?? 1}`}>
+                      {seg.label}
+                    </div>
+                  ),
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))
+    }
+  </div>
+</Figure>
+
+<style>
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    gap: 14px;
+  }
+  .card {
+    background: var(--code-bg);
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    align-content: start;
+    grid-template-rows: auto 1fr auto;
+  }
+  .card.durable {
+    border-color: var(--l-durable);
+  }
+  .card code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 10px;
+    margin: 0;
+    font-size: 12px;
+    align-content: start;
+  }
+  .facts dt {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    padding-top: 1px;
+  }
+  .facts dd {
+    margin: 0;
+    color: var(--text);
+  }
+  .life {
+    display: grid;
+    gap: 4px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .proc,
+  .store,
+  .gone {
+    min-width: 0;
+    height: 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .proc {
+    background: color-mix(in srgb, var(--l-agent) var(--l-mix), var(--code-bg));
+    border: 1px solid var(--l-agent);
+    color: var(--text);
+  }
+  .store {
+    background: color-mix(in srgb, var(--l-durable) var(--l-mix), var(--code-bg));
+    border: 1px solid var(--l-durable);
+    color: var(--text);
+  }
+  .gone {
+    border: 1px dotted var(--muted);
+    color: var(--muted);
+  }
+  .x {
+    color: var(--err);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  @media (max-width: 36rem) {
+    .cards {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

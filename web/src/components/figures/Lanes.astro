@@ -1,0 +1,243 @@
+---
+// A timeline with lanes: time runs left to right in numbered steps, and
+// each lane holds the events of one thing, such as one content block.
+// Under a lane, a buffer shows what the events built so far. A result row
+// at the end shows what comes out after the events. Use it where the
+// order of events and the thing each one feeds both matter.
+import Figure from "./Figure.astro";
+
+type Kind = "user" | "assistant" | "tool";
+
+interface Event {
+  // at is the step of the event, from 1.
+  at: number;
+  type: string;
+  payload?: string;
+}
+
+interface Cell {
+  at: number;
+  text: string;
+  // done marks the finished value.
+  done?: boolean;
+}
+
+interface Lane {
+  // name is the bold part of the lane title, such as "ContentIndex 0".
+  name?: string;
+  label: string;
+  kind: Kind;
+  events: Event[];
+  buffer?: Cell[];
+  // bufferLabel names the buffer, such as "block 0".
+  bufferLabel?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  steps: number;
+  lanes: Lane[];
+  // result is the row under the lanes: a call, an arrow, and what it gives.
+  result?: { call: string; type: string; parts: { text: string; kind: Kind }[]; tail?: string };
+}
+
+const { alt, caption, steps, lanes, result } = Astro.props;
+const cols = `grid-template-columns: repeat(${steps}, minmax(0, 1fr))`;
+const firstAt = (cells: Cell[]) => Math.min(...cells.map((c) => c.at));
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="tl">
+    <div class="axis" style={cols}>
+      {Array.from({ length: steps }, (_, i) => <span>{i + 1}</span>)}
+    </div>
+    {
+      lanes.map((lane) => (
+        <div class:list={["lane-set", `k-${lane.kind}`]}>
+          <div class="ln">
+            {lane.name && <b>{lane.name}</b>}
+            {lane.label}
+          </div>
+          <div class="lane" style={cols}>
+            {lane.events.map((ev) => (
+              <div class="ev" style={`grid-column: ${ev.at}`}>
+                <span class="t">{ev.type}</span>
+                <span class="p">{ev.payload ?? " "}</span>
+              </div>
+            ))}
+          </div>
+          {lane.buffer && lane.buffer.length > 0 && (
+            <div class="buf" style={cols}>
+              {lane.bufferLabel && firstAt(lane.buffer) > 1 && (
+                <span class="cap" style={`grid-column: 1 / ${firstAt(lane.buffer)}`}>
+                  {lane.bufferLabel}
+                </span>
+              )}
+              {lane.buffer.map((c) => (
+                <span class:list={["b", { done: c.done }]} style={`grid-column: ${c.at}`}>
+                  {c.text}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ))
+    }
+  </div>
+  {
+    result && (
+      <div class="res">
+        <span class="node">{result.call}</span>
+        <svg class="arr" viewBox="0 0 34 10" aria-hidden="true">
+          <path class="edge-accent" d="M0 5 H28" />
+          <path class="head-accent" d="M26 1 L33 5 L26 9 Z" />
+        </svg>
+        <span class="node accent out">
+          <b>{result.type}</b>
+          {result.parts.map((p) => (
+            <span class:list={["chip", `k-${p.kind}`]}>{p.text}</span>
+          ))}
+          {result.tail && <span class="muted">{result.tail}</span>}
+        </span>
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  /* The pad keeps the head of the axis inside the panel, so the panel
+     does not scroll. */
+  .tl {
+    padding-right: 6px;
+    font-family: var(--font-mono);
+  }
+  .axis {
+    position: relative;
+    display: grid;
+    column-gap: 4px;
+    padding-bottom: 3px;
+    border-bottom: 1.2px solid var(--line-strong);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .axis span {
+    text-align: center;
+  }
+  .axis::after {
+    content: "";
+    position: absolute;
+    right: -2px;
+    bottom: -4.5px;
+    border: 4px solid transparent;
+    border-left: 6px solid var(--line-strong);
+    border-right: 0;
+  }
+  .ln {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin: 12px 0 4px;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .ln b {
+    font-weight: 600;
+    color: var(--k);
+  }
+  .lane-set.k-user .ln b {
+    color: var(--text);
+  }
+  .lane {
+    position: relative;
+    display: grid;
+    column-gap: 4px;
+    align-items: center;
+    min-height: 36px;
+  }
+  .lane::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1px dashed var(--line);
+  }
+  .ev {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    padding: 2px 3px;
+    border: 1.2px solid var(--k);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+    text-align: center;
+    line-height: 1.25;
+  }
+  .ev .t {
+    display: block;
+    font-size: 9.5px;
+    color: var(--muted-strong);
+  }
+  .ev .p {
+    display: block;
+    overflow: hidden;
+    font-size: 11px;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .buf {
+    display: grid;
+    column-gap: 4px;
+    margin-top: 4px;
+  }
+  .b {
+    min-width: 0;
+    overflow: hidden;
+    padding: 1px 2px;
+    border: 1px dotted var(--muted);
+    border-radius: 6px;
+    background: var(--code-bg);
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .b.done {
+    border: 1.2px solid var(--k);
+    font-weight: 600;
+  }
+  .cap {
+    align-self: center;
+    padding-right: 4px;
+    font-size: 10px;
+    text-align: right;
+    color: var(--muted);
+  }
+  .res {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .res svg.arr {
+    flex: none;
+    width: 34px;
+    height: 10px;
+  }
+  .res .node.out {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .res .node.out b {
+    font-weight: 600;
+  }
+  .muted {
+    color: var(--muted);
+  }
+</style>

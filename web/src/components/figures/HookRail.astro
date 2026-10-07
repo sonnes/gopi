@@ -1,0 +1,192 @@
+---
+// A rail: the steps of a loop down a spine, and a tap off the spine at
+// each point where a hook runs. A tap holds the name of the hook, what
+// it takes and returns, and what it can do. A bracket at the left groups
+// the rows that repeat, such as each tool call. A tap can loop back to
+// the top. Use it for the points where a caller plugs into a loop.
+//
+// Each row is one grid row. The spine is the left border of the step
+// column, so it follows the rows and needs no offsets.
+import Figure from "./Figure.astro";
+
+interface Step {
+  step: string;
+  // muted draws a condition, such as "no tool calls?".
+  muted?: boolean;
+}
+
+interface Tap {
+  hook: string;
+  // io is what the hook takes and returns, such as "Call -> Call".
+  io: string;
+  does: string;
+  // loop marks the tap that starts the loop again, with a short label.
+  loop?: string;
+}
+
+type Row = Step | Tap;
+
+interface Group {
+  // from and to are the indexes of the first and the last row.
+  from: number;
+  to: number;
+  label: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  rows: Row[];
+  groups?: Group[];
+}
+
+const { alt, caption, rows, groups = [] } = Astro.props;
+const isTap = (r: Row): r is Tap => "hook" in r;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="rail" style={`grid-template-rows: repeat(${rows.length}, auto)`}>
+    {
+      groups.map((g) => (
+        <div class="group" style={`grid-row: ${g.from + 1} / ${g.to + 2}`}>
+          <span>{g.label}</span>
+        </div>
+      ))
+    }
+    {
+      rows.map((r, i) =>
+        isTap(r) ? (
+          <div class="row tap" style={`grid-row: ${i + 1}`}>
+            <span class="dot" />
+            <span class="arm" />
+            <div class:list={["card", { loop: r.loop }]}>
+              <span class="chip k-value hook">{r.hook}</span>
+              <span class="io">{r.io}</span>
+              <span class="does">{r.does}</span>
+              {r.loop && (
+                <small>
+                  <svg class="ico" viewBox="0 0 14 12" aria-hidden="true">
+                    <path d="M11 3 A5 4 0 1 0 12 7" />
+                    <path d="M9 1 L12 3 L9 5" />
+                  </svg>
+                  {r.loop}
+                </small>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div class:list={["row", "step", { muted: r.muted }]} style={`grid-row: ${i + 1}`}>
+            <span class="tick" />
+            <span class="name">{r.step}</span>
+          </div>
+        ),
+      )
+    }
+  </div>
+</Figure>
+
+<style>
+  .rail {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .group {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 0;
+    border: 1.2px solid var(--l-wire);
+    border-right: 0;
+    border-radius: 6px 0 0 6px;
+  }
+  .group span {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 10.5px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .row {
+    grid-column: 2;
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-left: 14px;
+    border-left: 1.6px solid var(--line-strong);
+  }
+  .step {
+    min-height: 26px;
+    gap: 8px;
+  }
+  .step .tick {
+    width: 10px;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .step.muted .name {
+    color: var(--muted);
+  }
+  .tap {
+    padding-block: 4px;
+  }
+  .dot {
+    position: absolute;
+    left: -5.6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--primary);
+  }
+  .arm {
+    flex: none;
+    width: 26px;
+    border-top: 1.6px solid var(--primary);
+  }
+  .card {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--code-bg);
+  }
+  .card .hook {
+    grid-row: 1 / 3;
+    text-align: center;
+  }
+  .io {
+    color: var(--text);
+  }
+  .does {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .card.loop {
+    border-color: var(--primary);
+    background: var(--primary-faint);
+  }
+  .card small {
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10.5px;
+    color: var(--link);
+  }
+  .card svg.ico {
+    display: inline-block;
+    width: 14px;
+    height: 12px;
+  }
+  .ico path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+  }
+</style>

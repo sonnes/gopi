@@ -1,0 +1,267 @@
+---
+// A trace view: one bar for each start and end pair, indented by how it
+// nests, in the order the events arrive. A disk marks an end that
+// carries stored entries, and ticks mark the updates inside a bar. The
+// widths show order, not time. Use it for events that come in start and
+// end pairs, where the nesting and the repeat matter.
+import Figure from "./Figure.astro";
+
+interface Span {
+  label: string;
+  // note is the muted text after the label, such as a role.
+  note?: string;
+  depth: 0 | 1 | 2;
+  // from and to are the ends of the bar, as percents of the track.
+  from: number;
+  to: number;
+  kind?: "assistant" | "tool";
+  // start and end are the names at the two ends of the bar.
+  start?: string;
+  end?: string;
+  // body is the bold text in the bar, such as the block it holds.
+  body?: string;
+  // ticks is the count of update marks in the bar.
+  ticks?: number;
+  // stored puts a disk at that end of the bar.
+  stored?: "start" | "end";
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  spans: Span[];
+  // key explains the marks: a pair of ends, a disk, and a tick.
+  key?: { pair?: [string, string]; stored?: string; tick?: string };
+  // note is the line under the bars, with a loop mark.
+  note?: string;
+}
+
+const { alt, caption, spans, key, note } = Astro.props;
+// The ticks sit in the right part of a bar, after its body.
+const tickAt = (i: number, n: number) => (n === 1 ? 75 : 62 + (i * 30) / (n - 1));
+---
+
+<Figure alt={alt} caption={caption}>
+  {
+    key && (
+      <div class="key">
+        {key.pair && (
+          <span class="kbar">
+            <span>{key.pair[0]}</span>
+            <span>{key.pair[1]}</span>
+          </span>
+        )}
+        {key.stored && (
+          <span class="ki">
+            <svg class="disk-i" viewBox="0 0 12 20" aria-hidden="true">
+              <path d="M1 5 V15 A5 2.4 0 0 0 11 15 V5" />
+              <ellipse cx="6" cy="5" rx="5" ry="2.4" />
+            </svg>
+            {key.stored}
+          </span>
+        )}
+        {key.tick && (
+          <span class="ki">
+            <i class="ktick" />
+            {key.tick}
+          </span>
+        )}
+      </div>
+    )
+  }
+  <div class="tr">
+    {
+      spans.map((s) => (
+        <>
+          <div class:list={["lb", `l${s.depth}`]}>
+            {s.label}
+            {s.note && <i>{s.note}</i>}
+          </div>
+          <div class="tk">
+            <div
+              class:list={[
+                "bar",
+                s.kind ? `k-${s.kind}` : "plain",
+                { solo: !s.start && !s.end, "disk-start": s.stored === "start" },
+              ]}
+              style={`left: ${s.from}%; width: ${s.to - s.from}%`}
+            >
+              {s.start && <span>{s.start}</span>}
+              {s.body && <b>{s.body}</b>}
+              {s.end && <span>{s.end}</span>}
+              {Array.from({ length: s.ticks ?? 0 }, (_, i) => (
+                <i class="tick" style={`left: ${tickAt(i, s.ticks ?? 0)}%`} />
+              ))}
+            </div>
+            {s.stored && (
+              <svg
+                class="disk"
+                viewBox="0 0 12 20"
+                aria-hidden="true"
+                style={`left: calc(${s.stored === "start" ? s.from : s.to}% - 6px)`}
+              >
+                <path d="M1 5 V15 A5 2.4 0 0 0 11 15 V5" />
+                <ellipse cx="6" cy="5" rx="5" ry="2.4" />
+              </svg>
+            )}
+          </div>
+        </>
+      ))
+    }
+    {
+      note && (
+        <div class="loop">
+          <svg class="ico" viewBox="0 0 14 12" aria-hidden="true">
+            <path d="M11 3 A5 4 0 1 0 12 7" />
+            <path d="M9 1 L12 3 L9 5" />
+          </svg>
+          {note}
+        </div>
+      )
+    }
+  </div>
+</Figure>
+
+<style>
+  .key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .ki {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .kbar {
+    display: inline-flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 132px;
+    height: 16px;
+    padding: 0 5px;
+    border: 1.2px solid var(--line-strong);
+    border-radius: 5px;
+    background: var(--code-bg);
+    font-size: 9.5px;
+    color: var(--muted-strong);
+  }
+  .ktick {
+    display: inline-block;
+    height: 10px;
+    border-left: 1.2px solid var(--l-agent);
+  }
+  .tr {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 5px;
+    font-family: var(--font-mono);
+  }
+  .lb {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .lb i {
+    font-size: 10px;
+    font-style: normal;
+    color: var(--muted);
+  }
+  .lb.l1 {
+    padding-left: 12px;
+  }
+  .lb.l2 {
+    padding-left: 24px;
+  }
+  .tk {
+    position: relative;
+    height: 24px;
+  }
+  .bar {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 0 6px;
+    border: 1.2px solid var(--k);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+    font-size: 10px;
+    white-space: nowrap;
+    color: var(--muted-strong);
+  }
+  .bar.plain {
+    --k: var(--line-strong);
+    background: var(--code-bg);
+  }
+  .bar.solo {
+    justify-content: center;
+    padding: 0 3px;
+  }
+  .bar.solo:has(.tick) {
+    justify-content: flex-start;
+  }
+  /* Room for the disk at the start of the bar. */
+  .bar.disk-start {
+    padding-left: 12px;
+  }
+  .bar b {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .tick {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    border-left: 1.2px solid var(--k);
+  }
+  .tr svg.disk {
+    position: absolute;
+    top: 1px;
+    z-index: 2;
+    width: 12px;
+    height: 20px;
+  }
+  .key svg.disk-i {
+    display: inline-block;
+    width: 12px;
+    height: 20px;
+  }
+  :is(.disk, .disk-i) :is(path, ellipse) {
+    fill: color-mix(in srgb, var(--l-durable) 30%, var(--code-bg));
+    stroke: var(--l-durable-deep);
+    stroke-width: 1.1;
+  }
+  .loop {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 10.5px;
+    color: var(--link);
+  }
+  .loop svg.ico {
+    flex: none;
+    width: 14px;
+    height: 12px;
+  }
+  .ico path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.3;
+  }
+</style>

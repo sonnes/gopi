@@ -1,0 +1,296 @@
+<section class="page" id="ink">
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap");
+
+#ink { --serif: "Source Serif 4", "IBM Plex Serif", Georgia, serif; }
+
+/* the figure: ink on the page, no panel */
+#ink figure { margin: 0; max-width: 566px; }
+#ink figure svg { display: block; width: 100%; height: auto; overflow: visible; }
+#ink figcaption { font-family: var(--serif); font-size: 14px; line-height: 1.45; color: var(--copy);
+  margin: 14px 0 0; }
+#ink figcaption b { font-weight: 600; color: var(--text); }
+
+/* type in the drawing */
+#ink svg { fill: var(--text); font-family: var(--serif); font-size: 13.5px; }
+#ink svg .m { font-family: var(--font-mono); font-size: 12px; }
+#ink svg .m-sm { font-family: var(--font-mono); font-size: 11.5px; }
+#ink svg .it { font-style: italic; font-size: 13px; }
+#ink svg .sc { font-variant-caps: all-small-caps; letter-spacing: 0.05em; font-size: 14px; }
+#ink svg .num { font-variant-numeric: oldstyle-nums; }
+#ink svg .dim { fill: var(--muted); }
+#ink svg .fin { font-weight: 600; }
+
+/* lines: one ink, told apart by weight and dash */
+#ink svg .rule { stroke: var(--text); stroke-width: 1; fill: none; }
+#ink svg .hair { stroke: var(--text); stroke-width: 0.6; fill: none; }
+#ink svg .ln { stroke: var(--text); stroke-width: 0.9; fill: none; }
+#ink svg .lead { stroke: var(--muted); stroke-width: 0.75; stroke-dasharray: 1 2.5; fill: none; }
+#ink svg .bar { stroke: var(--text); stroke-width: 2.5; fill: none; }
+#ink svg .ah { fill: var(--text); }
+
+/* kinds of entry: the line of the box */
+#ink svg .k-user { stroke: var(--text); stroke-width: 0.9; fill: none; }
+#ink svg .k-assistant { stroke: var(--text); stroke-width: 0.75; fill: none; }
+#ink svg .k-meta { stroke: var(--text); stroke-width: 0.9; stroke-dasharray: 4 3; fill: none; }
+#ink svg .k-ephemeral { stroke: var(--text); stroke-width: 1.2; stroke-dasharray: 0.1 3.2; stroke-linecap: round; fill: none; }
+
+/* the prose of the "On a Page" slot */
+#ink .prose { font-family: var(--font-sans); font-size: 16px; line-height: 1.65; color: var(--copy);
+  max-width: 31rem; margin: 0 0 24px; }
+#ink .prose code { font-size: 14px; color: var(--text); }
+#ink .slot figure + .why { margin-top: 18px; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">style</div>
+    <h2>Textbook Ink</h2>
+    <p class="job">Each figure looks like a figure in a programming book: thin lines in the text color, serif labels, mono code, and a numbered caption.</p>
+    <p class="now">Borrows from K&amp;R, The Go Programming Language, and the Tufte books: trace tables with rules, curly braces, leader lines, and italic notes in the margin.</p>
+  </div>
+
+  <!-- ============ F1: Streams ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F1 · Streams <span>· the events of one call</span></h3>
+    <figure>
+      <svg viewBox="0 0 566 308" role="img" aria-label="A table of the eight events of one call, with the index of the block that each event feeds and the block after the event. Under the table, stream.Wait returns the message.">
+        <defs>
+          <marker id="ink-ah1" viewBox="0 0 9 6" refX="9" refY="3" markerWidth="9" markerHeight="6" markerUnits="userSpaceOnUse" orient="auto"><path class="ah" d="M0,0 L9,3 L0,6 z"/></marker>
+        </defs>
+
+        <!-- rules -->
+        <line class="rule" x1="0" y1="1" x2="456" y2="1"/>
+        <line class="hair" x1="0" y1="24" x2="456" y2="24"/>
+        <line class="rule" x1="0" y1="217" x2="456" y2="217"/>
+
+        <!-- heads -->
+        <text class="sc" x="24" y="17">event</text>
+        <text class="sc" x="236" y="17" text-anchor="middle">index</text>
+        <text class="sc" x="276" y="17">the block after the event</text>
+
+        <!-- order -->
+        <g class="num dim" text-anchor="end">
+          <text x="13" y="40">1</text><text x="13" y="64">2</text><text x="13" y="88">3</text><text x="13" y="112">4</text>
+          <text x="13" y="136">5</text><text x="13" y="160">6</text><text x="13" y="184">7</text><text x="13" y="208">8</text>
+        </g>
+
+        <!-- events -->
+        <g class="m">
+          <text x="24" y="40">start</text>
+          <text x="24" y="64">text_start</text>
+          <text x="24" y="88">text_delta "Hel"</text>
+          <text x="24" y="112">text_delta "lo"</text>
+          <text x="24" y="136">text_end "Hello"</text>
+          <text x="24" y="160">tool_start</text>
+          <text x="24" y="184">tool_delta {"ci</text>
+          <text x="24" y="208">tool_end ToolCall weather</text>
+        </g>
+
+        <!-- ContentIndex -->
+        <text class="dim" x="236" y="40" text-anchor="middle">&#8211;</text>
+        <g class="m" text-anchor="middle">
+          <text x="236" y="64">0</text><text x="236" y="88">0</text><text x="236" y="112">0</text><text x="236" y="136">0</text>
+          <text x="236" y="160">1</text><text x="236" y="184">1</text><text x="236" y="208">1</text>
+        </g>
+
+        <!-- the block as it builds -->
+        <g class="m">
+          <text class="dim" x="276" y="64">""</text>
+          <text class="dim" x="276" y="88">"Hel"</text>
+          <text class="dim" x="276" y="112">"Hello"</text>
+          <text class="fin" x="276" y="136">Text "Hello"</text>
+          <text class="dim" x="276" y="160">""</text>
+          <text class="dim" x="276" y="184">{"ci</text>
+          <text class="fin" x="276" y="208">ToolCall weather</text>
+        </g>
+
+        <!-- braces: which rows build which block -->
+        <path class="ln" d="M466,50 Q471,50 471,55 L471,91 Q471,96 476,96 Q471,96 471,101 L471,137 Q471,142 466,142"/>
+        <text class="it" x="484" y="93">block 0</text>
+        <text class="m-sm" x="484" y="109">Text</text>
+        <path class="ln" d="M466,146 Q471,146 471,151 L471,175 Q471,180 476,180 Q471,180 471,185 L471,209 Q471,214 466,214"/>
+        <text class="it" x="484" y="177">block 1</text>
+        <text class="m-sm" x="484" y="193">ToolCall</text>
+
+        <!-- Wait -->
+        <text class="m" x="24" y="280">stream.Wait()</text>
+        <line class="ln" x1="126" y1="276" x2="202" y2="276" marker-end="url(#ink-ah1)"/>
+        <text class="it" x="164" y="269" text-anchor="middle">returns</text>
+        <text class="m" x="206" y="245">*ai.Message</text>
+        <rect class="rule" x="206.5" y="252.5" width="250" height="48"/>
+        <line class="hair" x1="206.5" y1="276.5" x2="456.5" y2="276.5"/>
+        <line class="hair" x1="258.5" y1="252.5" x2="258.5" y2="300.5"/>
+        <g class="m">
+          <text x="236" y="269" text-anchor="middle">[0]</text><text x="276" y="269">Text "Hello"</text>
+          <text x="236" y="293" text-anchor="middle">[1]</text><text x="276" y="293">ToolCall weather</text>
+        </g>
+        <text class="it" x="468" y="264">The message</text>
+        <text class="it" x="468" y="280">comes from Wait.</text>
+        <text class="it" x="468" y="296">It is not an event.</text>
+      </svg>
+      <figcaption><b>Figure 1.</b> The events of one call, in order, and the block that each event builds.</figcaption>
+    </figure>
+    <p class="why"><b>Reads as:</b> a trace table from a book: one row for each event, and under the table the message holds the finished rows in the same columns. <span class="cost">Cost: the block column repeats the text of the deltas, so a long payload has no room in the row.</span></p>
+  </div>
+
+  <!-- ============ F2: Sessions ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F2 · Sessions <span>· add context to a run</span></h3>
+    <figure>
+      <svg viewBox="0 0 566 316" role="img" aria-label="The call a.Run with three session.Text arguments. The model reads five entries: u1 user, a1 assistant, skill meta, u2 user, time ephemeral. The store keeps u1, a1, and the new entries skill and u2. The time is not stored.">
+        <!-- the call -->
+        <g class="m">
+          <text x="0" y="14">a.Run(ctx,</text>
+          <text x="0" y="32" xml:space="preserve">    session.Text(skill, session.Meta()),</text>
+          <text x="0" y="50" xml:space="preserve">    session.Text("next question"),</text>
+          <text x="0" y="68" xml:space="preserve">    session.Text(now, session.Ephemeral()),</text>
+          <text x="0" y="86">)</text>
+        </g>
+        <line class="lead" x1="296" y1="28" x2="340" y2="28"/>
+        <line class="lead" x1="253" y1="46" x2="340" y2="46"/>
+        <line class="lead" x1="318" y1="64" x2="340" y2="64"/>
+        <g class="m">
+          <text x="348" y="32">skill</text>
+          <text x="348" y="50">u2</text>
+          <text x="348" y="68">time</text>
+        </g>
+
+        <!-- column heads -->
+        <text class="sc" x="118" y="124">the model reads</text>
+        <text class="sc" x="358" y="124">the store keeps</text>
+
+        <!-- braces on the left -->
+        <path class="ln" d="M108,136 Q103,136 103,141 L103,157 Q103,162 98,162 Q103,162 103,167 L103,183 Q103,188 108,188"/>
+        <text class="it" x="92" y="166" text-anchor="end">in the log</text>
+        <path class="ln" d="M108,196 Q103,196 103,201 L103,232 Q103,237 98,237 Q103,237 103,242 L103,273 Q103,278 108,278"/>
+        <text class="it" x="92" y="234" text-anchor="end">added by</text>
+        <text class="m" x="92" y="250" text-anchor="end">a.Run</text>
+
+        <!-- what the model reads: one box per entry, the kind in its line -->
+        <rect class="k-user" x="118.5" y="136.5" width="180" height="22"/>
+        <rect class="k-assistant" x="118.5" y="166.5" width="180" height="22"/>
+        <rect class="k-assistant" x="121" y="169" width="175" height="17"/>
+        <rect class="k-meta" x="118.5" y="196.5" width="180" height="22"/>
+        <rect class="k-user" x="118.5" y="226.5" width="180" height="22"/>
+        <rect class="k-ephemeral" x="118.5" y="256.5" width="180" height="22"/>
+        <g class="m">
+          <text x="128" y="152">u1</text>
+          <text x="128" y="182">a1</text>
+          <text x="128" y="212">skill</text>
+          <text x="128" y="242">u2</text>
+          <text x="128" y="272">time</text>
+        </g>
+        <g class="sc" text-anchor="end">
+          <text x="290" y="152">user</text>
+          <text x="290" y="182">assistant</text>
+          <text x="290" y="212">meta</text>
+          <text x="290" y="242">user</text>
+          <text x="290" y="272">ephemeral</text>
+        </g>
+
+        <!-- the same entry, in the store -->
+        <line class="hair" x1="299" y1="147.5" x2="358" y2="147.5"/>
+        <line class="hair" x1="299" y1="177.5" x2="358" y2="177.5"/>
+        <line class="hair" x1="299" y1="207.5" x2="358" y2="207.5"/>
+        <line class="hair" x1="299" y1="237.5" x2="358" y2="237.5"/>
+        <text class="it dim" x="308" y="272">not stored</text>
+
+        <!-- the store -->
+        <rect class="rule" x="358.5" y="132.5" width="170" height="120"/>
+        <g class="m">
+          <text x="368" y="152">u1</text>
+          <text x="368" y="182">a1</text>
+          <text x="368" y="212">skill</text>
+          <text x="368" y="242">u2</text>
+        </g>
+        <text class="m-sm dim" x="414" y="212">injected=meta</text>
+        <text class="it" x="536" y="212">new</text>
+        <text class="it" x="536" y="242">new</text>
+
+        <!-- the note -->
+        <text class="it" x="118" y="308">The next run reads the skill again. It does not read the time.</text>
+      </svg>
+      <figcaption><b>Figure 2.</b> One run adds three entries. The model reads five entries, and the store keeps four.</figcaption>
+    </figure>
+    <p class="why"><b>Reads as:</b> one row for each entry, with the kind in small caps and in the line of its box, so the figure needs no color and no legend. <span class="cost">Cost: the double line of the assistant box is a weak signal at this size, and the reader learns four line styles.</span></p>
+  </div>
+
+  <!-- ============ F3: Tools ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F3 · Tools <span>· two failure channels</span></h3>
+    <figure>
+      <svg viewBox="0 0 566 212" role="img" aria-label="The model calls the tool with Run(ctx, call). An error result, ToolResult with IsError true and a nil error, goes back to the model and the run goes on. A Go error ends the run.">
+        <defs>
+          <marker id="ink-ah3" viewBox="0 0 9 6" refX="9" refY="3" markerWidth="9" markerHeight="6" markerUnits="userSpaceOnUse" orient="auto"><path class="ah" d="M0,0 L9,3 L0,6 z"/></marker>
+        </defs>
+
+        <text class="sc" x="280" y="30" text-anchor="middle">the model</text>
+        <line class="ln" x1="280" y1="38" x2="280" y2="68" marker-end="url(#ink-ah3)"/>
+        <text class="it" x="288" y="58">calls the tool</text>
+        <text class="m" x="280" y="88" text-anchor="middle" style="font-size:13px">Run(ctx, call)</text>
+
+        <line class="ln" x1="262" y1="96" x2="176" y2="126" marker-end="url(#ink-ah3)"/>
+        <line class="ln" x1="298" y1="96" x2="388" y2="126" marker-end="url(#ink-ah3)"/>
+
+        <text class="m" x="150" y="144" text-anchor="middle">ToolResult{IsError: true}, nil</text>
+        <text class="m" x="410" y="144" text-anchor="middle">ToolResult{}, err</text>
+
+        <!-- loop back -->
+        <path class="ln" d="M38,140 L14,140 L14,26 L236,26" marker-end="url(#ink-ah3)"/>
+        <text class="it" x="24" y="18">the result goes back</text>
+
+        <!-- exit -->
+        <line class="ln" x1="477" y1="140" x2="537" y2="140" marker-end="url(#ink-ah3)"/>
+        <line class="bar" x1="544" y1="124" x2="544" y2="156"/>
+        <text class="it" x="507" y="131" text-anchor="middle">run ends</text>
+
+        <g class="it">
+          <text x="42" y="170">An error result. The model reads</text>
+          <text x="42" y="187">it and corrects the call.</text>
+          <text x="42" y="204">The run goes on.</text>
+          <text x="349" y="170">A Go error. The run fails, for</text>
+          <text x="349" y="187">example with a canceled context</text>
+          <text x="349" y="204">or a transport that is down.</text>
+        </g>
+      </svg>
+      <figcaption><b>Figure 3.</b> The two ways that a tool run ends.</figcaption>
+    </figure>
+    <p class="why"><b>Reads as:</b> a flow chart without boxes, where the error result loops back to the model and the Go error stops at a bar on the right edge. <span class="cost">Cost: the bar is a convention, so the reader depends on the label "run ends" to read it.</span></p>
+  </div>
+
+  <!-- ============ On a Page ============ -->
+  <div class="slot">
+    <h3 class="slot-title">On a Page <span>· F3 next to body text</span></h3>
+    <p class="prose">A tool run ends in one of two ways. If the tool returns an error result, the agent sends the result to the model, and the model can correct the call. If the tool returns a Go error, the run stops and <code>Run</code> returns the error. Figure 3 shows the two paths.</p>
+    <figure>
+      <svg viewBox="0 0 566 212" role="img" aria-label="The model calls the tool with Run(ctx, call). An error result goes back to the model and the run goes on. A Go error ends the run.">
+        <defs>
+          <marker id="ink-ah4" viewBox="0 0 9 6" refX="9" refY="3" markerWidth="9" markerHeight="6" markerUnits="userSpaceOnUse" orient="auto"><path class="ah" d="M0,0 L9,3 L0,6 z"/></marker>
+        </defs>
+        <text class="sc" x="280" y="30" text-anchor="middle">the model</text>
+        <line class="ln" x1="280" y1="38" x2="280" y2="68" marker-end="url(#ink-ah4)"/>
+        <text class="it" x="288" y="58">calls the tool</text>
+        <text class="m" x="280" y="88" text-anchor="middle" style="font-size:13px">Run(ctx, call)</text>
+        <line class="ln" x1="262" y1="96" x2="176" y2="126" marker-end="url(#ink-ah4)"/>
+        <line class="ln" x1="298" y1="96" x2="388" y2="126" marker-end="url(#ink-ah4)"/>
+        <text class="m" x="150" y="144" text-anchor="middle">ToolResult{IsError: true}, nil</text>
+        <text class="m" x="410" y="144" text-anchor="middle">ToolResult{}, err</text>
+        <path class="ln" d="M38,140 L14,140 L14,26 L236,26" marker-end="url(#ink-ah4)"/>
+        <text class="it" x="24" y="18">the result goes back</text>
+        <line class="ln" x1="477" y1="140" x2="537" y2="140" marker-end="url(#ink-ah4)"/>
+        <line class="bar" x1="544" y1="124" x2="544" y2="156"/>
+        <text class="it" x="507" y="131" text-anchor="middle">run ends</text>
+        <g class="it">
+          <text x="42" y="170">An error result. The model reads</text>
+          <text x="42" y="187">it and corrects the call.</text>
+          <text x="42" y="204">The run goes on.</text>
+          <text x="349" y="170">A Go error. The run fails, for</text>
+          <text x="349" y="187">example with a canceled context</text>
+          <text x="349" y="204">or a transport that is down.</text>
+        </g>
+      </svg>
+      <figcaption><b>Figure 3.</b> The two ways that a tool run ends.</figcaption>
+    </figure>
+    <p class="why"><b>Reads as:</b> the figure has the same ink and the same weight as the text, so it reads as part of the page. <span class="cost">Cost: the serif labels are a third face on a page that already sets a sans and a mono.</span></p>
+  </div>
+</section>

@@ -1,0 +1,210 @@
+---
+// A check matrix: one row per option, one column per place or ability,
+// and a mark in each cell (yes, no, or half with a short label). A row
+// can take a kind, so its marks take the hue of that kind. Use it where
+// a table of yes and no is easier to read as a pattern of marks, such as
+// the injections of an entry or the abilities of each provider.
+import Figure from "./Figure.astro";
+
+type Kind = "user" | "assistant" | "tool" | "meta" | "ephemeral" | "error" | "value" | "ai";
+type MarkName = "yes" | "no" | "half";
+// A cell is a mark, or a mark with a short label under it.
+type Cell = MarkName | { mark: MarkName; label: string };
+
+interface Column {
+  label: string;
+  // sub is one or more muted lines under the label.
+  sub?: string | string[];
+}
+
+interface Row {
+  // label is a chip when the row has a kind, and a name when it has none.
+  label: string;
+  kind?: Kind;
+  code?: string;
+  sub?: string;
+  cells: Cell[];
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // corner heads the row column.
+  corner?: string;
+  columns: Column[];
+  rows: Row[];
+  // legend lists [mark, meaning] pairs under the matrix.
+  legend?: [MarkName, string][];
+  // colWidth is the width of each mark column.
+  colWidth?: string;
+}
+
+const { alt, caption, corner = "", columns, rows, legend, colWidth = "84px" } = Astro.props;
+
+const cols = `minmax(0, 1fr) repeat(${columns.length}, ${colWidth})`;
+const subs = (s?: string | string[]) => (s === undefined ? [] : Array.isArray(s) ? s : [s]);
+const markOf = (c: Cell) => (typeof c === "string" ? { mark: c, label: "" } : c);
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="mx" style={`grid-template-columns:${cols}`}>
+    <div class="h corner">{corner}</div>
+    {
+      columns.map((col) => (
+        <div class="h">
+          <span class="hl">{col.label}</span>
+          {subs(col.sub).map((s) => (
+            <span class="hs">{s}</span>
+          ))}
+        </div>
+      ))
+    }
+    {
+      rows.map((row, r) => {
+        const last = r === rows.length - 1;
+        return (
+          <>
+            <div class:list={["rh", { last }]}>
+              {row.kind ? <span class={`chip k-${row.kind}`}>{row.label}</span> : <b class="name">{row.label}</b>}
+              {row.code && <code>{row.code}</code>}
+              {row.sub && <span class="sub">{row.sub}</span>}
+            </div>
+            {row.cells.map((cell) => {
+              const { mark, label } = markOf(cell);
+              return (
+                <div class:list={["c", { last }, row.kind && `k-${row.kind}`]}>
+                  <span class="mc">
+                    <i class={`mk ${mark}`} />
+                    {label && <span class="ml">{label}</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        );
+      })
+    }
+  </div>
+  {
+    legend && (
+      <div class="leg lbl">
+        {legend.map(([mark, text]) => (
+          <span>
+            <i class={`mk ${mark}`} />
+            {text}
+          </span>
+        ))}
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  .mx {
+    display: grid;
+    align-items: center;
+  }
+  .h {
+    align-self: end;
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--muted);
+    padding: 0 2px 8px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .h.corner {
+    justify-items: start;
+    text-align: left;
+    padding-left: 0;
+  }
+  .hs {
+    font-size: 9.5px;
+  }
+  .rh {
+    padding: 10px 8px 10px 0;
+    border-bottom: 1px solid var(--line);
+    display: grid;
+    gap: 3px;
+    justify-items: start;
+    min-width: 0;
+  }
+  .rh code {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--copy);
+    overflow-wrap: anywhere;
+  }
+  .rh .name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .rh .sub {
+    font-family: var(--font-prose);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .c {
+    align-self: stretch;
+    display: grid;
+    place-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .last {
+    border-bottom: none;
+  }
+  .c:not([class*="k-"]),
+  .c.k-user {
+    --k: var(--text);
+  }
+  .mc {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+  }
+  .ml {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+  .mk {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.6px solid var(--k);
+  }
+  .mk.yes {
+    background: var(--k);
+  }
+  .mk.no {
+    border-color: var(--muted);
+  }
+  .mk.half {
+    background: linear-gradient(90deg, var(--k) 50%, transparent 50%);
+  }
+  .c.k-ephemeral .mk:not(.no) {
+    border-style: dotted;
+  }
+  .leg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin-top: 12px;
+  }
+  .leg span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .leg .mk {
+    --k: var(--muted-strong);
+    width: 12px;
+    height: 12px;
+  }
+</style>

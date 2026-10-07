@@ -1,0 +1,112 @@
+---
+title: OpenAI Chat
+summary: The Chat Completions provider, for OpenAI and the servers that copy its API.
+---
+
+import Hub from "../../../components/figures/Hub.astro";
+import Ladder from "../../../components/figures/Ladder.astro";
+
+<Hub
+  alt="The openaichat package calls a Chat Completions API. It implements TextProvider, ObjectProvider, and ModelLister, and not TokenCounter or ImageProvider. BaseURL points one client at OpenAI, OpenRouter, or Fireworks. OpenAI sends no reasoning text on this API, OpenRouter sends it as reasoning, and Fireworks sends it as reasoning_content. OpenAI and OpenRouter mark the cache with CacheBreakpoints. Fireworks caches by itself, and CacheBreakpoints fails the call."
+  pkg="pkg/ai/openaichat"
+  api="Chat Completions API"
+  implements={["TextProvider", "ObjectProvider", "ModelLister"]}
+  lacks={["TokenCounter", "ImageProvider"]}
+  lines={[
+    "openaichat.New(",
+    "  APIKey(key),",
+    ["  BaseURL(url),", "hl"],
+    ["  CacheBreakpoints(),", "dim"],
+    ")",
+  ]}
+  note="one request shape: only the fields that all three accept"
+  spokes={[
+    {
+      name: "OpenAI",
+      url: "api.openai.com",
+      rows: [
+        ["reasoning", "(none on this API)"],
+        ["cache mark", "with CacheBreakpoints()"],
+      ],
+    },
+    {
+      name: "OpenRouter",
+      url: "openrouter.ai/api/v1",
+      rows: [
+        ["reasoning", "reasoning"],
+        ["cache mark", "with CacheBreakpoints()"],
+      ],
+    },
+    {
+      name: "Fireworks",
+      url: "api.fireworks.ai/inference/v1",
+      rows: [
+        ["reasoning", "reasoning_content"],
+        ["cache mark", "automatic"],
+      ],
+      warn: "CacheBreakpoints() fails the call",
+    },
+  ]}
+/>
+
+## Models
+
+The package has no models. Use an `openai` model for OpenAI, or write your own for another server. Set `MaxTokens`, because Fireworks caps a call at 2048 tokens by default.
+
+```go
+kimi := ai.Model{
+	ID:        "accounts/fireworks/models/kimi-k2-thinking",
+	Name:      "Kimi K2 Thinking",
+	MaxTokens: 16384,
+}
+p := openaichat.New(
+	openaichat.APIKey(os.Getenv("FIREWORKS_API_KEY")),
+	openaichat.BaseURL("https://api.fireworks.ai/inference/v1"),
+)
+lm := ai.LanguageModel{Model: kimi, Provider: p}
+```
+
+## Thinking
+
+<Ladder
+  alt="ThinkingOff sends the reasoning_effort none, which a model that cannot turn reasoning off rejects. Every other level sends its name. An unset level sends nothing."
+  call="ai.Thinking(level)"
+  note="each level is `ai.Thinking<Name>`"
+  levels={["Off", "Low", "Medium", "High", "XHigh", "Max"]}
+  rows={[
+    {
+      provider: "openaichat",
+      field: "reasoning_effort",
+      sends: {
+        Off: { text: "none", warn: "some models reject it" },
+        Low: "low",
+        Medium: "medium",
+        High: "high",
+        XHigh: "xhigh",
+        Max: "max",
+      },
+    },
+  ]}
+  foot="A model that cannot turn reasoning off rejects `none`."
+/>
+
+A thinking block goes back as `reasoning_content`. A model with interleaved thinking needs it between tool calls. Send the assistant message back unchanged.
+
+## Objects
+
+`ai.GenerateObject` uses a strict JSON schema response format. On Fireworks, the schema turns off the reasoning output.
+
+## Errors
+
+An API error wraps `openaichat.Error`. An error that OpenRouter reports after the stream starts fails the stream. With `ai.MaxRetries`, the provider retries before the first event, as the [Anthropic](anthropic.mdx#errors) provider does.
+
+## Tool Results With Files
+
+The Chat API takes only text in a tool result. The provider sends the text as the result, and each image in a user message after the results.
+
+## Related
+
+- [OpenAI](openai.mdx) is the provider for the Responses API.
+- [Models](../ai/models.mdx) is the binding that the provider goes into.
+
+The decisions are in [docs/concepts/ai/openai.md](../../../../../docs/concepts/ai/openai.md).

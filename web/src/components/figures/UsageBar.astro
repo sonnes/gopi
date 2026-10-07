@@ -1,0 +1,230 @@
+---
+// Token counts as one stacked bar: each count is a segment, sized by its
+// value, so the reader sees that the counts sit side by side and do not
+// overlap. A struck-out total says that no total field exists, and a
+// sum of turns shows how to keep one. Use it for a set of counts that
+// add up to a whole that the type does not store.
+import Figure from "./Figure.astro";
+
+interface Segment {
+  name: string;
+  value: number;
+  // note is the short meaning under the name.
+  note?: string;
+}
+
+interface Group {
+  // label names the group above its segments, such as "input tokens".
+  label: string;
+  // hue is the layer that colors the group.
+  hue: "wire" | "agent";
+  segments: Segment[];
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  groups: Group[];
+  // tag is a label at the top right, such as "example counts".
+  tag?: string;
+  // total is the text after the struck-out total.
+  total?: string;
+  // turns are the counts of each turn, in the order of the segments.
+  // The component draws them and their sum.
+  turns?: { label: string; values: number[] }[];
+  sum?: { label: string; before: string; mark: string; after: string; comment?: string };
+}
+
+const { alt, caption, groups, tag, total, turns, sum } = Astro.props;
+
+// Each segment of a group takes a lighter or darker tint of the group hue.
+const mixes = [50, 20, 34, 42];
+const segs = groups.flatMap((g) =>
+  g.segments.map((s, i) => ({
+    ...s,
+    bg: `color-mix(in srgb, var(--l-${g.hue}) ${g.hue === "agent" ? 45 : mixes[i % mixes.length]}%, var(--code-bg))`,
+  })),
+);
+const fmt = (n: number) => n.toLocaleString("en-US");
+const grand = segs.reduce((a, s) => a + s.value, 0);
+const groupSize = (g: Group) => g.segments.reduce((a, s) => a + s.value, 0);
+
+const sums = turns && segs.map((_, i) => turns.reduce((a, t) => a + (t.values[i] ?? 0), 0));
+const widest = sums ? sums.reduce((a, v) => a + v, 0) : 1;
+// The sum is the widest bar. It stops short of the edge, so its ring shows.
+const width = (vals: number[]) => `${((vals.reduce((a, v) => a + v, 0) / widest) * 98).toFixed(1)}%`;
+---
+
+<Figure alt={alt} caption={caption}>
+  {tag && <div class="ub-tag lbl">{tag}</div>}
+  <div class="row top">
+    {
+      groups.map((g) => (
+        <div class="grp" style={`flex: ${groupSize(g)}`}>
+          <span>{g.label}</span>
+        </div>
+      ))
+    }
+  </div>
+  <div class="row bar">
+    {
+      segs.map((s) => (
+        <div style={`flex: ${s.value}; background: ${s.bg}`}>{fmt(s.value)}</div>
+      ))
+    }
+  </div>
+  <div class="row names">
+    {
+      segs.map((s) => (
+        <div style={`flex: ${s.value}`}>
+          {s.name}
+          {s.note && <span>{s.note}</span>}
+        </div>
+      ))
+    }
+  </div>
+  {
+    total && (
+      <div class="none">
+        <span class="chip drop">Total {fmt(grand)}</span>
+        {total}
+      </div>
+    )
+  }
+  {
+    turns && sums && (
+      <div class="add">
+        {turns.map((t, j) => (
+          <>
+            <span class="op">{j === 0 ? t.label : `+ ${t.label}`}</span>
+            <div class="mini" style={`width: ${width(t.values)}`}>
+              {t.values.map((v, i) => v > 0 && <div style={`flex: ${v}; background: ${segs[i]?.bg}`} />)}
+            </div>
+          </>
+        ))}
+        {sum && (
+          <>
+            <span class="op sum">= {sum.label}</span>
+            <div class="mini total" style={`width: ${width(sums)}`}>
+              {sums.map((v, i) => v > 0 && <div style={`flex: ${v}; background: ${segs[i]?.bg}`} />)}
+            </div>
+            <div class="code">
+              {sum.before}
+              <span class="hl">{sum.mark}</span>
+              {sum.after}
+              {sum.comment && <span class="cm"> // {sum.comment}</span>}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  .row {
+    display: flex;
+    font-family: var(--font-mono);
+  }
+  .ub-tag {
+    text-align: right;
+    margin-bottom: 6px;
+  }
+  .top {
+    margin-bottom: 4px;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  /* The flex of a group is the sum of its segments, so its bracket
+     spans them. The pad leaves a gap between two brackets. */
+  .grp {
+    min-width: 0;
+    padding-inline: 3px;
+    text-align: center;
+  }
+  .grp span {
+    display: block;
+    border-top: 1.2px solid var(--line-strong);
+    padding-top: 3px;
+  }
+  .bar {
+    height: 40px;
+    border: 1.2px solid var(--line-strong);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .bar > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    border-right: 1.2px solid var(--code-bg);
+  }
+  .bar > div:last-child {
+    border-right: 0;
+  }
+  .names {
+    margin-top: 5px;
+    font-size: 11px;
+  }
+  .names > div {
+    min-width: 0;
+    padding-inline: 2px;
+    text-align: center;
+  }
+  .names span {
+    display: block;
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+  .none {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .none .chip.drop {
+    font-size: 12px;
+  }
+  .add {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    row-gap: 6px;
+    align-items: center;
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .mini {
+    display: flex;
+    height: 14px;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .mini > div {
+    border-right: 1px solid var(--code-bg);
+  }
+  .mini.total {
+    box-shadow: 0 0 0 1.4px var(--primary);
+  }
+  .op {
+    color: var(--muted);
+  }
+  .op.sum {
+    font-weight: 600;
+    color: var(--link);
+  }
+  .add .code {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    padding: 6px 12px;
+  }
+</style>

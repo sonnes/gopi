@@ -1,0 +1,89 @@
+---
+title: The Layer
+summary: The types of one model call, and how they fit together.
+---
+
+import SignatureAnatomy from "../../../components/figures/SignatureAnatomy.astro";
+import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
+
+`pkg/ai` holds the types that name a model call. A provider serves the call. A binding pairs a model with a provider. The messages go in, and a stream of events and one final message come out.
+
+## The Picture
+
+<SignatureAnatomy
+  alt="The call model.StreamText(ctx, messages, opts...). The model is an ai.LanguageModel: a Model and a Provider. The messages are a slice of ai.Message with text, thinking, and tool call blocks. The options are ai.Options, and Tools takes the output of Tool.Info. StreamText returns an *ai.EventStream: the events in order, then Wait gives one *ai.Message."
+  parts={[
+    {
+      text: "model",
+      card: { type: "ai.LanguageModel", chips: [["Model"], ["Provider", "tool"]], plus: true, pages: ["Models"] },
+    },
+    { text: "." },
+    { text: "StreamText", method: true },
+    { text: "(ctx, " },
+    {
+      text: "messages",
+      card: {
+        type: "[]ai.Message",
+        chips: [["Text"], ["ThinkingBlock", "assistant"], ["ToolCall", "tool"], ["File", "tool"]],
+        pages: ["Messages"],
+      },
+    },
+    { text: ", " },
+    {
+      text: "opts...",
+      card: {
+        type: "ai.Options",
+        chips: [["SystemPrompt"], ["Tools"], ["MaxTokens"], ["Thinking"]],
+        sub: "Tools ← Tool.Info()",
+        pages: ["Options", "Tools"],
+      },
+    },
+    { text: ")" },
+  ]}
+  returns={{
+    type: "*ai.EventStream",
+    events: ["start", "text_delta", "text_delta", "text_end"],
+    wait: "Wait()",
+    result: "*ai.Message",
+    pages: ["Streams"],
+  }}
+/>
+
+## The Abstractions
+
+| Abstraction | Meaning                                                    | Page                     |
+| ----------- | ---------------------------------------------------------- | ------------------------ |
+| model       | One named model that a provider serves                     | [Models](models.mdx)     |
+| provider    | One backend that answers a model call                      | [Models](models.mdx)     |
+| message     | One turn of a conversation, with a role and content blocks | [Messages](messages.mdx) |
+| option      | One typed setting of a call                                | [Options](options.mdx)   |
+| stream      | The events of one call, read in order, then the message    | [Streams](streams.mdx)   |
+| tool        | One function that a model can call                         | [Tools](../tool/index.mdx)       |
+
+The glossary in [docs/README.md](../../../../../docs/README.md) keeps one name for each thing.
+
+## The Optional Capabilities
+
+A provider always streams text. It can also do these. Each one is a function on the binding that asserts the interface on the provider. If the provider lacks the interface, the function returns an error.
+
+<CheckMatrix
+  alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, and image interfaces. OpenAI Chat implements the object interface only. No provider implements speech."
+  corner="provider"
+  columns={[
+    { label: "Objects", sub: ["GenerateObject[T]", "ObjectProvider"] },
+    { label: "Token counts", sub: ["CountTokens", "TokenCounter"] },
+    { label: "Images", sub: ["GenerateImage", "ImageProvider"] },
+    { label: "Speech", sub: ["GenerateSpeech", "SpeechProvider"] },
+  ]}
+  rows={[
+    { label: "Anthropic", code: "anthropic", cells: ["yes", "yes", "no", "no"] },
+    { label: "OpenAI", code: "openai", cells: ["yes", "yes", "yes", "no"] },
+    { label: "OpenAI Chat", code: "openaichat", cells: ["yes", "no", "no", "no"] },
+  ]}
+  legend={[["yes", "implements the interface"], ["no", "the function returns an error"]]}
+  colWidth="112px"
+/>
+
+A provider can also list the models that its key can call, with `ModelLister`. The list belongs to the provider and not to one model, so it is a method on the provider and not a function on the binding. All three providers implement it.
+
+[Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) show what each provider adds to a call.

@@ -1,0 +1,80 @@
+---
+// Overrides Starlight's Footer to put a row of chips above the previous
+// and next cards: the two things a reader can do about a page that is
+// wrong. Starlight ships the edit link on its own; the issue link is
+// built from the GitHub entry in `social`, so there is one place the
+// repository is named.
+
+import { Icon } from "@astrojs/starlight/components";
+import config from "virtual:starlight/user-config";
+
+// Starlight's own Footer reaches for the Pagination override through a
+// virtual module that carries no types. This footer composes the site's
+// pagination directly instead: one import, and the type-checker can see
+// both ends of it.
+import Pagination from "./Pagination.astro";
+
+const { editUrl, entry } = Astro.locals.starlightRoute;
+
+const repo = config.social?.find((s) => s.icon === "github")?.href;
+const issueUrl = repo
+  ? `${repo}/issues/new?title=${encodeURIComponent(`docs: ${entry.data.title}`)}`
+  : undefined;
+---
+
+<footer>
+  {
+    (editUrl || issueUrl) && (
+      <div class="page-actions print:hidden">
+        {editUrl && (
+          <a class="chip" href={editUrl.href}>
+            <Icon name="pencil" size="0.95rem" />
+            Edit page
+          </a>
+        )}
+        {issueUrl && (
+          <a class="chip" href={issueUrl}>
+            <Icon name="question-circle" size="0.95rem" />
+            Raise issue
+          </a>
+        )}
+      </div>
+    )
+  }
+  <Pagination />
+</footer>
+
+<style>
+  footer {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 3.5rem;
+  }
+
+  .page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.42rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--panel);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted-strong);
+    text-decoration: none;
+  }
+  .chip:hover {
+    border-color: var(--line-strong);
+    color: var(--text);
+  }
+</style>

@@ -1,0 +1,177 @@
+<section class="page" id="annotated">
+<style>
+/* One code face, one note face. The code sits on --code-bg with a
+   hairline. Notes sit on the page ground, outside the code. */
+#annotated { --a-row: 20px; --a-mono: 11.5px; --a-pad: 10px; --a-lead: var(--muted); }
+
+#annotated figure { margin: 0; width: 566px; max-width: 100%; }
+#annotated .src { margin: 0; font-family: var(--font-mono); font-size: var(--a-mono);
+  line-height: var(--a-row); color: var(--text); background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: var(--a-pad) 12px;
+  white-space: pre; tab-size: 4; -moz-tab-size: 4; overflow: hidden; }
+#annotated .src .l { display: block; height: var(--a-row); }
+
+/* the site code colors */
+#annotated .kw { color: var(--l-ai-deep); }
+#annotated .ty { color: var(--l-wire-deep); }
+#annotated .st { color: var(--l-durable-deep); }
+#annotated .nu { color: var(--l-agent-deep); }
+#annotated .cm, #annotated .dim { color: var(--muted); }
+
+/* a note in the margin */
+#annotated .note { font-family: var(--font-sans); font-size: 13px; line-height: 18px; color: var(--copy); }
+#annotated .note b { font-weight: 600; color: var(--text); }
+#annotated .note code { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+#annotated .gap { height: 12px; }
+#annotated .lead-in { margin: 0 0 6px; }
+
+/* ---------- F1: the printout, with the block in the margin ---------- */
+#annotated .f1 { display: grid; grid-template-columns: 340px 1fr; }
+#annotated .f1 .margin { padding-top: calc(var(--a-pad) + 1px); padding-left: 12px; }
+#annotated .f1 .row { height: var(--a-row); display: flex; align-items: center; white-space: nowrap; }
+#annotated .f1 .buf { font-family: var(--font-mono); font-size: var(--a-mono); color: var(--text); }
+#annotated .f1 .buf .old { color: var(--muted); }
+#annotated .f1 .buf .new { text-decoration: underline; text-decoration-color: var(--a-lead);
+  text-decoration-thickness: 1px; text-underline-offset: 3px; }
+/* the bracket: a thin "]" that faces the lines it groups */
+#annotated .f1 .grp { position: relative; padding-left: 14px; }
+#annotated .f1 .grp::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 5px;
+  border: 1px solid var(--a-lead); border-left: 0; }
+#annotated .f1 .solo { padding-left: 14px; }
+#annotated .f1 .wait { height: auto; min-height: var(--a-row); align-items: flex-start; padding-top: 1px; white-space: normal; }
+
+/* ---------- F2: the call, then the file ---------- */
+#annotated .f2 { display: grid; grid-template-columns: 412px 1fr; column-gap: 12px; }
+#annotated .f2 .call { grid-column: 1; }
+#annotated .f2 .file { grid-column: 1; padding-left: 8px; font-size: 11px; }
+#annotated .f2 .file .l { display: grid; grid-template-columns: 2px 20px 11px 1fr; }
+#annotated .f2 .file .reads { background: transparent; }
+#annotated .f2 .file .on .reads { background: var(--text); }
+#annotated .f2 .file .no { text-align: right; padding-right: 6px; color: var(--muted); }
+#annotated .f2 .file .plus { color: var(--l-durable-deep); }
+#annotated .f2 .file .ghost .txt { color: var(--muted); text-decoration: line-through;
+  text-decoration-thickness: 1px; }
+#annotated .f2 .file .ghost .txt * { color: inherit; }
+#annotated .f2 .file b { font-weight: 600; }
+#annotated .f2 .margin { grid-column: 2; padding-top: calc(var(--a-pad) + 1px); }
+#annotated .f2 .margin .row { height: var(--a-row); display: flex; align-items: center; white-space: nowrap; }
+#annotated .f2 .margin .row.last { height: auto; white-space: normal; padding-top: 1px; }
+#annotated .f2 .foot { grid-column: 1 / -1; margin-top: 10px; display: grid; gap: 2px; }
+#annotated .f2 .bar-key { display: inline-block; width: 2px; height: 13px; background: var(--text);
+  vertical-align: -2px; margin-right: 7px; }
+
+/* ---------- F3: the return paths, with leader lines ---------- */
+#annotated .f3 { position: relative; height: 468px; }
+#annotated .f3 .src { width: 330px; }
+#annotated .f3 .src .lead { display: flex; }
+#annotated .f3 .src .lead::after { content: ""; flex: 1; align-self: center; margin: 0 -13px 0 8px;
+  border-top: 1px solid var(--a-lead); }
+#annotated .f3 .mark { text-decoration: underline; text-decoration-color: var(--a-lead);
+  text-decoration-thickness: 1px; text-underline-offset: 3px; }
+#annotated .f3 svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+#annotated .f3 svg path { stroke: var(--a-lead); stroke-width: 1; fill: none; }
+#annotated .f3 .n { position: absolute; left: 376px; width: 190px; }
+
+/* ---------- on a page ---------- */
+#annotated .prose { font-family: var(--font-sans); font-size: 16px; line-height: 1.65; color: var(--copy);
+  max-width: 31rem; margin: 0 0 24px; }
+#annotated .prose code { font-family: var(--font-mono); font-size: 14px; color: var(--text); }
+#annotated .slot figure + .why { margin-top: 18px; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">style</div>
+    <h2>Annotated Artifact</h2>
+    <p class="job">Each figure is the real thing that a developer sees: the program output, the file on disk, or the Go code, with notes in the margin.</p>
+    <p class="now">Borrows from Go by Example, with the code on the left and the notes on the right, and from a printout that a reviewer marked up with a pen.</p>
+  </div>
+
+  <!-- ============ F1: Streams ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F1 · Streams <span>· the events of one call</span></h3>
+    <figure>
+<pre class="src"><span class="l"><span class="kw">for</span> ev := <span class="kw">range</span> stream.Events() {</span><span class="l">	fmt.Printf(<span class="st">"%-10s %d %s\n"</span>,</span><span class="l">		ev.Type, ev.ContentIndex, ev.Delta+ev.Content)</span><span class="l">}</span><span class="l">msg, _ := stream.Wait()</span><span class="l">fmt.Printf(<span class="st">"%+v\n"</span>, msg.Content)</span></pre>
+      <div class="gap"></div>
+      <div class="f1">
+<pre class="src"><span class="l dim">$ go run .</span><span class="l">start      <span class="nu">0</span></span><span class="l">text_start <span class="nu">0</span></span><span class="l">text_delta <span class="nu">0</span> <span class="st">Hel</span></span><span class="l">text_delta <span class="nu">0</span> <span class="st">lo</span></span><span class="l">text_end   <span class="nu">0</span> <span class="st">Hello</span></span><span class="l">tool_start <span class="nu">1</span></span><span class="l">tool_delta <span class="nu">1</span> <span class="st">{"ci</span></span><span class="l">tool_end   <span class="nu">1</span></span><span class="l">[{Text:Hello} {ID:t1 Name:weather Input:[…]}]</span></pre>
+        <div class="margin">
+          <div class="row solo note">The block after each line</div>
+          <div class="row"></div>
+          <div class="grp">
+            <div class="row note"><code>Content[0]</code>, text</div>
+            <div class="row buf">Hel</div>
+            <div class="row buf"><span class="old">Hel</span><span class="new">lo</span></div>
+            <div class="row buf">Hello</div>
+          </div>
+          <div class="grp">
+            <div class="row note"><code>Content[1]</code>, tool call</div>
+            <div class="row buf">{"ci</div>
+            <div class="row buf"><span class="ty">ToolCall</span>&nbsp;<span class="st">weather</span></div>
+          </div>
+          <div class="row solo note wait"><span><code>Wait</code> returns this message. It is not an event.</span></div>
+        </div>
+      </div>
+    </figure>
+    <p class="why"><b>Reads as:</b> a program and its output, where the index is a column and the margin shows each block grow until <code>Wait</code> prints the message. <span class="cost">Cost:</span> the print format is ours and not a gopi API, so the reader must trust the <code>Printf</code> line above it.</p>
+  </div>
+
+  <!-- ============ F2: Sessions ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F2 · Sessions <span>· add context to a run</span></h3>
+    <figure class="f2">
+<pre class="src call"><span class="l">a.Run(ctx,</span><span class="l">	session.Text(skill, session.Meta()),</span><span class="l">	session.Text(<span class="st">"next question"</span>),</span><span class="l">	session.Text(now, session.Ephemeral()),</span><span class="l">)</span></pre>
+      <p class="note lead-in call" style="grid-column:1;margin-top:12px">After the call, <code>s1.jsonl</code> holds these lines.</p>
+<pre class="src file"><span class="l"><span class="reads"></span><span class="no">1</span><span></span><span class="txt">{<span class="st">"type"</span>:<span class="st">"session_init"</span>,<span class="st">"id"</span>:<span class="st">"s1"</span>,…}</span></span><span class="l on"><span class="reads"></span><span class="no">2</span><span></span><span class="txt">{<span class="st">"type"</span>:<span class="st">"message"</span>,<span class="st">"id"</span>:<span class="st">"u1"</span>,…<span class="st">"role"</span>:<b class="st">"user"</b>…}</span></span><span class="l on"><span class="reads"></span><span class="no">3</span><span></span><span class="txt">{<span class="st">"type"</span>:<span class="st">"message"</span>,<span class="st">"id"</span>:<span class="st">"a1"</span>,…<span class="st">"role"</span>:<b class="st">"assistant"</b>…}</span></span><span class="l on"><span class="reads"></span><span class="no">4</span><span class="plus">+</span><span class="txt">{<span class="st">"type"</span>:<span class="st">"message"</span>,<span class="st">"id"</span>:<span class="st">"skill"</span>,<span class="st">"injected"</span>:<b class="st">"meta"</b>,…}</span></span><span class="l on"><span class="reads"></span><span class="no">5</span><span class="plus">+</span><span class="txt">{<span class="st">"type"</span>:<span class="st">"message"</span>,<span class="st">"id"</span>:<span class="st">"u2"</span>,…<span class="st">"role"</span>:<b class="st">"user"</b>…}</span></span><span class="l on ghost"><span class="reads"></span><span class="no"></span><span></span><span class="txt">{"type":"message","id":"time","injected":<b>"ephemeral"</b>,…}</span></span></pre>
+      <div class="margin" style="grid-row:3">
+        <div class="row note"></div>
+        <div class="row note">user</div>
+        <div class="row note">assistant</div>
+        <div class="row note"><span><b>new</b>, meta</span></div>
+        <div class="row note"><span><b>new</b>, user</span></div>
+        <div class="row note last">ephemeral: not stored</div>
+      </div>
+      <div class="foot">
+        <p class="note" style="margin:0"><span class="bar-key"></span>The model reads the five lines on the bar.</p>
+        <p class="note" style="margin:0">The next run reads the skill again. It does not read the time.</p>
+      </div>
+    </figure>
+    <p class="why"><b>Reads as:</b> the file on disk after the call, with a <code>+</code> on each new line, a struck line for the time, and a bar for what the model reads. <span class="cost">Cost:</span> the kinds are told apart only by the words in each line, so the reader reads each line to find its kind.</p>
+  </div>
+
+  <!-- ============ F3: Tools ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F3 · Tools <span>· two failure channels</span></h3>
+    <figure class="f3">
+<pre class="src"><span class="l"><span class="kw">func</span> (w <span class="ty">weather</span>) Run(</span><span class="l">	ctx <span class="ty">context.Context</span>, call <span class="ty">ai.ToolCall</span>,</span><span class="l">) (<span class="ty">ai.ToolResult</span>, <span class="ty">error</span>) {</span><span class="l">	<span class="kw">var</span> in <span class="kw">struct</span>{ City <span class="ty">string</span> }</span><span class="l">	err := json.Unmarshal(call.Input, &amp;in)</span><span class="l">	<span class="kw">if</span> err != <span class="nu">nil</span> || in.City == <span class="st">""</span> {</span><span class="l">		msg := <span class="ty">ai.Text</span>{Text: <span class="st">"need a city"</span>}</span><span class="l">		<span class="kw">return</span> <span class="ty">ai.ToolResult</span>{</span><span class="l">			Content: []<span class="ty">ai.Content</span>{msg},</span><span class="l">			<span class="mark">IsError: <span class="nu">true</span></span>,</span><span class="l lead"><span>		}, <span class="mark nu">nil</span></span></span><span class="l">	}</span><span class="l">	t, err := w.api.Temp(ctx, in.City)</span><span class="l">	<span class="kw">if</span> err != <span class="nu">nil</span> {</span><span class="l lead"><span>		<span class="kw">return</span> <span class="ty">ai.ToolResult</span>{}, <span class="mark">err</span></span></span><span class="l">	}</span><span class="l">	<span class="cm">// ... return t as a text result</span></span><span class="l">}</span></pre>
+      <svg width="566" height="468" viewBox="0 0 566 468" aria-hidden="true">
+        <!-- loop-back: from "}, nil" up to the func line -->
+        <path d="M330 221 H352 V21 H368"/>
+        <path d="M363 17 L368 21 L363 25"/>
+        <!-- exit: from "err" down, past the end of Run -->
+        <path d="M330 301 H352 V411 H368"/>
+        <path d="M363 407 L368 411 L363 415"/>
+      </svg>
+      <p class="note n" style="top:11px;margin:0"><b>Back to the model.</b> The model reads the text of the error result, corrects the input, and calls <code>Run</code> again. The run goes on.</p>
+      <p class="note n" style="top:401px;margin:0"><b>Out of the run.</b> The agent stops and returns <code>err</code> to the caller, for example for a canceled <code>ctx</code>.</p>
+    </figure>
+    <p class="why"><b>Reads as:</b> the two <code>return</code> lines of a real tool, where one leader climbs back to <code>Run</code> and the other drops out below the function. <span class="cost">Cost:</span> the loop is a direction on the page and not a drawn cycle, so the note must say "calls <code>Run</code> again".</p>
+  </div>
+
+  <!-- ============ On a page ============ -->
+  <div class="slot">
+    <h3 class="slot-title">On a Page <span>· F3 next to body text</span></h3>
+    <p class="prose">A tool can fail in two ways. If the model can correct the problem, return a result with <code>IsError</code> set and a <code>nil</code> error. The model reads the result and calls the tool again. If the run cannot go on, return a Go error. The agent stops the run and returns the error to the caller.</p>
+    <figure class="f3">
+<pre class="src"><span class="l"><span class="kw">func</span> (w <span class="ty">weather</span>) Run(</span><span class="l">	ctx <span class="ty">context.Context</span>, call <span class="ty">ai.ToolCall</span>,</span><span class="l">) (<span class="ty">ai.ToolResult</span>, <span class="ty">error</span>) {</span><span class="l">	<span class="kw">var</span> in <span class="kw">struct</span>{ City <span class="ty">string</span> }</span><span class="l">	err := json.Unmarshal(call.Input, &amp;in)</span><span class="l">	<span class="kw">if</span> err != <span class="nu">nil</span> || in.City == <span class="st">""</span> {</span><span class="l">		msg := <span class="ty">ai.Text</span>{Text: <span class="st">"need a city"</span>}</span><span class="l">		<span class="kw">return</span> <span class="ty">ai.ToolResult</span>{</span><span class="l">			Content: []<span class="ty">ai.Content</span>{msg},</span><span class="l">			<span class="mark">IsError: <span class="nu">true</span></span>,</span><span class="l lead"><span>		}, <span class="mark nu">nil</span></span></span><span class="l">	}</span><span class="l">	t, err := w.api.Temp(ctx, in.City)</span><span class="l">	<span class="kw">if</span> err != <span class="nu">nil</span> {</span><span class="l lead"><span>		<span class="kw">return</span> <span class="ty">ai.ToolResult</span>{}, <span class="mark">err</span></span></span><span class="l">	}</span><span class="l">	<span class="cm">// ... return t as a text result</span></span><span class="l">}</span></pre>
+      <svg width="566" height="468" viewBox="0 0 566 468" aria-hidden="true">
+        <path d="M330 221 H352 V21 H368"/>
+        <path d="M363 17 L368 21 L363 25"/>
+        <path d="M330 301 H352 V411 H368"/>
+        <path d="M363 407 L368 411 L363 415"/>
+      </svg>
+      <p class="note n" style="top:11px;margin:0"><b>Back to the model.</b> The model reads the text of the error result, corrects the input, and calls <code>Run</code> again. The run goes on.</p>
+      <p class="note n" style="top:401px;margin:0"><b>Out of the run.</b> The agent stops and returns <code>err</code> to the caller, for example for a canceled <code>ctx</code>.</p>
+    </figure>
+    <p class="why"><b>Reads as:</b> a code block from the page with two pen marks, so the figure and the example code are one thing. <span class="cost">Cost:</span> the figure is 468px tall, which is taller than a drawn diagram of the same two paths.</p>
+  </div>
+</section>

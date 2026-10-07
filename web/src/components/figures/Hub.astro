@@ -1,0 +1,264 @@
+---
+// A hub: one client in the center, and edges that fan out to the
+// servers that it can call. Each server is a card with a few facts, and
+// a card can carry a warning. Use it when one package serves several
+// targets and the targets differ in a few ways. The center can also
+// hold the spec of the package: its API and the interfaces that it
+// implements (lit) and does not implement (dim).
+import Figure from "./Figure.astro";
+
+// A line of the center code. A line with "hl" is the one that picks
+// the server. A line with "dim" is optional.
+type Line = string | [string, "hl" | "dim"];
+
+interface Spoke {
+  name: string;
+  url: string;
+  // rows are [key, value] pairs. A value in parentheses draws muted.
+  rows: [string, string][];
+  warn?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // pkg and api head the center card.
+  pkg?: string;
+  api?: string;
+  implements?: string[];
+  lacks?: string[];
+  // lines is the code of the center card.
+  lines: Line[];
+  // note is a muted line under the center card.
+  note?: string;
+  spokes: Spoke[];
+}
+
+const {
+  alt,
+  caption,
+  pkg,
+  api,
+  implements: impl = [],
+  lacks = [],
+  lines,
+  note,
+  spokes,
+} = Astro.props;
+
+const line = (l: Line) => (typeof l === "string" ? [l, ""] : l);
+const muted = (v: string) => v.startsWith("(") && v.endsWith(")");
+// The edges run in a 40 x 100 box that stretches to the height of the
+// fan. Each server row has the same height, so row i has its middle at
+// (i + 0.5) / n of the height, and the hub sits at the middle.
+const n = spokes.length;
+const ys = spokes.map((_, i) => ((i + 0.5) * 100) / n);
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="fan">
+    <div class="hub">
+      <div class="node accent">
+        {
+          pkg && (
+            <div class="hub-top">
+              <b>{pkg}</b>
+              {api && <span>{api}</span>}
+            </div>
+          )
+        }
+        <div class="hub-code">
+          {
+            lines.map((l) => {
+              const [text, mark] = line(l);
+              return <div class:list={[mark]}>{text}</div>;
+            })
+          }
+        </div>
+        {
+          impl.length + lacks.length > 0 && (
+            <div class="badges">
+              {impl.map((name) => <span class="badge">{name}</span>)}
+              {lacks.map((name) => <span class="badge off">{name}</span>)}
+            </div>
+          )
+        }
+      </div>
+      {note && <div class="note">{note}</div>}
+    </div>
+    <svg viewBox="0 0 40 100" preserveAspectRatio="none" aria-hidden="true">
+      {
+        ys.map((y) => (
+          <path
+            class="edge-accent"
+            vector-effect="non-scaling-stroke"
+            d={`M0 50 C 20 50, 20 ${y}, 40 ${y}`}
+          />
+        ))
+      }
+    </svg>
+    <div class="servers" style={`grid-template-rows: repeat(${n}, 1fr)`}>
+      {
+        spokes.map((s) => (
+          <div class="lane">
+            <div class="srv">
+              <div class="srv-h">
+                <b>{s.name}</b>
+                <span>{s.url}</span>
+              </div>
+              {s.rows.map(([k, v]) => (
+                <div class="r">
+                  <span class="k">{k}</span>
+                  <span class:list={["v", { m: muted(v) }]}>
+                    {muted(v) ? v.slice(1, -1) : v}
+                  </span>
+                </div>
+              ))}
+              {s.warn && <span class="bad">⚠ {s.warn}</span>}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .fan {
+    display: grid;
+    grid-template-columns: 200px 36px minmax(0, 1fr);
+    min-width: 520px;
+  }
+  .hub {
+    display: grid;
+    gap: 6px;
+    align-self: center;
+  }
+  .hub .node {
+    font-size: 11.5px;
+    line-height: 1.5;
+    display: grid;
+    gap: 8px;
+  }
+  .hub-top {
+    display: grid;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+  }
+  .hub-top b {
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  .hub-top span {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .hub-code {
+    white-space: pre;
+  }
+  .hub-code .hl {
+    font-weight: 600;
+  }
+  .hub-code .dim {
+    color: var(--muted);
+  }
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .badge {
+    font-size: 10px;
+    line-height: 1.5;
+    padding: 0 6px;
+    border-radius: 5px;
+    border: 1px solid var(--l-wire);
+    color: var(--l-wire-deep);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+  .badge.off {
+    border: 1px dotted var(--line-strong);
+    color: var(--muted);
+    background: transparent;
+    text-decoration: line-through;
+    text-decoration-color: var(--muted-soft);
+  }
+  .note {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    line-height: 1.35;
+  }
+  .fan svg {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+  }
+  .servers {
+    display: grid;
+  }
+  .lane {
+    padding: 6px 0;
+    display: grid;
+  }
+  .srv {
+    position: relative;
+    background: var(--code-bg);
+    border: 1.2px solid var(--l-wire);
+    border-radius: 10px;
+    padding: 7px 11px;
+    display: grid;
+    align-content: start;
+    gap: 3px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  /* The head of the edge, at the middle of the left side of the card. */
+  .srv::before {
+    content: "";
+    position: absolute;
+    left: -7px;
+    top: 50%;
+    margin-top: -4px;
+    border-left: 6px solid var(--primary);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+  }
+  .srv-h {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .srv-h b {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .srv-h span {
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+  .r {
+    display: grid;
+    grid-template-columns: 76px 1fr;
+    gap: 6px;
+  }
+  .k {
+    color: var(--muted);
+  }
+  .v {
+    color: var(--text);
+  }
+  .v.m {
+    color: var(--muted);
+  }
+  .bad {
+    color: var(--err);
+    border: 1px dashed var(--err);
+    border-radius: 5px;
+    padding: 0 5px;
+    justify-self: start;
+    font-size: 10.5px;
+  }
+</style>

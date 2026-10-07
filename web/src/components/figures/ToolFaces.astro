@@ -1,0 +1,342 @@
+---
+// The two faces of one tool: the Go code that defines it, then what the
+// model reads and what your code runs, side by side. Numbered pins tie a
+// part of the code to the part of the schema that it makes. A row of
+// modes on top names the ways to build the tool. Use it where one
+// definition gives two things to two readers.
+//
+// The code and the JSON are plain strings. "@1" puts pin 1 where it
+// stands, and "==x==" marks x. The component colors the keywords, the
+// strings, and the names in types.
+import Figure from "./Figure.astro";
+
+interface Step {
+  // via is the label of the arrow into this step.
+  via?: string;
+  label: string;
+  value: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // modes are the ways to build the tool. The one with on is drawn.
+  modes?: { name: string; text: string; on?: boolean }[];
+  code: string;
+  // types are the names that the code colors as types.
+  types?: string[];
+  info: { title: string; note: string; json: string };
+  run: { title: string; note: string; steps: Step[] };
+}
+
+const { alt, caption, modes, code, types = [], info, run } = Astro.props;
+
+type Tok = { text: string; cls?: string } | { pin: string } | { hl: string };
+
+const KW = new Set([
+  "type", "struct", "var", "func", "return", "if", "else", "for", "range",
+  "const", "package", "import", "interface", "map", "chan", "go", "defer", "nil",
+]);
+
+function scan(src: string, mode: "go" | "json", named: Set<string>): Tok[] {
+  const out: Tok[] = [];
+  const push = (text: string, cls?: string) => {
+    const last = out.at(-1);
+    if (last && "text" in last && last.cls === cls) last.text += text;
+    else out.push({ text, cls });
+  };
+  let quote = "";
+  let qcls = "str";
+  let i = 0;
+  while (i < src.length) {
+    const rest = src.slice(i);
+    const pin = /^@(\d+)/.exec(rest);
+    if (pin) {
+      out.push({ pin: pin[1] });
+      i += pin[0].length;
+      continue;
+    }
+    const ch = src[i];
+    if (quote) {
+      push(ch, qcls);
+      if (ch === quote) quote = "";
+      i++;
+      continue;
+    }
+    if (rest.startsWith("==")) {
+      const end = src.indexOf("==", i + 2);
+      out.push({ hl: src.slice(i + 2, end) });
+      i = end + 2;
+      continue;
+    }
+    if (ch === '"' || (mode === "go" && ch === "`")) {
+      quote = ch;
+      // A JSON string that a colon follows is a key.
+      const end = src.indexOf(ch, i + 1);
+      qcls = mode === "json" && src.slice(end + 1).trimStart().startsWith(":") ? "ty" : "str";
+      push(ch, qcls);
+      i++;
+      continue;
+    }
+    if (mode === "go" && rest.startsWith("//")) {
+      const end = src.indexOf("\n", i);
+      const stop = end < 0 ? src.length : end;
+      push(src.slice(i, stop), "cm");
+      i = stop;
+      continue;
+    }
+    const word = /^[A-Za-z_]\w*/.exec(rest);
+    if (word) {
+      const w = word[0];
+      push(w, mode === "go" && KW.has(w) ? "kw" : named.has(w) ? "ty" : undefined);
+      i += w.length;
+      continue;
+    }
+    const num = /^\d+/.exec(rest);
+    if (num) {
+      push(num[0], "num");
+      i += num[0].length;
+      continue;
+    }
+    push(ch, ch === "…" ? "dim" : undefined);
+    i++;
+  }
+  return out;
+}
+
+const named = new Set([...types, "string", "error", "int", "bool", "any"]);
+const goToks = scan(code, "go", named);
+const jsonToks = scan(info.json, "json", new Set());
+---
+
+<Figure alt={alt} caption={caption}>
+  {
+    modes && (
+      <div class="seg">
+        {modes.map((m) => (
+          <span class:list={{ on: m.on }}>
+            <b>{m.name}</b> {m.text}
+          </span>
+        ))}
+      </div>
+    )
+  }
+  <div class="code src">{
+      goToks.map((t) =>
+        "pin" in t ? (
+          <span class="pin">{t.pin}</span>
+        ) : "hl" in t ? (
+          <span class="hl">{t.hl}</span>
+        ) : t.cls ? (
+          <span class={t.cls}>{t.text}</span>
+        ) : (
+          t.text
+        ),
+      )
+    }</div>
+  <div class="derive" aria-hidden="true"><i></i><i></i></div>
+  <div class="faces">
+    <div class="face k-tool">
+      <header><b>{info.title}</b><span>{info.note}</span></header>
+      <pre class="json">{
+        jsonToks.map((t) =>
+          "pin" in t ? (
+            <span class="pin">{t.pin}</span>
+          ) : "hl" in t ? (
+            <span class="hl">{t.hl}</span>
+          ) : t.cls ? (
+            <span class={t.cls}>{t.text}</span>
+          ) : (
+            t.text
+          ),
+        )
+      }</pre>
+    </div>
+    <div class="face k-assistant">
+      <header><b>{run.title}</b><span>{run.note}</span></header>
+      <div class="steps">
+        {
+          run.steps.map((s, i) => (
+            <>
+              {s.via && <div class="dn">{s.via}</div>}
+              <div class:list={["st", { res: i === run.steps.length - 1 }]}>
+                <small>{s.label}</small>
+                {s.value}
+              </div>
+            </>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .seg {
+    display: inline-flex;
+    margin-bottom: 12px;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .seg span {
+    padding: 3px 10px;
+    color: var(--muted);
+    background: var(--code-bg);
+  }
+  .seg span + span {
+    border-left: 1px solid var(--line-strong);
+  }
+  .seg span.on {
+    color: var(--link);
+    background: var(--primary-faint);
+    box-shadow: inset 0 0 0 1px var(--primary);
+  }
+  .seg b {
+    font-weight: 600;
+  }
+  .code.src {
+    font-size: 11.5px;
+  }
+  .code.src .pin {
+    margin: 0 1px;
+  }
+
+  /* The fork from the code to the two faces. The columns match the
+     faces, so each branch lands on the middle of its face. */
+  .derive {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.08fr 1fr;
+    column-gap: 12px;
+    height: 26px;
+  }
+  .derive::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0;
+    height: 10px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  .derive i {
+    position: relative;
+  }
+  .derive i::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 10px;
+    bottom: 0;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  .derive i::before {
+    content: "";
+    position: absolute;
+    top: 10px;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .derive i:first-child::before {
+    left: 50%;
+    right: -6px;
+  }
+  .derive i:last-child::before {
+    left: -6px;
+    right: 50%;
+  }
+
+  .faces {
+    display: grid;
+    grid-template-columns: 1.08fr 1fr;
+    gap: 12px;
+  }
+  .face {
+    min-width: 0;
+    overflow: hidden;
+    border: 1.2px solid var(--k);
+    border-radius: 12px;
+    background: var(--code-bg);
+  }
+  .face > header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--k);
+    background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .face > header b {
+    font-weight: 600;
+  }
+  .face > header span {
+    font-size: 10.5px;
+    color: var(--muted-strong);
+  }
+  .json {
+    margin: 0;
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.55;
+    white-space: pre;
+    color: var(--text);
+    background: none;
+  }
+  .json .ty {
+    color: var(--l-wire-deep);
+  }
+  .json .str {
+    color: var(--l-durable-deep);
+  }
+  .json .num {
+    color: var(--l-agent-deep);
+  }
+  .json .dim {
+    color: var(--muted);
+  }
+  .face .json .pin {
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+  }
+  .steps {
+    padding: 8px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .st {
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--code-bg);
+    overflow-wrap: anywhere;
+  }
+  .st small {
+    display: block;
+    font-size: 9.5px;
+    color: var(--muted);
+  }
+  .st.res {
+    border-color: var(--l-wire);
+  }
+  .dn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding-left: 14px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .dn::before {
+    content: "";
+    height: 100%;
+    margin-right: 4px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+</style>

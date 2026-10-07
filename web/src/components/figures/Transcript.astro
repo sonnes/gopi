@@ -1,0 +1,338 @@
+---
+// A conversation as a chat: one bubble for each message, with the typed
+// content blocks inside it. A tool result ties to its tool call with a
+// matching ID chip and a dashed connector. Use it where the page is about
+// the messages of a conversation and the order they go in.
+//
+// The transcript is one grid with a row for each block. The connector
+// is three borders in the tie column: the half row of the tool call, the
+// rows between, and the half row of the result. So it follows the layout
+// and needs no offsets.
+import Figure from "./Figure.astro";
+
+interface Block {
+  // type is the Go type of the block, such as Text or ToolCall.
+  type: string;
+  text: string;
+  // detail is muted text after the text, such as the input of a call.
+  detail?: string;
+  // id is the ID of a tool call. A tool_result with the same id ties to it.
+  id?: string;
+}
+
+interface Message {
+  role: "user" | "assistant" | "tool_result";
+  blocks: Block[];
+  stop?: string;
+  // id is the ToolCallID of a tool_result.
+  id?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  messages: Message[];
+  // list names the whole list, such as []ai.Message.
+  list?: string;
+  note?: string;
+  // tie labels the connector from a result to its call.
+  tie?: string;
+}
+
+const { alt, caption, messages, list, note, tie = "same ID" } = Astro.props;
+
+// Build the rows. Each entry is a track size. Spacing comes from fixed
+// rows, not from margins, so the middle of a content row is the middle
+// of the block in it.
+const rows: string[] = [];
+const add = (size = "auto") => {
+  rows.push(size);
+  return rows.length;
+};
+
+type Placed =
+  | { kind: "who"; row: number; role: string; col: string }
+  | { kind: "bubble"; from: number; to: number; role: string; col: string }
+  | { kind: "block"; row: number; block: Block; col: string }
+  | { kind: "foot"; row: number; stop: string; col: string }
+  | { kind: "result"; row: number; msg: Message; col: string };
+
+const items: Placed[] = [];
+const callRow = new Map<string, number>();
+const ties: { from: number; to: number }[] = [];
+
+// The columns: rail, left, middle, right, tie, label. A user message
+// sits right, an assistant message sits left, and a tool result sits in
+// the middle.
+const cols = {
+  user: "m / end",
+  assistant: "l / tie",
+  tool_result: "m / r",
+};
+
+messages.forEach((msg, i) => {
+  if (i > 0) add("12px");
+  if (msg.role === "tool_result") {
+    const row = add();
+    items.push({ kind: "result", row, msg, col: cols.tool_result });
+    const from = msg.id ? callRow.get(msg.id) : undefined;
+    if (from) ties.push({ from, to: row });
+    return;
+  }
+  const col = cols[msg.role];
+  items.push({ kind: "who", row: add(), role: msg.role, col });
+  const top = add("8px");
+  msg.blocks.forEach((block, j) => {
+    if (j > 0) add("5px");
+    const row = add();
+    items.push({ kind: "block", row, block, col });
+    if (block.id) callRow.set(block.id, row);
+  });
+  if (msg.stop) {
+    add("5px");
+    items.push({ kind: "foot", row: add(), stop: msg.stop, col });
+  }
+  const bottom = add("8px");
+  items.push({ kind: "bubble", from: top, to: bottom, role: msg.role, col });
+});
+
+const template = rows.join(" ");
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="tx" style={`grid-template-rows: ${template}`}>
+    <div class="rail"></div>
+    {
+      items.map((it) => {
+        if (it.kind === "who")
+          return (
+            <div class:list={["who", it.role]} style={`grid-row: ${it.row}; grid-column: ${it.col}`}>
+              {it.role}
+            </div>
+          );
+        if (it.kind === "bubble")
+          return (
+            <div
+              class:list={["bub", it.role]}
+              style={`grid-row: ${it.from} / ${it.to + 1}; grid-column: ${it.col}`}
+            />
+          );
+        if (it.kind === "block")
+          return (
+            <div class="blk" style={`grid-row: ${it.row}; grid-column: ${it.col}`}>
+              <span class="bt">{it.block.type}</span>
+              <span class:list={["tx-text", { think: it.block.type === "ThinkingBlock" }]}>
+                {it.block.text}
+                {it.block.detail && <span class="muted"> {it.block.detail}</span>}
+              </span>
+              {it.block.id && <span class="chip idc">{it.block.id}</span>}
+            </div>
+          );
+        if (it.kind === "foot")
+          return (
+            <div class="foot" style={`grid-row: ${it.row}; grid-column: ${it.col}`}>
+              <span class="stop">
+                StopReason <b>{it.stop}</b>
+              </span>
+            </div>
+          );
+        return (
+          <div class="res" style={`grid-row: ${it.row}; grid-column: ${it.col}`}>
+            <span class="role">tool_result</span>
+            {it.msg.blocks.map((b) => (
+              <span class="tx-text">
+                <span class="bt-in">{b.type}</span> {b.text}
+              </span>
+            ))}
+            {it.msg.id && <span class="chip idc">{it.msg.id}</span>}
+          </div>
+        );
+      })
+    }
+    {
+      ties.map((t) => (
+        <>
+          <div class="tie tie-top" style={`grid-row: ${t.from}`} />
+          {t.to - t.from > 1 && <div class="tie tie-mid" style={`grid-row: ${t.from + 1} / ${t.to}`} />}
+          <div class="tie tie-end" style={`grid-row: ${t.to}`} />
+          <div class="tie-l" style={`grid-row: ${t.from} / ${t.to + 1}`}>
+            {tie}
+          </div>
+        </>
+      ))
+    }
+  </div>
+  {
+    (list || note) && (
+      <div class="cap">
+        {list && <b>{list}</b>}
+        {note && <span class="muted">{note}</span>}
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  /* The bubble pads its blocks by --pad on each side. */
+  .tx {
+    --pad: 8px;
+    display: grid;
+    grid-template-columns:
+      [rail] 22px [l] 40px [m] minmax(0, 1fr) [r] 40px [tie] 18px [lab] 44px [end];
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .rail {
+    grid-column: rail;
+    grid-row: 1 / -1;
+    width: 10px;
+    margin-block: 4px;
+    border: 1.6px solid var(--primary);
+    border-right: 0;
+    border-radius: 8px 0 0 8px;
+  }
+  .who {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0 2px 3px;
+  }
+  .who.user {
+    text-align: right;
+  }
+  .bub {
+    --k: var(--l-agent);
+    border: 1.2px solid var(--k);
+    border-radius: 14px;
+    border-top-left-radius: 4px;
+    background: color-mix(in srgb, var(--k) 7%, var(--code-bg));
+  }
+  .bub.user {
+    --k: var(--line-strong);
+    background: var(--code-bg);
+    border-radius: 14px;
+    border-top-right-radius: 4px;
+  }
+  .blk,
+  .foot {
+    position: relative;
+    z-index: 1;
+    margin-inline: var(--pad);
+  }
+  .blk {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+  .bt {
+    flex: none;
+    width: 88px;
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+  }
+  .bt-in {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .think {
+    font-style: italic;
+    color: var(--muted);
+  }
+  .tx-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .foot {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .stop {
+    font-size: 10.5px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--l-agent);
+    color: var(--l-agent-deep);
+    background: var(--code-bg);
+  }
+  .stop b {
+    font-weight: 600;
+  }
+  .res {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 28px;
+    padding: 3px 8px;
+    border: 1.2px solid var(--l-wire);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--l-wire) 7%, var(--code-bg));
+    white-space: nowrap;
+  }
+  .res .role {
+    font-size: 11px;
+    color: var(--l-wire-deep);
+  }
+  /* The global chip rules are two classes deep, so these take three. */
+  .tx .chip.idc {
+    margin-left: auto;
+    border-color: var(--l-wire);
+    color: var(--l-wire-deep);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+
+  /* The tie: the right edge of each piece is the right edge of the tie
+     column, so the three pieces draw one line. */
+  .tie {
+    grid-column: tie;
+    border: 0 dashed var(--l-wire);
+    border-right-width: 1.2px;
+  }
+  .tie-top {
+    /* From the edge of the block, across the pad of the bubble. */
+    margin-left: calc(-1 * var(--pad));
+    align-self: end;
+    height: 50%;
+    border-top-width: 1.2px;
+    border-top-right-radius: 8px;
+  }
+  .tie-end {
+    grid-column: r / lab;
+    align-self: start;
+    height: 50%;
+    border-bottom-width: 1.2px;
+    border-bottom-right-radius: 8px;
+  }
+  .tie-l {
+    grid-column: lab;
+    align-self: center;
+    padding-left: 6px;
+    font-size: 10.5px;
+    line-height: 1.3;
+    color: var(--l-wire-deep);
+  }
+  .cap {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    margin-top: 14px;
+    padding-left: 22px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .cap b {
+    color: var(--link);
+    font-weight: 600;
+  }
+</style>

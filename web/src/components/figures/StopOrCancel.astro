@@ -1,0 +1,177 @@
+---
+// Short timelines side by side: each panel is one way to stop, with a
+// track for each party and the marks on it in time order. Use it to
+// compare what each way stops, such as a break against a cancel.
+//
+// A mark draws the line back to the mark before it, so the line always
+// meets the marks.
+import Figure from "./Figure.astro";
+
+// dot is an event, ghost is an event that nobody reads, gap is a step
+// with no event, and x is where a party stops. A chip is an end with a
+// name, such as "return" or "err".
+type Mark = "dot" | "ghost" | "gap" | "x" | { chip: string; err?: boolean };
+
+interface Track {
+  label: string;
+  marks: Mark[];
+}
+
+interface Case {
+  // code is the name of the way to stop, set as code.
+  code: string;
+  title: string;
+  tracks: Track[];
+  note?: string;
+  // strong is the part of the note that matters most.
+  strong?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  cases: Case[];
+}
+
+const { alt, caption, cases } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="cases" style={`grid-template-columns: repeat(${cases.length}, minmax(0, 1fr))`}>
+    {
+      cases.map((c) => (
+        <div class="case">
+          <h4>
+            <code>{c.code}</code> {c.title}
+          </h4>
+          {c.tracks.map((t) => (
+            <div class="ml">
+              <span>{t.label}</span>
+              <div class="track">
+                {t.marks.map((m) =>
+                  typeof m === "string" ? (
+                    m === "x" ? (
+                      <span class="m x">×</span>
+                    ) : (
+                      <i class:list={["m", "d", m]} />
+                    )
+                  ) : (
+                    <span class:list={["m", "endc", { err: m.err }]}>{m.chip}</span>
+                  ),
+                )}
+              </div>
+            </div>
+          ))}
+          {(c.note || c.strong) && (
+            <div class="note">
+              {c.note} {c.strong && <b>{c.strong}</b>}
+            </div>
+          )}
+        </div>
+      ))
+    }
+  </div>
+</Figure>
+
+<style>
+  .cases {
+    display: grid;
+    gap: 14px;
+  }
+  .case {
+    --gap: 9px;
+    padding: 10px 10px 8px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+  }
+  h4 {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  h4 code {
+    font-family: var(--font-mono);
+    color: var(--link);
+  }
+  .ml {
+    display: grid;
+    grid-template-columns: 58px 1fr;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .track {
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    height: 24px;
+  }
+  .m {
+    position: relative;
+    flex: none;
+  }
+  /* The line from this mark back to the one before it. */
+  .m + .m::before {
+    content: "";
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    width: var(--gap);
+    border-top: 1.2px solid var(--line-strong);
+    visibility: visible;
+  }
+  .d {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--line-strong);
+  }
+  .d.ghost {
+    background: var(--code-bg);
+    border: 1.2px dotted var(--muted);
+  }
+  .d.gap {
+    background: none;
+  }
+  /* Across a gap, the line runs through the empty step. */
+  .d.gap::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .x {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--primary);
+  }
+  .endc {
+    padding: 0 5px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--code-bg);
+    font-size: 10.5px;
+    color: var(--text);
+  }
+  .endc.err {
+    border: 1px dashed var(--err);
+    color: var(--err);
+  }
+  .note {
+    margin-top: 6px;
+    padding-left: 64px;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .note b {
+    font-weight: 600;
+    color: var(--text);
+  }
+</style>

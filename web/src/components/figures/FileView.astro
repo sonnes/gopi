@@ -1,0 +1,270 @@
+---
+// A file as the reader opens it: a head with the file name, one row per
+// line with a number, a tag in the gutter, the text, and a newline mark.
+// A torn line has no newline and looks cut off. A dashed row at the end
+// marks where the next write goes. Use it for a file format, or for what
+// a crash leaves in a file. The slot is one sentence under the file.
+import Figure from "./Figure.astro";
+import CallCode from "./CallCode.astro";
+
+type Kind = "user" | "assistant" | "tool" | "meta" | "ephemeral" | "error" | "value";
+
+interface Line {
+  // tag is the gutter tag. A torn line has no newline at its end.
+  tag: "record" | "entry" | "value" | "torn";
+  text: string;
+  // status is a note at the end of the row, such as "replayed". A drop
+  // status takes the error hue.
+  status?: { text: string; drop?: boolean };
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  call?: string;
+  name: string;
+  // note is the muted text on the right of the head.
+  note?: string;
+  lines: Line[];
+  // next is the text of the dashed row after the last line.
+  next?: string;
+  // grow is a line under the file.
+  grow?: string;
+  // result is a row of chips under the file: what a read of it returns.
+  result?: { label: string; chips: [string, Kind | "plain"][]; note?: string };
+}
+
+const { alt, caption, call, name, note, lines, next, grow, result } = Astro.props;
+const wide = lines.some((l) => l.status);
+
+// The type of each line is the part a reader looks for, so it is set in
+// bold.
+const split = (text: string) => {
+  const m = text.match(/"type":"[^"]*"/);
+  if (!m || m.index === undefined) return [text, "", ""];
+  return [text.slice(0, m.index), m[0], text.slice(m.index + m[0].length)];
+};
+---
+
+<Figure alt={alt} caption={caption}>
+  {call && <CallCode code={call} />}
+  <div class="file">
+    <div class="fh">
+      <b>{name}</b>
+      {note && <span>{note}</span>}
+    </div>
+    {
+      lines.map((line, i) => {
+        const [before, type, after] = split(line.text);
+        const torn = line.tag === "torn";
+        return (
+          <div class:list={["ln", { wide, torn }]}>
+            <span class="no">{i + 1}</span>
+            <span class={`tg ${line.tag}`}>{line.tag}</span>
+            {torn ? (
+              <span class="rip">
+                <code>{line.text}</code>
+              </span>
+            ) : (
+              <code>
+                {before}
+                <em>{type}</em>
+                {after}
+              </code>
+            )}
+            <span class="nl">{torn ? "" : "⏎"}</span>
+            {wide && <span class:list={["ld", line.status?.drop ? "drop" : "ok"]}>{line.status?.text}</span>}
+          </div>
+        );
+      })
+    }
+    {
+      next && (
+        <div class:list={["ln", "next", { wide }]}>
+          <span class="no">{lines.length + 1}</span>
+          <span />
+          <code>{next}</code>
+          <span />
+        </div>
+      )
+    }
+  </div>
+  {
+    grow && (
+      <div class="grow">
+        <span class="ar">↓</span>
+        {grow}
+      </div>
+    )
+  }
+  {
+    result && (
+      <div class="result">
+        <span class="lbl">{result.label}</span>
+        {result.chips.map(([text, kind]) => (
+          <span class:list={["chip", kind !== "plain" && `k-${kind}`]}>{text}</span>
+        ))}
+        {result.note && <span class="m">{result.note}</span>}
+      </div>
+    )
+  }
+  {Astro.slots.has("default") && <div class="note"><slot /></div>}
+</Figure>
+
+<style>
+  .file {
+    overflow: hidden;
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+  }
+  .fh {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 10.5px;
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--line) 35%, var(--code-bg));
+  }
+  .fh b {
+    font-weight: 600;
+  }
+  .fh span {
+    color: var(--muted);
+  }
+  .ln {
+    display: grid;
+    grid-template-columns: 22px 54px minmax(0, 1fr) 18px;
+    align-items: center;
+    gap: 0 6px;
+    min-height: 30px;
+    padding: 0 10px 0 6px;
+  }
+  .ln + .ln {
+    border-top: 1px solid var(--line);
+  }
+  .ln.wide {
+    grid-template-columns: 22px 54px minmax(0, 1fr) 18px 92px;
+  }
+  .no {
+    font-size: 10.5px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .ln code {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--copy);
+  }
+  .ln code em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .nl {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .tg {
+    --k: var(--line-strong);
+    padding: 0 6px;
+    border: 1px solid var(--k);
+    border-radius: 999px;
+    background: var(--code-bg);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
+    color: var(--text);
+  }
+  .tg.record {
+    border-color: var(--text);
+    background: var(--text);
+    color: var(--code-bg);
+  }
+  .tg.value {
+    --k: var(--l-harness);
+    background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+  }
+  .tg.torn {
+    --k: var(--err);
+    border-style: dashed;
+    color: var(--err);
+  }
+  .ln.next {
+    border-top: 1px dashed var(--primary);
+    background: var(--primary-faint);
+  }
+  .ln.next code {
+    color: var(--link);
+  }
+  .ln.torn {
+    background: color-mix(in srgb, var(--err) 6%, var(--code-bg));
+  }
+  .rip {
+    display: flex;
+    min-width: 0;
+  }
+  .rip code {
+    padding: 2px 16px 2px 6px;
+    color: var(--err);
+    background: color-mix(in srgb, var(--err) 14%, var(--code-bg));
+    clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 16%, calc(100% - 7px) 33%, 100% 50%, calc(100% - 8px) 67%, 100% 84%, calc(100% - 9px) 100%, 0 100%);
+    mask-image: linear-gradient(90deg, black 55%, rgb(0 0 0 / 0.45));
+  }
+  .ld {
+    font-size: 10px;
+    text-align: right;
+  }
+  .ld.ok {
+    color: var(--ok);
+  }
+  .ld.drop {
+    color: var(--err);
+    font-weight: 600;
+  }
+  .grow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .ar {
+    font-size: 14px;
+    color: var(--primary);
+  }
+  .result {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .result .lbl {
+    margin-right: 4px;
+  }
+  .m {
+    color: var(--muted);
+  }
+  .note {
+    margin-top: 12px;
+    font-family: var(--font-prose);
+    font-size: 12.5px;
+    color: var(--copy);
+  }
+  .note :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    color: var(--text);
+  }
+</style>

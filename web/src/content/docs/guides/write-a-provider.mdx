@@ -1,0 +1,132 @@
+---
+title: Write a Provider
+summary: Implement TextProvider with an option of your own and an event stream, and fake one in a test.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/write-a-provider/main.go?raw";
+
+:::note
+The program in this guide runs without a key.
+:::
+
+A provider is one method. `pkg/ai` gives the types, and the provider gives the transport.
+
+```go
+type TextProvider interface {
+	StreamText(
+		ctx context.Context,
+		model Model,
+		messages []Message,
+		opts Options,
+	) *EventStream
+}
+```
+
+## Fail Before the Stream
+
+A request that cannot be built has no stream to fail on. `ErrStream` returns one that carries the error to `Events` and to `Wait`, so the caller has one error path.
+
+```go
+if len(messages) == 0 {
+	return ai.ErrStream(errors.New("echo: no messages"))
+}
+```
+
+## Push the Events
+
+`NewEventStream` runs a function in a goroutine and gives it `push`. Push each event as the backend writes it. Check `ctx.Err()` in the loop, because a cancel goes through the context and not through the stream.
+
+```go
+var out strings.Builder
+for i, w := range words {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	if i > 0 {
+		w = " " + w
+	}
+	out.WriteString(w)
+	push(ai.Event{Type: ai.EventTextDelta, ContentIndex: 0, Delta: w})
+}
+push(ai.Event{Type: ai.EventTextEnd, ContentIndex: 0, Content: out.String()})
+```
+
+Then return the final message. Set the model ID, the stop reason, and the usage on it, because a loop above reads all three.
+
+```go
+msg := ai.AssistantMessage(ai.Text{Text: out.String()})
+msg.Model = model.ID
+msg.StopReason = stop
+msg.Usage = ai.Usage{Input: len(text), Output: len(words)}
+return &msg, nil
+```
+
+## Add an Option of Your Own
+
+`NewOption` makes a key that only your provider reads. `GetOption` returns a flag as well as the value, so the provider tells unset from false.
+
+```go
+var Upper = ai.NewOption[bool]()
+
+if upper, ok := ai.GetOption(opts, Upper); ok && upper {
+	text = strings.ToUpper(text)
+}
+```
+
+## Wrap Another Provider
+
+A middleware has the same shape. It holds an inner `ai.TextProvider`, implements `StreamText`, and calls the inner one. It returns the inner stream, or a new one that reads the inner events and pushes its own.
+
+```go
+type logging struct {
+	inner ai.TextProvider
+}
+
+func (l logging) StreamText(
+	ctx context.Context,
+	model ai.Model,
+	messages []ai.Message,
+	opts ai.Options,
+) *ai.EventStream {
+	log.Println("call", model.ID, len(messages), "messages")
+	return l.inner.StreamText(ctx, model, messages, opts)
+}
+```
+
+## Fake One in a Test
+
+A test needs no network. Give the binding a provider that replays scripted replies and records what it was called with.
+
+```go
+p := &fake.Provider{
+	Replies: []ai.Message{
+		ai.AssistantMessage(ai.Text{Text: "Hello, Ada."}),
+	},
+}
+lm := ai.LanguageModel{Model: ai.Model{ID: "fake"}, Provider: p}
+
+got, err := Greet(context.Background(), lm, "Ada")
+```
+
+`Replies` are consumed in order, so a call with no reply left fails and a test covers the error path. `Calls` holds the messages of each call and `Options` holds the options, so a test asserts on the prompt and on the settings. The fake is [examples/fake-provider/fake.go](../../../../../examples/fake-provider/fake.go), and its test is [fake_test.go](../../../../../examples/fake-provider/fake_test.go).
+
+## The Full Example
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/write-a-provider/main.go" />
+</div>
+
+## Read the Program
+
+- `logging` wraps `Echo`. The line `call echo-1 1 messages` on stderr comes from it.
+- `Upper` is an option that only this provider reads.
+- An empty message list fails before the stream starts. The caller sees it from `Events` or from `Wait`.
+- The producer checks `ctx.Err()` in its loop.
+- The final message carries the model ID, the stop reason, and the usage.
+
+## Related
+
+- [Streams](../ai/streams.mdx) for the event types and the rules of a producer.
+- [Options](../ai/options.mdx) for `NewOption` and `GetOption`.
+- [Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) are the providers in this repository.

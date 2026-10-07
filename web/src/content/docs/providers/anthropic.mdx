@@ -1,0 +1,130 @@
+---
+title: Anthropic
+summary: What the Anthropic provider adds to a call, and what it leaves to you.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+import Ladder from "../../../components/figures/Ladder.astro";
+import PrefixBar from "../../../components/figures/PrefixBar.astro";
+
+<SpecSheet
+  alt="The anthropic package calls the Messages API. It implements TextProvider, ObjectProvider, TokenCounter, and ModelLister, and not ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The models are Fable5_1, Opus5_5, Opus5, Sonnet5_5, Sonnet5, and Haiku4_5. A model and the provider bind into a language model."
+  pkg="pkg/ai/anthropic"
+  api="Messages API"
+  implements={["TextProvider", "ObjectProvider", "TokenCounter", "ModelLister"]}
+  lacks={["ImageProvider"]}
+  options={[
+    ["APIKey(key)", "default `ANTHROPIC_API_KEY`"],
+    ["BaseURL(url)", "a proxy or a test server"],
+    ["HTTPClient(c)", "a recording client"],
+  ]}
+  models={[
+    ["anthropic.Fable5_1", "ai"],
+    ["anthropic.Opus5_5", "ai"],
+    ["anthropic.Opus5", "ai"],
+    ["anthropic.Sonnet5_5", "ai"],
+    ["anthropic.Sonnet5", "ai"],
+    ["anthropic.Haiku4_5", "ai"],
+  ]}
+  bind={["model + anthropic.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+## Thinking
+
+`ai.Thinking` maps to the effort of the API. A level that the provider does not know fails the call before the request.
+
+<Ladder
+  alt="Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 always think. On them, an unset level sends the effort high, ThinkingOff fails the call, and every other level sends the effort of the same name. On the other models, an unset level sends nothing, ThinkingOff turns thinking off, and every other level sends adaptive thinking with the effort of the same name."
+  call="ai.Thinking(level)"
+  note="each level is `ai.Thinking<Name>`"
+  levels={["Off", "Low", "Medium", "High", "XHigh", "Max"]}
+  rows={[
+    {
+      provider: "always think",
+      field: "effort message",
+      sends: {
+        unset: "high",
+        Off: { text: "error", warn: "always thinks" },
+        Low: "low",
+        Medium: "medium",
+        High: "high",
+        XHigh: "xhigh",
+        Max: "max",
+      },
+    },
+    {
+      provider: "other models",
+      field: "effort",
+      sends: {
+        unset: { text: "nothing", plain: true },
+        Off: { text: "no thinking", plain: true },
+        Low: "low",
+        Medium: "medium",
+        High: "high",
+        XHigh: "xhigh",
+        Max: "max",
+      },
+    },
+  ]}
+  foot="The models that always think are Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5."
+/>
+
+On a model that always thinks, the provider sends the effort as a system message before each assistant message. Each assistant message keeps the effort that it used, so a change of level does not change the cached prefix. `msg.Effort` holds the effort that the API used.
+
+A thinking block comes back signed. Send the assistant message back unchanged, and the API verifies it. If a block does not match its prefix, the API drops the block and the call goes on. [Stream a Response](../guides/stream-a-response.mdx) shows the round trip.
+
+## Caching
+
+<PrefixBar
+  alt="The provider puts a cache mark at the end of the system prompt, on the last tool, and on the last user or system message. The prefix up to the last mark is cached when it has at least 512 to 4096 tokens, for each model. A shorter prefix is not cached, and the call does not fail."
+  provider="anthropic"
+  says="marks the system prompt, the last tool, and the last user message"
+  segments={[
+    { label: "system prompt + tools", width: 26, state: "hot", mark: true },
+    { label: "stable history", width: 50, state: "hot" },
+    { label: "new turn", width: 24, state: "hot", mark: true },
+  ]}
+  brackets={[
+    {
+      parts: 3,
+      label: "cached prefix",
+      note: "at least 512 to 4096 tokens, for each model. Shorter: not cached, no error",
+    },
+  ]}
+/>
+
+Put the stable part of a prompt first, so the prefix stays the same between calls. `ai.CacheShort` keeps the prefix for 5 minutes, and `ai.CacheLong` for 1 hour. `ai.CacheNone` sends no marks. `Usage.CacheRead`, `Usage.CacheWrite`, and `Usage.CacheWriteLong` show the effect.
+
+## System Messages
+
+Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 take a system message in the conversation, and the provider sends it in its place. On these models, a tool change goes in place too, so the cached prefix stays the same. Every other model gets the text as a `<system-reminder>` in a user message, and the tool list of the request holds the current tools.
+
+## Objects
+
+`ai.GenerateObject` uses structured outputs. The schema comes from your struct.
+
+## Token Counts
+
+`ai.CountTokens` sends the same messages, system prompt, tools, and thinking config as a call, so the count matches the call.
+
+## Errors
+
+An API error wraps `anthropic.Error`. Read the status code with `errors.As`.
+
+```go
+var apiErr *anthropic.Error
+if errors.As(err, &apiErr) {
+	fmt.Println(apiErr.StatusCode, apiErr.RequestID)
+}
+```
+
+With `ai.MaxRetries`, the provider sends the request again after a rate limit, an overload, or a server error. It retries only before the first event, and it waits as long as the server asks, up to `ai.MaxRetryDelay`.
+
+A refusal is not an error. The message has the stop reason `refusal`, and `msg.StopDetail` holds the reason that the API gave.
+
+## Related
+
+- [Models](../ai/models.mdx) is the binding that the provider goes into.
+- [Options](../ai/options.mdx) is how a setting reaches the provider.
+
+The decisions are in [docs/concepts/ai/provider.md](../../../../../docs/concepts/ai/provider.md).

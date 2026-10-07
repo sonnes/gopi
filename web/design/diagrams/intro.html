@@ -1,0 +1,45 @@
+<style>
+  .intro-map { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 16px 0 8px; }
+  .intro-map th { font-family: var(--font-mono); font-size: var(--label-size); letter-spacing: var(--label-track);
+    color: var(--muted); font-weight: 400; text-align: left; padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line-strong); }
+  .intro-map td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .intro-map td:first-child a { font-family: var(--font-mono); font-size: 0.8rem; color: var(--link); text-decoration: none; }
+  .intro-map td:nth-child(2) { color: var(--copy); }
+  .intro-map td:nth-child(3) { font-family: var(--font-mono); font-size: 0.78rem; }
+  .intro .rule { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 20px 0; }
+  .intro .rule div { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 14px 16px; font-size: 0.85rem; }
+  .intro .rule b { display: block; font-family: var(--font-mono); font-size: 0.85rem; margin-bottom: 4px; color: var(--text); }
+</style>
+<section class="intro" style="max-width: 64rem">
+  <h2>One Question Per Page, One Form Per Question</h2>
+  <p>Each figure on the site comes from the question that its page answers. Option A of each slot is the
+  form that the site uses. Each form is a component in <code>web/src/components/figures/</code>. B and C are
+  the forms that were not chosen. They stay here as a start for the next page. Each figure is drawn at the
+  width of the docs column (566px). The theme button switches between light and dark.</p>
+
+  <div class="rule">
+    <div><b>"What is inside it?"</b>Anatomy: annotated code, signature brackets, nesting, two faces.</div>
+    <div><b>"In what order?"</b>Time: lanes, spans, tapes, transcripts, replay tables.</div>
+    <div><b>"Which one applies?"</b>Comparison: check matrices, forks, ladders, spec sheets.</div>
+  </div>
+
+  <table class="intro-map">
+    <thead><tr><th>page</th><th>the question</th><th>form on the site (A)</th></tr></thead>
+    <tbody>
+      <tr><td><a href="#index">Overview</a></td><td>What are the layers? What does one call look like?</td><td>layer stack · annotated code</td></tr>
+      <tr><td><a href="#start">Get Started</a></td><td>What does each line of hello do?</td><td>type chain</td></tr>
+      <tr><td><a href="#ai-index">The Layer</a></td><td>What goes into a call, and what comes out?</td><td>signature anatomy · capability matrix</td></tr>
+      <tr><td><a href="#ai-models">Models</a></td><td>What does a binding add?</td><td>equation cards · nesting</td></tr>
+      <tr><td><a href="#ai-options">Options</a></td><td>Which value wins?</td><td>tape</td></tr>
+      <tr><td><a href="#ai-messages">Messages</a></td><td>What does a conversation hold?</td><td>chat transcript · stacked bar</td></tr>
+      <tr><td><a href="#ai-streams">Streams</a></td><td>How do deltas become a message?</td><td>timeline with lanes</td></tr>
+      <tr><td><a href="#ai-tools">Tools</a></td><td>What does the model see? Who sees a failure?</td><td>two faces · fork · onion</td></tr>
+      <tr><td><a href="#agent-index">Agents</a></td><td>When does the loop stop? What gets written?</td><td>cycle · trace table</td></tr>
+      <tr><td><a href="#agent-events">Events</a></td><td>How do the events nest?</td><td>span view</td></tr>
+      <tr><td><a href="#session-index">Sessions</a></td><td>What does the model read, and what does the store keep?</td><td>ledger · check matrix · tape + rails</td></tr>
+      <tr><td><a href="#session-stores">Stores</a></td><td>What is in the file? What does a load rebuild?</td><td>file view · replay table</td></tr>
+      <tr><td><a href="#providers">Providers</a></td><td>What does this provider add?</td><td>spec sheet · ladder · hub</td></tr>
+    </tbody>
+  </table>
+  <p class="lbl">Guides stay without a picture, as .claude/rules/site-docs.md says. The shape belongs on the abstraction page.</p>
+</section>

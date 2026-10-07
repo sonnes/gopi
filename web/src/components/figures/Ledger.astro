@@ -1,0 +1,240 @@
+---
+// A ledger: an append-only tape of entries on the left, and a drawer of
+// named values on the right. A bracket along the tape marks what the
+// model reads, and it stops short of the drawer. Use it for the shape
+// of a session: ordered entries next to state that is kept by name.
+import Figure from "./Figure.astro";
+
+type Kind = "user" | "assistant" | "tool" | "meta" | "ephemeral" | "error" | "value";
+
+interface Entry {
+  id: string;
+  kind: Kind;
+  text: string;
+  // tagged puts a value dot on the entry, to tie it to a value row.
+  tagged?: boolean;
+}
+
+interface Value {
+  name: string;
+  // key is shown after the name, as in "key e2".
+  key?: string;
+  value: string;
+  tagged?: boolean;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // tape labels the entries, and reads labels the bracket.
+  tape: string;
+  reads: string;
+  entries: Entry[];
+  // append is the dashed slot after the last entry.
+  append: string;
+  // drawer is the head of the values: a name on the left and a format
+  // on the right.
+  drawer: [string, string];
+  values: Value[];
+  // foot is the line at the bottom of the drawer. note is under it.
+  foot?: string;
+  note?: string;
+}
+
+const { alt, caption, tape, reads, entries, append, drawer, values, foot, note } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="ledger">
+    <div class="eye"><span>{reads}</span></div>
+    <div class="tape">
+      <div class="head">{tape}</div>
+      {
+        entries.map((e, i) => (
+          <>
+            {i > 0 && <div class="link" />}
+            <div class="row">
+              <span class="n">{i + 1}</span>
+              <div class={`tile k-${e.kind}`}>
+                <b>{e.id}</b>
+                {e.text}
+                {e.tagged && <span class="vdot" />}
+              </div>
+            </div>
+          </>
+        ))
+      }
+      <div class="link next" />
+      <div class="app">{append}</div>
+    </div>
+    <div>
+      <div class="drawer">
+        <div class="dh">
+          <span>{drawer[0]}</span>
+          <span>{drawer[1]}</span>
+        </div>
+        {
+          values.map((v) => (
+            <div class="kv">
+              <span class="k">
+                {v.name}
+                {v.key && ` · key ${v.key}`}
+                {v.tagged && <span class="vdot" />}
+              </span>
+              <span class="v">{v.value}</span>
+            </div>
+          ))
+        }
+        {foot && <div class="foot">{foot}</div>}
+      </div>
+      {note && <div class="noeye">{note}</div>}
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .ledger {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) 208px;
+    gap: 0 16px;
+    align-items: start;
+  }
+  .eye {
+    align-self: stretch;
+    border: 1.4px solid var(--text);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    margin: 18px 0 44px 12px;
+    position: relative;
+  }
+  .eye span {
+    position: absolute;
+    left: -14px;
+    top: 50%;
+    transform: translateY(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text);
+    background: var(--panel);
+    padding: 4px 0;
+    white-space: nowrap;
+  }
+  .head {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    margin: 0 0 6px 24px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    align-items: center;
+  }
+  .n {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .tile {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--text);
+    border: 1.2px solid var(--k);
+    border-radius: 8px;
+    padding: 6px 10px;
+    min-width: 0;
+    background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+  }
+  .tile.k-user {
+    background: var(--code-bg);
+  }
+  .tile b {
+    font-weight: 600;
+    font-size: 10.5px;
+    margin-right: 4px;
+  }
+  .link {
+    height: 10px;
+    margin-left: 40px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  .link.next {
+    border-left-style: dashed;
+    border-color: var(--primary);
+  }
+  .app {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--link);
+    margin-left: 24px;
+    border: 1.2px dashed var(--primary);
+    border-radius: 8px;
+    padding: 6px 10px;
+    background: var(--primary-faint);
+  }
+  .drawer {
+    border: 1.2px solid var(--l-harness);
+    border-radius: 12px;
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+  .dh {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg));
+    border-bottom: 1px solid var(--l-harness);
+  }
+  .kv {
+    display: grid;
+    padding: 7px 10px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  .kv + .kv {
+    border-top: 1px solid var(--line);
+  }
+  .k {
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+  .v {
+    color: var(--text);
+  }
+  .foot {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    padding: 6px 10px;
+    border-top: 1px dashed var(--line-strong);
+  }
+  .vdot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--l-harness);
+    vertical-align: 1px;
+    margin-left: 6px;
+  }
+  .noeye {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  @media (max-width: 36rem) {
+    .ledger {
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 16px;
+    }
+    .ledger > :last-child {
+      grid-column: 1 / -1;
+    }
+  }
+</style>

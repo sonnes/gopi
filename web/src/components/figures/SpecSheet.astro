@@ -1,0 +1,188 @@
+---
+// The spec sheet of one provider: the package, the API that it calls,
+// the interfaces that it implements (lit) and does not implement (dim),
+// the options of New, and the models. Use it at the top of a provider
+// page. In an option note, text between backticks draws as code.
+import Figure from "./Figure.astro";
+
+type ModelKind = "ai" | "value" | "ephemeral";
+
+interface Props {
+  alt: string;
+  caption?: string;
+  pkg: string;
+  api: string;
+  implements: string[];
+  // lacks lists the interfaces that the provider does not implement.
+  lacks?: string[];
+  // options lists the options of New, as [option, note] pairs.
+  options: [string, string][];
+  // models lists the models of the package, as [name, kind] pairs.
+  models?: [string, ModelKind][];
+  // bind is the line under the card, as [what binds, what it makes].
+  bind?: [string, string];
+  // accent strokes the card coral.
+  accent?: boolean;
+}
+
+const {
+  alt,
+  caption,
+  pkg,
+  api,
+  implements: impl,
+  lacks = [],
+  options,
+  models,
+  bind,
+  accent = false,
+} = Astro.props;
+
+// parts splits a note on backticks. An odd part is code.
+const parts = (s: string) => s.split("`");
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="specs">
+    <div class:list={["spec", { here: accent }]}>
+      <div class="spec-top">
+        <span class="spec-pkg">{pkg}</span>
+        <span class="spec-api">{api}</span>
+      </div>
+      <div class="badges">
+        {impl.map((name) => <span class="badge">{name}</span>)}
+        {lacks.map((name) => <span class="badge off">{name}</span>)}
+      </div>
+      <dl class="kv">
+        {
+          options.map(([opt, note]) => (
+            <>
+              <dt>{opt}</dt>
+              <dd>
+                {parts(note).map((p, i) => (i % 2 ? <code>{p}</code> : p))}
+              </dd>
+            </>
+          ))
+        }
+      </dl>
+      {
+        models && (
+          <div class="models">
+            <span class="lbl">models</span>
+            {models.map(([name, kind]) => (
+              <span class={`chip k-${kind}`}>{name}</span>
+            ))}
+          </div>
+        )
+      }
+    </div>
+    {
+      bind && (
+        <div class="bind">
+          <b>{bind[0]}</b> → <b>{bind[1]}</b>
+        </div>
+      )
+    }
+  </div>
+</Figure>
+
+<style>
+  .specs {
+    display: grid;
+    gap: 12px;
+  }
+  .spec {
+    background: var(--code-bg);
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: grid;
+    gap: 10px;
+  }
+  .spec.here {
+    border: 2px solid var(--primary);
+  }
+  .spec-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .spec-pkg {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .spec-api {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 5px;
+    border: 1px solid var(--l-wire);
+    color: var(--l-wire-deep);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+  .badge.off {
+    border: 1px dotted var(--line-strong);
+    color: var(--muted);
+    background: transparent;
+    text-decoration: line-through;
+    text-decoration-color: var(--muted-soft);
+  }
+  .kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    column-gap: 12px;
+    row-gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+    margin: 0;
+  }
+  .kv dt {
+    color: var(--text);
+  }
+  .kv dd {
+    margin: 0;
+    color: var(--muted);
+  }
+  .kv dd code {
+    font-family: inherit;
+    font-size: inherit;
+    color: var(--text);
+    background: none;
+    padding: 0;
+  }
+  .models {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+  .models .lbl {
+    margin-right: 4px;
+    font-size: 11px;
+  }
+  .bind {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .bind b {
+    color: var(--text);
+    font-weight: 500;
+  }
+</style>

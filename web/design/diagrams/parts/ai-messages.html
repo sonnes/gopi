@@ -1,0 +1,305 @@
+<section class="page" id="ai-messages">
+<style>
+/* ---- transcript (conversation A) ---- */
+#ai-messages .tx { position: relative; display: grid; gap: 10px; padding-left: 22px; }
+#ai-messages .tx-rail { position: absolute; left: 0; top: 4px; bottom: 4px; width: 10px;
+  border: 1.6px solid var(--primary); border-right: 0; border-radius: 8px 0 0 8px; }
+#ai-messages .who { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin: 0 0 3px 2px; }
+#ai-messages .bub { border: 1.2px solid var(--k); border-radius: 14px; padding: 8px; display: grid; gap: 5px;
+  background: color-mix(in srgb, var(--k) 7%, var(--code-bg)); }
+#ai-messages .m-user { justify-self: end; width: 370px; }
+#ai-messages .m-user .bub { --k: var(--line-strong); background: var(--code-bg); border-top-right-radius: 4px; }
+#ai-messages .m-user .who { text-align: right; margin-right: 2px; }
+#ai-messages .m-asst { width: 420px; }
+#ai-messages .m-asst .bub { --k: var(--l-agent); border-top-left-radius: 4px; }
+#ai-messages .blk { display: flex; align-items: center; gap: 8px; min-height: 26px; font-family: var(--font-mono);
+  font-size: 12px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; }
+#ai-messages .bt { font-size: 10px; color: var(--muted); width: 88px; flex: none; letter-spacing: .02em; }
+#ai-messages .blk .think { color: var(--muted); font-style: italic; }
+#ai-messages .blk .sp { margin-left: auto; }
+#ai-messages .idc { --k: var(--l-wire); border-color: var(--l-wire); color: var(--l-wire-deep);
+  background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+#ai-messages .foot { display: flex; justify-content: flex-end; gap: 6px; align-items: center; padding-top: 1px; }
+#ai-messages .stop { font-family: var(--font-mono); font-size: 10.5px; padding: 0 7px; border-radius: 999px;
+  border: 1px solid var(--l-agent); color: var(--l-agent-deep); background: var(--code-bg); }
+#ai-messages .stop b { font-weight: 600; }
+/* tool_result: a narrow system row */
+#ai-messages .m-tool { position: relative; width: 368px; margin-left: 40px; display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 12px; border: 1.2px solid var(--l-wire); border-radius: 8px; padding: 4px 8px;
+  background: color-mix(in srgb, var(--l-wire) 7%, var(--code-bg)); }
+#ai-messages .m-tool .role { font-size: 11px; color: var(--l-wire-deep); }
+#ai-messages .m-tool .sp { margin-left: auto; }
+#ai-messages .pair { position: relative; display: grid; gap: 10px; }
+/* the ID link: from the ToolCall ID chip down to the ToolCallID chip */
+#ai-messages .link { position: absolute; left: 400px; width: 30px; top: 106px; height: 74px;
+  border: 1.2px dashed var(--l-wire); border-left: 0; border-radius: 0 8px 8px 0; }
+#ai-messages .link-l { position: absolute; left: 436px; top: 124px; font-family: var(--font-mono); font-size: 10.5px;
+  color: var(--l-wire-deep); line-height: 1.3; }
+#ai-messages .tx-cap { display: flex; gap: 8px; align-items: baseline; margin-top: 14px; padding-left: 22px;
+  font-family: var(--font-mono); font-size: 12px; }
+#ai-messages .tx-cap b { color: var(--primary); font-weight: 600; }
+
+/* ---- anatomy (conversation B) ---- */
+#ai-messages .an { display: grid; grid-template-columns: 96px 1fr 84px; font-family: var(--font-mono); font-size: 12px;
+  background: var(--code-bg); border: 1.2px solid var(--l-agent); border-radius: 12px; overflow: hidden; }
+#ai-messages .an > div { padding: 6px 10px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-height: 32px; }
+#ai-messages .an .h { border-top: 0; background: color-mix(in srgb, var(--l-agent) 10%, var(--code-bg)); font-weight: 600; }
+#ai-messages .an .h.r { font-weight: 400; font-size: 10px; color: var(--muted); justify-content: space-between; }
+#ai-messages .an .f { color: var(--l-agent-deep); }
+#ai-messages .an .off { color: var(--muted); }
+#ai-messages .an .off.f { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+#ai-messages .dots { justify-content: space-between; }
+#ai-messages .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.2px solid var(--line-strong); }
+#ai-messages .dot.on { background: var(--text); border-color: var(--text); }
+#ai-messages .an .rh { display: flex; justify-content: space-between; width: 100%; }
+#ai-messages .legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+#ai-messages .legend .node { font-size: 11px; padding: 6px 8px; }
+#ai-messages .legend .node b { display: block; font-weight: 600; font-size: 12px; margin-bottom: 2px; }
+
+/* ---- usage (A) ---- */
+#ai-messages .ub-top { display: flex; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+#ai-messages .ub-top > div { border-top: 1.2px solid var(--line-strong); padding-top: 3px; text-align: center; }
+#ai-messages .ub-top .gap { border: 0; }
+#ai-messages .ubar { display: flex; height: 40px; border-radius: 8px; overflow: hidden; border: 1.2px solid var(--line-strong); }
+#ai-messages .ubar > div { display: flex; align-items: center; justify-content: center; font-family: var(--font-mono);
+  font-size: 12px; font-weight: 600; border-right: 1.2px solid var(--code-bg); }
+#ai-messages .ubar > div:last-child { border-right: 0; }
+#ai-messages .s-in { background: color-mix(in srgb, var(--l-wire) 50%, var(--code-bg)); }
+#ai-messages .s-cr { background: color-mix(in srgb, var(--l-wire) 20%, var(--code-bg)); }
+#ai-messages .s-cw { background: color-mix(in srgb, var(--l-wire) 34%, var(--code-bg)); }
+#ai-messages .s-out { background: color-mix(in srgb, var(--l-agent) 45%, var(--code-bg)); }
+#ai-messages .ulbl { display: flex; font-family: var(--font-mono); font-size: 11px; margin-top: 5px; }
+#ai-messages .ulbl > div { text-align: center; }
+#ai-messages .ulbl span { display: block; color: var(--muted); font-size: 10px; }
+#ai-messages .nototal { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+#ai-messages .nototal .chip.drop { font-size: 12px; }
+#ai-messages .add { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); display: grid;
+  grid-template-columns: 58px 1fr; row-gap: 6px; align-items: center; font-family: var(--font-mono); font-size: 11px; }
+#ai-messages .add .mini { display: flex; height: 14px; border-radius: 4px; overflow: hidden; }
+#ai-messages .add .mini > div { border-right: 1px solid var(--code-bg); }
+#ai-messages .add .op { color: var(--muted); }
+#ai-messages .add .sum { font-weight: 600; color: var(--primary); }
+#ai-messages .add .code { grid-column: 1 / -1; margin-top: 6px; padding: 6px 12px; }
+
+/* ---- usage (B): meters ---- */
+#ai-messages .meters { display: grid; grid-template-columns: 90px 1fr 48px; gap: 10px 12px; align-items: center; font-family: var(--font-mono); font-size: 12px; }
+#ai-messages .meter { height: 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--code-bg); overflow: hidden; }
+#ai-messages .meter > div { height: 100%; }
+#ai-messages .meters .d { grid-column: 2 / -1; margin-top: -8px; font-size: 10.5px; color: var(--muted); }
+#ai-messages .meters .n { text-align: right; font-weight: 600; }
+
+/* ---- stop reasons (A): fork ---- */
+#ai-messages .fork { display: grid; grid-template-columns: 124px 44px 1fr; align-items: center; }
+#ai-messages .fork .src { font-size: 12px; }
+#ai-messages .fork svg.fan { width: 44px; height: 184px; }
+#ai-messages .fig svg.ico { display: inline-block; width: 14px; height: 12px; }
+#ai-messages .outs { display: grid; grid-template-rows: repeat(4, 40px); gap: 8px; }
+#ai-messages .out { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 12px; }
+#ai-messages .out .chip { width: 76px; text-align: center; font-size: 12px; }
+#ai-messages .out .act { flex: 1; border: 1px solid var(--line); background: var(--code-bg); border-radius: 8px; padding: 5px 10px;
+  display: flex; align-items: center; gap: 8px; min-height: 34px; }
+#ai-messages .out .act small { margin-left: auto; font-size: 10.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+#ai-messages .out.loop .act { border-color: var(--primary); background: var(--primary-faint); }
+#ai-messages .out.loop small { color: var(--link); }
+#ai-messages .out.bad .act { border: 1px dashed var(--err); color: var(--err); }
+#ai-messages .tbl { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--code-bg); border-radius: 10px; }
+#ai-messages .tbl th, #ai-messages .tbl td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+#ai-messages .tbl th { font-family: var(--font-mono); font-weight: 400; font-size: var(--label-size); color: var(--muted); }
+#ai-messages .tbl code { font-size: 12px; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/messages.mdx</div>
+    <h2>Messages</h2>
+    <p class="job"><b>Must get across:</b> a conversation is a list of messages, each a role with typed content blocks, and every call sends the whole list.</p>
+    <p class="now">Today: four stacked boxes with the blocks as pipe-separated text, so it reads like a schema and not like a conversation, and the tie from a tool call to its result is a plain arrow.</p>
+  </div>
+
+  <!-- ============ A Conversation ============ -->
+  <div class="slot">
+    <h3 class="slot-title">A Conversation <span>· replaces the top diagram</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Chat transcript</span></div>
+        <figure class="fig">
+          <div class="tx">
+            <div class="tx-rail"></div>
+            <div class="m-user">
+              <div class="who">user</div>
+              <div class="bub">
+                <div class="blk"><span class="bt">Text</span>What is the weather in Lisbon?</div>
+              </div>
+            </div>
+            <div class="pair">
+              <div class="m-asst">
+                <div class="who">assistant</div>
+                <div class="bub">
+                  <div class="blk"><span class="bt">ThinkingBlock</span><span class="think">They want Lisbon weather.</span></div>
+                  <div class="blk"><span class="bt">Text</span>Let me check.</div>
+                  <div class="blk"><span class="bt">ToolCall</span>weather <span class="muted">{"city":"Lisbon"}</span><span class="chip idc sp">call_1</span></div>
+                  <div class="foot"><span class="stop">StopReason <b>tool_use</b></span></div>
+                </div>
+              </div>
+              <div class="m-tool">
+                <span class="role">tool_result</span>
+                <span class="muted" style="font-size:10px">Text</span> {"temp_c":21}
+                <span class="chip idc sp">call_1</span>
+              </div>
+              <div class="link"></div>
+              <div class="link-l">same<br>ID</div>
+            </div>
+            <div class="m-asst">
+              <div class="who">assistant</div>
+              <div class="bub">
+                <div class="blk"><span class="bt">Text</span>It is 21 °C in Lisbon.</div>
+                <div class="foot"><span class="stop">StopReason <b>stop</b></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="tx-cap"><b>[]ai.Message</b><span class="muted">every call sends all four</span></div>
+        </figure>
+        <p class="why"><b>Why:</b> It looks like a chat, so the reader sees turns first and then the typed blocks inside each turn. The matching <code>call_1</code> chips show how a result finds its call. <span class="cost">Cost: HTML and CSS only. The ID connector has a fixed offset, so it needs a check when the blocks change.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Message anatomy</span></div>
+        <figure class="fig">
+          <div class="an">
+            <div class="h">field</div>
+            <div class="h">the assistant message above</div>
+            <div class="h r"><span class="rh"><span>u</span><span>a</span><span>t</span></span></div>
+
+            <div class="f">Role</div><div>assistant</div>
+            <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i></div>
+
+            <div class="f">Content</div>
+            <div><span class="chip">ThinkingBlock</span><span class="chip">Text</span><span class="chip k-tool">ToolCall</span></div>
+            <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i></div>
+
+            <div class="f">Model</div><div class="muted">the model that answered</div>
+            <div class="dots"><i class="dot"></i><i class="dot on"></i><i class="dot"></i></div>
+
+            <div class="f">StopReason</div><div>tool_use</div>
+            <div class="dots"><i class="dot"></i><i class="dot on"></i><i class="dot"></i></div>
+
+            <div class="f">Usage</div><div>Input · Output · CacheRead · CacheWrite</div>
+            <div class="dots"><i class="dot"></i><i class="dot on"></i><i class="dot"></i></div>
+
+            <div class="f off">ToolCallID</div><div class="off">left out on this role</div>
+            <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot on"></i></div>
+
+            <div class="f off">IsError</div><div class="off">left out on this role</div>
+            <div class="dots"><i class="dot"></i><i class="dot"></i><i class="dot on"></i></div>
+
+            <div class="f">Timestamp</div><div>UTC</div>
+            <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i></div>
+          </div>
+          <div class="legend">
+            <div class="node"><b>Text</b>Text</div>
+            <div class="node"><b>ThinkingBlock</b>Thinking, Signature</div>
+            <div class="node k-tool"><b>ToolCall</b>ID, Name, Input</div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> One message laid open, with a user / assistant / tool_result column that shows which fields each role carries. <span class="cost">Cost: it loses the conversation and the ID tie, so the "every call sends all" idea needs prose.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Usage ============ -->
+  <div class="slot">
+    <h3 class="slot-title">Usage <span>· new, replaces the Usage table</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Stacked bar</span></div>
+        <figure class="fig">
+          <div class="ub-top">
+            <div style="flex:3900">input tokens</div><div class="gap" style="flex:40"></div><div style="flex:560">output</div>
+          </div>
+          <div class="ubar">
+            <div class="s-in" style="flex:1200">1,200</div>
+            <div class="s-cr" style="flex:2000">2,000</div>
+            <div class="s-cw" style="flex:700">700</div>
+            <div class="s-out" style="flex:600">600</div>
+          </div>
+          <div class="ulbl">
+            <div style="flex:1200">Input<span>uncached</span></div>
+            <div style="flex:2000">CacheRead<span>read from the cache</span></div>
+            <div style="flex:700">CacheWrite<span>to the cache</span></div>
+            <div style="flex:600">Output</div>
+          </div>
+          <div class="nototal"><span class="chip drop">Total 4,500</span> no such field: the four do not overlap</div>
+          <div class="add">
+            <span class="op">turn 1</span>
+            <div class="mini" style="width:52%"><div class="s-in" style="flex:1200"></div><div class="s-cr" style="flex:2000"></div><div class="s-cw" style="flex:700"></div><div class="s-out" style="flex:600"></div></div>
+            <span class="op">+ turn 2</span>
+            <div class="mini" style="width:40%"><div class="s-in" style="flex:300"></div><div class="s-cr" style="flex:2700"></div><div class="s-out" style="flex:500"></div></div>
+            <span class="sum">= total</span>
+            <div class="mini" style="width:92%;box-shadow:0 0 0 1.4px var(--primary)"><div class="s-in" style="flex:1500"></div><div class="s-cr" style="flex:4700"></div><div class="s-cw" style="flex:700"></div><div class="s-out" style="flex:1100"></div></div>
+            <div class="code">total = total.<span class="hl">Add</span>(msg.Usage)  <span class="cm">// field by field</span></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> One bar shows that the four counts sit side by side and do not overlap, and the struck-out total answers the first question a reader has. <span class="cost">Cost: the numbers are examples, so the page must say so. Very uneven counts make thin segments.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Four meters</span></div>
+        <figure class="fig">
+          <div class="meters">
+            <span>Input</span><div class="meter"><div class="s-in" style="width:40%"></div></div><span class="n">1,200</span>
+            <span class="d">the uncached input tokens</span>
+            <span>Output</span><div class="meter"><div class="s-out" style="width:20%"></div></div><span class="n">600</span>
+            <span class="d">the output tokens</span>
+            <span>CacheRead</span><div class="meter"><div class="s-cr" style="width:67%"></div></div><span class="n">2,000</span>
+            <span class="d">the input tokens read from the cache</span>
+            <span>CacheWrite</span><div class="meter"><div class="s-cw" style="width:23%"></div></div><span class="n">700</span>
+            <span class="d">the input tokens written to the cache</span>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> Each count gets its own row and its own definition, like a dashboard. <span class="cost">Cost: separate meters hint that the counts are unrelated, and they do not show the missing total or <code>Add</code>.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Stop Reasons ============ -->
+  <div class="slot">
+    <h3 class="slot-title">Stop Reasons <span>· optional, replaces the table</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Fork</span></div>
+        <figure class="fig">
+          <div class="fork">
+            <div class="node k-assistant src">msg.StopReason</div>
+            <svg class="fan" viewBox="0 0 44 184" aria-hidden="true">
+              <path class="edge" d="M0 92 C 22 92, 22 20, 44 20"/>
+              <path class="edge-accent" d="M0 92 C 22 92, 22 68, 44 68"/>
+              <path class="edge" d="M0 92 C 22 92, 22 116, 44 116"/>
+              <path class="edge" d="M0 92 C 22 92, 22 164, 44 164" style="stroke:var(--err);stroke-dasharray:4 3"/>
+            </svg>
+            <div class="outs">
+              <div class="out"><span class="chip">stop</span><div class="act">show the text</div></div>
+              <div class="out loop"><span class="chip" style="border-color:var(--primary);color:var(--link)">tool_use</span><div class="act">run each tool call, send the results<small>
+                <svg class="ico" viewBox="0 0 14 12"><path d="M11 3 A5 4 0 1 0 12 7" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M9 1 L12 3 L9 5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>call again</small></div></div>
+              <div class="out"><span class="chip">length</span><div class="act">raise the cap, or ask it to continue</div></div>
+              <div class="out bad"><span class="chip k-error">refusal</span><div class="act">do not run its tool calls</div></div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> Each value leads to one action, and <code>tool_use</code> is the only one that loops back to the model. <span class="cost">Cost: it drops the "Meaning" column, so the page keeps one line of text for <code>length</code> and <code>refusal</code>.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Keep the table</span></div>
+        <figure class="fig">
+          <table class="tbl">
+            <tr><th>StopReason</th><th>Meaning</th><th>What to do</th></tr>
+            <tr><td><code>stop</code></td><td>The turn ended</td><td>Show the text</td></tr>
+            <tr><td><code>tool_use</code></td><td>The model waits for tool results</td><td>Run each tool call, send the results</td></tr>
+            <tr><td><code>length</code></td><td>The output cap or the context is full</td><td>Raise the cap, or ask it to continue</td></tr>
+            <tr><td><code>refusal</code></td><td>A safety classifier stopped the turn</td><td>Do not run its tool calls</td></tr>
+          </table>
+        </figure>
+        <p class="why"><b>Why:</b> The table already holds three facts per value, and a lookup is what a reader wants here. <span class="cost">Cost: none to build. The loop on <code>tool_use</code> stays invisible.</span></p>
+      </div>
+    </div>
+  </div>
+</section>

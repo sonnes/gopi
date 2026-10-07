@@ -1,0 +1,758 @@
+/* Maps the Ember tokens onto Starlight's own variables, then puts the
+   docs chrome into one warm ground divided by hairlines. DESIGN.md holds
+   the contract; nothing here may redefine a token.
+
+   The rails carry no fill. Sidebar, reading column and contents are the
+   same ground, and a 1px line is all that separates them, so the only
+   panels on the page are the ones that have to interrupt the reading
+   flow: a code block, a callout, a card. Those round further than the
+   landing page does — --r-xl — because rounding is what marks a panel
+   once fill no longer does.
+
+   The prose is sans, so the content column can hold 44rem without the
+   line getting long. Headings take the mono display voice, the same as
+   the landing page. */
+
+:root {
+  --sl-font: var(--font-prose);
+  --sl-font-mono: var(--font-mono);
+
+  --sl-color-white: var(--text);
+  --sl-color-gray-1: var(--text);
+  --sl-color-gray-2: var(--copy);
+  --sl-color-gray-3: var(--muted);
+  --sl-color-gray-4: var(--muted-soft);
+  --sl-color-gray-5: var(--line-strong);
+  --sl-color-gray-6: var(--line);
+  --sl-color-black: var(--panel);
+
+  --sl-color-accent: var(--primary);
+  --sl-color-accent-low: var(--primary-faint);
+  --sl-color-accent-high: var(--link);
+
+  --sl-color-text: var(--copy);
+  --sl-color-text-accent: var(--link);
+  --sl-color-text-invert: var(--on-primary);
+  --sl-color-bg: transparent;
+  --sl-color-bg-nav: var(--ground);
+  --sl-color-bg-sidebar: var(--ground);
+  --sl-color-bg-inline-code: transparent;
+  --sl-color-hairline: var(--line);
+  --sl-color-hairline-light: var(--line);
+  --sl-color-hairline-shade: var(--line);
+
+  --sl-content-width: 44rem;
+  --sl-text-body: 0.94rem;
+  --sl-text-h1: clamp(1.8rem, 3.4vw, 2.35rem);
+  --sl-text-h2: 1.4rem;
+  --sl-text-h3: 1.05rem;
+  --sl-nav-height: var(--nav-height);
+  /* Nothing in the flow casts a shadow any more — a hairline separates
+     panels instead. These two are left for the things that float over
+     the page: the search dialog, the skip link, the mobile contents. */
+  --sl-shadow-md: var(--shadow);
+  --sl-shadow-lg: var(--shadow);
+}
+/* Starlight sets the overlay on ::backdrop itself, so the value goes
+   there too. */
+:root,
+::backdrop {
+  --sl-color-backdrop-overlay: var(--scrim);
+}
+
+/* ---------- one ground, divided by hairlines ---------- */
+/* The bar is almost solid. A trace of the prose under it shows that
+   the page has moved. More than a trace blurs a heading into a smudge
+   beside the search. */
+header.header {
+  background: color-mix(in srgb, var(--ground) 96%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  box-shadow: none;
+}
+.sidebar-pane {
+  background: var(--ground);
+  border-inline-end: 1px solid var(--line);
+}
+.main-pane {
+  background: var(--ground);
+}
+/* The contents sit inside the reading column now, so the line that used
+   to fence them off goes. */
+.right-sidebar {
+  border-inline-start: 0;
+}
+.page {
+  max-width: var(--shell);
+  margin-inline: auto;
+  background: var(--ground);
+}
+/* Title and prose are one flow, not two panels with a rule between. */
+.content-panel + .content-panel {
+  border-top: 0;
+  padding-top: 0.25rem;
+}
+.main-pane .content-panel:first-child {
+  padding-top: 2.4rem;
+}
+
+/* ---------- the lockup in the header ---------- */
+/* The same lockup as the landing page's .wordmark, off the same three
+   tokens, so the brand does not change face between the two. */
+.site-title {
+  font-family: var(--font-brand);
+  font-weight: 400;
+  font-size: 1.3rem;
+  letter-spacing: var(--h-track);
+  color: var(--text);
+  gap: 0.5rem;
+}
+.site-title img {
+  width: 88px;
+  height: auto;
+}
+
+/* ---------- search: a pill in the middle of the bar ---------- */
+/* Starlight's grid already gives search the column over the reading
+   column. Centring it there puts it under the eye rather than off in a
+   corner, which is the point of the shape. */
+site-search button[data-open-modal] {
+  font-size: 0.82rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 999px;
+  padding-inline: 0.85rem 0.45rem;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--muted);
+  box-shadow: none;
+  margin-inline: auto;
+  max-width: 23rem;
+}
+site-search button[data-open-modal]:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--copy);
+}
+site-search button[data-open-modal] kbd {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--muted);
+}
+
+/* ---------- prose ---------- */
+.sl-markdown-content {
+  font-size: var(--sl-text-body);
+  line-height: 1.7;
+}
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4 {
+  font-family: var(--font-display);
+  font-weight: var(--h-weight);
+  letter-spacing: var(--h-track);
+  line-height: 1.25;
+  color: var(--text);
+}
+/* An H2 opens a new part of the page. Space says so; the rule that used
+   to say it competed with every panel edge below it. */
+.sl-markdown-content
+  :is(h2, h3):not(:where(.not-content *)):not(:first-child) {
+  margin-top: 2.6rem;
+}
+.sl-markdown-content h3:not(:where(.not-content *)):not(:first-child) {
+  margin-top: 2rem;
+}
+/* One link style across the site: the hue, underlined in itself at 1px.
+   A paler underline would be a third value of the hue carrying no third
+   meaning. */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.sl-markdown-content a:hover:not(:where(.not-content *)) {
+  color: var(--primary);
+}
+/* Inline code is ink, not the hue: coral means "keyword" inside a code
+   block, and the same colour in the sentence above it would be saying
+   something else with it. A monospace face in a sans paragraph is
+   already the whole signal. */
+.sl-markdown-content code:not(:where(.not-content *)) {
+  font-size: 0.88em;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.sl-markdown-content a > code:not(:where(.not-content *)) {
+  color: inherit;
+}
+/* A line of prose holds about 70 characters. Code, figures, and tables
+   keep the full column. */
+.sl-markdown-content > :is(p, ul, ol:not(.sl-steps)) {
+  max-width: 31rem;
+}
+
+/* ---------- tables: a ledger, not a widget ---------- */
+/* The same table as the landing page. No box, no fill: the head sits on
+   the one strong rule, the rows on hairlines, and the first cell is
+   flush with the prose beside it. These pages are largely capability
+   matrices, and a matrix reads better without a frame around it.
+   Starlight sets a table to display: block, and then the width does
+   nothing. So a wide window shows the table as a table again. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  display: table;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  border: 0;
+  border-radius: 0;
+}
+.sl-markdown-content th:not(:where(.not-content *)) {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: var(--label-track);
+  line-height: 1.6;
+  color: var(--muted);
+  text-align: left;
+  white-space: nowrap;
+  background: none;
+  padding: 0 1rem 0.6rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+.sl-markdown-content td:not(:where(.not-content *)) {
+  color: var(--text);
+  background: none;
+  padding: 0.5rem 1rem 0.5rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.sl-markdown-content tr:last-child td:not(:where(.not-content *)) {
+  border-bottom: 0;
+}
+/* A matrix has as many columns as it has, so a narrow window scrolls the
+   ledger sideways rather than reflowing it into an unreadable stack. */
+@media (max-width: 50rem) {
+  .sl-markdown-content table:not(:where(.not-content *)) {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+/* ---------- callouts and cards ---------- */
+/* An aside is a panel like any other: one radius, one hairline, a tint
+   of its own colour. The icon sits in the gutter rather than on a bar. */
+.starlight-aside {
+  border: 1px solid var(--primary-line);
+  border-inline-start-width: 1px;
+  border-radius: var(--r-xl);
+  padding: 1rem 1.25rem;
+  background: var(--primary-faint);
+  gap: 0.8rem;
+}
+.starlight-aside__title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.starlight-aside__content {
+  font-size: 0.92rem;
+  color: var(--copy);
+}
+.starlight-aside--tip {
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, transparent);
+}
+.starlight-aside--tip .starlight-aside__icon {
+  color: var(--ok);
+}
+.starlight-aside--danger {
+  border-color: color-mix(in srgb, var(--err) 40%, transparent);
+  background: color-mix(in srgb, var(--err) 8%, transparent);
+}
+.starlight-aside--danger .starlight-aside__icon {
+  color: var(--err);
+}
+
+.sl-link-card,
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: none;
+}
+.sl-link-card:hover {
+  border-color: var(--primary-line);
+  background: var(--panel);
+}
+/* Starlight gives each card of a grid a different hue. Here every icon
+   takes the one accent. */
+.card {
+  --sl-card-border: var(--primary-line);
+  --sl-card-bg: var(--primary-faint);
+}
+.card .icon {
+  color: var(--link);
+}
+/* A card holds one link, and the whole card takes the click. The ring
+   goes round the card, not round the word. */
+.card {
+  position: relative;
+  padding: 1.25rem 1.5rem;
+}
+.card a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.card:hover {
+  border-color: var(--primary-line);
+}
+.card a:focus-visible {
+  outline: 0;
+}
+.card:has(a:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.sl-link-card .title,
+.card .title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.sl-link-card .description,
+.card .body {
+  font-size: 0.85rem;
+  color: var(--muted-strong);
+}
+
+/* ---------- sidebar ---------- */
+/* The current page is marked the way the contents mark it and the way
+   the landing nav marks it: the hue and the weight. A fill here would be
+   the only filled thing on the page that holds nothing. */
+.sidebar-content a {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  padding: 0.36rem 0.75rem;
+  border-radius: var(--r-md);
+  color: var(--muted-strong);
+}
+.sidebar-content a:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  color: var(--text);
+}
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover {
+  background: none;
+  color: var(--link);
+  font-weight: 600;
+}
+/* The rails go with the rest of them. A group's own pages sit flush
+   under its heading; only a nested group indents. */
+.sidebar-content ul ul li {
+  border-inline-start: 0;
+}
+.sidebar-content .top-level > li > details > ul > li {
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+}
+/* A group heading is in the mono and the title weight. The links are
+   the prose face, so a heading and a link never look alike. The heading
+   takes the same inset as a link, so the two align. */
+.sidebar-content summary {
+  padding-inline: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  letter-spacing: var(--label-track);
+  text-transform: none;
+  color: var(--muted);
+}
+/* A top-level page and a group heading take the title weight and the
+   ink, so they sit above the pages of a group. */
+.sidebar-content .large {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+/* A finger needs a taller row than a pointer. */
+@media (max-width: 50rem) {
+  .sidebar-content a {
+    padding-block: 0.6rem;
+  }
+}
+/* A link that opens another site says so. */
+.sidebar-content a[target="_blank"]::after {
+  content: " \2197";
+  color: var(--muted);
+}
+
+/* ---------- table of contents: a list, no rail ---------- */
+.right-sidebar h2 {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  letter-spacing: var(--label-track);
+  text-transform: none;
+  color: var(--muted);
+}
+.right-sidebar nav a {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+  border-inline-start: 0;
+  padding-block: 0.28rem;
+}
+.right-sidebar nav a:hover {
+  color: var(--text);
+}
+.right-sidebar nav a[aria-current="true"] {
+  color: var(--link);
+  font-weight: 600;
+}
+
+/* ---------- figures ---------- */
+/* A figure is the picture of one page: a layer stack, a timeline, a
+   file, a tape. Each form is a component in src/components/figures/,
+   and Figure.astro gives every one of them this panel. The panel is
+   .not-content, so the prose rules above do not reach inside it. The
+   classes below are the parts that more than one form draws. */
+.fig {
+  margin: 1.5rem 0;
+  padding: 1.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.fig-scroll {
+  overflow-x: auto;
+}
+.fig-caption {
+  margin: 0 0 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+@media (max-width: 50rem) {
+  .fig {
+    padding: 0.75rem;
+  }
+}
+.fig :is(p, ul, ol, h3, h4, pre, table) {
+  margin: 0;
+}
+.fig svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.fig svg text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  fill: var(--text);
+}
+.fig svg .t-muted {
+  fill: var(--muted);
+}
+.fig svg .edge {
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+  fill: none;
+}
+.fig svg .edge-accent {
+  stroke: var(--primary);
+  stroke-width: 1.6;
+  fill: none;
+}
+.fig svg .box {
+  fill: var(--code-bg);
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+}
+.fig svg .head {
+  fill: var(--line-strong);
+}
+.fig svg .head-accent {
+  fill: var(--primary);
+}
+
+/* The label voice, inside a figure. */
+.fig .lbl {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-track);
+  color: var(--muted);
+}
+
+/* A node is a box on the panel. The one node the figure is about takes
+   the accent. */
+.fig .node {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text);
+  background: var(--code-bg);
+  border: 1.2px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.fig .node.accent {
+  border: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--code-bg));
+}
+
+/* A chip is a small pill: an entry, a badge, an event. */
+.fig .chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--code-bg);
+  color: var(--text);
+  white-space: nowrap;
+}
+.fig .chip.drop {
+  text-decoration: line-through;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+/* A kind colours a node or a chip by what it holds. The table of kinds
+   is in DESIGN.md. */
+.fig .k-user {
+  --k: var(--line-strong);
+}
+.fig .k-assistant {
+  --k: var(--l-agent);
+}
+.fig .k-tool {
+  --k: var(--l-wire);
+}
+.fig .k-meta {
+  --k: var(--l-durable);
+}
+.fig .k-value {
+  --k: var(--l-harness);
+}
+.fig .k-ephemeral {
+  --k: var(--muted);
+}
+.fig .k-error {
+  --k: var(--err);
+}
+.fig .k-ai {
+  --k: var(--l-ai);
+}
+.fig :is(.node, .chip, .tint)[class*="k-"] {
+  border-color: var(--k);
+  background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg));
+}
+.fig :is(.node, .chip).k-user {
+  background: var(--code-bg);
+}
+.fig :is(.node, .chip):is(.k-meta, .k-error) {
+  border-style: dashed;
+}
+.fig :is(.node, .chip).k-ephemeral {
+  border-style: dotted;
+  background: var(--code-bg);
+  color: var(--muted);
+}
+.fig :is(.node, .chip).k-error {
+  color: var(--err);
+}
+
+/* Code inside a figure: the four syntax hues of ember.js, and a mark. */
+.fig .code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  white-space: pre;
+  color: var(--text);
+  overflow-x: auto;
+}
+.fig .code .kw {
+  color: var(--l-ai-deep);
+}
+.fig .code .ty {
+  color: var(--l-wire-deep);
+}
+.fig .code .str {
+  color: var(--l-durable-deep);
+}
+.fig .code .num {
+  color: var(--l-agent-deep);
+}
+.fig .code :is(.dim, .cm) {
+  color: var(--muted);
+}
+.fig .code .hl {
+  background: var(--primary-faint);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--primary-line);
+}
+
+/* A pin is a numbered mark that ties a line of code to its note. */
+.fig .pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+/* ---------- code: one panel ---------- */
+/* A code block is one panel: the code background, a hairline, and
+   --r-xl. A title or a terminal bar is a row at the top of the panel,
+   with a hairline under it. ec.config.mjs gives that row its colors. */
+.expressive-code .frame {
+  border-radius: var(--r-xl);
+  border: 1px solid var(--line);
+  background: var(--code-bg);
+  padding: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+/* The panel draws the only outer line. The pre and the terminal bar
+   draw none of their own. */
+.expressive-code .frame pre,
+.expressive-code .frame.is-terminal .header {
+  border: 0;
+  border-radius: 0;
+}
+.expressive-code .frame:not(.has-title):not(.is-terminal) .header {
+  display: none;
+}
+/* The file name is a label, and it starts on the same line as the code
+   below it. */
+.expressive-code .frame.has-title:not(.is-terminal) .title {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-track);
+  padding-inline: var(--ec-codePadInl);
+}
+
+/* A guide ends with a whole program. The panel stops at about 24 lines
+   and scrolls, so the output notes under it stay one scroll away. */
+.program .expressive-code pre {
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+/* ---------- scroll cues ---------- */
+/* A panel that scrolls fades at the edge where more is hidden. The fade
+   follows the scroll position, so it goes at the end. A panel that does
+   not scroll has an inactive timeline, and so it has no fade. The
+   longhands keep the minifier from folding the timeline into the
+   animation shorthand, which Chrome then drops. */
+@property --fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes fade-out-at-end {
+  from,
+  92% {
+    --fade: 2.5rem;
+  }
+  to {
+    --fade: 0px;
+  }
+}
+.fig-scroll,
+.program .expressive-code pre {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+@supports (animation-timeline: scroll()) {
+  .fig-scroll {
+    mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent);
+    animation-name: fade-out-at-end;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(self inline);
+  }
+  .program .expressive-code pre {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent);
+    animation-name: fade-out-at-end;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: scroll(self block);
+  }
+}
+@media (max-width: 50rem) {
+  .sl-markdown-content table:not(:where(.not-content *)) {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  @supports (animation-timeline: scroll()) {
+    .sl-markdown-content table:not(:where(.not-content *)) {
+      mask-image: linear-gradient(to right, #000 calc(100% - var(--fade)), transparent);
+      animation-name: fade-out-at-end;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
+      animation-timeline: scroll(self inline);
+    }
+  }
+}
+
+/* ---------- footer: chips, then the pair of cards ---------- */
+.sl-markdown-content + footer,
+.content-panel footer {
+  margin-top: 1rem;
+}
+
+.docs-sketch {
+  display: none;
+  margin: 40px 0 0;
+}
+.docs-sketch img {
+  display: block;
+  width: 100%;
+  max-width: 192px;
+  height: auto;
+  margin-inline: auto;
+}
+:root[data-theme="dark"] .docs-sketch img {
+  filter: invert(1);
+}
+@media (min-width: 72rem) {
+  .docs-sketch { display: block; }
+}

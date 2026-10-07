@@ -1,0 +1,155 @@
+<section class="page" id="ai-options">
+<style>
+  #ai-options .cv { position: relative; width: 566px; }
+  #ai-options .cv > svg { position: absolute; inset: 0; z-index: 1; }
+  #ai-options .tok { position: absolute; top: 20px; height: 28px; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 11px; border-radius: 8px; border: 1.2px solid var(--line-strong); background: var(--code-bg); }
+  #ai-options .tok.val { border-color: var(--l-harness); background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg)); }
+  #ai-options .tok.tool { border-color: var(--l-wire); background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+  #ai-options .tok.drop { border-color: var(--muted); border-style: dashed; background: var(--code-bg); color: var(--muted);
+    text-decoration: line-through; }
+  #ai-options .tok.hit { border: 2px solid var(--primary); }
+  #ai-options svg text { font-size: 10.5px; }
+  #ai-options svg .n { fill: var(--muted); }
+  #ai-options svg .q { font-size: 11.5px; font-weight: 600; fill: var(--text); }
+  #ai-options svg .r { font-size: 12px; font-weight: 600; fill: var(--link); }
+  #ai-options .row2 { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); display: flex; gap: 8px;
+    align-items: center; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11.5px; }
+  #ai-options .row2 b { font-weight: 600; }
+  #ai-options .row2 .res { color: var(--link); font-weight: 600; }
+
+  /* resolution table */
+  #ai-options table.rt { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  #ai-options table.rt th { text-align: left; font-family: var(--font-mono); font-weight: 400; font-size: var(--label-size);
+    letter-spacing: var(--label-track); color: var(--muted); padding: 0 8px 6px 0; border-bottom: 1px solid var(--line-strong); }
+  #ai-options table.rt td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  #ai-options table.rt td .chip { margin-right: 3px; }
+  #ai-options table.rt .out { color: var(--link); font-weight: 600; }
+  #ai-options table.rt .out.unset { color: var(--muted); font-weight: 400; }
+
+  /* unset A: two cards */
+  #ai-options .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #ai-options .uc { background: var(--code-bg); border: 1.2px solid var(--line-strong); border-radius: 12px; padding: 12px;
+    display: grid; gap: 9px; font-family: var(--font-mono); font-size: 11.5px; justify-items: start; align-content: start; }
+  #ai-options .uc .ttl { font-weight: 600; font-size: 12px; }
+  #ai-options .uc .slotbox { height: 26px; min-width: 120px; padding: 0 10px; border-radius: 8px; display: flex; align-items: center;
+    font-size: 11px; border: 1.2px dashed var(--muted); color: var(--muted); }
+  #ai-options .uc .slotbox.set { border: 1.2px solid var(--l-harness); color: var(--text);
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg)); }
+  #ai-options .uc .q { color: var(--muted); font-size: 11px; }
+  #ai-options .uc .big { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  #ai-options .uc .big .f { color: var(--muted); }
+  #ai-options .uc .big .t { color: var(--ok); }
+  #ai-options .uc .mean { font-size: 10.5px; color: var(--copy); border-top: 1px dashed var(--line); padding-top: 7px; width: 100%; }
+
+  /* unset B: truth table */
+  #ai-options table.tt { border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; width: 100%; }
+  #ai-options table.tt th { text-align: left; font-weight: 400; font-size: var(--label-size); letter-spacing: var(--label-track);
+    color: var(--muted); padding: 0 12px 6px 0; border-bottom: 1px solid var(--line-strong); }
+  #ai-options table.tt td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  #ai-options table.tt .t { color: var(--ok); font-weight: 600; }
+  #ai-options table.tt .f { color: var(--muted); font-weight: 600; }
+  #ai-options table.tt td:last-child { color: var(--copy); font-size: 11px; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/options.mdx</div>
+    <h2>Options</h2>
+    <p class="job"><b>Must get across:</b> the options of a call join into one list, and a later value for a key wins. An unset option and an option set to zero give different answers.</p>
+    <p class="now">Today a flowchart draws the options as one box and the provider as another box. It does not show which value wins, or what the provider gets for an option that the caller did not set.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Two Rules <span>· replaces the diagram, and illustrates the Two Rules section</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Tape</span></div>
+        <figure class="fig">
+          <div class="cv" style="height:118px">
+            <div class="tok" style="left:0;width:92px">System("…")</div>
+            <div class="tok val drop" style="left:100px;width:112px">MaxTokens(300)</div>
+            <div class="tok tool drop" style="left:220px;width:106px">Toolset(a, b)</div>
+            <div class="tok val hit" style="left:334px;width:112px">MaxTokens(500)</div>
+            <div class="tok tool" style="left:454px;width:90px">Toolset(c)</div>
+            <svg viewBox="0 0 566 118" width="566" height="118" aria-hidden="true">
+              <defs><marker id="ai-options-ha" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="head-accent" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+              <text x="0" y="10" class="n">the options of one call, in order →</text>
+              <text x="156" y="64" text-anchor="middle" class="n">replaced by 500</text>
+              <text x="273" y="64" text-anchor="middle" class="n">replaced by [c]</text>
+              <path class="edge-accent" d="M530,100 V80 H390 V54" marker-end="url(#ai-options-ha)"/>
+              <circle cx="499" cy="80" r="3.5" fill="var(--panel)" stroke="var(--primary)" stroke-width="1.2"/>
+              <text x="499" y="72" text-anchor="middle" class="n">skip</text>
+              <text x="382" y="98" text-anchor="end" class="r">(500, true)</text>
+              <text x="566" y="114" text-anchor="end" class="q">GetOption(opts, ai.MaxTokens)</text>
+            </svg>
+          </div>
+          <div class="row2"><b>GetOption(opts, ai.Toolset)</b><span class="muted">→</span><span class="res">([c], true)</span><span class="muted">the whole list, not [a, b, c]</span></div>
+        </figure>
+        <p class="why"><b>Why:</b> The lookup is drawn as what it is: a scan from the right that stops at the first match. The struck tokens make the rule "later wins" visible, and <code>Toolset</code> shows that a list is replaced as one value. <span class="cost">Cost: The tokens drop the <code>ai.</code> prefix to fit the column.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Resolution table</span></div>
+        <figure class="fig">
+          <table class="rt">
+            <thead><tr><th>key</th><th>set, in call order</th><th>the provider reads</th></tr></thead>
+            <tbody>
+              <tr><td>ai.System</td><td><span class="chip">"…"</span></td><td class="out">("…", true)</td></tr>
+              <tr><td>ai.MaxTokens</td><td><span class="chip drop">300</span><span class="chip k-value">500</span></td><td class="out">(500, true)</td></tr>
+              <tr><td>ai.Toolset</td><td><span class="chip drop">[a, b]</span><span class="chip k-tool">[c]</span></td><td class="out">([c], true)</td></tr>
+              <tr><td>ai.Thinking</td><td><span class="muted">nothing</span></td><td class="out unset">("", false)</td></tr>
+            </tbody>
+          </table>
+        </figure>
+        <p class="why"><b>Why:</b> One row per key puts both rules in one place, and the unset row previews the next section. <span class="cost">Cost: The call order across keys is lost, so "later" is only visible inside a row.</span></p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Unset Is a State <span>· new; sits beside the code block in Two Rules</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Two cards</span></div>
+        <figure class="fig">
+          <div class="two">
+            <div class="uc">
+              <span class="ttl">nothing set</span>
+              <span class="slotbox">no MaxTokens</span>
+              <span class="q">GetOption(opts, ai.MaxTokens)</span>
+              <span class="big">(0, <span class="f">false</span>)</span>
+              <span class="mean">The provider uses Model.MaxTokens, then its own default.</span>
+            </div>
+            <div class="uc">
+              <span class="ttl">set to zero</span>
+              <span class="slotbox set">MaxTokens(0)</span>
+              <span class="q">GetOption(opts, ai.MaxTokens)</span>
+              <span class="big">(0, <span class="t">true</span>)</span>
+              <span class="mean">The caller set zero.</span>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The same <code>0</code> sits over two different flags, side by side, so the reader sees that the flag is what tells them apart. <span class="cost">Cost: It shows one option. The reader must carry the rule to the others.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Truth table</span></div>
+        <figure class="fig">
+          <table class="tt">
+            <thead><tr><th>the caller passed</th><th>cap</th><th>ok</th><th>meaning</th></tr></thead>
+            <tbody>
+              <tr><td class="muted">nothing</td><td>0</td><td class="f">false</td><td>unset: Model.MaxTokens</td></tr>
+              <tr><td>ai.MaxTokens(0)</td><td>0</td><td class="t">true</td><td>zero, on purpose</td></tr>
+              <tr><td>ai.MaxTokens(500)</td><td>500</td><td class="t">true</td><td>500</td></tr>
+            </tbody>
+          </table>
+        </figure>
+        <p class="why"><b>Why:</b> It matches the <code>cap, ok :=</code> line in the code block, column for column. <span class="cost">Cost: A table of three rows is close to the prose it replaces.</span></p>
+      </div>
+
+    </div>
+  </div>
+</section>

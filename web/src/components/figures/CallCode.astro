@@ -1,0 +1,34 @@
+---
+// The call at the top of a figure: a few lines of Go in the .code box.
+// It colors a string, a comment, and a literal value with the syntax
+// hues of the site. Use it for the call that a figure shows the effect of.
+interface Props {
+  code: string;
+}
+
+const { code } = Astro.props;
+
+const escape = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const token = /("(?:[^"\\]|\\.)*"|`[^`]*`)|(\/\/.*$)|\b(true|false|nil|\d+(?:\.\d+)?)\b/gm;
+let html = "";
+let last = 0;
+for (const m of code.matchAll(token)) {
+  html += escape(code.slice(last, m.index));
+  const cls = m[1] ? "str" : m[2] ? "cm" : "num";
+  html += `<span class="${cls}">${escape(m[0])}</span>`;
+  last = m.index + m[0].length;
+}
+html += escape(code.slice(last));
+---
+
+<div class="code call" set:html={html} />
+
+<style>
+  .code.call {
+    font-size: 11.5px;
+    padding: 8px 12px;
+    margin-bottom: 14px;
+  }
+</style>

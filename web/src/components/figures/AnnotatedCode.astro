@@ -1,0 +1,144 @@
+---
+// Annotated code: a few lines of Go, cut into steps, with a numbered
+// note beside each step. The steps read top to bottom as one panel of
+// code. Use it when the steps of a job are easier to see on the code
+// itself than in a second picture. Keep each line at 50 columns or
+// fewer, so the notes keep their column.
+import Figure from "./Figure.astro";
+
+interface Step {
+  // code is the Go source of the step. A tab indents one level.
+  code: string;
+  // title names the step, such as "bind".
+  title: string;
+  // type is the type or the call that the step is about.
+  type: string;
+  note?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  steps: Step[];
+}
+
+const { alt, caption, steps } = Astro.props;
+
+// A small Go highlighter with the four hues of src/shiki/ember.js:
+// coral for the language, blue for a name from a package, green for
+// literal text, and amber for a value that the language names.
+const keywords = new Set([
+  "break", "case", "chan", "const", "continue", "default", "defer",
+  "else", "for", "func", "go", "if", "import", "interface", "map",
+  "package", "range", "return", "select", "struct", "switch", "type", "var",
+]);
+const constants = new Set(["nil", "true", "false", "iota"]);
+const token = /(\/\/.*)|("(?:[^"\\]|\\.)*"|`[^`]*`)|(\b\d+\b)|(\.[A-Z]\w*)|(\b[a-z_]\w*\b)/g;
+
+type Part = { text: string; cls?: string };
+
+function highlight(src: string): Part[] {
+  const parts: Part[] = [];
+  let last = 0;
+  for (const m of src.matchAll(token)) {
+    const at = m.index ?? 0;
+    if (at > last) parts.push({ text: src.slice(last, at) });
+    const [text, comment, str, num, name, word] = m;
+    if (comment) parts.push({ text, cls: "cm" });
+    else if (str) parts.push({ text, cls: "str" });
+    else if (num) parts.push({ text, cls: "num" });
+    else if (name) parts.push({ text: "." }, { text: name.slice(1), cls: "ty" });
+    else if (word && keywords.has(word)) parts.push({ text, cls: "kw" });
+    else if (word && constants.has(word)) parts.push({ text, cls: "num" });
+    else parts.push({ text });
+    last = at + text.length;
+  }
+  if (last < src.length) parts.push({ text: src.slice(last) });
+  return parts;
+}
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="ac">
+    {
+      steps.map((s, i) => (
+        <>
+          <div
+            class:list={[
+              "code",
+              "step",
+              { first: i === 0, last: i === steps.length - 1 },
+            ]}
+          >
+            {highlight(s.code).map((p) =>
+              p.cls ? <span class={p.cls}>{p.text}</span> : p.text,
+            )}
+          </div>
+          <div class="note">
+            <span class="pin">{i + 1}</span>
+            <span>
+              <b>{s.title}</b>
+              {s.type}
+              {s.note && <span class="sub">{s.note}</span>}
+            </span>
+          </div>
+        </>
+      ))
+    }
+  </div>
+</Figure>
+
+<style>
+  .ac {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+  }
+  /* The steps join into one panel: only the first and the last step
+     draw the top and the bottom of it. */
+  .ac .code.step {
+    border-radius: 0;
+    border-top: 0;
+    border-bottom: 0;
+    padding: 8px 14px;
+    tab-size: 4;
+    font-size: 11px;
+    overflow: visible;
+  }
+  .ac .code.step.first {
+    border-top: 1px solid var(--line);
+    border-radius: 10px 10px 0 0;
+    padding-top: 12px;
+  }
+  .ac .code.step.last {
+    border-bottom: 1px solid var(--line);
+    border-radius: 0 0 10px 10px;
+    padding-bottom: 12px;
+  }
+  .ac .code.step.first.last {
+    border-radius: 10px;
+  }
+  .note {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 8px;
+    align-content: center;
+    border-left: 1.5px solid var(--primary-line);
+    padding: 4px 0 4px 10px;
+    margin: 6px 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .note b {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .sub {
+    display: block;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+</style>

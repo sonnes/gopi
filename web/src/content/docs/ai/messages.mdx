@@ -1,0 +1,131 @@
+---
+title: Messages
+summary: A message is one turn, with a role and a list of content blocks.
+---
+
+import Transcript from "../../../components/figures/Transcript.astro";
+import UsageBar from "../../../components/figures/UsageBar.astro";
+import StopFork from "../../../components/figures/StopFork.astro";
+
+A content block is text, thinking, a tool call, or a file. A file is an image or a PDF, in a user message or a tool result. A model holds no state, so each call sends every message of the conversation.
+
+<Transcript
+  alt="A conversation of four messages. The user asks for the weather. The assistant message holds a thinking block, a text block, and a call to the weather tool with the ID call_1. The tool result carries the same ID. The assistant then gives the answer."
+  messages={[
+    { role: "user", blocks: [{ type: "Text", text: "What is the weather in Lisbon?" }] },
+    {
+      role: "assistant",
+      blocks: [
+        { type: "ThinkingBlock", text: "They want Lisbon weather." },
+        { type: "Text", text: "Let me check." },
+        { type: "ToolCall", text: "weather", detail: `{"city":"Lisbon"}`, id: "call_1" },
+      ],
+      stop: "tool_use",
+    },
+    { role: "tool_result", id: "call_1", blocks: [{ type: "Text", text: `{"temp_c":21}` }] },
+    { role: "assistant", blocks: [{ type: "Text", text: "It is 21 °C in Lisbon." }], stop: "stop" },
+  ]}
+  list="[]ai.Message"
+  note="every call sends all four"
+/>
+
+## Build
+
+```go
+ai.UserMessage("What is the weather in Lisbon?")
+ai.AssistantMessage(ai.Text{Text: "Let me check."}, call)
+ai.ToolResultMessage(call.ID, ai.Text{Text: `{"temp_c":21}`})
+ai.SystemMessage(ai.Text{Text: "Answer in French from now on."})
+```
+
+## System Messages
+
+The `ai.SystemPrompt` option is the prompt in front of the conversation. A system message adds instructions from its place, so you can change the prompt mid-session without a change to the start of the request.
+
+A provider sends the message with the system role of its API: `system` for `anthropic` and `openaichat`, `developer` for `openai`. The message waits until the next assistant message, so it never comes between a tool call and its result.
+
+A model that does not take a system message inside the conversation gets the text as a `<system-reminder>` in a user message. The provider knows which models take one, so your code sends the same messages to every model.
+
+A system message holds other blocks too. `ai.Section` and `ai.SectionRemoved` change a named part of the prompt. `ai.ToolAdded` and `ai.ToolRemoved` change the tools that the model can call. One message can hold any mix, in order:
+
+```go
+ai.SystemMessage(
+	ai.SectionRemoved{Name: "env"},
+	ai.Section{Name: "repo", Text: "<repo>gopi</repo>"},
+	ai.ToolAdded{Tool: weather.Info()},
+)
+```
+
+## Read
+
+```go
+msg.Text()        // the text blocks, joined
+msg.ToolCalls()   // the tool call blocks, in order
+msg.StopReason    // why the model stopped
+msg.StopDetail    // the reason that the API gave, if any
+msg.Effort        // the effort that the API used, such as "high"
+msg.Usage         // the token counts of this response
+```
+
+## Stop Reasons
+
+<StopFork
+  alt="msg.StopReason forks four ways. stop: show the text. tool_use: run each tool call, send the results, and call the model again. length: raise the cap, or ask the model to continue. refusal: do not run its tool calls."
+  from="msg.StopReason"
+  outcomes={[
+    { value: "stop", action: "show the text" },
+    { value: "tool_use", action: "run each tool call, send the results", loop: "call again" },
+    { value: "length", action: "raise the cap, or ask it to continue" },
+    { value: "refusal", action: "do not run its tool calls", bad: true },
+  ]}
+/>
+
+`length` means that the output cap or the context is full. `refusal` means that a safety classifier stopped the turn, and `msg.StopDetail` holds the reason that the API gave.
+
+## Usage
+
+<UsageBar
+  alt="An example Usage as one bar of four segments that do not overlap: 1,200 Input, 2,000 CacheRead, 700 CacheWrite, and 600 Output. The first three are input tokens. Usage has no total field. The sum of two turns is total.Add(msg.Usage), field by field."
+  tag="example counts"
+  groups={[
+    {
+      label: "input tokens",
+      hue: "wire",
+      segments: [
+        { name: "Input", value: 1200, note: "uncached" },
+        { name: "CacheRead", value: 2000, note: "read from the cache" },
+        { name: "CacheWrite", value: 700, note: "written to the cache" },
+      ],
+    },
+    { label: "output", hue: "agent", segments: [{ name: "Output", value: 600 }] },
+  ]}
+  total="no such field: the four do not overlap"
+  turns={[
+    { label: "turn 1", values: [1200, 2000, 700, 600] },
+    { label: "turn 2", values: [300, 2700, 0, 500] },
+  ]}
+  sum={{ label: "total", before: "total = total.", mark: "Add", after: "(msg.Usage)", comment: "field by field" }}
+/>
+
+`Usage.Add` sums two values, so a loop keeps one running total. `CacheWriteLong` is the part of `CacheWrite` that the provider keeps for the long time of `ai.CacheLong`, at its own price.
+
+## JSON
+
+A message round-trips through JSON, so a conversation needs no schema of your own to store it.
+
+```go
+data, err := json.Marshal(messages)
+err = os.WriteFile(path, data, 0o600)
+
+var back []ai.Message
+err = json.Unmarshal(data, &back)
+```
+
+Each block carries a type tag, and an unknown tag fails the read. A store cannot lose a block without a report. A field that does not apply to the role is left out, so a user message has no usage. The timestamp is in UTC. The program is [examples/save-a-conversation/main.go](../../../../../examples/save-a-conversation/main.go).
+
+## Related
+
+- [Tools](../tool/index.mdx) produce the tool result that goes into a message.
+- [Streams](streams.mdx) deliver the final message.
+
+The decisions are in [docs/concepts/ai/message.md](../../../../../docs/concepts/ai/message.md).

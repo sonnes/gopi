@@ -1,0 +1,344 @@
+/* Shared Agent Gopi colors, typography, and layout. See DESIGN.md. */
+
+:root {
+  color-scheme: light;
+
+  /* ground + panels */
+  --ground: #fffefc;
+  --panel: #fff8e9;
+  --panel-soft: #efe2c7;
+  /* The panel under code and diagrams. src/shiki/ember.js holds the
+     same value as the code background. */
+  --code-bg: #ffffff;
+
+  --line: #dbccb1;
+  --line-strong: #b8a589;
+
+  /* ink */
+  --text: #3c3028;
+  --copy: #594a3e;
+  --muted: #786653;
+  --muted-soft: #78665399;
+  --muted-strong: #5d564f;
+
+  /* the hue — coral */
+  --primary: #de7356;
+  --link: #a43f28;
+  --primary-ink: #6e2617;
+  --primary-sky: #f4c65d;
+  --primary-line: #de735673;
+  --primary-faint: #de735614;
+  --on-primary: #fff8e9;
+
+  /* signal */
+  --ok: #2e8b4e;
+  --err: #b3261e;
+
+  /* The dim layer under a dialog: the ink, not a cool grey. */
+  --scrim: #3c302866;
+
+  /* type */
+  --font-sans: "Noto Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Headlines are set in the mono. The product is a codebase you can
+     read, so the site is written in the face the code is written in,
+     and the sans is left to carry the prose. */
+  --font-display: var(--font-mono);
+  --font-brand: "Lilita One", var(--font-sans);
+  --butter: #f4c65d;
+  --brand-ink: #3c3028;
+  --brand-cream: #f4ead5;
+  --font-prose: var(--font-sans);
+  --h-weight: 700;
+  --h-track: -0.045em;
+
+  /* One label voice for four jobs: a section kicker, a filename, a
+     table head and the footer metadata. Lowercase and lightly tracked,
+     so it reads as a caption and not as a short line of code. */
+  --label-size: 0.78rem;
+  --label-track: 0.02em;
+
+  /* layer hues — one for each layer of the stack, the same on every
+     diagram. A diagram kind takes one: assistant the agent hue, tool the
+     wire hue, meta the durable hue, and value the harness hue. Stroke is
+     ≥ 3:1 on the panel, for lines and tints. Deep is ≥ 4.5:1 under white
+     text, for the one solid cell a figure allows. */
+  --l-ai: #de7356;
+  --l-ai-deep: #a43f28;
+  --l-agent: #b98212;
+  --l-agent-deep: #8a5f00;
+  --l-durable: #3e9a62;
+  --l-durable-deep: #2a6e45;
+  --l-harness: #8b6bd6;
+  --l-harness-deep: #5e44a6;
+  --l-wire: #3f86d6;
+  --l-wire-deep: #2a5fa3;
+  --l-you: var(--text);
+  --l-you-deep: var(--text);
+  --l-outside: var(--muted);
+  --l-outside-deep: var(--muted-strong);
+  --l-mix: 13%;
+
+  /* shape. The docs chrome rounds further than the landing page: a code
+     block, a callout and a card are panels the eye groups, and the wider
+     radius is what groups them. --r stays the landing page's corner. */
+  --r: 8px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+  --shadow:
+    0 1px 0 rgba(30, 24, 20, 0.04), 0 14px 34px -18px rgba(228, 100, 75, 0.28);
+
+  /* layout */
+  --shell: 78rem;
+  --shell-pad: 2.5rem;
+  --nav-height: 4.5rem;
+  --split: minmax(0, 5fr) minmax(0, 7fr);
+  --gutter: 2.5rem;
+  --band: 4rem;
+  --measure: 27rem;
+  --split-gap: 0;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --ground: #141110;
+  --panel: #302720;
+  --panel-soft: #3c3028;
+  --code-bg: #171312;
+
+  --line: #332c28;
+  --line-strong: #4a403a;
+
+  --text: #f0eae4;
+  --copy: #c9bfb6;
+  --muted: #8c8078;
+  --muted-soft: #8c807899;
+  --muted-strong: #a89c93;
+
+  /* The fill lifts and the link lifts further: on a dark ground the
+     deeper value is the unreadable one, so the pair swaps ends. */
+  --primary: #ff8e75;
+  --link: #ffa994;
+  --primary-ink: #ffc7b8;
+  --primary-sky: #5c2a20;
+  --primary-line: #ff8e7566;
+  --primary-faint: #ff8e7522;
+  --on-primary: #251e19;
+
+  --ok: #5cc47c;
+  --err: #ff6b5a;
+
+  --scrim: #0b0908a6;
+
+  --shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 32px -18px rgba(0, 0, 0, 0.6);
+
+  /* Lifted, like --primary. Deep is the stroke itself here: on a dark
+     ground the solid cell takes dark text, so it need not darken. */
+  --l-ai: #ff8e75;
+  --l-ai-deep: #ff8e75;
+  --l-agent: #f2b94a;
+  --l-agent-deep: #f2b94a;
+  --l-durable: #6ccb8c;
+  --l-durable-deep: #6ccb8c;
+  --l-harness: #b49cf0;
+  --l-harness-deep: #b49cf0;
+  --l-wire: #7ab0f2;
+  --l-wire-deep: #7ab0f2;
+  --l-mix: 22%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-prose);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One focus ring on both layouts: the hue, outside the element. The
+   coral is 3.1:1 on white, above the 3:1 that a focus ring needs. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--primary-sky);
+  color: var(--primary-ink);
+}
+
+/* ---------- shared chrome ---------- */
+.micro,
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  letter-spacing: var(--label-track);
+  line-height: 1.6;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+}
+.site-nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  height: var(--nav-height);
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding-inline: var(--shell-pad);
+}
+
+/* ---------- the mark and the wordmark ---------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  margin-right: auto;
+  color: var(--text);
+}
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  display: block;
+  flex: none;
+}
+.wordmark {
+  display: block;
+  width: 88px;
+  height: auto;
+}
+
+.site-nav-links {
+  display: flex;
+  gap: 0.15rem;
+  align-items: center;
+}
+.site-nav-links a {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--muted);
+  padding: 0.42rem 0.7rem;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+.site-nav-links a:hover {
+  color: var(--text);
+  background: var(--panel-soft);
+}
+.site-nav-links a[aria-current="page"] {
+  color: var(--text);
+}
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  color: var(--text);
+  background: var(--panel-soft);
+}
+.theme-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+:root[data-theme="light"] .theme-toggle .moon,
+:root[data-theme="dark"] .theme-toggle .sun {
+  display: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--panel);
+  color: var(--text);
+}
+.btn:hover {
+  border-color: var(--primary);
+  color: var(--link);
+}
+.btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+.btn--primary:hover {
+  background: var(--link);
+  border-color: var(--link);
+  color: var(--on-primary);
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+}
+.site-footer .foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.5rem;
+  align-items: center;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 1.3rem var(--shell-pad);
+}
+.site-footer a {
+  text-decoration: none;
+  color: var(--muted);
+}
+.site-footer a:hover {
+  color: var(--link);
+}
+
+/* The nav does not wrap and does not scroll, so links drop out of it as
+   the window narrows. Home and the docs are the two that stay. */
+@media (max-width: 62rem) {
+  :root {
+    --split: minmax(0, 1fr);
+    --shell-pad: 1.15rem;
+    --band: 3rem;
+  }
+  .site-nav-links a:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (max-width: 40rem) {
+  .site-nav-links a:nth-child(n + 2) {
+    display: none;
+  }
+}
+
+:root[data-theme="dark"] :is(.wordmark, .hero-wordmark, .site-title img) {
+  filter: invert(0.88) hue-rotate(180deg);
+}

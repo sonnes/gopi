@@ -1,0 +1,256 @@
+<section class="page" id="ai-streams">
+<style>
+/* ---- lanes (picture A) ---- */
+#ai-streams .tl { display: grid; grid-template-columns: repeat(8, 1fr); column-gap: 4px; font-family: var(--font-mono); }
+#ai-streams .axis { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); column-gap: 4px;
+  font-size: 10px; color: var(--muted); border-bottom: 1.2px solid var(--line-strong); padding-bottom: 3px; position: relative; }
+#ai-streams .axis span { text-align: center; }
+#ai-streams .axis::after { content: ""; position: absolute; right: -2px; bottom: -4.5px; border: 4px solid transparent;
+  border-left: 6px solid var(--line-strong); border-right: 0; }
+#ai-streams .ln { grid-column: 1 / -1; font-size: 10.5px; color: var(--muted); margin: 12px 0 4px; display: flex; gap: 6px; align-items: center; }
+#ai-streams .ln b { font-weight: 600; color: var(--k); }
+#ai-streams .lane { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); column-gap: 4px; position: relative; min-height: 36px; align-items: center; }
+#ai-streams .lane::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--line); }
+#ai-streams .span { position: relative; height: 3px; border-radius: 2px; background: var(--k); align-self: center; opacity: .55; }
+#ai-streams .ev { position: relative; z-index: 1; border: 1.2px solid var(--k); border-radius: 7px; padding: 2px 3px; text-align: center;
+  background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg)); line-height: 1.25; }
+#ai-streams .ev .t { display: block; font-size: 9.5px; color: var(--muted-strong); }
+#ai-streams .ev .p { display: block; font-size: 11px; color: var(--text); white-space: nowrap; overflow: hidden; }
+#ai-streams .buf { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(8, 1fr); column-gap: 4px; margin-top: 4px; }
+#ai-streams .b { font-size: 11px; text-align: center; border: 1px dotted var(--muted); border-radius: 6px; padding: 1px 2px;
+  background: var(--code-bg); white-space: nowrap; }
+#ai-streams .b.done { border: 1.2px solid var(--k); font-weight: 600; }
+#ai-streams .buf .cap { font-size: 10px; color: var(--muted); align-self: center; text-align: right; padding-right: 4px; }
+#ai-streams .res { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); font-family: var(--font-mono); font-size: 12px; }
+#ai-streams .res .arr { flex: none; width: 34px; height: 10px; }
+#ai-streams .res .node.accent { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+#ai-streams .res .node.accent b { font-weight: 600; }
+
+/* ---- sequence (picture B) ---- */
+#ai-streams .seq text.h { font-weight: 600; }
+#ai-streams .seq .edge { stroke: var(--muted); }
+#ai-streams .seq .head { fill: var(--muted); }
+#ai-streams .seq .life { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 3; }
+#ai-streams .seq .frame { fill: none; stroke: var(--line-strong); stroke-width: 1; }
+#ai-streams .seq .ftag { fill: var(--panel-soft); stroke: var(--line-strong); stroke-width: 1; }
+#ai-streams .seq .act { fill: var(--code-bg); stroke: var(--line-strong); stroke-width: 1; }
+#ai-streams .seq text.s { font-size: 11px; }
+#ai-streams .seq text.a { fill: var(--link); font-weight: 600; }
+
+/* ---- typewriter (picture C) ---- */
+#ai-streams .tape { display: flex; flex-wrap: wrap; gap: 4px; font-family: var(--font-mono); }
+#ai-streams .tape .chip { font-size: 10.5px; }
+#ai-streams .bufs { display: grid; gap: 10px; margin-top: 16px; }
+#ai-streams .bx { display: grid; grid-template-columns: 128px 1fr; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11px; }
+#ai-streams .bx .lbl { font-size: 10.5px; }
+#ai-streams .screen { font-family: var(--font-mono); font-size: 18px; min-height: 42px; display: flex; align-items: center; gap: 0;
+  border: 1.2px solid var(--k); border-radius: 10px; padding: 6px 12px; background: var(--code-bg); }
+#ai-streams .screen .ok { margin-left: auto; font-size: 11px; }
+#ai-streams .caret { display: inline-block; width: 2px; height: 20px; background: var(--primary); margin-left: 1px;
+  animation: ai-streams-blink 1s steps(1) infinite; }
+@keyframes ai-streams-blink { 50% { opacity: 0; } }
+#ai-streams .st1 { animation: ai-streams-s1 8s linear infinite; }
+#ai-streams .st2 { animation: ai-streams-s2 8s linear infinite; }
+#ai-streams .st3 { animation: ai-streams-s3 8s linear infinite; }
+#ai-streams .st4 { animation: ai-streams-s4 8s linear infinite; }
+#ai-streams .st5 { animation: ai-streams-s5 8s linear infinite; }
+#ai-streams .st6 { animation: ai-streams-s6 8s linear infinite; }
+#ai-streams .st7 { animation: ai-streams-s7 8s linear infinite; }
+#ai-streams .st8 { animation: ai-streams-s8 8s linear infinite; }
+@keyframes ai-streams-s1 { 0%, 38% { opacity: 1; } 40%, 44.9% { opacity: .12; } 45%, 100% { opacity: 1; } }
+@keyframes ai-streams-s2 { 0%, 38% { opacity: 1; } 40%, 49.9% { opacity: .12; } 50%, 100% { opacity: 1; } }
+@keyframes ai-streams-s3 { 0%, 38% { opacity: 1; } 40%, 54.9% { opacity: .12; } 55%, 100% { opacity: 1; } }
+@keyframes ai-streams-s4 { 0%, 38% { opacity: 1; } 40%, 59.9% { opacity: .12; } 60%, 100% { opacity: 1; } }
+@keyframes ai-streams-s5 { 0%, 38% { opacity: 1; } 40%, 64.9% { opacity: .12; } 65%, 100% { opacity: 1; } }
+@keyframes ai-streams-s6 { 0%, 38% { opacity: 1; } 40%, 69.9% { opacity: .12; } 70%, 100% { opacity: 1; } }
+@keyframes ai-streams-s7 { 0%, 38% { opacity: 1; } 40%, 74.9% { opacity: .12; } 75%, 100% { opacity: 1; } }
+@keyframes ai-streams-s8 { 0%, 38% { opacity: 1; } 40%, 79.9% { opacity: .12; } 80%, 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #ai-streams .st1, #ai-streams .st2, #ai-streams .st3, #ai-streams .st4, #ai-streams .st5, #ai-streams .st6, #ai-streams .st7, #ai-streams .st8, #ai-streams .caret { animation: none; } }
+
+/* ---- rules (A): two short timelines ---- */
+#ai-streams .pair2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+#ai-streams .mini { border: 1px solid var(--line); border-radius: 12px; background: var(--code-bg); padding: 10px 10px 8px; font-family: var(--font-mono); }
+#ai-streams .mini h4 { margin: 0 0 8px; font-size: 12px; font-weight: 600; }
+#ai-streams .mini h4 code { color: var(--link); }
+#ai-streams .ml { display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 6px; height: 24px; font-size: 10.5px; color: var(--muted); }
+#ai-streams .track { position: relative; height: 24px; display: flex; align-items: center; gap: 9px; }
+#ai-streams .track::before { content: ""; position: absolute; left: 0; top: 50%; border-top: 1.2px solid var(--line-strong); width: var(--w, 100%); }
+#ai-streams .d { position: relative; width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); flex: none; }
+#ai-streams .d.gh { background: var(--code-bg); border: 1.2px dotted var(--muted); }
+#ai-streams .d.gone { visibility: hidden; }
+#ai-streams .x { position: relative; font-size: 12px; font-weight: 700; color: var(--primary); line-height: 1; }
+#ai-streams .endc { position: relative; font-size: 10.5px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--code-bg); color: var(--text); }
+#ai-streams .endc.err { border: 1px dashed var(--err); color: var(--err); }
+#ai-streams .mini .note { margin-top: 6px; font-size: 10.5px; color: var(--muted); padding-left: 64px; }
+#ai-streams .mini .note b { color: var(--text); font-weight: 600; }
+#ai-streams .mx { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; background: var(--code-bg); }
+#ai-streams .mx th, #ai-streams .mx td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: left; }
+#ai-streams .mx th { font-weight: 400; font-size: 10.5px; color: var(--muted); }
+#ai-streams .y { color: var(--ok); font-weight: 600; }
+#ai-streams .n { color: var(--err); font-weight: 600; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/streams.mdx</div>
+    <h2>Streams</h2>
+    <p class="job"><b>Must get across:</b> a stream is the ordered events of one call, each tagged with the block it builds, and <code>Wait</code> gives the final message and error after them.</p>
+    <p class="now">Today: three boxes and a list of event names in one tall box, so the reader cannot see time, which block each event feeds, or how deltas become the final message.</p>
+  </div>
+
+  <!-- ============ The Picture ============ -->
+  <div class="slot">
+    <h3 class="slot-title">The Picture <span>· replaces the top diagram</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Timeline with lanes</span></div>
+        <figure class="fig">
+          <div class="tl">
+            <div class="axis"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div>
+
+            <div class="ln k-user">the call</div>
+            <div class="lane k-user">
+              <div class="ev"><span class="t">start</span><span class="p">&nbsp;</span></div>
+            </div>
+
+            <div class="ln k-assistant"><b>ContentIndex 0</b> a text block</div>
+            <div class="lane k-assistant">
+              <span></span>
+              <div class="ev"><span class="t">text_start</span><span class="p">&nbsp;</span></div>
+              <div class="ev"><span class="t">text_delta</span><span class="p">"Hel"</span></div>
+              <div class="ev"><span class="t">text_delta</span><span class="p">"lo"</span></div>
+              <div class="ev"><span class="t">text_end</span><span class="p">"Hello"</span></div>
+            </div>
+            <div class="buf k-assistant">
+              <span class="cap" style="grid-column:1/3">block 0</span>
+              <span class="b">Hel</span><span class="b">Hello</span><span class="b done">Hello</span>
+            </div>
+
+            <div class="ln k-tool"><b>ContentIndex 1</b> a tool call block</div>
+            <div class="lane k-tool">
+              <span></span><span></span><span></span><span></span><span></span>
+              <div class="ev"><span class="t">tool_start</span><span class="p">&nbsp;</span></div>
+              <div class="ev"><span class="t">tool_delta</span><span class="p">{"ci</span></div>
+              <div class="ev"><span class="t">tool_end</span><span class="p">ToolCall</span></div>
+            </div>
+            <div class="buf k-tool">
+              <span class="cap" style="grid-column:1/7">block 1</span>
+              <span class="b">{"ci…</span><span class="b done">weather</span>
+            </div>
+          </div>
+          <div class="res">
+            <span class="node">stream.Wait()</span>
+            <svg class="arr" viewBox="0 0 34 10"><path class="edge-accent" d="M0 5 H28"/><path class="head-accent" d="M26 1 L33 5 L26 9 Z"/></svg>
+            <span class="node accent"><b>*ai.Message</b>
+              <span class="chip k-assistant">[0] Text</span><span class="chip k-tool">[1] ToolCall</span><span class="muted">, err</span></span>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> Time runs left to right and each <code>ContentIndex</code> gets its own lane, so the reader sees which block a delta feeds and how the buffer grows into the block of the final message. <span class="cost">Cost: HTML grid only. Eight columns fill the width, so a longer example needs "..." columns.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Sequence diagram</span></div>
+        <figure class="fig">
+          <svg class="seq" viewBox="0 0 566 330" aria-label="Sequence: the provider pushes events, your code ranges over them, then calls Wait.">
+            <rect class="box" x="2" y="2" width="150" height="30" rx="8"/><text class="h" x="77" y="21" text-anchor="middle">provider goroutine</text>
+            <rect class="box" x="208" y="2" width="150" height="30" rx="8"/><text class="h" x="283" y="21" text-anchor="middle">*ai.EventStream</text>
+            <rect class="box" x="414" y="2" width="150" height="30" rx="8"/><text class="h" x="489" y="21" text-anchor="middle">your code</text>
+            <line class="life" x1="77" y1="32" x2="77" y2="322"/>
+            <line class="life" x1="283" y1="32" x2="283" y2="322"/>
+            <line class="life" x1="489" y1="32" x2="489" y2="322"/>
+
+            <!-- loop frame -->
+            <rect class="frame" x="20" y="50" width="530" height="150" rx="6"/>
+            <path class="ftag" d="M20 56 a6 6 0 0 1 6 -6 H296 v14 l-8 8 H20 Z"/>
+            <text class="s" x="28" y="65">for ev, err := range stream.Events()</text>
+
+            <path class="edge" d="M77 98 H276"/><path class="head" d="M274 94 L282 98 L274 102 Z"/>
+            <text class="s" x="86" y="92">push(start)</text>
+            <path class="edge" d="M283 112 H482"/><path class="head" d="M480 108 L488 112 L480 116 Z"/>
+            <text class="s t-muted" x="292" y="106">ev</text>
+
+            <path class="edge" d="M77 140 H276"/><path class="head" d="M274 136 L282 140 L274 144 Z"/>
+            <text class="s" x="86" y="134">push(text_delta "Hel")</text>
+            <path class="edge" d="M283 154 H482"/><path class="head" d="M480 150 L488 154 L480 158 Z"/>
+            <text class="s t-muted" x="292" y="148">ev</text>
+            <text class="s t-muted" x="283" y="186" text-anchor="middle">… to tool_end</text>
+
+            <!-- the result -->
+            <path class="edge" d="M77 232 H276"/><path class="head" d="M274 228 L282 232 L274 236 Z"/>
+            <text class="s" x="86" y="226">return msg, err</text>
+            <path class="edge" d="M489 262 H290"/><path class="head" d="M292 258 L284 262 L292 266 Z"/>
+            <text class="s" x="480" y="256" text-anchor="end">stream.Wait()</text>
+            <path class="edge-accent" d="M283 296 H482"/><path class="head-accent" d="M480 292 L488 296 L480 300 Z"/>
+            <text class="s a" x="292" y="290">*ai.Message, err</text>
+          </svg>
+        </figure>
+        <p class="why"><b>Why:</b> It shows the two goroutines and that the message and the error come back through <code>Wait</code>, not as an event. <span class="cost">Cost: it shows only two events, so the lanes and the buffer are lost.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">C</span><span class="option-name">Typewriter (CSS motion)</span></div>
+        <figure class="fig">
+          <div class="tape">
+            <span class="chip st1">start</span>
+            <span class="chip k-assistant st2">text_start 0</span>
+            <span class="chip k-assistant st3">text_delta "Hel"</span>
+            <span class="chip k-assistant st4">text_delta "lo"</span>
+            <span class="chip k-assistant st5">text_end "Hello"</span>
+            <span class="chip k-tool st6">tool_start 1</span>
+            <span class="chip k-tool st7">tool_delta {"ci</span>
+            <span class="chip k-tool st8">tool_end ToolCall</span>
+          </div>
+          <div class="bufs">
+            <div class="bx k-assistant"><span class="lbl">block 0 · Text</span>
+              <div class="screen"><span class="st3">Hel</span><span class="st4">lo</span><span class="caret"></span><span class="chip k-assistant ok st5">text_end</span></div></div>
+            <div class="bx k-tool"><span class="lbl">block 1 · ToolCall</span>
+              <div class="screen" style="font-size:14px"><span class="st7">{"ci</span><span class="st8 muted">ty":"Lisbon"}</span><span class="chip k-tool ok st8">tool_end</span></div></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The motion shows the one idea that a list cannot: deltas append to a buffer, and the end event closes the block. The still frame shows the finished blocks. <span class="cost">Cost: motion on a docs page can distract, and it hides <code>Wait</code>.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Rules ============ -->
+  <div class="slot">
+    <h3 class="slot-title">Rules <span>· new, sits beside the second rule</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Two short timelines</span></div>
+        <figure class="fig">
+          <div class="pair2">
+            <div class="mini">
+              <h4><code>break</code> out of Events</h4>
+              <div class="ml"><span>your loop</span>
+                <div class="track" style="--w:52px"><i class="d"></i><i class="d"></i><i class="d"></i><span class="x">×</span></div></div>
+              <div class="ml"><span>provider</span>
+                <div class="track" style="--w:120px"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d gh"></i><i class="d gh"></i><i class="d gh"></i><span class="endc">return</span></div></div>
+              <div class="note">runs to its end, <b>later events dropped</b></div>
+            </div>
+            <div class="mini">
+              <h4><code>cancel</code> the context</h4>
+              <div class="ml"><span>your loop</span>
+                <div class="track" style="--w:70px"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d gone"></i><span class="endc err">err</span></div></div>
+              <div class="ml"><span>provider</span>
+                <div class="track" style="--w:52px"><i class="d"></i><i class="d"></i><i class="d"></i><span class="x">×</span></div></div>
+              <div class="note"><b>the call stops</b></div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> Side by side, the reader sees that <code>break</code> ends only their loop, and a cancel ends the call. <span class="cost">Cost: small and static. The dot counts are examples.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Check matrix</span></div>
+        <figure class="fig">
+          <table class="mx">
+            <tr><th></th><th>your loop stops</th><th>the call stops</th><th>later events</th></tr>
+            <tr><td><code>break</code></td><td class="y">yes</td><td class="n">no</td><td>dropped</td></tr>
+            <tr><td><code>cancel(ctx)</code></td><td class="y">yes</td><td class="y">yes</td><td>none, an error</td></tr>
+          </table>
+        </figure>
+        <p class="why"><b>Why:</b> Two rows answer "does it stop the call?" at a glance. <span class="cost">Cost: it shows no time, so "runs to its end" needs the sentence.</span></p>
+      </div>
+    </div>
+  </div>
+</section>

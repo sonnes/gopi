@@ -1,0 +1,239 @@
+---
+// A ladder: one scale of levels, and a row for each provider that says
+// what the provider sends at each level. The first column is the unset
+// marker, the value when the caller sets no level. Use it for a setting
+// that a provider maps onto its own field. A page can show one row or
+// several rows on the same scale.
+import Figure from "./Figure.astro";
+
+// A cell is a chip with the value that the provider sends. A cell with
+// plain set draws as muted text, for "nothing is sent". A warn is a
+// short red note under the chip.
+type Cell = string | { text: string; plain?: boolean; warn?: string };
+
+interface Row {
+  // provider is the name of the row, and field is the API field.
+  provider: string;
+  field: string;
+  // sends maps a level (or the unset marker) to its cell. A level that
+  // the map does not hold stays blank.
+  sends: Record<string, Cell>;
+  // span draws a bracket under the cells from one level to another.
+  span?: { from: string; to: string; label: string };
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // call is the setting, drawn at the top left.
+  call: string;
+  // note is drawn at the top right.
+  note?: string;
+  // unset is the name of the first column.
+  unset?: string;
+  levels: string[];
+  rows: Row[];
+  foot?: string;
+}
+
+const { alt, caption, call, note, unset = "unset", levels, rows, foot } =
+  Astro.props;
+
+const cols = [unset, ...levels];
+const cell = (c: Cell) => (typeof c === "string" ? { text: c } : c);
+// col gives the grid column (1-based) of a level.
+const col = (level: string) => cols.indexOf(level) + 1;
+// parts splits a note on backticks. An odd part is code.
+const parts = (s: string) => s.split("`");
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="ladder" style={`--n: ${levels.length}`}>
+    <div class="cap">
+      <span class="lbl">{call}</span>
+      {
+        note && (
+          <span class="lbl">
+            {parts(note).map((p, i) => (i % 2 ? <code>{p}</code> : p))}
+          </span>
+        )
+      }
+    </div>
+    {
+      cols.map((name, i) => (
+        <div class:list={["tick", { unset: i === 0 }]}>{name}</div>
+      ))
+    }
+    <div class="rail0"></div>
+    <div class="rail"></div>
+    {
+      rows.map((row) => (
+        <>
+          <div class="rowlbl">
+            <b>{row.provider}</b>
+            <span>{row.field}</span>
+          </div>
+          {cols.map((name, i) => {
+            const c = row.sends[name];
+            if (!c) return <div class="cell" />;
+            const { text, plain, warn } = cell(c);
+            return (
+              <div class:list={["cell", { unsetcell: i === 0 }]}>
+                {plain ? (
+                  <span class="none">{text}</span>
+                ) : (
+                  <span class="chip">{text}</span>
+                )}
+                {warn && <span class="warn">{warn}</span>}
+              </div>
+            );
+          })}
+          {row.span && (
+            <>
+              <div
+                class="sum"
+                style={`grid-column: ${col(row.span.from)} / ${col(row.span.to) + 1}`}
+              />
+              <div
+                class="sumlbl"
+                style={`grid-column: ${col(row.span.from)} / ${col(row.span.to) + 1}`}
+              >
+                {row.span.label}
+              </div>
+            </>
+          )}
+        </>
+      ))
+    }
+    {
+      foot && (
+        <div class="foot">
+          {parts(foot).map((p, i) => (i % 2 ? <code>{p}</code> : p))}
+        </div>
+      )
+    }
+  </div>
+</Figure>
+
+<style>
+  .ladder {
+    display: grid;
+    grid-template-columns: 74px repeat(var(--n), minmax(0, 1fr));
+    font-family: var(--font-mono);
+    font-size: 11px;
+    min-width: 460px;
+  }
+  .cap {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+  code {
+    font-family: inherit;
+    font-size: 11.5px;
+    color: var(--text);
+    background: none;
+    padding: 0;
+  }
+  .tick {
+    text-align: center;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text);
+    padding-bottom: 6px;
+    position: relative;
+  }
+  .tick::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -4px;
+    width: 1.4px;
+    height: 9px;
+    background: var(--primary);
+  }
+  .tick.unset {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .tick.unset::after {
+    background: var(--line-strong);
+  }
+  .rail {
+    grid-column: 2 / -1;
+    height: 0;
+    border-top: 1.6px solid var(--primary);
+    margin: 0 6%;
+  }
+  .rail0 {
+    grid-column: 1;
+    height: 0;
+    border-top: 1.2px dashed var(--line-strong);
+    margin: 0 30%;
+  }
+  .rowlbl {
+    grid-column: 1 / -1;
+    margin-top: 14px;
+    margin-bottom: 4px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .rowlbl b {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 11.5px;
+  }
+  .rowlbl span {
+    color: var(--muted);
+  }
+  .cell {
+    text-align: center;
+    padding: 3px 2px;
+  }
+  .cell .chip {
+    font-size: 10.5px;
+    padding: 1px 6px;
+  }
+  .cell .none {
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+  .unsetcell .chip {
+    border-style: dashed;
+    white-space: normal;
+    line-height: 1.25;
+    padding: 2px 5px;
+    border-radius: 6px;
+  }
+  .warn {
+    color: var(--err);
+    font-size: 10px;
+    display: block;
+    line-height: 1.2;
+    margin-top: 2px;
+  }
+  .sum {
+    margin: 3px 6% 0;
+    border: 1.2px solid var(--l-wire);
+    border-top: 0;
+    border-radius: 0 0 8px 8px;
+    height: 7px;
+  }
+  .sumlbl {
+    text-align: center;
+    color: var(--l-wire-deep);
+    font-size: 10.5px;
+    margin-top: 2px;
+  }
+  .foot {
+    grid-column: 1 / -1;
+    margin-top: 14px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: 11px;
+    color: var(--muted);
+  }
+</style>

@@ -1,0 +1,197 @@
+---
+// An option tape: the options of one call as tokens in call order. A
+// token that a later token replaces is struck through, with a note under
+// it. The scan draws one lookup: it starts at the right, skips each
+// token that does not match, and stops at the first match. More lookups
+// can follow as rows under the tape. Use it to show that a later value
+// wins.
+//
+// The layout is computed from the width of the mono face, 0.6em for
+// each character.
+import Figure from "./Figure.astro";
+
+interface Token {
+  text: string;
+  // kind colors the token: value for a setting, tool for a tool list.
+  kind?: "plain" | "value" | "tool";
+  // drop strikes the token through and says what replaced it.
+  drop?: string;
+  // hit marks the token that the scan stops at.
+  hit?: boolean;
+}
+
+interface Lookup {
+  query: string;
+  result: string;
+  note?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // label is the line over the tape.
+  label: string;
+  tokens: Token[];
+  scan: Lookup;
+  lookups?: Lookup[];
+}
+
+const { alt, caption, label, tokens, scan, lookups } = Astro.props;
+
+const W = 550;
+const GAP = 8;
+const TOP = 20;
+const TOK_H = 28;
+const H = 118;
+
+let x = 0;
+const placed = tokens.map((t) => {
+  const w = Math.ceil(t.text.length * 11 * 0.6 + 16);
+  const p = { ...t, x, w, c: x + w / 2 };
+  x += w + GAP;
+  return p;
+});
+const hitAt = placed.findIndex((t) => t.hit);
+const hit = placed[hitAt];
+// The scan skips every token after the hit that is not struck through.
+const skips = placed.slice(hitAt + 1).filter((t) => !t.drop);
+
+const scanX = W - 36;
+const scanY = 80;
+const bottom = TOP + TOK_H;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="cv" style={`width:${W}px;height:${H}px`}>
+    {
+      placed.map((t) => (
+        <div
+          class:list={["tok", t.kind, { drop: t.drop, hit: t.hit }]}
+          style={`left:${t.x}px;top:${TOP}px;width:${t.w}px;height:${TOK_H}px`}
+        >
+          {t.text}
+        </div>
+      ))
+    }
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} aria-hidden="true">
+      <text x="0" y="10" class="n">{label}</text>
+      {
+        placed
+          .filter((t) => t.drop)
+          .map((t) => (
+            <text x={t.c} y={bottom + 16} text-anchor="middle" class="n">
+              {t.drop}
+            </text>
+          ))
+      }
+      <path class="edge-accent" d={`M${scanX},${H - 18} V${scanY} H${hit.c} V${bottom + 6}`} />
+      <path class="head-accent" d={`M${hit.c - 4},${bottom + 10} L${hit.c},${bottom + 1} L${hit.c + 4},${bottom + 10} z`} />
+      {
+        skips.map((t) => (
+          <>
+            <circle cx={t.c} cy={scanY} r="3.5" class="skip" />
+            <text x={t.c} y={scanY - 8} text-anchor="middle" class="n">
+              skip
+            </text>
+          </>
+        ))
+      }
+      <text x={hit.c - 8} y={H - 20} text-anchor="end" class="r">{scan.result}</text>
+      <text x={W} y={H - 4} text-anchor="end" class="q">{scan.query}</text>
+    </svg>
+  </div>
+  {
+    lookups?.map((l) => (
+      <div class="row2">
+        <b>{l.query}</b>
+        <span class="to">&rarr;</span>
+        <span class="res">{l.result}</span>
+        {l.note && <span class="to">{l.note}</span>}
+      </div>
+    ))
+  }
+</Figure>
+
+<style>
+  .cv {
+    position: relative;
+    margin: 0 auto;
+  }
+  .cv > svg {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+  .tok {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    white-space: nowrap;
+    border-radius: 8px;
+    border: 1.2px solid var(--line-strong);
+    background: var(--code-bg);
+  }
+  .tok.value {
+    border-color: var(--l-harness);
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg));
+  }
+  .tok.tool {
+    border-color: var(--l-wire);
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+  .tok.drop {
+    border-color: var(--muted);
+    border-style: dashed;
+    background: var(--code-bg);
+    color: var(--muted);
+    text-decoration: line-through;
+  }
+  .tok.hit {
+    border: 2px solid var(--primary);
+  }
+  .cv svg .n {
+    font-size: 10.5px;
+    fill: var(--muted);
+  }
+  .cv svg .q {
+    font-size: 11.5px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+  .cv svg .r {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+  .cv svg .skip {
+    fill: var(--panel);
+    stroke: var(--primary);
+    stroke-width: 1.2;
+  }
+  .row2 {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--line);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text);
+  }
+  .row2 b {
+    font-weight: 600;
+  }
+  .to {
+    color: var(--muted);
+  }
+  .res {
+    color: var(--text);
+    font-weight: 600;
+  }
+</style>

@@ -5,4 +5,5 @@ use (
 	./pkg/ai/anthropic
 	./pkg/ai/openai
 	./pkg/ai/openaichat
+	./examples
 )

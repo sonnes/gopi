@@ -1,0 +1,118 @@
+---
+import wordmark from "../assets/gopi-wordmark.png";
+import mark from "../assets/gopi-mark-light.svg";
+import "../styles/tokens.css";
+import "../styles/landing.css";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const base = import.meta.env.BASE_URL;
+const docs = `${base.replace(/\/$/, "")}/docs/`;
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href={mark.src} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lilita+One&family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline>
+      // Match Starlight's storage key so the docs and the landing page
+      // agree on the theme across navigations. Light is the default: only
+      // an explicit choice turns the site dark.
+      const stored = localStorage.getItem("starlight-theme");
+      if (stored === "dark" || stored === "light") {
+        document.documentElement.dataset.theme = stored;
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-nav">
+      <div class="site-nav-inner">
+        <a class="brand" href={base}>
+          <img class="brand-mark" src={mark.src} alt="" width="36" height="36" />
+          <img class="wordmark" src={wordmark.src} alt="gopi" width={wordmark.width} height={wordmark.height} />
+        </a>
+        <nav class="site-nav-links">
+          <a href={docs}>Documentation</a>
+          <a href={`${docs}ai/`}>API</a>
+          <a href="https://github.com/sonnes/gopi">GitHub</a>
+        </nav>
+        <button class="theme-toggle" id="theme" type="button" aria-label="Switch theme">
+          <svg
+            class="sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4"></circle>
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            ></path>
+          </svg>
+          <svg
+            class="moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.2 8.2 0 1 0 20 14.2z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="foot">
+        <span class="micro">Ravi Atluri &amp; contributors</span>
+        <span class="micro foot-right">Go 1.27 · one module</span>
+      </div>
+    </footer>
+
+    <script is:inline>
+      // Two listeners: the theme switch and the copy button. The page
+      // needs no JavaScript to be read.
+      const root = document.documentElement;
+
+      document.getElementById("theme")?.addEventListener("click", () => {
+        const next = root.dataset.theme === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        localStorage.setItem("starlight-theme", next);
+      });
+
+      document.querySelectorAll("[data-copy]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const scope = btn.closest(".install");
+          const src = scope.querySelector("pre code, pre, code");
+          navigator.clipboard?.writeText(src.textContent.trim());
+          const was = btn.textContent;
+          btn.textContent = "Copied";
+          setTimeout(() => (btn.textContent = was), 1200);
+        });
+      });
+    </script>
+  </body>
+</html>

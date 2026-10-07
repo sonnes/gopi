@@ -1,0 +1,131 @@
+---
+title: Call a Model
+summary: One call and what comes back, an output cap and a token count, and a typed value instead of prose.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/call-a-model/main.go?raw";
+
+:::note
+The program in this guide needs `ANTHROPIC_API_KEY`.
+:::
+
+A call takes a binding, the messages, and the options. It gives back one message.
+
+```go
+msg, err := model.StreamText(ctx, messages).Wait()
+```
+
+## Set the Call Up
+
+Options carry every setting but the messages. Pass as many as the call needs.
+
+```go
+msg, err := model.StreamText(ctx, messages,
+	ai.SystemPrompt([]ai.Content{ai.Text{Text: "You answer in plain lists. No introduction."}}),
+	ai.MaxTokens(300),
+).Wait()
+```
+
+| Option              | Sets                                 |
+| ------------------- | ------------------------------------ |
+| `ai.SystemPrompt`   | The system prompt                    |
+| `ai.MaxTokens`      | The output cap                       |
+| `ai.Thinking`       | The thinking level                   |
+| `ai.Tools`          | The tools the model can call         |
+| `ai.ToolChoice`     | If the model must call a tool        |
+| `ai.Temperature`    | The sampling temperature             |
+| `ai.CacheRetention` | How long the provider caches the prefix |
+| `ai.MaxRetries`     | How many times the provider retries  |
+
+[Options](../ai/options.mdx) has the defaults.
+
+## Read What Comes Back
+
+`Text` joins the text blocks. Thinking blocks and tool calls are left out.
+
+```go
+fmt.Println(msg.Text())
+fmt.Println("stop:", msg.StopReason)
+fmt.Printf("usage: in=%d out=%d cache_read=%d cache_write=%d\n",
+	msg.Usage.Input, msg.Usage.Output,
+	msg.Usage.CacheRead, msg.Usage.CacheWrite)
+```
+
+A stop reason of `length` means the cap cut the answer. Append the partial answer and ask for the rest.
+
+```go
+if msg.StopReason == ai.StopReasonLength {
+	messages = append(messages, *msg, ai.UserMessage("Continue."))
+	msg, err = model.StreamText(ctx, messages, system, ai.MaxTokens(200)).Wait()
+}
+```
+
+## Count Before You Call
+
+`CountTokens` sends the same messages and options as the call, so the count matches what the call will send.
+
+```go
+count, err := ai.CountTokens(ctx, model, messages, system)
+fmt.Println("input tokens:", count.Total)
+```
+
+Add the usage of each turn into one total. It holds four counts and no sum, so add the ones your limit counts.
+
+```go
+var total ai.Usage
+total = total.Add(msg.Usage)
+```
+
+## Ask for a Typed Value
+
+`GenerateObject` derives a JSON schema from a struct, sends it, and decodes the answer back into the struct. The `jsonschema` tag is the description the model reads for a field.
+
+```go
+type Recipe struct {
+	Name        string   `json:"name"`
+	Ingredients []string `json:"ingredients"`
+	Minutes     int      `json:"minutes" jsonschema:"total time in minutes"`
+}
+
+res, err := ai.GenerateObject[Recipe](ctx, model, messages)
+fmt.Printf("%s, %d minutes\n", res.Object.Name, res.Object.Minutes)
+fmt.Println("raw:", res.Raw)
+```
+
+The provider must implement `ai.ObjectProvider`. If it does not, the call returns an error before any request.
+
+## Change the Provider
+
+The binding holds the provider. Change the binding, and every call stays the same.
+
+```go
+lm := ai.LanguageModel{Model: openai.GPT6Luna, Provider: openai.New()}
+```
+
+| Provider                                    | Reads the key from  | Calls                                         |
+| ------------------------------------------- | ------------------- | --------------------------------------------- |
+| [Anthropic](../providers/anthropic.mdx)     | `ANTHROPIC_API_KEY` | The Messages API                              |
+| [OpenAI](../providers/openai.mdx)           | `OPENAI_API_KEY`    | The Responses API                             |
+| [OpenAI Chat](../providers/openai-chat.mdx) | `OPENAI_API_KEY`    | A Chat Completions API: OpenAI, OpenRouter, Fireworks |
+
+A provider that lacks a capability fails that call. OpenAI Chat has no token count.
+
+## The Full Example
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/call-a-model/main.go" />
+</div>
+
+## Read the Output
+
+- The first answer is one string. The usage line shows the four counts. The two cache counts stay at zero, because this prompt is shorter than the minimum that the model caches.
+- The second call stops on `length`. The cap of 64 tokens is too small, and the turn after it continues the answer.
+- The count is what the call sends. It includes the system prompt.
+- `Object` is the decoded struct. `Raw` is the JSON text the model wrote.
+
+## Related
+
+- [Messages](../ai/messages.mdx) for the fields of the response.
+- [Options](../ai/options.mdx) for the settings of a call.
+- [Stream a Response](stream-a-response.mdx) to read the answer as it arrives.

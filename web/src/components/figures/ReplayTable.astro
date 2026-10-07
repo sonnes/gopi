@@ -1,0 +1,180 @@
+---
+// A replay table: one row per line of a file, and one column per value
+// with the state of that value after the line. The component folds the
+// lines itself, so the page lists only the lines. The last row is what a
+// load returns. Use it where a load replays a log of writes, and a later
+// write replaces an earlier one.
+import Figure from "./Figure.astro";
+import CallCode from "./CallCode.astro";
+
+// A line is a set or a delete of one value, or a plain line such as the
+// record, which changes no value.
+type Line =
+  | { op: "set"; name: string; value: string }
+  | { op: "delete"; name: string }
+  | { text: string };
+
+interface Props {
+  alt: string;
+  caption?: string;
+  call?: string;
+  // values names the columns, in order.
+  values: string[];
+  lines: Line[];
+  head?: string;
+  load?: string;
+  unset?: string;
+}
+
+const {
+  alt,
+  caption,
+  call,
+  values,
+  lines,
+  head = "line in the file → the values after it",
+  load = "Load returns the values",
+  unset = "not set",
+} = Astro.props;
+
+// Fold the lines in order. Each row keeps the state after its line, the
+// value that the line changed, and the value that a delete removed.
+type State = Record<string, string | undefined>;
+let state: State = {};
+const rows = lines.map((line) => {
+  const before = state;
+  state = { ...state };
+  if ("op" in line) {
+    if (line.op === "set") state[line.name] = line.value;
+    else delete state[line.name];
+  }
+  return {
+    line,
+    state,
+    changed: "op" in line ? line.name : undefined,
+    removed: "op" in line && line.op === "delete" ? before[line.name] : undefined,
+  };
+});
+const cols = `22px minmax(0, 1fr) repeat(${values.length}, minmax(76px, auto))`;
+---
+
+<Figure alt={alt} caption={caption}>
+  {call && <CallCode code={call} />}
+  <div class="fold" style={`grid-template-columns:${cols}`}>
+    <div class="h" />
+    <div class="h">{head}</div>
+    {values.map((v) => <div class="h st">{v}</div>)}
+
+    {
+      rows.map(({ line, state, changed, removed }, i) => (
+        <>
+          <div class="no">{i + 1}</div>
+          {"op" in line ? (
+            <div>
+              <span class:list={["op", { del: line.op === "delete" }]}>{line.op}</span>
+              {line.name}
+              {line.op === "set" && ` ${line.value}`}
+            </div>
+          ) : (
+            <div class="m">{line.text}</div>
+          )}
+          {values.map((v) =>
+            v === changed && removed !== undefined ? (
+              <div class="v gone">
+                <s>{removed}</s>—
+              </div>
+            ) : (
+              <div class:list={["v", { chg: v === changed }]}>{state[v] ?? "—"}</div>
+            ),
+          )}
+        </>
+      ))
+    }
+
+    <div class="no loadrow" />
+    <div class="loadrow">{load}</div>
+    {values.map((v) => <div class="loadrow v">{state[v] ?? unset}</div>)}
+  </div>
+  {Astro.slots.has("default") && <div class="note"><slot /></div>}
+</Figure>
+
+<style>
+  .fold {
+    display: grid;
+    align-items: stretch;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .fold > div {
+    display: flex;
+    align-items: center;
+    padding: 6px;
+    border-bottom: 1px solid var(--line);
+    min-width: 0;
+  }
+  .fold > .h {
+    font-size: 10px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .fold > .h.st {
+    color: var(--l-harness-deep);
+  }
+  .fold > .no {
+    justify-content: flex-end;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .m {
+    color: var(--muted);
+  }
+  .op {
+    margin-right: 6px;
+    padding: 0 6px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 10px;
+    line-height: 16px;
+  }
+  .op.del {
+    border-color: var(--err);
+    border-style: dashed;
+    color: var(--err);
+  }
+  .v {
+    color: var(--muted);
+  }
+  .fold > .v.chg {
+    color: var(--text);
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg));
+    box-shadow: inset 2px 0 0 var(--l-harness);
+  }
+  .v.gone {
+    color: var(--err);
+  }
+  .v.gone s {
+    margin-right: 4px;
+    color: var(--muted);
+  }
+  .fold > .loadrow {
+    border-top: 1.4px solid var(--primary);
+    border-bottom: none;
+    background: var(--primary-faint);
+    color: var(--link);
+    font-weight: 600;
+  }
+  .fold > .loadrow.v {
+    color: var(--text);
+  }
+  .note {
+    margin-top: 12px;
+    font-family: var(--font-prose);
+    font-size: 12.5px;
+    color: var(--copy);
+  }
+  .note :global(code) {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    color: var(--text);
+  }
+</style>

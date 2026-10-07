@@ -1,0 +1,101 @@
+<section class="page" id="start">
+<style>
+  #start .cv { position: relative; width: 566px; }
+  #start .cv > svg { position: absolute; inset: 0; }
+  #start .tb { position: absolute; height: 46px; display: flex; flex-direction: column; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.35; padding: 0 10px; border-radius: 8px;
+    border: 1.2px solid var(--line-strong); background: var(--code-bg); }
+  #start .tb small { font-size: 10.5px; color: var(--muted); }
+  #start .tb.wire { border-color: var(--l-wire); background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+  #start .tb.asst { border-color: var(--l-agent); background: color-mix(in srgb, var(--l-agent) var(--l-mix), var(--code-bg)); }
+  #start .tb.accent { border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--code-bg)); }
+  #start .tb.eph { height: 24px; border-style: dotted; border-color: var(--muted); color: var(--muted); font-size: 11px; }
+  #start svg .m { font-size: 11.5px; font-weight: 600; fill: var(--text); }
+  #start svg .n { font-size: 10.5px; fill: var(--muted); }
+
+  #start .ann .code { tab-size: 4; font-size: 11.5px; line-height: 1.7; }
+  #start .ann .code .pin { margin-left: 6px; }
+  #start .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin-top: 12px;
+    font-family: var(--font-mono); font-size: 11px; line-height: 1.45; }
+  #start .notes div { display: grid; grid-template-columns: 16px 1fr; gap: 7px; align-items: start; }
+  #start .notes b { font-weight: 600; }
+  #start .notes .muted { display: block; font-size: 10.5px; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/start.mdx</div>
+    <h2>Get Started</h2>
+    <p class="job"><b>Must get across:</b> the program turns a provider and a model into a string, and each method call changes the type by one step.</p>
+    <p class="now">Today a top-down flowchart puts the types in a column and the methods on the edges. The method names are small labels on the lines, and they are the part the reader needs.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Read the Program <span>· replaces the diagram</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Type chain</span></div>
+        <figure class="fig">
+          <div class="cv" style="height:246px">
+            <svg viewBox="0 0 566 246" width="566" height="246" aria-hidden="true">
+              <defs><marker id="start-h" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+              <path class="edge" d="M200,23 H230 V81 H200"/>
+              <path class="edge" d="M230,52 H272" marker-end="url(#start-h)"/>
+              <text x="251" y="46" text-anchor="middle" class="n">bind</text>
+              <path class="edge" d="M366,74 V130 H95 V156" marker-end="url(#start-h)"/>
+              <text x="230" y="124" text-anchor="middle" class="m">StreamText(ctx, messages)</text>
+              <path class="edge" d="M190,183 H246" marker-end="url(#start-h)"/>
+              <text x="218" y="177" text-anchor="middle" class="m">Wait()</text>
+              <path class="edge" d="M396,183 H452" marker-end="url(#start-h)"/>
+              <text x="424" y="177" text-anchor="middle" class="m">Text()</text>
+              <path class="edge" d="M95,206 V220" stroke-dasharray="2 3"/>
+            </svg>
+            <div class="tb wire" style="left:0;top:0;width:200px">anthropic.New()<small>the provider, with the key</small></div>
+            <div class="tb" style="left:0;top:58px;width:200px">anthropic.Sonnet5<small>the model, its output cap</small></div>
+            <div class="tb accent" style="left:276px;top:28px;width:180px">ai.LanguageModel<small>the binding of the two</small></div>
+            <div class="tb" style="left:0;top:160px;width:190px">*ai.EventStream<small>events, then one message</small></div>
+            <div class="tb asst" style="left:250px;top:160px;width:146px">*ai.Message<small>the final message</small></div>
+            <div class="tb" style="left:456px;top:160px;width:110px">string<small>the answer</small></div>
+            <div class="tb eph" style="left:0;top:220px;width:190px">Events(): the deltas</div>
+            <div class="lbl" style="position:absolute;left:202px;top:223px;font-size:10.5px">Wait() skips them</div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The methods sit on the arrows in the same order as the code, so the reader can trace one line of the program across the figure. The dotted branch shows the events that <code>Wait()</code> skips. <span class="cost">Cost: The positions are fixed by hand. A longer type name means that the layout must move.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Annotated code</span></div>
+        <figure class="fig ann">
+<div class="code"><span class="kw">func</span> main() {
+	ctx := context.Background()
+
+	model := <span class="ty">ai.LanguageModel</span>{<span class="pin">1</span>
+		Model:    anthropic.Sonnet5,<span class="pin">2</span>
+		Provider: anthropic.New(),<span class="pin">3</span>
+	}
+
+	messages := []<span class="ty">ai.Message</span>{
+		ai.UserMessage(<span class="str">"Say hello in one sentence."</span>),
+	}
+
+	msg, err := model.StreamText(ctx, messages).Wait()<span class="pin">4</span><span class="pin">5</span>
+	<span class="kw">if</span> err != <span class="kw">nil</span> {
+		log.Fatal(err)
+	}
+	fmt.Println(msg.Text())<span class="pin">6</span>
+}</div>
+          <div class="notes">
+            <div><span class="pin">1</span><span><b>ai.LanguageModel</b><span class="muted">the binding of the two</span></span></div>
+            <div><span class="pin">4</span><span><b>StreamText</b><span class="muted">→ *ai.EventStream</span></span></div>
+            <div><span class="pin">2</span><span><b>anthropic.Sonnet5</b><span class="muted">the model, with its output cap</span></span></div>
+            <div><span class="pin">5</span><span><b>Wait()</b><span class="muted">→ *ai.Message, the events skipped</span></span></div>
+            <div><span class="pin">3</span><span><b>anthropic.New()</b><span class="muted">reads ANTHROPIC_API_KEY</span></span></div>
+            <div><span class="pin">6</span><span><b>Text()</b><span class="muted">→ string</span></span></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The notes sit on the program that the reader just ran, so no new shape has to be learned. <span class="cost">Cost: It repeats the listing in step 3 of the same page, and the chain of types is split across six notes.</span></p>
+      </div>
+
+    </div>
+  </div>
+</section>

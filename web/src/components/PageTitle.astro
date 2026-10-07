@@ -1,0 +1,81 @@
+---
+// Overrides Starlight's PageTitle so the repo's frontmatter convention
+// reaches the page: `summary` sets the lede.
+//
+// Above the title sits the eyebrow — the name of the sidebar group the
+// page belongs to. A reader arriving from search lands mid-tree with no
+// idea which part of the docs they are in, and the sidebar is off to one
+// side or, on a phone, behind a button. The eyebrow answers it in one
+// line. It reads the group out of the sidebar rather than the file path,
+// so renaming a group renames the eyebrow with it.
+
+// Starlight's own PAGE_TITLE_ID; its constants module is not exported,
+// and the value is part of the anchor contract (#_top).
+const PAGE_TITLE_ID = "_top";
+
+const { entry, sidebar } = Astro.locals.starlightRoute;
+
+// Starlight does not export its SidebarEntry type from the package, so
+// the type is taken off the value the route already carries.
+type SidebarEntry = (typeof sidebar)[number];
+const { title, summary } = entry.data as {
+  title: string;
+  summary?: string;
+};
+
+/** The label of the innermost group holding the current page. */
+function sectionOf(entries: SidebarEntry[], label?: string): string | undefined {
+  for (const item of entries) {
+    if (item.type === "link") {
+      if (item.isCurrent) return label;
+      continue;
+    }
+    const found = sectionOf(item.entries, item.label);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+const section = sectionOf(sidebar);
+---
+
+{section && <p class="eyebrow">{section}</p>}
+
+<h1 id={PAGE_TITLE_ID}>{title}</h1>
+
+{summary && <p class="page-lede">{summary}</p>}
+
+<style>
+  @layer starlight.core {
+    h1 {
+      margin-top: 0.35rem;
+      font-family: var(--font-display);
+      font-size: var(--sl-text-h1);
+      line-height: 1.1;
+      letter-spacing: var(--h-track);
+      font-weight: var(--h-weight);
+      color: var(--text);
+    }
+  }
+
+  /* The group name is a label, not a link, so it does not take the hue. */
+  .eyebrow {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--label-size);
+    letter-spacing: var(--label-track);
+    color: var(--muted);
+  }
+
+  /* Short and large: the lede is read, not scanned, so it takes a
+     measure of its own rather than the width of the prose below it. */
+  .page-lede {
+    margin-top: 0.7rem;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    color: var(--muted-strong);
+    max-width: 38ch;
+    text-wrap: pretty;
+  }
+
+</style>

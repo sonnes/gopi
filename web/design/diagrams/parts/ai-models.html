@@ -1,0 +1,189 @@
+<section class="page" id="ai-models">
+<style>
+  /* Bind A: equation cards */
+  #ai-models .eq { display: grid; grid-template-columns: 1fr 18px 1fr 18px 1.3fr; align-items: stretch; }
+  #ai-models .op { align-self: center; justify-self: center; font-family: var(--font-mono); font-size: 18px; color: var(--muted); }
+  #ai-models .card { border: 1.2px solid var(--line-strong); background: var(--code-bg); border-radius: 12px; padding: 10px;
+    display: grid; grid-template-rows: auto 1fr auto; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+  #ai-models .card.wire { border-color: var(--l-wire); background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); }
+  #ai-models .card.accent { border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--code-bg)); }
+  #ai-models .card .t { font-weight: 600; }
+  #ai-models .card .t small { display: block; font-weight: 400; font-size: 11px; color: var(--copy); }
+  #ai-models .fields { display: grid; gap: 3px; align-content: start; font-size: 11px; }
+  #ai-models .fields span { border-left: 2px solid var(--line); padding-left: 7px; color: var(--copy); }
+  #ai-models .card.wire .fields span { border-left-color: color-mix(in srgb, var(--l-wire) 50%, var(--code-bg)); }
+  #ai-models .card .eg { font-size: 10.5px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 6px; }
+  #ai-models .sockets { display: grid; gap: 7px; align-content: start; }
+  #ai-models .sk { display: grid; grid-template-columns: 14px 1fr; gap: 7px; align-items: start; font-size: 11.5px; line-height: 1.3; }
+  #ai-models .sk i { width: 12px; height: 12px; margin-top: 1px; border-radius: 50%; background: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-faint); }
+  #ai-models .sk.cond i { background: none; border: 1.2px dashed var(--muted); box-shadow: none; }
+  #ai-models .sk small { display: block; font-size: 10.5px; color: var(--muted); }
+  #ai-models .sk.cond > span { color: var(--copy); }
+
+  /* Bind B: plug and socket */
+  #ai-models .ps { display: grid; grid-template-columns: repeat(3, 1fr); font-family: var(--font-mono); font-size: 11.5px; }
+  #ai-models .ps .sock { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 2px solid var(--primary); border-radius: 12px; background: color-mix(in srgb, var(--primary) 6%, var(--code-bg));
+    padding: 8px 0 8px; position: relative; }
+  #ai-models .ps .sock .t { grid-column: 1 / -1; font-weight: 600; padding: 0 12px 8px; font-size: 12px; }
+  #ai-models .ps .sl { display: grid; justify-items: center; gap: 5px; text-align: center; }
+  #ai-models .ps .hole { width: 34px; height: 14px; border-radius: 4px; border: 1.2px solid var(--line-strong);
+    background: var(--panel-soft); position: relative; }
+  #ai-models .ps .hole.live { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 22%, var(--code-bg)); }
+  #ai-models .ps .sl.dead { color: var(--muted); }
+  #ai-models .ps .sl small { display: block; font-size: 10.5px; color: var(--muted); }
+  #ai-models .ps .sl.dead .hole { border-style: dashed; border-color: var(--muted); background: none; }
+  #ai-models .ps .prong { height: 44px; margin-top: -16px; display: flex; justify-content: center; position: relative; z-index: 1; }
+  #ai-models .ps .prong i { width: 10px; height: 100%; background: var(--l-wire); border-radius: 0 0 2px 2px; }
+  #ai-models .ps .prong i.none { background: none; border: 1.2px dashed var(--muted); border-bottom: 0; border-radius: 2px 2px 0 0; }
+  #ai-models .ps .plug { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr);
+    border: 1.2px solid var(--l-wire); border-radius: 12px; background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+    padding: 8px 0; text-align: center; }
+  #ai-models .ps .plug .t { grid-column: 1 / -1; font-weight: 600; padding-top: 6px; font-size: 12px; order: 2; }
+  #ai-models .ps .plug .gone { color: var(--muted); text-decoration: line-through; }
+
+  /* Wrap A: nesting */
+  #ai-models .cv { position: relative; width: 566px; }
+  #ai-models .cv > svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+  #ai-models .bx { position: absolute; border: 1.2px solid var(--line-strong); border-radius: 14px; background: var(--code-bg);
+    font-family: var(--font-mono); font-size: 12px; padding: 8px 12px; }
+  #ai-models .bx .t { font-weight: 600; }
+  #ai-models .bx small { display: block; font-size: 10.5px; color: var(--muted); }
+  #ai-models .bx.accent { border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--code-bg)); }
+  #ai-models .bx.wire { border-color: var(--l-wire); background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); border-radius: 10px; }
+  #ai-models .bx.you { display: flex; align-items: center; justify-content: center; text-align: center; border-radius: 10px; padding: 0 6px; }
+  #ai-models .cv .chip.m { position: absolute; }
+  #ai-models svg .m { font-size: 11px; font-weight: 600; fill: var(--text); }
+  #ai-models svg .n { font-size: 10.5px; fill: var(--muted); }
+
+  /* Wrap B: before / after */
+  #ai-models .ba { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #ai-models .ba .col { display: grid; gap: 8px; align-content: start; }
+  #ai-models .ba .code { font-size: 11px; line-height: 1.6; }
+  #ai-models .ba .chain { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/models.mdx</div>
+    <h2>Models</h2>
+    <p class="job"><b>Must get across:</b> a model is metadata and a provider holds the credentials. The binding pairs them and gets one function for each interface that the provider implements.</p>
+    <p class="now">Today the first flowchart draws the three functions as equal boxes under the binding, so "always" and "only if" look the same. The second draws the wrapper as nested groups, with no call that goes through them.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Bind <span>· replaces the first diagram</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Equation cards</span></div>
+        <figure class="fig">
+          <div class="eq">
+            <div class="card">
+              <span class="t">ai.Model</span>
+              <div class="fields"><span>ID</span><span>Name</span><span>MaxTokens</span><span style="border:0;padding:0;color:var(--muted)">no credentials</span></div>
+              <span class="eg">anthropic.Sonnet5</span>
+            </div>
+            <span class="op">+</span>
+            <div class="card wire">
+              <span class="t">ai.TextProvider</span>
+              <div class="fields"><span>credentials</span><span>wire format</span><span>StreamText(…)</span></div>
+              <span class="eg">anthropic.New()</span>
+            </div>
+            <span class="op">=</span>
+            <div class="card accent">
+              <span class="t">ai.LanguageModel<small>{ Model, Provider }</small></span>
+              <div class="sockets">
+                <div class="sk"><i></i><span>StreamText<small>always</small></span></div>
+                <div class="sk cond"><i></i><span>GenerateObject<small>if an ObjectProvider</small></span></div>
+                <div class="sk cond"><i></i><span>CountTokens<small>if a TokenCounter</small></span></div>
+              </div>
+              <span class="eg">your code calls this</span>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The sum reads as one sentence: metadata plus a backend gives a callable binding. The lit and dashed sockets separate the one call you always have from the calls that depend on the provider. <span class="cost">Cost: A dashed socket does not say which real provider has it. The capability matrix on The Layer page says that.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Plug and socket</span></div>
+        <figure class="fig">
+          <div class="ps">
+            <div class="sock">
+              <span class="t">ai.LanguageModel</span>
+              <div class="sl"><span>StreamText<small>works</small></span><span class="hole live"></span></div>
+              <div class="sl"><span>GenerateObject<small>works</small></span><span class="hole live"></span></div>
+              <div class="sl dead"><span>CountTokens<small>returns an error</small></span><span class="hole"></span></div>
+            </div>
+            <div class="prong"><i></i></div>
+            <div class="prong"><i></i></div>
+            <div class="prong"><i class="none"></i></div>
+            <div class="plug">
+              <span class="t">openaichat.New()</span>
+              <span>TextProvider</span><span>ObjectProvider</span><span class="gone">TokenCounter</span>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> A real provider with a missing prong shows the rule on a case: no <code>TokenCounter</code>, so <code>CountTokens</code> returns an error. <span class="cost">Cost: It shows one provider. The general rule ("a function per interface") is left for the reader to infer.</span></p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Wrap <span>· replaces the second diagram</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Nesting</span></div>
+        <figure class="fig">
+          <div class="cv" style="height:204px">
+            <div class="bx you" style="left:0;top:78px;width:80px;height:90px">your<br>code</div>
+            <div class="bx" style="left:96px;top:0;width:470px;height:204px"><span class="t">ai.LanguageModel</span></div>
+            <span class="chip m" style="left:236px;top:8px">Model: anthropic.Sonnet5</span>
+            <div class="bx accent" style="left:118px;top:38px;width:432px;height:152px"><span class="t">Provider: logging{…}</span><small>logs the call, returns the inner stream</small></div>
+            <div class="bx wire" style="left:330px;top:96px;width:204px;height:78px"><span class="t">inner: anthropic.New()</span><small>speaks the wire format</small></div>
+            <svg viewBox="0 0 566 204" width="566" height="204" aria-hidden="true">
+              <defs><marker id="ai-models-h" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L8,4 L0,8 z"/></marker>
+                <marker id="ai-models-hm" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path style="fill:var(--muted)" d="M0,0 L8,4 L0,8 z"/></marker>
+                <marker id="ai-models-ha" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="head-accent" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+              <path class="edge-accent" d="M80,112 H326" marker-end="url(#ai-models-ha)"/>
+              <text x="140" y="106" class="m">StreamText(ctx, messages)</text>
+              <path class="edge" style="stroke:var(--muted)" d="M330,150 H84" marker-end="url(#ai-models-hm)"/>
+              <text x="140" y="166" class="n">*ai.EventStream, unchanged</text>
+            </svg>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The call goes in through each layer and the stream comes back out, so the reader sees that a wrapper is a provider around a provider. The binding does not change at all. <span class="cost">Cost: It draws the case from the guide, where the wrapper passes the stream through. A wrapper that makes its own stream needs a second picture.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Before and after</span></div>
+        <figure class="fig">
+          <div class="ba">
+            <div class="col">
+              <span class="lbl">without</span>
+<div class="code">ai.LanguageModel{
+  Model:    anthropic.Sonnet5,
+  <span class="hl">Provider: anthropic.New(),</span>
+}</div>
+              <div class="chain"><span class="chip">LanguageModel</span>→<span class="chip k-tool">anthropic</span></div>
+            </div>
+            <div class="col">
+              <span class="lbl">with the wrapper</span>
+<div class="code">ai.LanguageModel{
+  Model:    anthropic.Sonnet5,
+  <span class="hl">Provider: logging{</span>
+  <span class="hl">  inner: anthropic.New(),</span>
+  <span class="hl">},</span>
+}</div>
+              <div class="chain"><span class="chip">LanguageModel</span>→<span class="chip" style="border-color:var(--primary)">logging</span>→<span class="chip k-tool">anthropic</span></div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The diff is the lesson: only the <code>Provider</code> field changes. <span class="cost">Cost: It shows the code, not the flow of the call and the stream through the wrapper.</span></p>
+      </div>
+
+    </div>
+  </div>
+</section>

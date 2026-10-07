@@ -1,0 +1,269 @@
+---
+// An onion: each ring wraps the next, and the core is the thing they
+// wrap. A call goes in through every ring to the core, and the result
+// comes back out through every ring. A list at the side names what a
+// ring can do. Use it for middleware, where each layer holds the next.
+//
+// The rings share one grid cell, and ring i is inset by i steps, so the
+// core sets the size. The middle of every ring is the middle of the
+// core, so the call and the result cross each ring at the same height.
+import Figure from "./Figure.astro";
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // rings are the wrappers, from the outside in.
+  rings: string[];
+  core: { name: string; note?: string };
+  // call and result label the way in and the way out.
+  call: string;
+  result: string;
+  // can lists what a ring can do, under a title.
+  can?: { title: string; items: string[] };
+  // chain is the call that builds the onion, and a note on its order.
+  chain?: { call: string; note?: string };
+}
+
+const { alt, caption, rings, core, call, result, can, chain } = Astro.props;
+const n = rings.length;
+// Each ring takes a stronger tint than the one outside it.
+const tint = (i: number) => `color-mix(in srgb, var(--l-harness) ${8 * (i + 1)}%, var(--code-bg))`;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="on">
+    <div class="onion" style={`--n: ${n}`}>
+      <div class="cell">
+        {
+          rings.map((r, i) => (
+            <div class="ring" style={`--i: ${i}; background: ${tint(i)}`}>
+              <span class="hd">{r}</span>
+            </div>
+          ))
+        }
+        <div class="core">
+          <b>{core.name}</b>
+          {core.note && <small>{core.note}</small>}
+        </div>
+      </div>
+      <i class="line in"><span>{call}</span></i>
+      <i class="line out"><span>{result}</span></i>
+      {
+        rings.map((_, i) => (
+          <>
+            <i class="dot in" style={`--i: ${i}`} />
+            <i class="dot out" style={`--i: ${i}`} />
+          </>
+        ))
+      }
+    </div>
+    {
+      can && (
+        <div class="can">
+          <span class="lbl">{can.title}</span>
+          <ul>
+            {can.items.map((c) => (
+              <li>{c}</li>
+            ))}
+          </ul>
+        </div>
+      )
+    }
+  </div>
+  {
+    chain && (
+      <div class="chain">
+        {chain.call}
+        {chain.note && <span>{chain.note}</span>}
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  .on {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  /* --lead is the room for the labels on the left. --px and --py are
+     the step between two rings. --k is how far the call and the result
+     sit from the middle. */
+  .onion {
+    --lead: 40px;
+    --px: 48px;
+    --py: 32px;
+    --k: 13px;
+    position: relative;
+    flex: none;
+    padding-left: var(--lead);
+  }
+  .cell {
+    display: grid;
+  }
+  .ring,
+  .core {
+    grid-area: 1 / 1;
+  }
+  .ring {
+    position: relative;
+    margin: calc(var(--i) * var(--py)) calc(var(--i) * var(--px));
+    border: 1.2px solid var(--l-harness);
+    border-radius: calc(22px - var(--i) * 6px);
+  }
+  .hd {
+    position: absolute;
+    left: 14px;
+    top: 7px;
+    font-weight: 600;
+  }
+  /* The rings are positioned, so the core must be too, or they paint
+     over it. */
+  .core {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 100px;
+    min-height: 64px;
+    margin: calc(var(--n) * var(--py)) calc(var(--n) * var(--px));
+    padding: 6px 12px;
+    border: 1.2px solid var(--l-wire);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+  .core b {
+    font-weight: 600;
+  }
+  .core small {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* The call and the result run from the left edge to the core. */
+  .line {
+    position: absolute;
+    left: 0;
+    width: calc(var(--lead) + var(--n) * var(--px));
+    font-size: 11px;
+    font-style: normal;
+    color: var(--link);
+  }
+  .line.in {
+    top: calc(50% - var(--k));
+    border-top: 1.4px solid var(--primary);
+  }
+  .line.out {
+    top: calc(50% + var(--k));
+    border-top: 1.4px dashed var(--primary);
+  }
+  .line span {
+    position: absolute;
+    left: 0;
+  }
+  .line.in span {
+    bottom: 3px;
+  }
+  .line.out span {
+    top: 3px;
+  }
+  .line::after {
+    content: "";
+    position: absolute;
+    top: -4.7px;
+    border: 4px solid transparent;
+  }
+  .line.in::after {
+    right: -1px;
+    border-left: 7px solid var(--primary);
+    border-right: 0;
+  }
+  .line.out::after {
+    left: -1px;
+    border-right: 7px solid var(--primary);
+    border-left: 0;
+  }
+  /* A dot where a line crosses the edge of a ring. */
+  .dot {
+    position: absolute;
+    left: calc(var(--lead) + var(--i) * var(--px) - 3px);
+    width: 6px;
+    height: 6px;
+    border: 1.4px solid var(--primary);
+    border-radius: 50%;
+    background: var(--code-bg);
+    box-sizing: border-box;
+  }
+  .dot.in {
+    top: calc(50% - var(--k) - 2.3px);
+  }
+  .dot.out {
+    top: calc(50% + var(--k) - 2.3px);
+  }
+
+  /* What a ring can do: a bracket that joins the edge of the onion. */
+  .can {
+    position: relative;
+    display: grid;
+    gap: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .can ul {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0 0 0 8px;
+    list-style: none;
+  }
+  .can ul::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  .can ul::after {
+    content: "";
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    width: 22px;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .can li {
+    position: relative;
+    padding: 1px 12px;
+    border: 1px solid var(--l-harness);
+    border-radius: 10px;
+    background: var(--code-bg);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .can li::before {
+    content: "";
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    width: 8px;
+    border-top: 1.2px solid var(--line-strong);
+  }
+  .chain {
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+    margin-top: 12px;
+    padding-left: 40px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  .chain span {
+    font-size: 11px;
+    color: var(--muted);
+  }
+</style>

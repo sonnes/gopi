@@ -1,0 +1,124 @@
+/* Explorer chrome + shared figure primitives. Tokens come from tokens.css
+   (a copy of web/src/styles/tokens.css). Every figure uses only these
+   tokens, so it follows the theme toggle. */
+
+body { margin: 0; background: var(--ground); color: var(--text);
+  font-family: var(--font-prose); font-size: 15px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+code, .mono { font-family: var(--font-mono); }
+
+/* ---------- explorer chrome ---------- */
+.top { position: sticky; top: 0; z-index: 10; background: var(--ground);
+  border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1340px; margin: 0 auto; padding: 12px 32px;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.top h1 { font-family: var(--font-mono); font-size: 0.95rem; margin: 0;
+  letter-spacing: -0.02em; margin-right: auto; }
+.top nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.top nav a { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
+  text-decoration: none; padding: 3px 7px; border-radius: 6px; }
+.top nav a:hover { background: var(--panel-soft); color: var(--text); }
+.top button { font-family: var(--font-mono); font-size: 0.72rem; background: none;
+  border: 1px solid var(--line-strong); color: var(--text); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer; }
+
+main { max-width: 1340px; margin: 0 auto; padding: 24px 32px 120px; }
+.intro { max-width: 46rem; color: var(--copy); }
+.intro h2 { font-family: var(--font-mono); letter-spacing: -0.03em; color: var(--text); }
+
+/* one docs page */
+.page { border-top: 1px solid var(--line); padding-top: 40px; margin-top: 64px; }
+.page-head { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 24px; max-width: 46rem; }
+.page-path { font-family: var(--font-mono); font-size: var(--label-size);
+  letter-spacing: var(--label-track); color: var(--muted); }
+.page-head h2 { font-family: var(--font-mono); font-size: 1.5rem; letter-spacing: -0.045em;
+  margin: 0; line-height: 1.2; }
+.page-head .job { color: var(--copy); margin: 0; }
+.page-head .job b { color: var(--text); font-weight: 600; }
+.page-head .now { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+/* one visual on a page (a page can have several: "the stack", "one call") */
+.slot { margin: 32px 0 8px; }
+.slot-title { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600;
+  margin: 0 0 12px; }
+.slot-title span { color: var(--muted); font-weight: 400; }
+
+/* the alternatives, side by side when there is room */
+.options { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 24px; align-items: start; }
+.option { display: grid; gap: 10px; }
+.option-head { display: flex; gap: 10px; align-items: baseline; }
+.tag { font-family: var(--font-mono); font-size: 0.7rem; padding: 1px 8px; border-radius: 999px;
+  border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+.tag.rec { border-color: var(--primary); color: var(--link); background: var(--primary-faint); }
+.option-name { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; }
+.why { font-size: 0.85rem; color: var(--copy); margin: 0; max-width: 34rem; }
+.why b { color: var(--text); font-weight: 600; }
+.why .cost { color: var(--muted); }
+
+/* ---------- the figure panel: same as a docs diagram ---------- */
+/* A docs diagram panel is 566px wide inside. .fig is capped to that
+   width so every mockup is drawn at the size it would ship at. */
+.fig { margin: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 24px; max-width: 616px; width: 100%; overflow-x: auto; }
+.fig-caption { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; margin: 0 0 16px; }
+
+/* ---------- shared primitives ---------- */
+.lbl { font-family: var(--font-mono); font-size: var(--label-size);
+  letter-spacing: var(--label-track); color: var(--muted); }
+.mono { font-size: 12px; }
+.muted { color: var(--muted); }
+
+/* a node: a box on the panel */
+.node { font-family: var(--font-mono); font-size: 12px; line-height: 1.45; color: var(--text);
+  background: var(--code-bg); border: 1.2px solid var(--line-strong); border-radius: 8px;
+  padding: 6px 10px; }
+.node.accent { border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--code-bg)); }
+
+/* kinds: the same stroke + tint as the site's diagram kinds */
+.k-user      { --k: var(--line-strong); }
+.k-assistant { --k: var(--l-agent); }
+.k-tool      { --k: var(--l-wire); }
+.k-meta      { --k: var(--l-durable); }
+.k-value     { --k: var(--l-harness); }
+.k-ephemeral { --k: var(--muted); }
+.k-error     { --k: var(--err); }
+.k-ai        { --k: var(--l-ai); }
+[class*="k-"].node, [class*="k-"].chip, [class*="k-"].tint {
+  border-color: var(--k);
+  background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg)); }
+.k-user.node, .k-user.chip { background: var(--code-bg); }
+.k-meta.node, .k-meta.chip, .k-error.node, .k-error.chip { border-style: dashed; }
+.k-ephemeral.node, .k-ephemeral.chip { border-style: dotted; background: var(--code-bg); color: var(--muted); }
+.k-error.node, .k-error.chip { color: var(--err); }
+
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 11px; line-height: 1.4;
+  padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-strong);
+  background: var(--code-bg); color: var(--text); white-space: nowrap; }
+.chip.drop { text-decoration: line-through; color: var(--muted); border-color: var(--line); }
+
+/* a code panel inside a figure */
+.code { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--code-bg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; white-space: pre; color: var(--text);
+  overflow-x: auto; }
+.code .kw { color: var(--l-ai-deep); }
+.code .ty { color: var(--l-wire-deep); }
+.code .str { color: var(--l-durable-deep); }
+.code .num { color: var(--l-agent-deep); }
+.code .dim, .code .cm { color: var(--muted); }
+.code .hl { background: var(--primary-faint); border-radius: 3px; box-shadow: 0 0 0 1px var(--primary-line); }
+
+/* a numbered pin that ties a code span to a note */
+.pin { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--primary); color: var(--on-primary); font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600; vertical-align: 1px; flex: none; }
+
+/* svg defaults for hand-placed drawings */
+.fig svg { display: block; max-width: 100%; height: auto; overflow: visible; }
+.fig svg text { font-family: var(--font-mono); font-size: 12px; fill: var(--text); }
+.fig svg .t-muted { fill: var(--muted); }
+.fig svg .edge { stroke: var(--line-strong); stroke-width: 1.2; fill: none; }
+.fig svg .edge-accent { stroke: var(--primary); stroke-width: 1.6; fill: none; }
+.fig svg .box { fill: var(--code-bg); stroke: var(--line-strong); stroke-width: 1.2; }
+.fig svg .head { fill: var(--line-strong); }
+.fig svg .head-accent { fill: var(--primary); }

@@ -1,0 +1,265 @@
+---
+// Signature anatomy: one call in large type, with a bracket under each
+// part that has a type of its own. Each bracket drops into a card that
+// opens the part into its type and its pieces. The method drops a coral
+// line through the cards into what the call returns. Use it when the
+// parts of one signature are the map of a section.
+//
+// The call must stay one short line. Its position is computed from the
+// width of the mono face, 0.6em for each character, so the line of the
+// method lands in the gap between two cards.
+import Figure from "./Figure.astro";
+
+type Kind = "user" | "assistant" | "tool" | "meta" | "value" | "ephemeral" | "error" | "ai";
+
+interface Card {
+  type: string;
+  // chips are the pieces of the type, as [text, kind] pairs.
+  chips: [string, Kind?][];
+  // plus joins the chips with a plus sign, for a type made of two parts.
+  plus?: boolean;
+  sub?: string;
+  // pages names the pages that explain the part.
+  pages?: string[];
+}
+
+interface Part {
+  text: string;
+  // card opens the part into its type. A part with a card gets a bracket.
+  card?: Card;
+  // method marks the name of the method. It drops the line into the return.
+  method?: boolean;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  parts: Part[];
+  returns: {
+    type: string;
+    // events are the chips of the stream, in order.
+    events: string[];
+    // wait is the call that skips to the result.
+    wait: string;
+    result: string;
+    pages?: string[];
+  };
+}
+
+const { alt, caption, parts, returns } = Astro.props;
+
+const GAP = 19;
+const FONT = 18;
+const cards = parts.filter((p) => p.card).map((p) => p.card!);
+const n = cards.length;
+
+// The line of the method drops into the gap after the cards of the
+// parts before it. The cards share the width of the column, so the
+// center of that gap is a calc() of the column width.
+const mi = parts.findIndex((p) => p.method);
+const before = parts.slice(0, mi).filter((p) => p.card).length;
+const gapX = `((100% - ${GAP * (n - 1)}px) * ${before / n} + ${(before - 1) * GAP + GAP / 2}px)`;
+const methodChars = parts.slice(0, mi).reduce((c, p) => c + p.text.length, 0) + parts[mi].text.length / 2;
+const codeX = `max(0px, calc(${gapX} - ${methodChars * FONT * 0.6}px))`;
+
+const columns = cards.map((_, i) => (i === 0 ? "1fr" : `${GAP}px 1fr`)).join(" ");
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="sa">
+    <div class="call">
+      <code style={`left:${codeX};font-size:${FONT}px`}>
+        {
+          parts.map((p) =>
+            p.card ? <span class="br">{p.text}</span> : p.method ? <span class="st">{p.text}</span> : p.text,
+          )
+        }
+      </code>
+    </div>
+    <div class="cards" style={`grid-template-columns:${columns}`}>
+      {
+        cards.map((c, i) => (
+          <>
+            {i > 0 && <div class:list={{ gapline: i === before }} />}
+            <div class="card">
+              <span class="t">{c.type}</span>
+              <div class="row">
+                {c.chips.map(([text, kind], j) => (
+                  <>
+                    {c.plus && j > 0 && <span class="plus">+</span>}
+                    <span class:list={["chip", kind && `k-${kind}`]}>{text}</span>
+                  </>
+                ))}
+              </div>
+              {c.sub && <span class="sub">{c.sub}</span>}
+              {c.pages && <span class="pgs">see {c.pages.join(", ")}</span>}
+            </div>
+          </>
+        ))
+      }
+    </div>
+    <div class="ret">
+      <svg class="tip" style={`left:calc(${gapX} - 6px)`} viewBox="0 0 12 8" aria-hidden="true">
+        <path class="head-accent" d="M0,0 L12,0 L6,8 z" />
+      </svg>
+      <div class="top">
+        <span><span class="t">{returns.type}</span><span class="lbl">returns</span></span>
+        {returns.pages && <span class="pgs-r">see {returns.pages.join(", ")}</span>}
+      </div>
+      <div class="evs">
+        {returns.events.map((e) => <span class="chip k-ephemeral">{e}</span>)}
+        <span class="more">...</span>
+        <span class="wait">{returns.wait}</span>
+        <span class="chip k-assistant">{returns.result}</span>
+      </div>
+    </div>
+  </div>
+</Figure>
+
+<style>
+  .sa {
+    min-width: 520px;
+    font-family: var(--font-mono);
+    color: var(--text);
+  }
+  .call {
+    position: relative;
+    height: 84px;
+  }
+  .call code {
+    position: absolute;
+    top: 0;
+    line-height: 26px;
+    white-space: pre;
+    font-family: var(--font-mono);
+    color: var(--text);
+    background: none;
+    padding: 0;
+  }
+  .br,
+  .st {
+    position: relative;
+  }
+  /* A bracket under a part, and the line from it down to its card. */
+  .br::after {
+    content: "";
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    top: 30px;
+    height: 7px;
+    border: 1.2px solid var(--line-strong);
+    border-top: 0;
+    border-radius: 0 0 5px 5px;
+  }
+  .br::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 37px;
+    height: 47px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  /* The method, and the coral line from it down to the return. */
+  .st {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .st::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 28px;
+    height: 56px;
+    border-left: 1.6px solid var(--primary);
+  }
+  .cards {
+    display: grid;
+    align-items: start;
+  }
+  .card {
+    background: var(--code-bg);
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 9px 10px;
+    margin-bottom: 20px;
+    display: grid;
+    gap: 7px;
+    align-content: start;
+    font-size: 12px;
+  }
+  .t {
+    font-weight: 600;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .plus {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .sub,
+  .pgs,
+  .pgs-r {
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .pgs {
+    border-top: 1px dashed var(--line);
+    padding-top: 6px;
+  }
+  .gapline {
+    align-self: stretch;
+    justify-self: center;
+    border-left: 1.6px solid var(--primary);
+  }
+  .ret {
+    position: relative;
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    background: var(--code-bg);
+    padding: 9px 10px;
+    display: grid;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .ret .top .lbl {
+    font-size: 10.5px;
+    margin-left: 8px;
+  }
+  .evs {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .more {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .wait {
+    font-size: 11px;
+    font-weight: 600;
+    margin: 0 2px 0 6px;
+    white-space: nowrap;
+  }
+  .wait::after {
+    content: " \2192";
+    font-weight: 400;
+    color: var(--muted);
+  }
+  .ret svg.tip {
+    position: absolute;
+    top: -8px;
+    width: 12px;
+    height: 8px;
+  }
+</style>

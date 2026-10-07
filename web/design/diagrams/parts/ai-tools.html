@@ -1,0 +1,305 @@
+<section class="page" id="ai-tools">
+<style>
+/* ---- two faces (A Tool, A) ---- */
+#ai-tools .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; font-family: var(--font-mono); font-size: 11px; margin-bottom: 12px; }
+#ai-tools .seg span { padding: 3px 10px; color: var(--muted); background: var(--code-bg); }
+#ai-tools .seg span + span { border-left: 1px solid var(--line-strong); }
+#ai-tools .seg span.on { background: var(--primary-faint); color: var(--link); box-shadow: inset 0 0 0 1px var(--primary); }
+#ai-tools .seg b { font-weight: 600; }
+#ai-tools .code .pin { margin: 0 1px; }
+#ai-tools .code { font-size: 11.5px; }
+#ai-tools .fig svg.derive { display: block; height: 26px; }
+#ai-tools .faces { display: grid; grid-template-columns: 1.08fr 1fr; gap: 12px; }
+#ai-tools .face { border: 1.2px solid var(--k); border-radius: 12px; background: var(--code-bg); overflow: hidden; }
+#ai-tools .face > header { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 6px 10px;
+  background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg)); border-bottom: 1px solid var(--k); font-family: var(--font-mono); font-size: 12px; }
+#ai-tools .face > header b { font-weight: 600; }
+#ai-tools .face > header span { font-size: 10.5px; color: var(--muted-strong); }
+#ai-tools .json { font-family: var(--font-mono); font-size: 11px; line-height: 1.55; white-space: pre; padding: 8px 10px; margin: 0; color: var(--text); }
+#ai-tools .json .k { color: var(--l-wire-deep); }
+#ai-tools .json .s { color: var(--l-durable-deep); }
+#ai-tools .json .d { color: var(--muted); }
+#ai-tools .json .pin { width: 14px; height: 14px; font-size: 9px; }
+#ai-tools .steps { display: grid; gap: 0; padding: 8px 10px; font-family: var(--font-mono); font-size: 11px; }
+#ai-tools .st { border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; background: var(--code-bg); }
+#ai-tools .st small { display: block; font-size: 9.5px; color: var(--muted); }
+#ai-tools .st.res { border-color: var(--l-wire); }
+#ai-tools .dn { display: flex; align-items: center; gap: 6px; height: 22px; padding-left: 14px; font-size: 10px; color: var(--muted); }
+#ai-tools .dn::before { content: ""; width: 0; height: 100%; border-left: 1.2px solid var(--line-strong); margin-right: 4px; }
+
+/* ---- card anatomy (A Tool, B) ---- */
+#ai-tools .card { border: 1.4px solid var(--line-strong); border-radius: 14px; background: var(--code-bg); overflow: hidden; font-family: var(--font-mono); font-size: 12px; }
+#ai-tools .card > header { padding: 7px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; }
+#ai-tools .card > header b { font-weight: 600; }
+#ai-tools .halves { display: grid; grid-template-columns: 1fr 1fr; }
+#ai-tools .half { padding: 10px 12px; display: grid; gap: 6px; align-content: start; }
+#ai-tools .half + .half { border-left: 1px solid var(--line); }
+#ai-tools .half .sig { font-weight: 600; }
+#ai-tools .half .who { font-size: 10.5px; color: var(--muted); }
+#ai-tools .half .fl { display: flex; flex-wrap: wrap; gap: 4px; }
+#ai-tools .ctors { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px dashed var(--line); }
+#ai-tools .ctors > div { padding: 6px 12px; font-size: 11px; color: var(--copy); }
+#ai-tools .ctors > div + div { border-left: 1px solid var(--line); }
+#ai-tools .ctors .row { display: contents; }
+#ai-tools .ctors .nm { grid-column: 1 / -1; padding-bottom: 0; font-weight: 600; color: var(--text); }
+#ai-tools .ends { display: grid; grid-template-columns: 1fr 1fr; margin-top: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; }
+
+/* ---- failure fork (A) ---- */
+#ai-tools .ff text.sm { font-size: 11px; }
+#ai-tools .ff .bnd { fill: none; stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 5 4; }
+#ai-tools .ff .kt { fill: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); stroke: var(--l-wire); stroke-width: 1.2; }
+#ai-tools .ff .ka { fill: color-mix(in srgb, var(--l-agent) var(--l-mix), var(--code-bg)); stroke: var(--l-agent); stroke-width: 1.2; }
+#ai-tools .ff .ke { fill: var(--code-bg); stroke: var(--err); stroke-width: 1.2; stroke-dasharray: 4 3; }
+#ai-tools .ff .ee { stroke: var(--err); stroke-width: 1.3; fill: none; stroke-dasharray: 4 3; }
+#ai-tools .ff .he { fill: var(--err); }
+#ai-tools .ff text.er { fill: var(--err); }
+#ai-tools .ff text.ac { fill: var(--link); }
+
+/* ---- who sees it (B) ---- */
+#ai-tools .who2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-family: var(--font-mono); font-size: 11.5px; }
+#ai-tools .col { border-radius: 12px; border: 1.2px solid var(--k); background: var(--code-bg); overflow: hidden; }
+#ai-tools .col.k-error { border-style: dashed; }
+#ai-tools .col h4 { margin: 0; padding: 6px 10px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--k) var(--l-mix), var(--code-bg)); }
+#ai-tools .col > div { padding: 6px 10px; border-top: 1px solid var(--line); }
+#ai-tools .col > div small { display: block; font-size: 9.5px; color: var(--muted); letter-spacing: .02em; }
+
+/* ---- onion (A) and stack (B) ---- */
+#ai-tools .on .r1 { fill: color-mix(in srgb, var(--l-harness) 8%, var(--code-bg)); stroke: var(--l-harness); stroke-width: 1.2; }
+#ai-tools .on .r2 { fill: color-mix(in srgb, var(--l-harness) 16%, var(--code-bg)); stroke: var(--l-harness); stroke-width: 1.2; }
+#ai-tools .on .r3 { fill: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); stroke: var(--l-wire); stroke-width: 1.2; }
+#ai-tools .on text.hd { font-weight: 600; }
+#ai-tools .on text.sm { font-size: 11px; }
+#ai-tools .on .dash { stroke: var(--primary); stroke-width: 1.4; fill: none; stroke-dasharray: 4 3; }
+#ai-tools .on .dot { fill: var(--code-bg); stroke: var(--primary); stroke-width: 1.4; }
+#ai-tools .on .cap { fill: var(--code-bg); stroke: var(--l-harness); stroke-width: 1; }
+#ai-tools .on text.ac { fill: var(--link); }
+#ai-tools .fl .bar { stroke-width: 1.2; }
+#ai-tools .fl .ba { fill: color-mix(in srgb, var(--l-harness) 10%, var(--code-bg)); stroke: var(--l-harness); }
+#ai-tools .fl .bb { fill: color-mix(in srgb, var(--l-harness) 20%, var(--code-bg)); stroke: var(--l-harness); }
+#ai-tools .fl .bt { fill: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg)); stroke: var(--l-wire); }
+#ai-tools .fl text.sm { font-size: 11px; }
+#ai-tools .fl .dash { stroke: var(--line-strong); stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/tools.mdx</div>
+    <h2>Tools</h2>
+    <p class="job"><b>Must get across:</b> a tool has two faces, the info that the model reads and the run function that you call, and a middleware wraps both.</p>
+    <p class="now">Today: a chain of boxes from the two constructors to the model, so the reader never sees a schema, and the middleware diagram draws the nesting but not the way in and out.</p>
+  </div>
+
+  <!-- ============ A Tool ============ -->
+  <div class="slot">
+    <h3 class="slot-title">A Tool <span>· replaces the top diagram</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Two faces</span></div>
+        <figure class="fig">
+          <div class="seg"><span class="on"><b>DefineTool</b> typed: the schema is derived</span><span><b>NewTool</b> raw: you write it</span></div>
+          <div class="code"><span class="kw">type</span> <span class="ty">WeatherIn</span> <span class="kw">struct</span> {
+    City <span class="pin">2</span><span class="ty">string</span> `<span class="pin">1</span><span class="str">json:"city"</span> <span class="pin">3</span><span class="str">jsonschema:"the city to look up"</span>`
+}
+
+<span class="kw">var</span> weather = ai.<span class="hl">DefineTool</span>(
+    <span class="pin">4</span><span class="str">"weather"</span>, <span class="str">"Get the current weather of a city."</span>,
+    <span class="kw">func</span>(ctx context.Context, in <span class="ty">WeatherIn</span>) (<span class="ty">WeatherOut</span>, <span class="ty">error</span>) {…},
+)</div>
+          <svg class="derive" width="100%" height="26" aria-hidden="true">
+            <line class="edge" x1="50%" y1="0" x2="50%" y2="10"/>
+            <line class="edge" x1="26%" y1="10" x2="76%" y2="10"/>
+            <line class="edge" x1="26%" y1="10" x2="26%" y2="26"/>
+            <line class="edge" x1="76%" y1="10" x2="76%" y2="26"/>
+          </svg>
+          <div class="faces">
+            <div class="face k-tool">
+              <header><b>Info()</b><span>what the model reads</span></header>
+<pre class="json">{<span class="pin">4</span><span class="k">"name"</span>: <span class="s">"weather"</span>,
+ <span class="k">"description"</span>: <span class="s">"Get the cur…"</span>,
+ <span class="k">"input_schema"</span>: {
+   <span class="k">"type"</span>: <span class="s">"object"</span>,
+   <span class="k">"properties"</span>: {
+     <span class="pin">1</span><span class="k">"city"</span>: {
+       <span class="pin">2</span><span class="k">"type"</span>: <span class="s">"string"</span>,
+       <span class="pin">3</span><span class="k">"description"</span>:
+         <span class="s">"the city to look up"</span> }},
+   <span class="k">"required"</span>: [<span class="s">"city"</span>],
+   <span class="k">"additionalProperties"</span>: false }}</pre>
+            </div>
+            <div class="face k-assistant">
+              <header><b>Run(ctx, call)</b><span>what you run</span></header>
+              <div class="steps">
+                <div class="st"><small>ToolCall.Input</small>{"city":"Lisbon"}</div>
+                <div class="dn">decode into In</div>
+                <div class="st"><small>in</small>WeatherIn{City: "Lisbon"}</div>
+                <div class="dn">your func</div>
+                <div class="st"><small>Out</small>WeatherOut{TempC: 21}</div>
+                <div class="dn">JSON text</div>
+                <div class="st res"><small>ToolResult · Text</small>{"city":"Lisbon","temp_c":21}</div>
+              </div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The reader sees the Go type and the schema that the model reads, with pins from each tag to its property. The toggle says in one line that <code>NewTool</code> skips the derive step. <span class="cost">Cost: the pins must track the example code. The description is cut to fit the column.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Card anatomy</span></div>
+        <figure class="fig">
+          <div class="card">
+            <header><b>ai.Tool</b><span class="muted">interface</span></header>
+            <div class="halves">
+              <div class="half k-tool" style="background:color-mix(in srgb, var(--l-wire) 6%, var(--code-bg))">
+                <span class="sig">Info() ToolInfo</span>
+                <div class="fl"><span class="chip k-tool">Name</span><span class="chip k-tool">Description</span><span class="chip k-tool">InputSchema</span></div>
+                <span class="who">read by the model, through ai.Toolset</span>
+              </div>
+              <div class="half" style="background:color-mix(in srgb, var(--l-agent) 6%, var(--code-bg))">
+                <span class="sig">Run(ctx, ToolCall)</span>
+                <div class="fl"><span class="chip k-assistant">(ToolResult, error)</span></div>
+                <span class="who">called by your code with each ToolCall</span>
+              </div>
+            </div>
+            <div class="ctors">
+              <div class="nm">DefineTool[In, Out](name, desc, fn)</div>
+              <div>derives InputSchema from In</div><div>decodes into In, calls fn</div>
+              <div class="nm" style="border-top:1px dashed var(--line)">NewTool(info, run)</div>
+              <div>you write the schema</div><div>you decode the call</div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The interface split in two halves, with each constructor filling both halves, reads as a spec sheet. <span class="cost">Cost: no example schema, so the reader still does not see what the model reads.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Two Failure Channels ============ -->
+  <div class="slot">
+    <h3 class="slot-title">Two Failure Channels <span>· replaces the second diagram</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Fork with a loop</span></div>
+        <figure class="fig">
+          <svg class="ff" viewBox="0 0 566 236" aria-label="An error result loops back to the model. A returned error leaves the run.">
+            <rect class="bnd" x="4" y="4" width="388" height="228" rx="14"/>
+            <text class="t-muted sm" x="18" y="222">the run goes on</text>
+
+            <rect class="ka" x="22" y="22" width="120" height="34" rx="8"/>
+            <text x="82" y="43" text-anchor="middle">the model</text>
+            <rect class="box" x="232" y="22" width="140" height="34" rx="8"/>
+            <text x="302" y="43" text-anchor="middle">Run(ctx, call)</text>
+            <path class="edge" d="M142 39 H226"/><path class="head" d="M224 35 L232 39 L224 43 Z"/>
+            <text class="t-muted sm" x="186" y="33" text-anchor="middle">ToolCall</text>
+
+            <!-- fork -->
+            <path class="edge-accent" d="M302 56 V82 H236 V100"/><path class="head-accent" d="M232 98 L236 106 L240 98 Z"/>
+            <path class="ee" d="M302 82 H482 V100"/><path class="he" d="M478 98 L482 106 L486 98 Z"/>
+
+            <!-- loop result -->
+            <rect class="kt" x="112" y="106" width="248" height="46" rx="8"/>
+            <text x="236" y="125" text-anchor="middle">ToolResult{IsError: true}, nil</text>
+            <text class="t-muted sm" x="236" y="142" text-anchor="middle">an error result</text>
+            <path class="edge-accent" d="M112 129 H72 Q62 129 62 119 V62"/><path class="head-accent" d="M58 64 L62 56 L66 64 Z"/>
+            <text class="ac sm" x="72" y="176">the model reads it and corrects the call</text>
+            <path class="edge-accent" d="M62 129 V170 H68" style="stroke-dasharray:2 3;stroke-width:1"/>
+
+            <!-- exit result -->
+            <rect class="ke" x="408" y="106" width="150" height="46" rx="8"/>
+            <text class="er" x="483" y="125" text-anchor="middle">ToolResult{}, err</text>
+            <text class="t-muted sm" x="483" y="142" text-anchor="middle">a returned error</text>
+            <path class="ee" d="M483 152 V180"/><path class="he" d="M479 178 L483 186 L487 178 Z"/>
+            <text class="sm" x="483" y="202" text-anchor="middle">the run fails</text>
+            <text class="t-muted sm" x="483" y="218" text-anchor="middle">canceled ctx, transport down</text>
+          </svg>
+        </figure>
+        <p class="why"><b>Why:</b> The error result stays inside the dashed run and goes back to the model. The Go error crosses the edge and ends the run, so the difference is where the arrow goes. <span class="cost">Cost: hand-placed SVG. It holds only the two outcomes, which is all this page has.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Who sees it</span></div>
+        <figure class="fig">
+          <div class="who2">
+            <div class="col k-tool">
+              <h4>the model sees it</h4>
+              <div><small>Run returns</small>ToolResult{IsError: true}, nil</div>
+              <div><small>when</small>your func returns an error. DefineTool makes it a result</div>
+              <div><small>then</small>it reads the result and corrects the call</div>
+            </div>
+            <div class="col k-error">
+              <h4 style="color:var(--err)">your code sees it</h4>
+              <div><small>Run returns</small>ToolResult{}, err</div>
+              <div><small>when</small>a canceled or expired context, a transport that is down</div>
+              <div><small>then</small>the run fails with err</div>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> Two columns with the same three rows compare the channels line by line. <span class="cost">Cost: it has no loop, so "goes back to the model" is a word and not a shape.</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Middleware ============ -->
+  <div class="slot">
+    <h3 class="slot-title">Middleware <span>· replaces the third diagram</span></h3>
+    <div class="options">
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Onion</span></div>
+        <figure class="fig">
+          <svg class="on" viewBox="0 0 566 236" aria-label="Middleware a wraps middleware b, which wraps tool t. The call goes in through each ring and the result comes back out.">
+            <rect class="r1" x="40" y="6" width="340" height="200" rx="22"/>
+            <rect class="r2" x="100" y="40" width="220" height="132" rx="16"/>
+            <rect class="r3" x="160" y="74" width="100" height="64" rx="10"/>
+            <text class="hd" x="56" y="28">middleware a</text>
+            <text class="hd" x="116" y="61">middleware b</text>
+            <text class="hd" x="210" y="102" text-anchor="middle">tool t</text>
+            <text class="t-muted sm" x="210" y="120" text-anchor="middle">t.Run</text>
+
+            <!-- in -->
+            <path class="edge-accent" d="M0 94 H154"/><path class="head-accent" d="M152 90 L160 94 L152 98 Z"/>
+            <text class="ac sm" x="2" y="86">call</text>
+            <circle class="dot" cx="40" cy="94" r="3"/><circle class="dot" cx="100" cy="94" r="3"/>
+            <!-- out -->
+            <path class="dash" d="M160 120 H6"/><path class="head-accent" d="M8 116 L0 120 L8 124 Z"/>
+            <text class="ac sm" x="2" y="138">result</text>
+            <circle class="dot" cx="40" cy="120" r="3"/><circle class="dot" cx="100" cy="120" r="3"/>
+
+            <!-- what a ring can do -->
+            <path class="edge" d="M380 60 H402"/>
+            <text class="sm t-muted" x="410" y="30">a ring sees Info, Run</text>
+            <rect class="cap" x="410" y="40" width="130" height="20" rx="10"/><text class="sm" x="475" y="54" text-anchor="middle">rename</text>
+            <rect class="cap" x="410" y="64" width="130" height="20" rx="10"/><text class="sm" x="475" y="78" text-anchor="middle">edit description</text>
+            <rect class="cap" x="410" y="88" width="130" height="20" rx="10"/><text class="sm" x="475" y="102" text-anchor="middle">deny a call</text>
+            <rect class="cap" x="410" y="112" width="130" height="20" rx="10"/><text class="sm" x="475" y="126" text-anchor="middle">retry a run</text>
+            <rect class="cap" x="410" y="136" width="130" height="20" rx="10"/><text class="sm" x="475" y="150" text-anchor="middle">append to a result</text>
+            <path class="edge" d="M402 50 V146 M402 50 H410 M402 74 H410 M402 98 H410 M402 122 H410 M402 146 H410"/>
+
+            <text x="40" y="228">ChainTool(t, a, b)</text>
+            <text class="t-muted sm" x="186" y="228">runs a, then b, then t</text>
+          </svg>
+        </figure>
+        <p class="why"><b>Why:</b> Rings show that each middleware holds the next tool, and the call crosses every ring in and the result crosses every ring out. <span class="cost">Cost: hand-placed SVG. More than three layers get crowded.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Call stack</span></div>
+        <figure class="fig">
+          <svg class="fl" viewBox="0 0 566 160" aria-label="a.Run calls b.Run, which calls t.Run. The results return in reverse.">
+            <text class="t-muted sm" x="0" y="12">call</text>
+            <text class="t-muted sm" x="566" y="12" text-anchor="end">return</text>
+            <rect class="bar ba" x="0" y="22" width="566" height="30" rx="8"/>
+            <text x="12" y="41">a.Run(ctx, call)</text>
+            <text class="sm t-muted" x="554" y="41" text-anchor="end">res, err</text>
+            <rect class="bar bb" x="60" y="60" width="446" height="30" rx="8"/>
+            <text x="72" y="79">b.Run(ctx, call)</text>
+            <text class="sm t-muted" x="494" y="79" text-anchor="end">res, err</text>
+            <rect class="bar bt" x="120" y="98" width="326" height="30" rx="8"/>
+            <text x="132" y="117">t.Run(ctx, call)</text>
+            <text class="sm t-muted" x="434" y="117" text-anchor="end">res, err</text>
+            <text class="sm t-muted" x="0" y="152">before next.Run: deny</text>
+            <text class="sm t-muted" x="566" y="152" text-anchor="end">after: retry, append</text>
+          </svg>
+        </figure>
+        <p class="why"><b>Why:</b> Nested bars read like a profiler trace: a enters first and returns last. The two ends show where each kind of change happens. <span class="cost">Cost: it does not show that a middleware also sees <code>Info</code>.</span></p>
+      </div>
+    </div>
+  </div>
+</section>

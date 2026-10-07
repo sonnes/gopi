@@ -1,0 +1,208 @@
+<section class="page" id="ai-index">
+<style>
+  /* A: signature anatomy */
+  #ai-index .call { position: relative; height: 84px; }
+  #ai-index .call code { position: absolute; left: 67px; top: 0; font-size: 18px; line-height: 26px;
+    white-space: pre; color: var(--text); letter-spacing: 0; }
+  #ai-index .call .br, #ai-index .call .st { position: relative; }
+  #ai-index .call .br::after { content: ""; position: absolute; left: 1px; right: 1px; top: 30px; height: 7px;
+    border: 1.2px solid var(--line-strong); border-top: 0; border-radius: 0 0 5px 5px; }
+  #ai-index .call .br::before { content: ""; position: absolute; left: 50%; top: 37px; height: 47px;
+    border-left: 1.2px solid var(--line-strong); }
+  #ai-index .call .st { color: var(--link); }
+  #ai-index .call .st::before { content: ""; position: absolute; left: 50%; top: 28px; height: 56px;
+    border-left: 1.6px solid var(--primary); }
+  #ai-index .call .arg { position: absolute; top: 44px; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--muted); background: var(--panel); padding: 0 4px; }
+
+  #ai-index .cards { display: grid; grid-template-columns: 176px 19px 176px 19px 176px; align-items: start; }
+  #ai-index .card { background: var(--code-bg); border: 1.2px solid var(--line-strong); border-radius: 12px;
+    padding: 9px 10px; margin-bottom: 20px; display: grid; gap: 7px; align-content: start;
+    font-family: var(--font-mono); font-size: 12px; }
+  #ai-index .card .t { font-weight: 600; }
+  #ai-index .card .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  #ai-index .card .plus { font-size: 11px; color: var(--muted); }
+  #ai-index .card .sub { font-size: 10.5px; color: var(--muted); }
+  #ai-index .pg { font-family: var(--font-mono); font-size: 10.5px; color: var(--link);
+    text-decoration: underline; text-decoration-color: var(--primary-line); text-underline-offset: 2px; }
+  #ai-index .pg::after { content: " ↗"; text-decoration: none; }
+  #ai-index .card .pgs { display: flex; gap: 10px; border-top: 1px dashed var(--line); padding-top: 6px; margin-top: auto; }
+  #ai-index .gapline { align-self: stretch; justify-self: center; border-left: 1.6px solid var(--primary); }
+
+  #ai-index .ret { position: relative; border: 1.2px solid var(--line-strong); border-radius: 12px;
+    background: var(--code-bg); padding: 9px 10px; display: grid; gap: 8px; font-family: var(--font-mono); font-size: 12px; }
+  #ai-index .ret .top { display: flex; justify-content: space-between; align-items: baseline; }
+  #ai-index .ret .top .t { font-weight: 600; }
+  #ai-index .ret .top .lbl { font-size: 10.5px; margin-left: 8px; }
+  #ai-index .ret .evs { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
+  #ai-index .ret .wait { font-size: 11px; font-weight: 600; margin: 0 2px 0 6px; white-space: nowrap; }
+  #ai-index .ret .wait::after { content: " →"; font-weight: 400; color: var(--muted); }
+  #ai-index .ret .tip { position: absolute; left: 180px; top: -8px; width: 12px; height: 8px; }
+
+  /* B: machine I/O */
+  #ai-index .cv { position: relative; width: 566px; }
+  #ai-index .cv > svg { position: absolute; inset: 0; }
+  #ai-index .nd { position: absolute; display: flex; flex-direction: column; justify-content: center;
+    font-family: var(--font-mono); font-size: 12px; line-height: 1.35; padding: 0 10px; border-radius: 8px;
+    border: 1.2px solid var(--line-strong); background: var(--code-bg); }
+  #ai-index .nd small { font-size: 10.5px; color: var(--muted); }
+  #ai-index .nd.machine { border: 2px solid var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--code-bg));
+    align-items: center; font-size: 13px; font-weight: 600; border-radius: 12px; }
+  #ai-index .nd.machine small { font-weight: 400; }
+  #ai-index .tick { position: absolute; width: 5px; height: 20px; border-radius: 2px;
+    border: 1px dotted var(--muted); background: var(--code-bg); }
+
+  /* capability matrix */
+  #ai-index table.cap { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  #ai-index table.cap th { font-weight: 400; text-align: center; vertical-align: bottom; padding: 0 4px 8px;
+    border-bottom: 1px solid var(--line-strong); line-height: 1.4; }
+  #ai-index table.cap th:first-child { text-align: left; padding-left: 0; }
+  #ai-index table.cap th .lbl { display: block; color: var(--text); font-size: 11.5px; font-weight: 600; letter-spacing: 0; font-family: var(--font-mono); }
+  #ai-index table.cap th code { display: block; font-size: 10.5px; color: var(--copy); }
+  #ai-index table.cap th code.if { color: var(--muted); }
+  #ai-index table.cap td { text-align: center; padding: 9px 4px; border-bottom: 1px solid var(--line); }
+  #ai-index table.cap td:first-child { text-align: left; padding-left: 0; }
+  #ai-index table.cap td small { display: block; font-size: 10.5px; color: var(--muted); }
+  #ai-index .yes { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--ok) 18%, var(--code-bg)); border: 1.2px solid var(--ok); color: var(--ok); font-size: 12px; }
+  #ai-index .no { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; border: 1.2px dashed var(--muted); }
+  #ai-index .foot { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; font-size: 10.5px; align-items: center; }
+  #ai-index .foot span { display: inline-flex; gap: 6px; align-items: center; }
+  #ai-index .foot .yes, #ai-index .foot .no { width: 14px; height: 14px; font-size: 9px; }
+
+  /* badges */
+  #ai-index .provs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #ai-index .prov { background: var(--code-bg); border: 1.2px solid var(--l-wire); border-radius: 12px; padding: 10px;
+    display: grid; gap: 5px; align-content: start; font-family: var(--font-mono); }
+  #ai-index .prov .t { font-size: 12px; font-weight: 600; }
+  #ai-index .prov .t small { display: block; font-weight: 400; font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+  #ai-index .bdg { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1.2px solid var(--ok);
+    background: color-mix(in srgb, var(--ok) 14%, var(--code-bg)); justify-self: start; }
+  #ai-index .bdg.off { border: 1.2px dashed var(--muted); background: none; color: var(--muted); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">web/src/content/docs/ai/index.mdx</div>
+    <h2>The Layer</h2>
+    <p class="job"><b>Must get across:</b> one call takes a binding, the messages, and the options, and it returns a stream of events and then one message.</p>
+    <p class="now">Today a flowchart joins seven boxes into one call box. The reader cannot see which part of the signature each box is, and two tables on the page repeat the same capability facts.</p>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">The Picture <span>· replaces the diagram</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Signature anatomy</span></div>
+        <figure class="fig">
+          <div class="call">
+            <code><span class="br">model</span>.<span class="st">StreamText</span>(ctx, <span class="br">messages</span>, <span class="br">opts...</span>)</code>
+          </div>
+          <div class="cards">
+            <div class="card">
+              <span class="t">ai.LanguageModel</span>
+              <div class="row"><span class="chip">Model</span><span class="plus">+</span><span class="chip k-tool">Provider</span></div>
+              <div class="pgs"><span class="pg">Models</span></div>
+            </div>
+            <div class="gapline"></div>
+            <div class="card">
+              <span class="t">[]ai.Message</span>
+              <div class="row"><span class="chip">Text</span><span class="chip k-assistant">ThinkingBlock</span><span class="chip k-tool">ToolCall</span></div>
+              <div class="pgs"><span class="pg">Messages</span></div>
+            </div>
+            <div></div>
+            <div class="card">
+              <span class="t">ai.Options</span>
+              <div class="row"><span class="chip">System</span><span class="chip">Toolset</span><span class="chip">MaxTokens</span><span class="chip">Thinking</span><span class="chip">ToolChoice</span></div>
+              <span class="sub">Toolset ← Tool.Info()</span>
+              <div class="pgs"><span class="pg">Options</span><span class="pg">Tools</span></div>
+            </div>
+          </div>
+          <div class="ret">
+            <svg class="tip" viewBox="0 0 12 8"><path class="head-accent" d="M0,0 L12,0 L6,8 z"/></svg>
+            <div class="top"><span><span class="t">*ai.EventStream</span><span class="lbl">returns</span></span><span class="pg">Streams</span></div>
+            <div class="evs">
+              <span class="chip k-ephemeral">start</span><span class="chip k-ephemeral">text_delta</span><span class="chip k-ephemeral">text_delta</span><span class="muted" style="font-size:11px">…</span><span class="chip k-ephemeral">text_end</span>
+              <span class="wait">Wait()</span><span class="chip k-assistant">*ai.Message</span>
+            </div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The reader sees the real signature and each argument opens into its type and its page, so the figure is also a map of the section. The return path comes out of the method name, and the events and the message sit in their real order. <span class="cost">Cost: The brackets depend on the mono font width. The call must stay one short line.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Machine I/O</span></div>
+        <figure class="fig">
+          <div class="cv" style="height:200px">
+            <svg viewBox="0 0 566 200" width="566" height="200" aria-hidden="true">
+              <defs><marker id="ai-index-h" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="head" d="M0,0 L8,4 L0,8 z"/></marker></defs>
+              <path class="edge" d="M172,40 C196,40 190,86 210,86" marker-end="url(#ai-index-h)"/>
+              <path class="edge" d="M172,100 H210" marker-end="url(#ai-index-h)"/>
+              <path class="edge" d="M172,160 C196,160 190,114 210,114" marker-end="url(#ai-index-h)"/>
+              <path class="edge" d="M356,100 H388" marker-end="url(#ai-index-h)"/>
+              <text x="396" y="80" class="t-muted" style="font-size:10.5px">Event, Event, …</text>
+              <path class="edge" d="M480,114 V146" marker-end="url(#ai-index-h)"/>
+              <text x="488" y="135" style="font-size:11px;font-weight:600">Wait()</text>
+            </svg>
+            <div class="nd" style="left:0;top:20px;width:172px;height:40px">ai.LanguageModel<small>Model + Provider</small></div>
+            <div class="nd" style="left:0;top:80px;width:172px;height:40px">[]ai.Message<small>the only argument</small></div>
+            <div class="nd" style="left:0;top:140px;width:172px;height:40px">...ai.Options<small>every other setting</small></div>
+            <div class="nd machine" style="left:214px;top:62px;width:142px;height:76px">StreamText<small>one call</small></div>
+            <div class="tick" style="left:398px;top:90px"></div><div class="tick" style="left:411px;top:90px"></div>
+            <div class="tick" style="left:424px;top:90px"></div><div class="tick" style="left:437px;top:90px"></div>
+            <div class="tick" style="left:450px;top:90px"></div><div class="tick" style="left:463px;top:90px"></div>
+            <div class="tick" style="left:476px;top:90px"></div><div class="tick" style="left:489px;top:90px"></div>
+            <div class="tick" style="left:502px;top:90px"></div><div class="tick" style="left:515px;top:90px"></div>
+            <div class="nd k-assistant" style="left:420px;top:150px;width:120px;height:32px;align-items:center;border-color:var(--l-agent);background:color-mix(in srgb, var(--l-agent) var(--l-mix), var(--code-bg))">*ai.Message</div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The reader gets the shape of a call at a glance: inputs, one box, outputs. The ticks say "many, small, in order" without naming the event types. <span class="cost">Cost: It loses the signature, so the reader still has to map each input to an argument.</span></p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="slot">
+    <h3 class="slot-title">Optional Capabilities <span>· new; merges the two tables</span></h3>
+    <div class="options">
+
+      <div class="option">
+        <div class="option-head"><span class="tag rec">A · on the site</span><span class="option-name">Capability matrix</span></div>
+        <figure class="fig">
+          <table class="cap">
+            <thead><tr>
+              <th><span class="lbl">provider</span></th>
+              <th><span class="lbl">Objects</span><code>GenerateObject[T]</code><code class="if">ObjectProvider</code></th>
+              <th><span class="lbl">Token counts</span><code>CountTokens</code><code class="if">TokenCounter</code></th>
+              <th><span class="lbl">Images</span><code>GenerateImage</code><code class="if">ImageProvider</code></th>
+              <th><span class="lbl">Speech</span><code>GenerateSpeech</code><code class="if">SpeechProvider</code></th>
+            </tr></thead>
+            <tbody>
+              <tr><td>Anthropic<small>anthropic</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
+              <tr><td>OpenAI<small>openai</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no"></span></td></tr>
+              <tr><td>OpenAI Chat<small>openaichat</small></td><td><span class="yes">✓</span></td><td><span class="no"></span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
+            </tbody>
+          </table>
+          <div class="lbl foot"><span><span class="yes">✓</span>implements the interface</span><span><span class="no"></span>the function returns an error</span><span>every provider: StreamText</span></div>
+        </figure>
+        <p class="why"><b>Why:</b> One grid answers both questions on the page: which interface a function needs, and which provider has it. The empty Speech column shows that no provider implements it. <span class="cost">Cost: A new provider or capability adds a row or a column, and the column heads are already at the width limit.</span></p>
+      </div>
+
+      <div class="option">
+        <div class="option-head"><span class="tag">B</span><span class="option-name">Badges per provider</span></div>
+        <figure class="fig">
+          <div class="provs">
+            <div class="prov"><span class="t">Anthropic<small>anthropic.New()</small></span>
+              <span class="bdg">StreamText</span><span class="bdg">GenerateObject</span><span class="bdg">CountTokens</span><span class="bdg off">GenerateImage</span></div>
+            <div class="prov"><span class="t">OpenAI<small>openai.New()</small></span>
+              <span class="bdg">StreamText</span><span class="bdg">GenerateObject</span><span class="bdg">CountTokens</span><span class="bdg">GenerateImage</span></div>
+            <div class="prov"><span class="t">OpenAI Chat<small>openaichat.New()</small></span>
+              <span class="bdg">StreamText</span><span class="bdg">GenerateObject</span><span class="bdg off">CountTokens</span><span class="bdg off">GenerateImage</span></div>
+          </div>
+        </figure>
+        <p class="why"><b>Why:</b> The reader who has already picked a provider reads one card and is done. <span class="cost">Cost: The interface names are gone, and comparing providers across cards is slower than reading a column.</span></p>
+      </div>
+
+    </div>
+  </div>
+</section>

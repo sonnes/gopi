@@ -1,0 +1,118 @@
+---
+title: OpenAI
+summary: What the OpenAI Responses provider adds to a call, and what it leaves to you.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+import Ladder from "../../../components/figures/Ladder.astro";
+import PrefixBar from "../../../components/figures/PrefixBar.astro";
+
+<SpecSheet
+  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, and HTTPClient. The models are GPT6Luna, GPT6Sol, and GPT6Astra, and the image model is GPTImage2. A model and the provider bind into a language model."
+  pkg="pkg/ai/openai"
+  api="Responses API"
+  implements={["TextProvider", "ObjectProvider", "TokenCounter", "ImageProvider", "ModelLister"]}
+  options={[
+    ["APIKey(key)", "default `OPENAI_API_KEY`"],
+    ["BaseURL(url)", "OpenRouter, a proxy, a test server"],
+    ["HTTPClient(c)", "a recording client"],
+  ]}
+  models={[
+    ["openai.GPT6Luna", "ai"],
+    ["openai.GPT6Sol", "ai"],
+    ["openai.GPT6Astra", "ai"],
+    ["openai.GPTImage2", "value"],
+  ]}
+  bind={["model + openai.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+## Thinking
+
+`ai.Thinking` maps to the reasoning effort of the API. A level that the provider does not know fails the call before the request.
+
+<Ladder
+  alt="Each thinking level sends the reasoning effort of the same name and asks for a reasoning summary. ThinkingOff sends the effort none and no summary. An unset level asks for a summary, and the model uses its own effort."
+  call="ai.Thinking(level)"
+  note="each level is `ai.Thinking<Name>`"
+  levels={["Off", "Low", "Medium", "High", "XHigh", "Max"]}
+  rows={[
+    {
+      provider: "openai",
+      field: "reasoning effort",
+      sends: {
+        unset: "model's effort + summary",
+        Off: "none",
+        Low: "low",
+        Medium: "medium",
+        High: "high",
+        XHigh: "xhigh",
+        Max: "max",
+      },
+      span: { from: "Low", to: "Max", label: "+ a reasoning summary" },
+    },
+  ]}
+/>
+
+The API stores nothing. A thinking block carries the encrypted reasoning in its signature. Send the assistant message back unchanged, and the model keeps its reasoning between tool calls.
+
+## Caching
+
+<PrefixBar
+  alt="On GPT-6 and GPT-5.6, the provider puts a cache mark at the end of the system prompt. The API caches the rest of the history by itself. The new turn comes last."
+  provider="openai"
+  says="marks the end of the system prompt"
+  segments={[
+    { label: "system prompt", width: 26, state: "hot", mark: true },
+    { label: "stable history", width: 50 },
+    { label: "new turn", width: 24, state: "fresh" },
+  ]}
+  brackets={[
+    { parts: 1, label: "marked" },
+    { parts: 1, label: "the API caches the rest of the history", auto: true },
+  ]}
+/>
+
+The mark goes only to GPT-6 and GPT-5.6, because other models reject it. Put the stable part of a prompt first. `openai.PromptCacheKey` routes the calls of one conversation to the same cache. `ai.CacheLong` keeps the prefix for 24 hours, and `ai.CacheNone` sends no mark and no key. `Usage.CacheRead` and `Usage.CacheWrite` show the effect.
+
+```go
+opts := ai.JoinOptions(
+	ai.SystemPrompt(system),
+	openai.PromptCacheKey(conversationID),
+)
+```
+
+## System Messages
+
+GPT-6 and GPT-5.6 take a developer message in the conversation, and the provider sends a system message there. A tool that a system message adds goes in place as an `additional_tools` item, so the cached prefix stays the same. A tool that a system message removes stays in the tool list, and an `allowed_tools` tool choice limits the model to the current tools. Every other model gets the text as a `<system-reminder>` in a user message.
+
+## Objects
+
+`ai.GenerateObject` uses structured outputs in strict mode. The schema comes from your struct.
+
+## Token Counts
+
+`ai.CountTokens` sends the same input, tools, and thinking config as a call. Only api.openai.com has the endpoint.
+
+## Images
+
+`GenerateImage` takes `openai.GPTImage2` or a GPT Image 2.5 model, with `ai.ImageSize` and `ai.ImageCount`.
+
+```go
+im := ai.ImageModel{Model: openai.GPTImage2, Provider: openai.New()}
+resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1024x1024"))
+```
+
+## Other Servers
+
+`BaseURL` points the provider at another Responses API. OpenRouter serves one at `https://openrouter.ai/api/v1`. It has no token count and no images. For Fireworks, use [OpenAI Chat](openai-chat.mdx).
+
+## Errors
+
+An API error wraps `openai.Error`. Read the status code with `errors.As`. With `ai.MaxRetries`, the provider retries before the first event, as the [Anthropic](anthropic.mdx#errors) provider does.
+
+## Related
+
+- [Models](../ai/models.mdx) is the binding that the provider goes into.
+- [Options](../ai/options.mdx) is how a setting reaches the provider.
+
+The decisions are in [docs/concepts/ai/openai.md](../../../../../docs/concepts/ai/openai.md).

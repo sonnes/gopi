@@ -1,0 +1,166 @@
+---
+// A fork: a few steps in a column, a split into two or more lanes (one
+// per outcome), and a merge back into the steps that follow. A lane
+// shows what its outcome brings back as rows of chips, or as one node.
+// Use it for a call with a few outcomes that end in the same state, such
+// as opening a session that exists or does not.
+import Figure from "./Figure.astro";
+
+type Kind = "user" | "assistant" | "tool" | "meta" | "ephemeral" | "error" | "value";
+
+interface Branch {
+  // tag names the outcome. A solid tag is the case with data, and a
+  // dashed tag is the empty case.
+  tag: string;
+  solid?: boolean;
+  node?: string;
+  // rows are [label, chips, note] lines, such as the entries in order.
+  rows?: { label: string; chips: [string, Kind][]; note?: string }[];
+  result?: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  steps: string[];
+  branches: Branch[];
+  // after are the steps after the merge. An oval ends a flow, and an
+  // accent marks the one step that the figure is about.
+  after: { text: string; shape?: "oval" | "accent" }[];
+}
+
+const { alt, caption, steps, branches, after } = Astro.props;
+const n = branches.length;
+// The split runs from the middle of the first lane to the middle of the last.
+const span = `${((n - 1) / n) * 100}%`;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="fork">
+    {
+      steps.map((s) => (
+        <>
+          <div class="node">{s}</div>
+          <div class="stem" />
+        </>
+      ))
+    }
+    <div class="split" style={`width:${span}`} />
+    <div class="lanes" style={`grid-template-columns:repeat(${n}, minmax(0, 1fr))`}>
+      {
+        branches.map((b) => (
+          <div class="lane">
+            <span class:list={["lh", b.solid ? "yes" : "no"]}>{b.tag}</span>
+            {b.node && <div class="node">{b.node}</div>}
+            {b.rows && (
+              <div class="snap">
+                {b.rows.map((r) => (
+                  <div class="row">
+                    <span class="l">{r.label}</span>
+                    {r.chips.map(([text, kind]) => (
+                      <span class={`chip k-${kind}`}>{text}</span>
+                    ))}
+                    {r.note && <span class="m">{r.note}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {b.result && <span class="res">{b.result}</span>}
+          </div>
+        ))
+      }
+    </div>
+    <div class="merge" style={`width:${span}`} />
+    {
+      after.map((a) => (
+        <>
+          <div class="stem" />
+          <div class:list={["node", a.shape]}>{a.text}</div>
+        </>
+      ))
+    }
+  </div>
+</Figure>
+
+<style>
+  .fork {
+    display: grid;
+    justify-items: center;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  .fork .node {
+    text-align: center;
+  }
+  .fork .node.oval {
+    border-radius: 999px;
+    padding: 4px 14px;
+  }
+  .stem {
+    width: 0;
+    height: 14px;
+    border-left: 1.2px solid var(--line-strong);
+  }
+  .split,
+  .merge {
+    height: 14px;
+    border: 1.2px solid var(--line-strong);
+  }
+  .split {
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+  }
+  .merge {
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  .lanes {
+    display: grid;
+    width: 100%;
+  }
+  .lane {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    padding: 0 6px;
+  }
+  .lh {
+    margin: 4px 0;
+    padding: 0 8px;
+    border-radius: 999px;
+    font-size: 10.5px;
+  }
+  .lh.no {
+    color: var(--muted);
+    border: 1px dashed var(--line-strong);
+  }
+  .lh.yes {
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+  }
+  .res,
+  .m {
+    color: var(--muted);
+    font-size: 10.5px;
+  }
+  .res {
+    margin-top: 4px;
+  }
+  .snap {
+    display: grid;
+    gap: 4px;
+    justify-items: center;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .l {
+    width: 48px;
+    text-align: right;
+    font-size: 10px;
+    color: var(--muted);
+  }
+</style>

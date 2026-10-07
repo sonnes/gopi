@@ -1,0 +1,99 @@
+---
+title: Options
+summary: An option is one typed setting of a call, and a later value wins.
+---
+
+import OptionTape from "../../../components/figures/OptionTape.astro";
+import ValuePair from "../../../components/figures/ValuePair.astro";
+
+The messages are the only argument of a call. Every other setting, such as the system prompt or the tools, travels as an option. A [system message](messages.mdx#system-messages) adds to the prompt from its place in the conversation.
+
+## The Built-In Options
+
+| Setter              | Type                | Default when unset                         |
+| ------------------- | ------------------- | ------------------------------------------ |
+| `ai.SystemPrompt`   | `[]ai.Content`      | No system prompt                           |
+| `ai.Tools`          | `[]ai.ToolInfo`     | No tools                                   |
+| `ai.MaxTokens`      | `int`               | `Model.MaxTokens`, then the provider's own |
+| `ai.Thinking`       | `ai.ThinkingLevel`  | The default of the model                   |
+| `ai.Temperature`    | `float64`           | The default of the model                   |
+| `ai.ToolChoice`     | `ai.ToolChoiceMode` | The model decides                          |
+| `ai.CacheRetention` | `ai.Retention`      | `ai.CacheShort`                            |
+| `ai.MaxRetries`     | `int`               | No retry                                   |
+| `ai.MaxRetryDelay`  | `time.Duration`     | 60 seconds                                 |
+| `ai.Headers`        | `map[string]string` | No extra headers                           |
+
+The system prompt is a list of blocks. An `ai.Text` block is plain text, and an `ai.Section` block is a named part of the prompt:
+
+```go
+ai.SystemPrompt([]ai.Content{
+	ai.Text{Text: "You are terse."},
+	ai.Section{Name: "date", Text: "Today is 2026-10-07."},
+})
+```
+
+A provider retries only before the first event of a stream, and only after an error that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. A provider does not send `ai.Temperature` to a model that rejects it.
+
+## Two Rules
+
+<OptionTape
+  alt="Five options of one call, in order: SystemPrompt, MaxTokens(300), Tools(a, b), MaxTokens(500), Tools(c). MaxTokens(500) replaces MaxTokens(300), and Tools(c) replaces Tools(a, b). GetOption for MaxTokens scans from the right, skips Tools(c), and stops at MaxTokens(500). GetOption for Tools gets the list [c] only."
+  label="the options of one call, in order →"
+  tokens={[
+    { text: "SystemPrompt(...)" },
+    { text: "MaxTokens(300)", kind: "value", drop: "replaced by 500" },
+    { text: "Tools(a, b)", kind: "tool", drop: "replaced by [c]" },
+    { text: "MaxTokens(500)", kind: "value", hit: true },
+    { text: "Tools(c)", kind: "tool" },
+  ]}
+  scan={{ query: "GetOption(opts, ai.MaxTokens)", result: "(500, true)" }}
+  lookups={[{ query: "GetOption(opts, ai.Tools)", result: "([c], true)", note: "the whole list, not [a, b, c]" }]}
+/>
+
+Put all the tools in one `ai.Tools`.
+
+Unset is a state of its own. A provider reads a value and a flag.
+
+<ValuePair
+  alt="Two lookups of MaxTokens. When nothing is set, GetOption returns 0 and false, and the provider uses Model.MaxTokens, then its own default. When the caller sets MaxTokens(0), GetOption returns 0 and true."
+  cards={[
+    {
+      title: "nothing set",
+      input: "no MaxTokens",
+      set: false,
+      query: "GetOption(opts, ai.MaxTokens)",
+      value: "0",
+      ok: false,
+      meaning: "The provider uses Model.MaxTokens, then its own default.",
+    },
+    {
+      title: "set to zero",
+      input: "MaxTokens(0)",
+      set: true,
+      query: "GetOption(opts, ai.MaxTokens)",
+      value: "0",
+      ok: true,
+      meaning: "The caller set zero.",
+    },
+  ]}
+/>
+
+## Your Own Option
+
+A provider defines an option with `NewOption`, once, at package level. It travels in the same list as the built-in ones, and no other provider sees it.
+
+```go
+var Upper = ai.NewOption[bool]()
+
+// in the provider
+if upper, ok := ai.GetOption(opts, Upper); ok && upper { ... }
+```
+
+`openai.PromptCacheKey` is one. [OpenAI](../providers/openai.mdx) shows it, and [Write a Provider](../guides/write-a-provider.mdx) shows one in a program.
+
+## Related
+
+- [Models](models.mdx) is where a binding joins the options for its provider.
+- [Tools](../tool/index.mdx) produce the `ToolInfo` that `ai.Tools` carries.
+
+The decisions are in [docs/concepts/ai/provider.md](../../../../../docs/concepts/ai/provider.md).

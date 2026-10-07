@@ -1,0 +1,184 @@
+---
+// A loop drawn as a ring: an entry call above, three steps on the ring
+// (a model call, a question, a tool step), a store in the middle that
+// each step appends to, and an exit to the right. Use it for a loop that
+// repeats until a question says stop, such as the agent loop.
+//
+// The ring is hand-placed SVG. Each box takes the width of its label, so
+// keep a step label at 20 characters or fewer.
+import Figure from "./Figure.astro";
+
+interface Props {
+  alt: string;
+  caption?: string;
+  // entry is the call that starts the loop, and a muted line under it.
+  entry: { call: string; sub?: string };
+  // The three steps, clockwise from the top.
+  model: string;
+  question: string;
+  tools: string;
+  // exit ends the loop when the answer to the question is "no".
+  exit: string;
+  // store sits in the middle of the ring. append labels the ticks to it.
+  store: string;
+  append?: string;
+  // turn labels the arc that closes the loop. limit is a note next to it.
+  turn: string;
+  limit?: { title: string; lines: string[] };
+  yes?: string;
+  no?: string;
+  // legend explains the ring line and the append tick.
+  legend?: [string, string];
+}
+
+const {
+  alt,
+  caption,
+  entry,
+  model,
+  question,
+  tools,
+  exit,
+  store,
+  append = "append",
+  turn,
+  limit,
+  yes = "yes",
+  no = "no",
+  legend,
+} = Astro.props;
+
+// IBM Plex Mono advances 0.6em, so a label is its length times that.
+const w12 = (s: string) => s.length * 7.2;
+const w10 = (s: string) => s.length * 6.3;
+
+const entryW = Math.max(w12(entry.call), entry.sub ? w10(entry.sub) : 0) + 28;
+const modelW = w12(model) + 28;
+const questionW = w12(question) + 28;
+const toolsW = w12(tools) + 28;
+const exitW = Math.min(w12(exit) + 28, 116);
+const turnW = w10(turn) + 18;
+
+const id = `lc${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<Figure alt={alt} caption={caption}>
+  <svg viewBox="0 0 566 314" aria-hidden="true" class="loop">
+    <defs>
+      <marker id={`${id}-h`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head" /></marker>
+      <marker id={`${id}-a`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-accent" /></marker>
+      <marker id={`${id}-l`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="head-log" /></marker>
+    </defs>
+
+    <rect class="box" x={250 - entryW / 2} y="2" width={entryW} height={entry.sub ? 40 : 28} rx="8" />
+    <text x="250" y="18" text-anchor="middle">{entry.call}</text>
+    {entry.sub && <text x="250" y="34" text-anchor="middle" class="t-muted sm">{entry.sub}</text>}
+    <line class="edge" x1="250" y1={entry.sub ? 42 : 30} x2="250" y2="74" marker-end={`url(#${id}-h)`} />
+
+    <path class="edge-accent" d="M 316.9 115.7 A 100 100 0 0 1 347 214.2" marker-end={`url(#${id}-a)`} />
+    <path class="edge-accent" d="M 316.9 264.3 A 100 100 0 0 1 183.1 264.3" marker-end={`url(#${id}-a)`} />
+    <path class="edge-accent" d="M 153 214.2 A 100 100 0 0 1 183.1 115.7" marker-end={`url(#${id}-a)`} />
+    <text x="250" y="306" text-anchor="middle" class="t-accent sm">{yes}</text>
+
+    <rect class="pill" x={151 - turnW / 2} y="147" width={turnW} height="22" rx="11" />
+    <text x="151" y="162" text-anchor="middle" class="sm t-accent">{turn}</text>
+    {
+      limit && (
+        <>
+          <text x="0" y="146" class="sm b">{limit.title}</text>
+          {limit.lines.map((line, i) => (
+            <text x="0" y={161 + i * 14} class="sm t-muted">{line}</text>
+          ))}
+        </>
+      )
+    }
+
+    <rect class="s-asst" x={250 - modelW / 2} y="76" width={modelW} height="28" rx="8" />
+    <text x="250" y="94.5" text-anchor="middle">{model}</text>
+    <rect class="box" x={337 - questionW / 2} y="226" width={questionW} height="28" rx="14" />
+    <text x="337" y="244.5" text-anchor="middle">{question}</text>
+    <rect class="s-tool" x={164 - toolsW / 2} y="226" width={toolsW} height="28" rx="8" />
+    <text x="164" y="244.5" text-anchor="middle">{tools}</text>
+
+    <path class="s-log" d="M 206 158 V 196 A 44 8 0 0 0 294 196 V 158" />
+    <ellipse class="s-log" cx="250" cy="158" rx="44" ry="8" />
+    <text x="250" y="185" text-anchor="middle" class="sm">{store}</text>
+    <line class="tick" x1="250" y1="105" x2="250" y2="146" marker-end={`url(#${id}-l)`} />
+    <text x="256" y="130" class="sm t-muted">{append}</text>
+    <line class="tick" x1="206" y1="225" x2="220" y2="207" marker-end={`url(#${id}-l)`} />
+
+    <line class="edge" x1={337 + questionW / 2} y1="240" x2="448" y2="240" marker-end={`url(#${id}-h)`} />
+    <text x={(337 + questionW / 2 + 448) / 2} y="233" text-anchor="middle" class="sm t-muted">{no}</text>
+    <rect class="box" x="450" y="226" width={exitW} height="28" rx="14" />
+    <text x={450 + exitW / 2} y="244.5" text-anchor="middle">{exit}</text>
+  </svg>
+  {
+    legend && (
+      <div class="legend lbl">
+        <span><i class="sw" />{legend[0]}</span>
+        <span><i class="sw dash" />{legend[1]}</span>
+      </div>
+    )
+  }
+</Figure>
+
+<style>
+  .loop .s-asst {
+    fill: color-mix(in srgb, var(--l-agent) var(--l-mix), var(--code-bg));
+    stroke: var(--l-agent);
+    stroke-width: 1.2;
+  }
+  .loop .s-tool {
+    fill: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+    stroke: var(--l-wire);
+    stroke-width: 1.2;
+  }
+  .loop .s-log {
+    fill: color-mix(in srgb, var(--l-durable) var(--l-mix), var(--code-bg));
+    stroke: var(--l-durable);
+    stroke-width: 1.2;
+  }
+  .loop .pill {
+    fill: var(--panel);
+    stroke: var(--primary);
+    stroke-width: 1.2;
+  }
+  .loop .tick {
+    stroke: var(--l-durable);
+    stroke-width: 1.2;
+    stroke-dasharray: 3 3;
+    fill: none;
+  }
+  .loop .head-log {
+    fill: var(--l-durable);
+  }
+  .loop text.sm {
+    font-size: 10.5px;
+  }
+  .loop text.b {
+    font-weight: 600;
+  }
+  .loop text.t-accent {
+    fill: var(--link);
+  }
+  .legend {
+    display: flex;
+    gap: 2px 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sw {
+    display: inline-block;
+    width: 22px;
+    height: 0;
+    border-top: 1.6px solid var(--primary);
+  }
+  .sw.dash {
+    border-top: 1.2px dashed var(--l-durable);
+  }
+</style>

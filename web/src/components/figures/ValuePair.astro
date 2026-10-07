@@ -1,0 +1,108 @@
+---
+// A value pair: two or more cards, side by side, that ask the same
+// question of two states and get the same value with a different flag.
+// Each card shows what the caller passed, the lookup, the result, and
+// what the result means. Use it when a flag, not the value, tells two
+// states apart, such as an option that is unset and one set to zero.
+import Figure from "./Figure.astro";
+
+interface Card {
+  title: string;
+  // input is what the caller passed. An input that is not set is dashed.
+  input: string;
+  set: boolean;
+  query: string;
+  value: string;
+  ok: boolean;
+  meaning: string;
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  cards: Card[];
+}
+
+const { alt, caption, cards } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="two" style={`grid-template-columns:repeat(${cards.length}, 1fr)`}>
+    {
+      cards.map((c) => (
+        <div class="uc">
+          <span class="ttl">{c.title}</span>
+          <span class:list={["slotbox", { set: c.set }]}>{c.input}</span>
+          <span class="q">{c.query}</span>
+          <span class="big">
+            ({c.value}, <span class:list={[c.ok ? "t" : "f"]}>{String(c.ok)}</span>)
+          </span>
+          <span class="mean">{c.meaning}</span>
+        </div>
+      ))
+    }
+  </div>
+</Figure>
+
+<style>
+  .two {
+    display: grid;
+    gap: 14px;
+    min-width: 440px;
+  }
+  .uc {
+    background: var(--code-bg);
+    border: 1.2px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 12px;
+    display: grid;
+    gap: 9px;
+    justify-items: start;
+    align-content: start;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text);
+  }
+  .ttl {
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .slotbox {
+    height: 26px;
+    min-width: 120px;
+    padding: 0 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    border: 1.2px dashed var(--muted);
+    color: var(--muted);
+  }
+  .slotbox.set {
+    border: 1.2px solid var(--l-harness);
+    color: var(--text);
+    background: color-mix(in srgb, var(--l-harness) var(--l-mix), var(--code-bg));
+  }
+  .q {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .big {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .f {
+    color: var(--muted);
+  }
+  .t {
+    color: var(--ok);
+  }
+  .mean {
+    width: 100%;
+    font-size: 10.5px;
+    color: var(--copy);
+    border-top: 1px dashed var(--line);
+    padding-top: 7px;
+  }
+</style>

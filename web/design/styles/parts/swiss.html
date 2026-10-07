@@ -1,0 +1,296 @@
+<section class="page" id="swiss">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;700;800&display=swap');
+
+  /* The brand of the landing page, set as a poster: butter, brown ink,
+     the ground, one coral. Square corners. Kinds are fill, outline,
+     hatching and dash, not hues. The offset shadow is the landing page's
+     primary action, and here it marks the one thing that a figure is for. */
+  :root[data-theme="light"] #swiss {
+    --sw-paper: #fffefc;
+    --sw-ink: #3c3028;
+    --sw-on-ink: #fffefc;
+    --sw-butter: #f4c65d;
+    --sw-on-butter: #3c3028;
+    --sw-coral: #de7356;
+  }
+  :root[data-theme="dark"] #swiss {
+    --sw-paper: #2b221c;
+    --sw-ink: #f4ead5;
+    --sw-on-ink: #2b221c;
+    --sw-butter: #f4c65d;
+    --sw-on-butter: #3c3028;
+    --sw-coral: #ff8e75;
+  }
+  #swiss {
+    --sw-hatch: repeating-linear-gradient(-45deg, var(--sw-ink) 0 2px, transparent 2px 7px);
+    --sw-sans: "Inter Tight", var(--font-sans);
+  }
+
+  #swiss .sw-fig { margin: 0; max-width: 566px; width: 100%; border: 2px solid var(--sw-ink);
+    background: var(--sw-paper); color: var(--sw-ink); font-family: var(--sw-sans); line-height: 1.2; }
+  #swiss .sw-cap { font-family: var(--sw-sans); font-weight: 700; font-size: 20px; letter-spacing: -0.005em;
+    padding: 12px 14px; border-bottom: 2px solid var(--sw-ink); }
+  #swiss code, #swiss .m { font-family: var(--font-mono); }
+  #swiss .plate { display: inline-block; background: var(--sw-paper); color: var(--sw-ink); padding: 1px 5px; }
+  #swiss .num { font-family: var(--sw-sans); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
+
+  /* ---------- F1: streams ---------- */
+  #swiss .sw-ev { display: grid; grid-template-columns: 46px 122px 90px 1fr 1fr; }
+  #swiss .sw-ev > div { display: flex; align-items: center; min-height: 38px; }
+  #swiss .sw-ev .c { padding: 0 0 0 12px; border-top: 1px solid var(--sw-ink); }
+  #swiss .sw-ev .c.n { font-size: 20px; }
+  #swiss .sw-ev .c.e { font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
+  #swiss .sw-ev .c.p { font-family: var(--font-mono); font-size: 13px; }
+  #swiss .sw-ev .h { border-top: 0; padding-top: 10px; padding-bottom: 10px; font-weight: 700; font-size: 14px; align-items: end; }
+  #swiss .sw-ev .ln { border-left: 2px solid var(--sw-ink); padding: 0 12px; align-items: stretch; }
+  #swiss .sw-ev .ln.h { align-items: center; gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+  #swiss .sw-ev .ln.h .num { font-size: 36px; line-height: 1; }
+  #swiss .sw-ev .ln.h span { font-size: 12px; font-weight: 500; line-height: 1.25; }
+  #swiss .sw-ev .ln.h span b { font-size: 15px; font-weight: 700; display: block; }
+  #swiss .bar { flex: 1; display: flex; align-items: center; padding: 0 8px;
+    font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+  #swiss .bar.t { background: var(--sw-butter); color: var(--sw-on-butter); }
+  #swiss .bar.k { background: var(--sw-hatch); }
+  #swiss .bar.k .plate { padding: 0 4px; }
+  #swiss .bar.open { border-top: 5px solid var(--sw-ink); }
+  #swiss .bar.shut { border-bottom: 5px solid var(--sw-ink); }
+  #swiss .bar u { text-decoration-thickness: 3px; text-underline-offset: 3px; }
+
+  #swiss .sw-ret { display: grid; grid-template-columns: 258px 1fr; border-top: 2px solid var(--sw-ink); }
+  #swiss .sw-ret .say { padding: 14px 12px 16px; }
+  #swiss .sw-ret .say code { display: block; font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  #swiss .sw-ret .say span { font-size: 14px; font-weight: 500; }
+  #swiss .msg { margin: 14px 16px 18px 12px; border: 2px solid var(--sw-ink); box-shadow: 4px 4px 0 var(--sw-ink);
+    display: grid; grid-template-columns: 1fr 1fr; background: var(--sw-paper); }
+  #swiss .msg .tab { grid-column: 1 / -1; background: var(--sw-ink); color: var(--sw-on-ink);
+    font-family: var(--font-mono); font-weight: 700; font-size: 13px; padding: 4px 8px; }
+  #swiss .msg .blk { padding: 8px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; line-height: 1.35; }
+  #swiss .msg .blk.t { background: var(--sw-butter); color: var(--sw-on-butter); }
+  #swiss .msg .blk.k { background: var(--sw-hatch); border-left: 2px solid var(--sw-ink); }
+
+  /* ---------- F2: sessions ---------- */
+  #swiss .sw-code { display: grid; grid-template-columns: 44px 1fr; border-bottom: 2px solid var(--sw-ink);
+    font-family: var(--font-mono); font-size: 13px; line-height: 1.75; padding: 10px 0; }
+  #swiss .sw-code .g { text-align: right; padding-right: 12px; font-family: var(--sw-sans); font-weight: 700; font-size: 14px; }
+  #swiss .sw-code .l { white-space: pre; }
+  #swiss .sw-code .l b { font-weight: 700; }
+
+  #swiss .sw-ctx { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 8px; padding: 0 14px; }
+  #swiss .sw-ctx .num { font-size: 30px; line-height: 1; padding: 14px 0 6px; }
+  #swiss .band { grid-column: 1 / -1; font-weight: 700; font-size: 15px; padding: 18px 0 8px; }
+  #swiss .tile { min-height: 64px; padding: 8px; border: 2px solid var(--sw-ink); display: flex; flex-direction: column;
+    justify-content: space-between; align-items: flex-start; }
+  #swiss .tile b { font-size: 20px; font-weight: 700; }
+  #swiss .tile i { font-style: normal; font-size: 13px; font-weight: 500; }
+  #swiss .tile.user { background: var(--sw-paper); }
+  #swiss .tile.asst { background: var(--sw-ink); color: var(--sw-on-ink); }
+  #swiss .tile.meta { background: var(--sw-hatch); }
+  #swiss .tile.meta .plate { padding: 0 4px; }
+  #swiss .tile.eph { border-style: dashed; }
+  #swiss .reads { grid-column: 1 / -1; height: 14px; background: var(--sw-ink); }
+  #swiss .keep { min-height: 72px; padding: 8px; border: 2px solid var(--sw-ink); display: flex; flex-direction: column;
+    justify-content: space-between; }
+  #swiss .keep b { font-size: 18px; font-weight: 700; }
+  #swiss .keep i { font-style: normal; font-size: 13px; font-weight: 500; }
+  #swiss .keep code { font-size: 10.5px; font-weight: 600; }
+  #swiss .keep.new { background: var(--sw-butter); color: var(--sw-on-butter); box-shadow: 4px 4px 0 var(--sw-ink); }
+  #swiss .keep.new em { font-style: normal; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; }
+  #swiss .keep.none { border-color: transparent; }
+  #swiss .keep.none b { text-decoration: line-through; text-decoration-thickness: 3px; }
+  #swiss .sw-note { margin-top: 20px; padding: 14px; border-top: 2px solid var(--sw-ink);
+    font-size: 17px; font-weight: 700; letter-spacing: 0; line-height: 1.3; }
+
+  /* ---------- F3: tools (inline SVG) ---------- */
+  #swiss svg { display: block; width: 100%; height: auto; }
+  #swiss svg text { font-family: var(--sw-sans); fill: var(--sw-ink); }
+  #swiss svg .mono { font-family: var(--font-mono); font-weight: 700; }
+  #swiss svg .b { font-weight: 700; }
+  #swiss svg .frame { fill: none; stroke: var(--sw-ink); stroke-width: 2; }
+  #swiss svg .ink { fill: var(--sw-ink); }
+  #swiss svg .on-ink { fill: var(--sw-on-ink); }
+  #swiss svg .outline { fill: var(--sw-paper); stroke: var(--sw-ink); stroke-width: 2; }
+  #swiss svg .butter { fill: var(--sw-butter); stroke: var(--sw-ink); stroke-width: 2; }
+  #swiss svg .coral { fill: var(--sw-coral); stroke: var(--sw-ink); stroke-width: 2; }
+  #swiss svg .on-fill { fill: var(--sw-on-butter); }
+  #swiss svg .wire { fill: none; stroke: var(--sw-ink); stroke-width: 2; }
+  #swiss svg .loop { fill: none; stroke: var(--sw-ink); stroke-width: 5; stroke-linejoin: miter; }
+  #swiss svg .exit { fill: none; stroke: var(--sw-coral); stroke-width: 5; }
+  #swiss svg .exit-head { fill: var(--sw-coral); }
+  #swiss svg .fail { fill: var(--sw-coral); }
+  #swiss svg .shadow { fill: var(--sw-ink); }
+
+  #swiss .prose { font-family: var(--font-sans); font-size: 16px; line-height: 1.65; color: var(--copy);
+    max-width: 31rem; margin: 0 0 20px; }
+  #swiss .prose code { font-size: 0.88em; color: var(--text); }
+</style>
+
+  <div class="page-head">
+    <div class="page-path">style</div>
+    <h2>Swiss Brand</h2>
+    <p class="job">A figure is a poster on a strict grid: 2px rules, square corners, big bold numerals, and four flat colors, where fill, outline, hatching and dash tell the kinds apart.</p>
+    <p class="now">Borrows from the International Typographic Style and from the landing page: butter yellow, brown ink, square corners, and the solid offset shadow of the primary action.</p>
+  </div>
+
+  <!-- ============ F1: Streams ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F1 · Streams</h3>
+    <figure class="sw-fig">
+      <figcaption class="sw-cap">The events of one call</figcaption>
+      <div class="sw-ev" role="table" aria-label="Eight stream events, the block that each event builds, and the message that Wait returns">
+        <div class="c h n"></div><div class="c h e">event</div><div class="c h p">payload</div>
+        <div class="ln h"><span class="num">0</span><span>ContentIndex<b>text</b></span></div>
+        <div class="ln h"><span class="num">1</span><span>ContentIndex<b>tool call</b></span></div>
+
+        <div class="c n num">01</div><div class="c e">start</div><div class="c p"></div>
+        <div class="ln"></div><div class="ln"></div>
+
+        <div class="c n num">02</div><div class="c e">text_start</div><div class="c p"></div>
+        <div class="ln"><div class="bar t open">""</div></div><div class="ln"></div>
+
+        <div class="c n num">03</div><div class="c e">text_delta</div><div class="c p">"Hel"</div>
+        <div class="ln"><div class="bar t">Hel</div></div><div class="ln"></div>
+
+        <div class="c n num">04</div><div class="c e">text_delta</div><div class="c p">"lo"</div>
+        <div class="ln"><div class="bar t">Hel<u>lo</u></div></div><div class="ln"></div>
+
+        <div class="c n num">05</div><div class="c e">text_end</div><div class="c p">"Hello"</div>
+        <div class="ln"><div class="bar t shut">Hello</div></div><div class="ln"></div>
+
+        <div class="c n num">06</div><div class="c e">tool_start</div><div class="c p"></div>
+        <div class="ln"></div><div class="ln"><div class="bar k open"></div></div>
+
+        <div class="c n num">07</div><div class="c e">tool_delta</div><div class="c p">{"ci</div>
+        <div class="ln"></div><div class="ln"><div class="bar k"><span class="plate">{"ci</span></div></div>
+
+        <div class="c n num">08</div><div class="c e">tool_end</div><div class="c p">ToolCall</div>
+        <div class="ln"></div><div class="ln"><div class="bar k shut"><span class="plate">weather</span></div></div>
+      </div>
+      <div class="sw-ret">
+        <div class="say"><code>stream.Wait()</code><span>returns the message. It is not an event.</span></div>
+        <div class="msg">
+          <div class="tab">*ai.Message</div>
+          <div class="blk t">[0] Text<br>"Hello"</div>
+          <div class="blk k"><span class="plate">[1] ToolCall<br>weather</span></div>
+        </div>
+      </div>
+    </figure>
+    <p class="why"><b>Reads as:</b> a numbered table of events, with one column for each block, where the butter bar and the hatched bar show which block each delta feeds and how "Hel" becomes "Hello". <span class="cost">Cost:</span> the two lane columns take half the width, so a stream with three or more blocks needs narrower lanes or a second table.</p>
+  </div>
+
+  <!-- ============ F2: Sessions ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F2 · Sessions</h3>
+    <figure class="sw-fig">
+      <figcaption class="sw-cap">Add context to a run</figcaption>
+      <div class="sw-code" aria-label="The call">
+        <span class="g"></span><span class="l">a.Run(ctx,</span>
+        <span class="g">03</span><span class="l">    session.Text(skill, session.<b>Meta()</b>),</span>
+        <span class="g">04</span><span class="l">    session.Text("next question"),</span>
+        <span class="g">05</span><span class="l">    session.Text(now, session.<b>Ephemeral()</b>),</span>
+        <span class="g"></span><span class="l">)</span>
+      </div>
+      <div class="sw-ctx">
+        <span class="num">01</span><span class="num">02</span><span class="num">03</span><span class="num">04</span><span class="num">05</span>
+        <div class="tile user"><b>u1</b><i>user</i></div>
+        <div class="tile asst"><b>a1</b><i>assistant</i></div>
+        <div class="tile meta"><span class="plate"><b>skill</b></span><span class="plate"><i>meta</i></span></div>
+        <div class="tile user"><b>u2</b><i>user</i></div>
+        <div class="tile eph"><b>time</b><i>ephemeral</i></div>
+
+        <div class="band">The model reads all five</div>
+        <div class="reads"></div>
+
+        <div class="band">The store keeps four</div>
+        <div class="keep"><b>u1</b><i>kept</i></div>
+        <div class="keep"><b>a1</b><i>kept</i></div>
+        <div class="keep new"><em>NEW</em><b>skill</b><code>injected=meta</code></div>
+        <div class="keep new"><em>NEW</em><b>u2</b></div>
+        <div class="keep none"><b>time</b><i>not stored</i></div>
+      </div>
+      <p class="sw-note" style="margin-bottom:0">The next run reads the skill again. It does not read the time.</p>
+    </figure>
+    <p class="why"><b>Reads as:</b> one column for each message, with the kind set by fill (assistant), outline (user), hatching (meta) and dash (ephemeral), and the two new lines on disk raised by the butter fill and the offset shadow. <span class="cost">Cost:</span> the four kinds rely on the word in each tile as much as on the texture, because a dashed outline and a solid outline are close at a glance.</p>
+  </div>
+
+  <!-- ============ F3: Tools ============ -->
+  <div class="slot">
+    <h3 class="slot-title">F3 · Tools</h3>
+    <figure class="sw-fig">
+      <figcaption class="sw-cap">Two failure channels</figcaption>
+      <svg viewBox="0 0 562 340" role="img" aria-label="Run(ctx, call) ends one of two ways. An error result loops back to the model and the run goes on. A Go error leaves the run and the run fails.">
+        <!-- the run: a frame with a gap where the Go error leaves -->
+        <path class="frame" d="M434 272 H14 V16 H548 V272 H458"/>
+        <rect class="ink" x="14" y="16" width="96" height="26"/>
+        <text class="on-ink b" x="24" y="34" font-size="14">the run</text>
+
+        <!-- the model and the call -->
+        <rect class="ink" x="40" y="60" width="150" height="48"/>
+        <text class="on-ink b" x="115" y="90" font-size="17" text-anchor="middle">the model</text>
+        <path class="wire" d="M190 84 H292"/><path class="ink" d="M290 78 L302 84 L290 90 Z"/>
+        <text class="mono" x="244" y="75" font-size="12" text-anchor="middle">ToolCall</text>
+        <rect class="outline" x="302" y="60" width="232" height="48"/>
+        <text class="mono" x="418" y="90" font-size="16" text-anchor="middle">Run(ctx, call)</text>
+
+        <!-- the fork -->
+        <path class="wire" d="M418 108 V128 M185 128 H446 M185 128 V140 M446 128 V140"/>
+        <path class="ink" d="M179 138 L185 148 L191 138 Z"/><path class="ink" d="M440 138 L446 148 L452 138 Z"/>
+
+        <!-- 1: the error result, looping back -->
+        <rect class="butter" x="40" y="148" width="290" height="62"/>
+        <text class="on-fill num" x="52" y="192" font-size="32">1</text>
+        <text class="on-fill mono" x="84" y="174" font-size="12.5">ToolResult{IsError: true}, nil</text>
+        <text class="on-fill b" x="84" y="197" font-size="15">an error result</text>
+        <path class="loop" d="M40 180 H22 V84 H30"/><path class="ink" d="M28 76 L40 84 L28 92 Z"/>
+        <text class="b" x="40" y="238" font-size="15">The model reads it and corrects the call.</text>
+        <text class="b" x="40" y="258" font-size="15">The run goes on.</text>
+
+        <!-- 2: the Go error, leaving -->
+        <rect class="coral" x="356" y="148" width="180" height="62"/>
+        <text class="on-fill num" x="368" y="192" font-size="32">2</text>
+        <text class="on-fill mono" x="400" y="174" font-size="12">ToolResult{}, err</text>
+        <text class="on-fill b" x="400" y="197" font-size="15">a Go error</text>
+        <path class="exit" d="M446 210 V310"/><path class="exit-head" d="M437 308 L446 322 L455 308 Z"/>
+        <text class="fail b" x="426" y="304" font-size="22" text-anchor="end">The run fails</text>
+        <text x="426" y="322" font-size="13" text-anchor="end">canceled context, transport down</text>
+      </svg>
+    </figure>
+    <p class="why"><b>Reads as:</b> the frame is the run, the thick loop stays inside it and goes back to the model, and the coral arrow breaks through the frame and leaves. <span class="cost">Cost:</span> hand-placed SVG with fixed text widths, so a longer type name means moving boxes by hand.</p>
+  </div>
+
+  <!-- ============ On a page ============ -->
+  <div class="slot">
+    <h3 class="slot-title">On a Page</h3>
+    <p class="prose">A tool reports a failure in one of two ways. If the model can fix the call, return an error result with <code>IsError</code> set. The model reads it and tries again. If the run cannot go on, return a Go error. The run stops and <code>Run</code> returns the error to you.</p>
+    <figure class="sw-fig">
+      <figcaption class="sw-cap">Two failure channels</figcaption>
+      <svg viewBox="0 0 562 340" role="img" aria-label="Run(ctx, call) ends one of two ways. An error result loops back to the model and the run goes on. A Go error leaves the run and the run fails.">
+        <path class="frame" d="M434 272 H14 V16 H548 V272 H458"/>
+        <rect class="ink" x="14" y="16" width="96" height="26"/>
+        <text class="on-ink b" x="24" y="34" font-size="14">the run</text>
+        <rect class="ink" x="40" y="60" width="150" height="48"/>
+        <text class="on-ink b" x="115" y="90" font-size="17" text-anchor="middle">the model</text>
+        <path class="wire" d="M190 84 H292"/><path class="ink" d="M290 78 L302 84 L290 90 Z"/>
+        <text class="mono" x="244" y="75" font-size="12" text-anchor="middle">ToolCall</text>
+        <rect class="outline" x="302" y="60" width="232" height="48"/>
+        <text class="mono" x="418" y="90" font-size="16" text-anchor="middle">Run(ctx, call)</text>
+        <path class="wire" d="M418 108 V128 M185 128 H446 M185 128 V140 M446 128 V140"/>
+        <path class="ink" d="M179 138 L185 148 L191 138 Z"/><path class="ink" d="M440 138 L446 148 L452 138 Z"/>
+        <rect class="butter" x="40" y="148" width="290" height="62"/>
+        <text class="on-fill num" x="52" y="192" font-size="32">1</text>
+        <text class="on-fill mono" x="84" y="174" font-size="12.5">ToolResult{IsError: true}, nil</text>
+        <text class="on-fill b" x="84" y="197" font-size="15">an error result</text>
+        <path class="loop" d="M40 180 H22 V84 H30"/><path class="ink" d="M28 76 L40 84 L28 92 Z"/>
+        <text class="b" x="40" y="238" font-size="15">The model reads it and corrects the call.</text>
+        <text class="b" x="40" y="258" font-size="15">The run goes on.</text>
+        <rect class="coral" x="356" y="148" width="180" height="62"/>
+        <text class="on-fill num" x="368" y="192" font-size="32">2</text>
+        <text class="on-fill mono" x="400" y="174" font-size="12">ToolResult{}, err</text>
+        <text class="on-fill b" x="400" y="197" font-size="15">a Go error</text>
+        <path class="exit" d="M446 210 V310"/><path class="exit-head" d="M437 308 L446 322 L455 308 Z"/>
+        <text class="fail b" x="426" y="304" font-size="22" text-anchor="end">The run fails</text>
+        <text x="426" y="322" font-size="13" text-anchor="end">canceled context, transport down</text>
+      </svg>
+    </figure>
+  </div>
+</section>

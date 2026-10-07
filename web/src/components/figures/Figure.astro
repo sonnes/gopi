@@ -1,0 +1,19 @@
+---
+// The panel of every figure. A form in this directory draws inside it.
+// The panel is .not-content, so the prose styles of a page do not reach
+// the drawing. The alt is the text alternative of the whole figure.
+interface Props {
+  alt: string;
+  caption?: string;
+  class?: string;
+}
+
+const { alt, caption, class: extra } = Astro.props;
+---
+
+<figure class:list={["fig", "not-content", extra]} role="img" aria-label={alt}>
+  {caption && <figcaption class="fig-caption">{caption}</figcaption>}
+  <div class="fig-scroll">
+    <slot />
+  </div>
+</figure>

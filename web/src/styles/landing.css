@@ -1,0 +1,605 @@
+/* Landing-page styles. Shared design rules are in DESIGN.md. */
+
+/* Containers on this page carry their own padding, and the columns
+   inside them carry theirs. One box model keeps both on the same edge. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: var(--h-weight);
+  letter-spacing: var(--h-track);
+  margin: 0;
+}
+
+/* ---------- the sheet ---------- */
+.row-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+}
+.index li a {
+  padding-inline: 0;
+}
+/* Every rule across the page stops at the container, including the one
+   under the nav and the one over the footer. */
+.row-inner,
+.site-nav-inner,
+.site-footer .foot {
+  border-top: 1px solid var(--line);
+}
+.row--wide .row-inner {
+  border-top: 0;
+}
+.site-nav-inner {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+.site-nav,
+.site-footer {
+  border: 0;
+}
+/* The hero opens the sheet: no rule above it, one below, where the spine
+   between its columns can land. */
+.hero .row-inner {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.row-inner {
+  display: grid;
+  grid-template-columns: var(--split);
+}
+.cell--words {
+  padding: var(--band) var(--gutter) var(--band) var(--shell-pad);
+}
+.cell--work {
+  padding: var(--band) var(--shell-pad) var(--band) var(--gutter);
+  min-width: 0;
+}
+
+.row {
+  /* A #fragment lands the band under the sticky nav, not behind it. */
+  scroll-margin-top: var(--nav-height);
+}
+
+/* A band whose artifact is not a paragraph: the words keep the measure
+   of the left column, and the ledger runs the whole sheet under them. */
+.row--wide .wide-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: var(--band) var(--shell-pad);
+  border-top: 1px solid var(--line);
+}
+.wide-head {
+  display: grid;
+  grid-template-columns: var(--split);
+  gap: var(--gutter);
+  margin-bottom: 2.5rem;
+}
+/* The eyebrow sits above the heading in the left cell, so the right cell
+   drops by exactly that much and the two first lines meet. */
+.wide-note {
+  padding-top: 2.25rem;
+}
+.wide-head p {
+  color: var(--copy);
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 0;
+  max-width: 34rem;
+}
+.wide-head code {
+  color: var(--text);
+  font-size: 0.92em;
+}
+
+/* Four ways, four columns, one rule between each. */
+.fourup {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line-strong);
+}
+.fourup li {
+  padding: 1.5rem var(--gutter) 0 0;
+  border-right: 1px solid var(--line);
+}
+.fourup li + li {
+  padding-left: var(--gutter);
+}
+.fourup li:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+.fourup p {
+  margin: 0;
+  color: var(--copy);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.fourup .label {
+  margin-bottom: 0.7rem;
+}
+.fourup-cmd {
+  margin-top: 1rem !important;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------- the label voice ---------- */
+/* The voice itself is in tokens.css, under .label. These are the other
+   things on this page that speak in it. */
+.frame-path,
+.ledger th,
+.tree-head,
+.ways dt {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  font-weight: 400;
+  letter-spacing: var(--label-track);
+  line-height: 1.6;
+  text-transform: none;
+  color: var(--muted);
+}
+.foot-right {
+  margin-left: auto;
+}
+/* Element-qualified to outrank `.cell--words p`, which would otherwise
+   set a kicker at the size of the body copy. */
+.cell--words p.label,
+.label {
+  margin: 0 0 1rem;
+  max-width: none;
+}
+
+/* ---------- hero ---------- */
+.hero h1 {
+  font-size: clamp(1.9rem, 4.2vw, 3.4rem);
+  line-height: 1.12;
+  max-width: 14em;
+  text-wrap: balance;
+  /* Optical: pull the cap-height level with the label across the spine. */
+  margin-top: -0.12em;
+}
+.hero .cell--words p.lede {
+  color: var(--copy);
+  font-size: 1.05rem;
+  line-height: 1.6;
+  max-width: var(--measure);
+  margin: 1.4rem 0 2.5rem;
+}
+
+/* The command is a field you can take: the artifact frame, at the size
+   of a control. */
+.install {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: var(--measure);
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--line-strong);
+}
+.install code {
+  font-size: 0.85rem;
+}
+.install .sig {
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.install code {
+  flex: 1;
+  color: var(--text);
+  font-size: 0.8rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+/* Element-qualified: Expressive Code wraps its own copy button in a
+   `div.copy`, and a bare class selector would draw one over it. */
+button.copy {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--muted);
+  cursor: pointer;
+}
+button.copy svg {
+  width: 15px;
+  height: 15px;
+}
+button.copy:hover {
+  color: var(--link);
+}
+
+.hero-meta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+.cell--words p.hero-actions {
+  margin: 2.5rem 0 0;
+}
+
+/* ---------- band copy ---------- */
+.row h2 {
+  font-size: clamp(1.2rem, 1.9vw, 1.5rem);
+  line-height: 1.3;
+  margin-bottom: 1.5rem;
+  text-wrap: balance;
+}
+.cell--words p {
+  color: var(--copy);
+  font-size: 1rem;
+  line-height: 1.55;
+  margin: 0 0 1.5rem;
+  max-width: var(--measure);
+}
+.cell--words p:last-of-type {
+  margin-bottom: 0;
+}
+.cell--words code {
+  color: var(--text);
+  font-size: 0.92em;
+}
+/* One way out of every band, in the reading face, in the same place. */
+.more {
+  display: inline-block;
+  margin-top: 2.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.more:hover {
+  color: var(--primary);
+}
+
+/* ---------- artifacts ---------- */
+/* A file, a log and a table are the same object: a name on a rule, then
+   the thing itself. Hairlines divide; nothing is filled. */
+.codeframe,
+.artifact {
+  margin: 0;
+}
+.frame-head,
+.artifact figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.frame-path,
+.artifact figcaption {
+  font-size: var(--label-size);
+  color: var(--muted);
+}
+/* Expressive Code ships its own sheet, border and gutter. Here the code
+   sits on the work column itself. */
+.codeframe .expressive-code,
+.codeframe .expressive-code pre,
+.codeframe .expressive-code .frame {
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.codeframe .expressive-code pre {
+  padding: 0 !important;
+}
+.codeframe .expressive-code pre > code,
+.codeframe .expressive-code .ec-line .code {
+  padding-inline: 0 !important;
+}
+/* Code is quieter than the prose it illustrates: one step down, and
+   tighter, so the two columns come out the same height. */
+.codeframe .expressive-code pre code {
+  font-size: 0.8rem;
+  line-height: 1.62;
+}
+
+.shell {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.62;
+  color: var(--text);
+  overflow-x: auto;
+}
+/* What the specimen prints, under the source that prints it: one step
+   dimmer and stepped in, so it cannot be read as a second snippet. */
+.shell--out {
+  margin-top: 1.5rem;
+  padding-top: 1.3rem;
+  border-top: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+.shell--out .p {
+  color: var(--muted);
+}
+
+/* ---------- ledgers: the session and the providers ---------- */
+.ledger {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+}
+.ledger th {
+  text-align: left;
+  padding: 0 1rem 0.8rem 0;
+  border-bottom: 1px solid var(--line-strong);
+}
+.ledger td {
+  padding: 0.5rem 1rem 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+.ledger th:first-child,
+.ledger td:first-child {
+  padding-left: 0;
+}
+.ledger td.mono {
+  font-family: var(--font-mono);
+}
+.ledger tr:last-child td {
+  border-bottom: 0;
+}
+.ledger--providers tbody tr:nth-child(4) td {
+  border-bottom: 1px solid var(--line-strong);
+}
+.ledger td.dim {
+  color: var(--muted);
+}
+/* The second path steps in behind a corner, so the branch is visible in
+   the shape of the rows and not only in the note beside them. */
+/* ---------- the session tree ---------- */
+/* The rows are a fixed height so the drawn path can meet each one. */
+.tree {
+  position: relative;
+}
+.tree-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.tree-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.tree-rows li {
+  display: grid;
+  grid-template-columns: 8rem 9rem 22rem 1fr;
+  align-items: center;
+  height: 44px;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+/* The head of the tree is the head of a ledger: the label voice on the
+   one strong rule. */
+.tree-head {
+  border-bottom: 1px solid var(--line-strong);
+}
+.tree-rows .mono {
+  font-family: var(--font-mono);
+}
+.tree-rows .dim {
+  color: var(--muted);
+}
+.tree-head span:first-child,
+.tree-rows .id {
+  padding-left: 32px;
+}
+.tree-rows .is-child .id {
+  padding-left: 59px;
+}
+.tree-lines {
+  stroke-width: 1.5;
+}
+.tree-lines .is-fork {
+  stroke: var(--primary);
+}
+.ledger col:nth-child(1) {
+  width: 20%;
+}
+.ledger col:nth-child(2) {
+  width: 13%;
+}
+.ledger col:nth-child(3) {
+  width: 14%;
+}
+.ledger col:nth-child(4) {
+  width: 22%;
+}
+
+/* ---------- the four run modes ---------- */
+/* A definition table, not four little headings: the term in the label
+   voice at the left, the line about it beside. */
+.ways {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  grid-auto-rows: minmax(2.6rem, auto);
+  align-items: start;
+  margin: 0;
+  max-width: var(--measure);
+}
+.ways dt {
+  line-height: 1.6;
+  padding: 0.28rem 1rem 0 0;
+}
+.ways dd {
+  margin: 0 0 1rem;
+  color: var(--copy);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  padding-top: 0.25rem;
+}
+.ways dd:last-of-type {
+  margin-bottom: 0;
+}
+
+/* ---------- the way out ---------- */
+/* The page ends on the same paper it began on, with the largest line
+   after the headline and the four ways into the documentation. */
+.outro {
+  border-top: 1px solid var(--line);
+}
+.outro-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: var(--band) var(--shell-pad) 0;
+}
+.outro-link {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: var(--h-weight);
+  letter-spacing: var(--h-track);
+  font-size: clamp(1.2rem, 1.9vw, 1.5rem);
+  line-height: 1.3;
+  color: var(--text);
+}
+.outro-link:hover {
+  color: var(--link);
+}
+.outro-lede {
+  font-size: 1rem;
+  line-height: 1.6;
+  max-width: var(--measure);
+  margin: 1.75rem 0 3.5rem;
+  color: var(--copy);
+}
+.ways-out {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--line);
+}
+.ways-out li {
+  padding: 1.5rem var(--gutter) 1.5rem 0;
+  border-right: 1px solid var(--line);
+}
+.ways-out li:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+.ways-out li + li {
+  padding-left: var(--gutter);
+}
+.ways-out a {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+.ways-out a:hover {
+  color: var(--primary);
+}
+.ways-out span {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+@media (max-width: 62rem) {
+  .row-inner,
+  .ways-out,
+  .fourup {
+    display: block;
+  }
+  .row--wide .wide-inner {
+    padding-inline: var(--shell-pad);
+  }
+  .wide-head {
+    display: block;
+  }
+  .wide-note {
+    padding-top: 1.5rem;
+  }
+  .fourup li,
+  .fourup li + li {
+    padding: 1.25rem 0 0;
+    border-right: 0;
+  }
+  .ways-out li {
+    padding-block: 1rem 0;
+  }
+  .cell--words {
+    padding: var(--band) var(--shell-pad);
+    border-right: 0;
+  }
+  .cell--work {
+    padding: var(--band) var(--shell-pad);
+  }
+  .index a {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
+.agent-hero .row-inner { grid-template-columns: 1.15fr 1fr; align-items: center; }
+.agent-hero .cell--words { padding-block: 4rem; }
+.agent-hero h1 { font-family: var(--font-brand); font-weight: 400; font-size: clamp(3.1rem, 6.5vw, 5.5rem); line-height: 1.05; letter-spacing: -0.025em; }
+.agent-hero .hero-description { font-family: var(--font-mono); font-size: clamp(1.1rem, 2vw, 1.5rem); margin: 1.5rem 0 0; color: var(--text); }
+.agent-hero .cell--words p.lede { margin: 1rem 0 2rem; }
+.agent-portrait { margin: 0; padding: 1.5rem var(--shell-pad) 1.5rem 0; text-align: center; }
+.agent-portrait img { display: block; width: 100%; max-width: 430px; height: auto; margin: 0 auto; }
+.agent-portrait figcaption { display: flex; justify-content: space-between; border-top: 1px solid var(--line-strong); padding-top: 0.75rem; margin: 0 1.5rem; }
+.agent-portrait figcaption span:first-child { color: var(--link); }
+.agent-hero .hero-actions { display: flex; align-items: center; gap: 1.5rem; }
+.agent-hero .hero-actions .more { margin: 0; }
+.agent-hero .btn--primary { background: var(--butter); border-color: var(--brand-ink); color: var(--brand-ink); font-family: var(--font-mono); box-shadow: 3px 3px 0 var(--brand-ink); }
+.agent-hero .btn--primary:hover { background: var(--primary); }
+@media (max-width: 62rem) {
+  .agent-hero .row-inner { display: grid; grid-template-columns: 1.1fr 1fr; }
+  .agent-hero .cell--words { padding-block: 3rem; }
+}
+@media (max-width: 46rem) {
+  .agent-hero .row-inner { display: flex; flex-direction: column; }
+  .agent-hero .cell--words { width: 100%; padding-bottom: 1rem; }
+  .agent-portrait { padding: 0 var(--shell-pad) 2rem; width: 100%; }
+  .agent-portrait img { max-width: 290px; }
+  .agent-hero .hero-actions { gap: 1rem; flex-wrap: wrap; }
+}
+
+.artifact { overflow-x: auto; }
+.ledger { min-width: 42rem; }
+
+.hero-wordmark { display: block; width: min(100%, 340px); height: auto; margin-left: -0.04em; }

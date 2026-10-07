@@ -1,0 +1,147 @@
+---
+// A layer stack: the packages of a module as bands, from the caller at
+// the top to the lowest layer at the bottom. The order of the bands is
+// the order of the imports. A layer can take a plug: a list of parts
+// that dock into it from the side, such as the providers of pkg/ai.
+// Use it for the overview of a module, not for the flow of one call.
+import Figure from "./Figure.astro";
+
+type Hue = "plain" | "ai" | "agent" | "durable" | "harness" | "wire" | "outside";
+
+interface Layer {
+  name: string;
+  job: string;
+  // hue is the layer color. plain draws the neutral band.
+  hue?: Hue;
+  // plug docks a list of parts into the side of this layer.
+  plug?: { label: string; items: string[] };
+}
+
+interface Props {
+  alt: string;
+  caption?: string;
+  layers: Layer[];
+}
+
+const { alt, caption, layers } = Astro.props;
+---
+
+<Figure alt={alt} caption={caption}>
+  <div class="stack">
+    {
+      layers.map((l) => {
+        const band = (
+          <div class:list={["band", `hue-${l.hue ?? "plain"}`]}>
+            <span class="pk">{l.name}</span>
+            <span class="jb">{l.job}</span>
+          </div>
+        );
+        if (!l.plug) return band;
+        return (
+          <div class="docked">
+            {band}
+            <div class="plug">
+              <span class="plug-label">{l.plug.label}</span>
+              {l.plug.items.map((item) => (
+                <span>{item}</span>
+              ))}
+            </div>
+          </div>
+        );
+      })
+    }
+  </div>
+</Figure>
+
+<style>
+  .hue-plain {
+    --h: var(--line-strong);
+  }
+  .hue-ai {
+    --h: var(--l-ai);
+  }
+  .hue-agent {
+    --h: var(--l-agent);
+  }
+  .hue-durable {
+    --h: var(--l-durable);
+  }
+  .hue-harness {
+    --h: var(--l-harness);
+  }
+  .hue-wire {
+    --h: var(--l-wire);
+  }
+  .hue-outside {
+    --h: var(--l-outside);
+  }
+  .stack {
+    display: grid;
+    gap: 6px;
+    min-width: 480px;
+  }
+  .band {
+    display: grid;
+    grid-template-columns: 124px 1fr;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1.2px solid var(--h);
+    background: color-mix(in srgb, var(--h) var(--l-mix), var(--code-bg));
+  }
+  .band.hue-plain {
+    background: var(--code-bg);
+  }
+  .pk {
+    font-weight: 600;
+    color: var(--text);
+  }
+  .jb {
+    font-size: 11px;
+    color: var(--copy);
+  }
+  .docked {
+    display: grid;
+    grid-template-columns: 1fr 138px;
+    gap: 14px;
+  }
+  .plug {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text);
+    border: 1.2px solid var(--l-wire);
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: color-mix(in srgb, var(--l-wire) var(--l-mix), var(--code-bg));
+  }
+  .plug-label {
+    font-size: 10.5px;
+    letter-spacing: var(--label-track);
+    color: var(--muted);
+  }
+  /* The two prongs of the plug, into the band on its left. */
+  .plug::before,
+  .plug::after {
+    content: "";
+    position: absolute;
+    left: -15px;
+    width: 14px;
+    height: 5px;
+    background: var(--l-wire);
+    border-radius: 2px 0 0 2px;
+  }
+  .plug::before {
+    top: calc(50% - 12px);
+  }
+  .plug::after {
+    top: calc(50% + 7px);
+  }
+</style>
