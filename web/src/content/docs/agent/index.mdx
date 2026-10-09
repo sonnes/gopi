@@ -1,0 +1,124 @@
+---
+title: Agents
+summary: An agent is the loop that runs a model with tools until the work is done. It keeps its history in memory.
+---
+
+import LoopCycle from "../../../components/figures/LoopCycle.astro";
+import TraceTable from "../../../components/figures/TraceTable.astro";
+
+{/* A multi-line prop loses its indent in MDX, and an export keeps it. */}
+
+export const runCall = `a.Run(ctx, ai.UserMessage(
+    "Is it warmer in Lisbon or in Oslo?",
+))`;
+
+An agent calls the model and runs the tools that the model calls. Then it calls the model again with the results. Each message goes into the history when the message is complete.
+
+<LoopCycle
+  alt="Run adds the input to the history. The loop calls the model and asks if the message has tool calls. If yes, the loop runs the tool calls and calls the model again. If no, the run ends at agent_end. One turn is one model call and the tool calls that it makes."
+  entry={{ call: "Run(ctx, msgs...)", sub: "history + input" }}
+  model="call the model"
+  question="tool calls?"
+  tools="run the tool calls"
+  exit="agent_end"
+  turn="next turn"
+/>
+
+A turn is one model call and the tool calls that it makes. A [steer message](steer.mdx), a follow-up, or a `BeforeStop` [hook](hooks.mdx) can also start the next turn.
+
+## Create an Agent
+
+`agent.New` takes a model and options. It does no I/O, so it takes no context and returns no error.
+
+```go
+a := agent.New(lm,
+	agent.Toolset(weather),
+	agent.System(func(context.Context) ([]ai.Section, error) {
+		return []ai.Section{{Name: "base", Text: "Answer in one sentence."}}, nil
+	}),
+)
+```
+
+## Options
+
+| Option              | Sets                                                            |
+| ------------------- | --------------------------------------------------------------- |
+| `History(msgs...)`  | The messages that the agent starts with, such as a saved conversation |
+| `Toolset(tools...)` | The tools of the agent. Each name must be unique. A deferred tool waits for the [search](tool-changes.mdx) |
+| `System(fn)`        | The system prompt as [sections](sections.mdx), built before each model call |
+| `MaxTokens(n)`      | The maximum output tokens of every model call                    |
+| `Thinking(level)`   | The thinking level of every model call                           |
+| `Hooks(hs...)`      | [Hooks](hooks.mdx) that change the loop at six points            |
+| `BeforeCall(fn)`, `AfterCall(fn)`, `BeforeTool(fn)`, `AfterTool(fn)`, `AfterTurn(fn)`, `BeforeStop(fn)` | One hook at one point of the loop |
+
+## Run
+
+`Run` adds the messages to the history and returns a stream of [events](events.mdx). `Wait` returns the messages that the run produced. The input is not in that result, because you already have it.
+
+```go
+stream := a.Run(ctx, ai.UserMessage("Is it warmer in Lisbon or in Oslo?"))
+msgs, err := stream.Wait()
+```
+
+With no messages, the run continues from the last message of the history. So after a failure stops a run, `a.Run(ctx)` continues it.
+
+<TraceTable
+  caption="One Run With Two Tool Calls"
+  alt="Turn 1 adds the base system message that System built, then the question. The assistant calls the weather tool for Lisbon and for Oslo, and the two tool results follow. In turn 2, the assistant answers with no tool call, so the run ends. The first model call reads the base and the question. The second model call reads every message above its answer."
+  call={runCall}
+  turns={[
+    {
+      label: "turn 1",
+      rows: [
+        { id: "s1", kind: "meta", who: "base:", text: "Answer in one sentence." },
+        { id: "u1", kind: "user", text: "Lisbon or Oslo?" },
+        { id: "a1", kind: "assistant", who: "calls", chips: [["weather Lisbon", "tool"], ["weather Oslo", "tool"]] },
+        { id: "t1", kind: "tool", who: "weather:", text: "Lisbon 21" },
+        { id: "t2", kind: "tool", who: "weather:", text: "Oslo 9" },
+      ],
+    },
+    { label: "turn 2", rows: [{ id: "a2", kind: "assistant", text: "Lisbon is warmer", stop: "no tool call" }] },
+  ]}
+  calls={["a1", "a2"]}
+>
+  The system message goes before the input, so the model reads the prompt before the messages that it applies to.
+</TraceTable>
+
+## Rules
+
+- Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream, with no event.
+- Each run that starts ends with `agent_end`, also a run that fails.
+- The tool calls of one message run at the same time. The results go into the history in call order. If a message calls a tool marked `tool.Sequential()`, every call of that message runs in order.
+- A Go error from a tool goes to the model as an error result, and the run goes on. If the context of the run is canceled, the run fails.
+- If the model calls a tool that the agent does not have, the model gets an error result.
+- If two tools have the same name, `New` panics.
+- The agent has no cap on the turns of a run. To set a cap, add a `BeforeCall` hook that reads `State.Turn()` and returns an error.
+
+## Save and Resume
+
+`a.State().Messages()` returns the history. Each message of the history arrives on the stream as one `message_end` event. This includes the input. To save a conversation, save the message of each `message_end`.
+
+```go
+case agent.EventMessageEnd:
+	saved = append(saved, ev.Message)
+```
+
+To resume, give the saved messages to `History`.
+
+```go
+resumed := agent.New(lm, agent.History(saved...), agent.Toolset(weather))
+```
+
+If the first message is a system message, it is the base of the prompt. If `Toolset` adds or removes a tool after the base, the agent declares the difference as a [tool change](tool-changes.mdx).
+
+## Related
+
+- [Events](events.mdx) are what a run reports.
+- [Hooks](hooks.mdx) change a model call, a tool call, or the stop of a run.
+- [Steer and Follow-Up](steer.mdx) send messages to a run that is active.
+- [Tool Changes](tool-changes.mdx) load deferred tools during a conversation.
+- [Sections](sections.mdx) change parts of the prompt during a conversation.
+- [Tools](../tool/index.mdx) are what the model calls.
+- [Run an Agent](../guides/run-an-agent.mdx) is the guide.
+
+The design is in [docs/concepts/agent/loop.md](../../../../../docs/concepts/agent/loop.md).

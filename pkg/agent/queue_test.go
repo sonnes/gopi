@@ -1,0 +1,229 @@
+package agent_test
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
+)
+
+func TestSteerDuringToolCall(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	wait := tool.Func("wait", func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+		close(started)
+		<-release
+		return textResult("waited"), nil
+	})
+	p := &script{responses: []ai.Message{
+		toolCalls("wait", "wait2"),
+		text("done"),
+	}}
+	ran := false
+	wait2 := tool.Func("wait2", func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+		ran = true
+		return textResult("second"), nil
+	}, tool.Sequential())
+	a := agent.New(model(p), agent.Toolset(wait, wait2))
+
+	s := a.Run(context.Background(), ai.UserMessage("hi"))
+	go func() {
+		<-started
+		a.Steer(ai.UserMessage("use the other file"))
+		close(release)
+	}()
+	events, _, err := collect(t, s)
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	assert.True(t, ran, "every call of the turn runs")
+	calls := p.received()
+	require.Len(t, calls, 2)
+	assert.Equal(t, []string{"hi", "", "waited", "second", "use the other file"}, msgTexts(calls[1]))
+	assert.Equal(t,
+		[]string{"hi", "", "waited", "second", "use the other file", "done"},
+		historyTexts(a),
+	)
+}
+
+func TestSteerBeforeRun(t *testing.T) {
+	p := &script{responses: []ai.Message{text("ok")}}
+	a := agent.New(model(p))
+	a.Steer(ai.UserMessage("first"))
+
+	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	assert.Equal(t, types([]agent.Event{
+		agent.EventAgentStart{},
+		agent.EventTurnStart{},
+		agent.EventMessageStart{},
+		agent.EventMessageEnd{},
+		agent.EventMessageStart{},
+		agent.EventMessageEnd{},
+		agent.EventMessageStart{},
+	}), types(events[:7]), "the steer is a message event after the input")
+	assert.Equal(t, "hi", as[agent.EventMessageEnd](t, events[3]).Message.Text())
+	assert.Equal(t, "first", as[agent.EventMessageEnd](t, events[5]).Message.Text())
+	assert.Equal(t, []string{"hi", "first"}, msgTexts(p.received()[0]))
+	assert.Equal(t, []string{"first", "ok"}, msgTexts(msgs))
+}
+
+func TestQueueOrder(t *testing.T) {
+	tests := []struct {
+		name      string
+		responses []ai.Message
+		// setup returns the options of the test. a is set before the
+		// run starts.
+		setup func(a **agent.Agent) []agent.Option
+		// before runs after New and before Run.
+		before  func(a *agent.Agent)
+		history []string
+	}{
+		{
+			name:      "a steer continues a turn with no tool calls",
+			responses: []ai.Message{text("one"), text("two")},
+			setup: func(a **agent.Agent) []agent.Option {
+				return []agent.Option{steerOnTurn(a, 1, "more")}
+			},
+			history: []string{"hi", "one", "more", "two"},
+		},
+		{
+			name: "a follow-up waits until the run would stop",
+			responses: []ai.Message{
+				toolCall("c1", "echo", `{"s":"x"}`),
+				text("one"),
+				text("two"),
+			},
+			before:  func(a *agent.Agent) { a.FollowUp(ai.UserMessage("next")) },
+			history: []string{"hi", "", "echo:x", "one", "next", "two"},
+		},
+		{
+			name:      "the steer queue comes before the follow-up queue",
+			responses: []ai.Message{text("one"), text("two"), text("three")},
+			setup: func(a **agent.Agent) []agent.Option {
+				return []agent.Option{steerOnTurn(a, 1, "steer")}
+			},
+			before:  func(a *agent.Agent) { a.FollowUp(ai.UserMessage("follow")) },
+			history: []string{"hi", "one", "steer", "two", "follow", "three"},
+		},
+		{
+			name:      "the follow-up queue comes before BeforeStop",
+			responses: []ai.Message{text("one"), text("two"), text("three")},
+			setup: func(**agent.Agent) []agent.Option {
+				return []agent.Option{agent.BeforeStop(once("hook"))}
+			},
+			before: func(a *agent.Agent) {
+				a.FollowUp(ai.UserMessage("follow"), ai.UserMessage("up"))
+			},
+			history: []string{"hi", "one", "follow", "up", "two", "hook", "three"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &script{responses: tt.responses}
+			var a *agent.Agent
+			opts := []agent.Option{agent.Toolset(echo)}
+			if tt.setup != nil {
+				opts = append(opts, tt.setup(&a)...)
+			}
+			a = agent.New(model(p), opts...)
+			if tt.before != nil {
+				tt.before(a)
+			}
+
+			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			require.NoError(t, err)
+			emittest.CheckEvents(t, events)
+
+			assert.Equal(t, tt.history, historyTexts(a))
+		})
+	}
+}
+
+// steerOnTurn returns a BeforeCall hook that steers the agent with s on
+// the given turn. The first turn is 1.
+func steerOnTurn(a **agent.Agent, turn int, s string) agent.Option {
+	return agent.BeforeCall(func(_ context.Context, st agent.State, r agent.Request) (agent.Request, error) {
+		if st.Turn() == turn {
+			(*a).Steer(ai.UserMessage(s))
+		}
+		return r, nil
+	})
+}
+
+func TestQueueKeptAfterFailure(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		text("one"),
+		text("two"),
+		text("three"),
+	}}
+	var a *agent.Agent
+	failed := false
+	a = agent.New(model(p),
+		agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
+			if failed {
+				return nil, nil
+			}
+			failed = true
+			a.Steer(ai.UserMessage("steer"))
+			return nil, errors.New("stop")
+		}),
+	)
+	a.FollowUp(ai.UserMessage("follow"))
+
+	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	require.Error(t, err)
+	assert.Equal(t, []string{"hi", "one"}, historyTexts(a), "the failure stops the run before a drain")
+
+	_, _, err = collect(t, a.Run(context.Background()))
+	require.NoError(t, err)
+	assert.Equal(t,
+		[]string{"hi", "one", "steer", "two", "follow", "three"},
+		historyTexts(a),
+		"the next run reads the queues",
+	)
+}
+
+func TestQueueConcurrent(t *testing.T) {
+	const (
+		writers = 8
+		each    = 10
+	)
+	responses := make([]ai.Message, 0, 4*writers*each)
+	for range cap(responses) {
+		responses = append(responses, text("ok"))
+	}
+	p := &script{responses: responses}
+	a := agent.New(model(p))
+
+	s := a.Run(context.Background(), ai.UserMessage("hi"))
+	var wg sync.WaitGroup
+	for range writers {
+		wg.Go(func() {
+			for range each {
+				a.Steer(ai.UserMessage("steer"))
+				a.FollowUp(ai.UserMessage("follow"))
+			}
+		})
+	}
+	wg.Wait()
+	_, err := s.Wait()
+	require.NoError(t, err)
+	_, err = a.Run(context.Background()).Wait()
+	require.NoError(t, err)
+
+	got := strings.Join(historyTexts(a), " ")
+	assert.Equal(t, writers*each, strings.Count(got, "steer"), "every steer reaches the history")
+	assert.Equal(t, writers*each, strings.Count(got, "follow"), "every follow-up reaches the history")
+}

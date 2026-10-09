@@ -1,9 +1,9 @@
 ---
-// A turn-by-turn trace of one run: one row per entry that the run
-// appends, grouped by turn, with the author that the log records. One
-// column per model call shows what the call reads (a bar over the rows
-// before it) and the row that it writes (an arrow). Use it for a run
-// where the order of the messages and what each call reads matter.
+// A turn-by-turn trace of one run: one row per message that the run
+// adds, grouped by turn, with an optional author column. One column per
+// model call shows what the call reads (a bar over the rows before it)
+// and the row that it writes (an arrow). Use it for a run where the
+// order of the messages and what each call reads matter.
 import Figure from "./Figure.astro";
 import CallCode from "./CallCode.astro";
 
@@ -19,7 +19,9 @@ interface Row {
   chips?: [string, Kind][];
   // stop is an accent word at the end, such as "no tool call".
   stop?: string;
-  author: string;
+  // author fills the author column. If no row has an author, the
+  // table has no author column.
+  author?: string;
 }
 
 interface Turn {
@@ -35,15 +37,29 @@ interface Props {
   // calls lists the ID of the row that each model call writes. A call
   // reads every row above that row.
   calls: string[];
-  // authorLabel heads the author column.
+  // entryLabel heads the message column. authorLabel heads the author
+  // column.
+  entryLabel?: string;
   authorLabel?: string;
 }
 
-const { alt, caption, call, turns, calls, authorLabel = "log · author" } = Astro.props;
+const {
+  alt,
+  caption,
+  call,
+  turns,
+  calls,
+  entryLabel = "message",
+  authorLabel = "author",
+} = Astro.props;
 
 const rows = turns.flatMap((t) => t.rows);
 const written = calls.map((id) => rows.findIndex((r) => r.id === id));
-const cols = `54px minmax(0, 1fr) 96px repeat(${calls.length}, 44px)`;
+const hasAuthor = rows.some((r) => r.author);
+// first is the grid column of the first model call.
+const first = hasAuthor ? 4 : 3;
+const authorCol = hasAuthor ? "96px " : "";
+const cols = `54px minmax(0, 1fr) ${authorCol}repeat(${calls.length}, 44px)`;
 
 // Row 1 is the head. Each turn starts on the row after the rows of the
 // turn before it, so a turn cell can span its rows.
@@ -60,11 +76,11 @@ const lastRow = at - 1;
   <CallCode code={call} />
   <div class="trace" style={`grid-template-columns:${cols}`}>
     <div class="th" style="grid-area:1/1;padding-left:2px">turn</div>
-    <div class="th" style="grid-area:1/2">entry</div>
-    <div class="th" style="grid-area:1/3">{authorLabel}</div>
+    <div class="th" style="grid-area:1/2">{entryLabel}</div>
+    {hasAuthor && <div class="th" style="grid-area:1/3">{authorLabel}</div>}
     {
       calls.map((_, c) => (
-        <div class="th c" style={`grid-area:1/${4 + c}`}>
+        <div class="th c" style={`grid-area:1/${first + c}`}>
           call {c + 1}
         </div>
       ))
@@ -95,10 +111,12 @@ const lastRow = at - 1;
                     {row.stop && <span class="stop">{row.stop}</span>}
                   </span>
                 </div>
-                <div class:list={["cell", "w", { last }]} style={`grid-area:${r}/3`}>
-                  <span class="plus">+</span>
-                  {row.author}
-                </div>
+                {hasAuthor && (
+                  <div class:list={["cell", "w", { last }]} style={`grid-area:${r}/3`}>
+                    <span class="plus">+</span>
+                    {row.author}
+                  </div>
+                )}
               </>
             );
           })}
@@ -112,11 +130,11 @@ const lastRow = at - 1;
         return (
           <>
             {w > 0 && (
-              <div class="rd" style={`grid-row:2/span ${w};grid-column:${4 + c}`}>
+              <div class="rd" style={`grid-row:2/span ${w};grid-column:${first + c}`}>
                 <span class:list={["bar", { early: !final }]} />
               </div>
             )}
-            <div class="rd" style={`grid-row:${2 + w};grid-column:${4 + c}`}>
+            <div class="rd" style={`grid-row:${2 + w};grid-column:${first + c}`}>
               <span class:list={["out", { early: !final }]}>→ {calls[c]}</span>
             </div>
           </>

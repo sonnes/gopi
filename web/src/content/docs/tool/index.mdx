@@ -99,7 +99,7 @@ A tool has info that the model reads, and a run function that you call with a to
 | `tool.Sequential()`    | The calls of a message with this tool run one after another |
 | `tool.Deferred()`      | The tool waits until an `ai.ToolAdded` block in a [system message](../ai/messages.mdx#system-messages) adds it |
 
-`tool.New` and `tool.Func` take the same options. `tool.Defer(t)` marks a tool that is already built, such as a sandbox tool, as deferred.
+`tool.New` and `tool.Func` take the same options. `tool.Defer(t)` marks a tool that is already built, such as a tool from another package, as deferred. An agent loads a deferred tool with its search. [Tool Changes](../agent/tool-changes.mdx) shows how.
 
 ## Middleware
 
@@ -137,4 +137,4 @@ func Reminder(text string) tool.Middleware {
 - [Messages](../ai/messages.mdx) carry the tool call in and the tool result back.
 - [Use Tools](../guides/use-tools.mdx) is the guide.
 
-The decisions are in [docs/concepts/tool/tool.md](../../../../../docs/concepts/tool/tool.md).
+The design is in [docs/concepts/tool/tool.md](../../../../../docs/concepts/tool/tool.md).

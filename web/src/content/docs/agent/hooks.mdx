@@ -1,0 +1,129 @@
+---
+title: Hooks
+summary: A hook is a function that the agent loop calls before and after a model call and a tool call, after a turn, and before the run stops.
+---
+
+import HookRail from "../../../components/figures/HookRail.astro";
+
+`agent.Hook` has a method for each point. A hook embeds `agent.BaseHook` and overrides the methods that it needs. Each method gets a copy of `agent.State` and returns the value that the loop uses. A hook that needs more data than the state keeps it in its own value.
+
+<HookRail
+  alt="One turn of the loop, top to bottom. BeforeCall changes the request before the model call. AfterCall changes the message before message_end. For each tool call, BeforeTool runs after tool_execution_start and can block the call with Deny, then the tool runs, then AfterTool changes the result before tool_execution_end. AfterTurn runs after turn_end and adds messages. If the turn made no tool calls and the queues are empty, BeforeStop runs, and its messages start the next turn."
+  rows={[
+    { step: "turn_start" },
+    { hook: "BeforeCall", io: "Request -> Request", does: "change the messages and the options of one call" },
+    { step: "call the model" },
+    { hook: "AfterCall", io: "Message -> Message", does: "change the message before message_end" },
+    { step: "message_end" },
+    { step: "tool_execution_start" },
+    { hook: "BeforeTool", io: "ToolCall -> ToolCall", does: "change the call, or block it with Deny" },
+    { step: "run the tool" },
+    { hook: "AfterTool", io: "ToolResult -> ToolResult", does: "change the result" },
+    { step: "tool_execution_end" },
+    { step: "turn_end" },
+    { hook: "AfterTurn", io: "State -> []Message", does: "add messages, no new turn" },
+    { step: "no tool calls, queues empty?", muted: true },
+    { hook: "BeforeStop", io: "State -> []Message", does: "the first hook with messages wins", loop: "next turn" },
+  ]}
+  groups={[{ from: 5, to: 9, label: "each tool call" }]}
+/>
+
+## Add a Hook
+
+`agent.Hooks` adds hook values to the agent. One value can act at more than one point.
+
+```go
+type Budget struct {
+	agent.BaseHook
+	Max int // the output tokens after which no tool runs
+}
+
+func (b Budget) BeforeTool(ctx context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+	if s.Usage().Output > b.Max {
+		return c, agent.Deny("the token budget is spent")
+	}
+	return c, nil
+}
+
+a := agent.New(lm, agent.Hooks(Budget{Max: 50_000}))
+```
+
+For one point, use the option of that point, such as `agent.BeforeTool`. The hooks run in the order that you add them. Each hook gets the value that the hook before it returned.
+
+## Change One Model Call
+
+A `BeforeCall` hook gets the `agent.Request` of one call: the messages and the options. The agent sends the request that the last hook returns, and the history does not change. To add an option, use `ai.JoinOptions`. To change a message, change a copy of it, because the messages share their arrays with the history.
+
+The agent has no cap on the turns of a run. To set a cap, return an error from a `BeforeCall` hook. The run then fails before the model call.
+
+```go
+maxTurns := agent.BeforeCall(func(ctx context.Context, s agent.State, r agent.Request) (agent.Request, error) {
+	if s.Turn() > 20 {
+		return r, errors.New("the run is over 20 turns")
+	}
+	return r, nil
+})
+```
+
+## Change the Message
+
+An `AfterCall` hook gets the final message of the model before `message_end`. `message_end` and the history have the message that the last hook returns, and the agent runs the tool calls of that message. If the stream fails, no `AfterCall` hook runs.
+
+## Change or Block a Tool Call
+
+A `BeforeTool` hook can change the input or the name of a call. It runs after the agent finds the tool, so a call to an unknown tool gets an error result and no hook runs.
+
+To block a call, return `agent.Deny` with a reason. The model reads the reason as an error result.
+
+```go
+readOnly := agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+	if c.Name == "bash" {
+		return c, agent.Deny("bash is off in read-only mode")
+	}
+	return c, nil
+})
+```
+
+When the calls of a message run at the same time, the `BeforeTool` hooks of every call run before any call runs, one call at a time, in call order.
+
+## Change a Result
+
+An `AfterTool` hook changes the result before `tool_execution_end`. The hooks run in the goroutine of each call, so an `AfterTool` hook must be safe for concurrent use.
+
+A [middleware](../tool/index.mdx) wraps one tool. A tool hook covers every tool of the agent and reads the state.
+
+## Add Messages
+
+An `AfterTurn` hook returns messages to add after `turn_end`. Each message gets `message_start` and `message_end` on the [stream](events.mdx). The messages do not start a turn. The next model call reads them, in this run or in the next run.
+
+A `BeforeStop` hook runs when the turn made no tool calls and the [steer and follow-up queues](steer.mdx) are empty. The first hook that returns messages starts a new turn with them. The hooks after it do not run.
+
+```go
+untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]ai.Message, error) {
+	if testsPass() {
+		return nil, nil
+	}
+	return []ai.Message{ai.UserMessage("The tests fail. Fix them.")}, nil
+})
+```
+
+## Errors
+
+| Point                     | If a hook returns an error                                |
+| ------------------------- | --------------------------------------------------------- |
+| `BeforeCall`              | The run fails before the model call.                      |
+| `AfterCall`               | The run fails. The history does not keep the message.     |
+| `BeforeTool`              | The call does not run. The error text is its error result. |
+| `AfterTool`               | The error text is the error result of the call.           |
+| `AfterTurn`, `BeforeStop` | The run fails.                                            |
+
+The hooks after the failed hook do not run. If the context of the run is canceled, the run fails.
+
+## Related
+
+- [Agents](index.mdx) run the loop.
+- [Events](events.mdx) are what a run reports.
+- [Steer and Follow-Up](steer.mdx) add messages from outside the run.
+- [Tools](../tool/index.mdx) have middleware for the rules of one tool.
+
+The design is in [docs/concepts/agent/loop.md](../../../../../docs/concepts/agent/loop.md).

@@ -1,6 +1,6 @@
 ---
 title: Overview
-summary: Model calls, typed tools, and streamed events for AI agents in Go.
+summary: Model calls, typed tools, streamed events, and an agent loop for AI agents in Go.
 ---
 
 import LayerStack from "../../components/figures/LayerStack.astro";
@@ -8,14 +8,15 @@ import AnnotatedCode from "../../components/figures/AnnotatedCode.astro";
 import { Card, CardGrid, Code } from "@astrojs/starlight/components";
 import hello from "../../../../examples/hello/main.go?raw";
 
-gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream.
+gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream. An agent runs the calls and the tools in a loop, and keeps its history in memory.
 
 ## The Stack
 
 <LayerStack
-  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/ai and runs the tools of pkg/tool. The providers plug into pkg/ai from the side."
+  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/agent, or pkg/ai directly. pkg/agent runs the tools of pkg/tool. The providers plug into pkg/ai from the side."
   layers={[
-    { name: "your application", job: "calls pkg/ai, and runs the tools of pkg/tool" },
+    { name: "your application", job: "calls pkg/agent, or pkg/ai directly" },
+    { name: "pkg/agent", job: "the loop: model calls, tools, hooks", hue: "agent" },
     { name: "pkg/tool", job: "the tools: typed input, deferral, middleware", hue: "wire" },
     {
       name: "pkg/ai",
@@ -82,6 +83,11 @@ fmt.Println(msg.Text())`,
 
     [pkg/tool](tool/index.mdx)
   </Card>
+  <Card title="Agents" icon="seti:go">
+    The loop that runs a model with tools, its events, and its hooks.
+
+    [pkg/agent](agent/index.mdx)
+  </Card>
   <Card title="Guides" icon="list-format">
     One page for each job, with snippets for the choices and one complete program that compiles.
 
@@ -97,8 +103,8 @@ fmt.Println(msg.Text())`,
 
     [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi)
   </Card>
-  <Card title="Decisions" icon="github">
-    The alternative that lost, and the reason. For the developers of gopi.
+  <Card title="Design" icon="github">
+    The design rules of each part, and their reasons. For the developers of gopi.
 
     [docs/concepts](../../../../docs/concepts/README.md)
   </Card>

@@ -1,0 +1,94 @@
+---
+title: Events
+summary: An event is one thing that happened in a run. The events of a run arrive in order on its stream, and each event changes the state of the agent.
+---
+
+import Spans from "../../../components/figures/Spans.astro";
+
+`Agent.Run` returns the stream of the run. `Events` reads each event in order. `Wait` returns the messages that the run produced. Your input is not in that result, because you already have it.
+
+<Spans
+  alt="A trace of one run as nested bars. agent_start and agent_end are the two ends of the outer bar, and agent_end carries the usage and the error. Turn 1 holds the input message, an assistant message with a ToolCall, one tool execution of weather, and a tool result message. Turn 2 holds an assistant message with Text. Each message ends with message_end, where the caller saves the message. The run ends after turn 2, because it has no tool call."
+  key={{ pair: ["X_start", "X_end"], stored: "message_end: save the message", tick: "message_update" }}
+  spans={[
+    { label: "agent", depth: 0, from: 0, to: 100, start: "agent_start", body: "Usage, Error", end: "agent_end" },
+    { label: "turn 1", depth: 1, from: 2, to: 60, start: "turn_start", end: "turn_end" },
+    { label: "message", note: "user", depth: 2, from: 4, to: 15, body: "input", stored: "end" },
+    { label: "message", note: "assistant", depth: 2, from: 16, to: 36, kind: "assistant", body: "ToolCall", ticks: 3, stored: "end" },
+    { label: "tool_execution", depth: 2, from: 37, to: 47, kind: "tool", body: "weather" },
+    { label: "message", note: "tool_result", depth: 2, from: 48, to: 58, kind: "tool", stored: "end" },
+    { label: "turn 2", depth: 1, from: 62, to: 98, start: "turn_start", end: "turn_end" },
+    { label: "message", note: "assistant", depth: 2, from: 64, to: 95, kind: "assistant", body: "Text", ticks: 4, stored: "end" },
+  ]}
+  note="Turn 1 ends with a tool call, so turn 2 starts. Turn 2 has none, so the run ends."
+/>
+
+[GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Event) lists the fields of each event.
+
+## Save the Conversation
+
+Each message of the history arrives as one `message_end`, also your input and the messages from hooks. To save the conversation, save the message of each `message_end`.
+
+```go
+s := a.Run(ctx, ai.UserMessage("Fix the failing test."))
+for ev, err := range s.Events() {
+	if err != nil {
+		return err
+	}
+	if end, ok := ev.(agent.EventMessageEnd); ok {
+		save(end.Message)
+	}
+}
+```
+
+- The run does not wait for your save. If the process stops, a message that the stream holds and that you did not save is lost.
+- If a `message_end` carries an assistant message with no content, do not save it. The history does not keep it.
+- To give the saved messages to a new agent, use the `History` option of [`New`](index.mdx).
+
+## The Order of a Turn
+
+- A turn starts with `turn_start`. If the [sections](sections.mdx) or the [tools](tool-changes.mdx) changed, a system message with the change comes next.
+- Then the new messages of the turn come. In turn 1, they are your input, then the [steer queue](steer.mdx).
+- The assistant message comes next: one `message_start`, one `message_update` for each model event, and one `message_end`. A `message_update` carries a snapshot of the partial message and the model event behind it.
+- The tool calls of one message run at the same time. Each `tool_execution_start` comes first, in call order. Each `tool_execution_end` comes when its call ends. The result messages come last, in call order.
+- If the message calls a sequential tool, the calls run in order. Each call then sends its start, its end, and its result before the next call starts.
+- `turn_end` carries the assistant message and the tool results. The messages of the `AfterTurn` [hooks](hooks.mdx) come after it.
+
+## Failures
+
+- `agent_end` comes on every exit of a run, also when the run fails. It carries the usage of the run, and the error as a string.
+- Each start event has its end event, also on a failure.
+- If a failure cuts an assistant message short, its `message_end` carries the part that arrived. Its stop reason is `error`, or `aborted` if you canceled the context.
+- After `agent_end`, `Events` gives the error. `Wait` returns the messages that the run produced, with the error.
+- To stop a run, cancel its context. If you only stop reading the stream, the run continues to its end.
+
+## State
+
+The state is what an agent knows: the messages that the model reads, the progress of the run, the queues, and the loaded tools. `Agent.State` returns a copy. The copy shares its messages with the agent, so do not change a message of the copy.
+
+The agent applies each event to its state with `State.Apply`, then sends it. A viewer that applies the events of a run to a snapshot gets the same messages and progress as the agent. The progress is the turn, the partial message, the pending tool calls, the usage, and the error.
+
+```go
+// The agent: a snapshot, then each event of the run.
+snap, err := json.Marshal(a.State())
+data, err := json.Marshal(ev)
+
+// The viewer: decode the snapshot, then apply each event.
+var s agent.State
+err = json.Unmarshal(snap, &s)
+e, err := agent.UnmarshalEvent(data)
+s.Apply(e)
+show(s.Turn(), s.Streaming(), s.Pending())
+```
+
+- Each event encodes to JSON with a `type` field that names the event. `agent.UnmarshalEvent` decodes it.
+- A snapshot does not hold the queues or the loaded tools, because they change with no event.
+
+## Related
+
+- [Agents](index.mdx) run the loop that sends these events.
+- [Hooks](hooks.mdx) read the same state as a viewer.
+- [Steer and Follow-Up](steer.mdx) add the new messages of a turn.
+- [Streams](../ai/streams.mdx) carry the model events inside `message_update`.
+
+The design is in [docs/concepts/agent/run-stream.md](../../../../../docs/concepts/agent/run-stream.md).

@@ -52,7 +52,7 @@ A tool has two failure channels. An error result goes to the model, which correc
 
 ## Run the Loop
 
-Send the infos, run every call the model makes, append each result, and call again. The loop ends when the stop reason is not `tool_use`. A refusal can hold tool calls, so the loop does not run the calls of any other stop.
+Send the infos, run every call the model makes, append each result, and call again. The loop ends when the stop reason is not `tool_use`. A refusal can hold tool calls, so the loop does not run the calls of any other stop. An [agent](../agent/index.mdx) runs this loop for you.
 
 ```go
 for {
@@ -138,3 +138,4 @@ return res, nil
 
 - [Tools](../tool/index.mdx) for the interface and the two failure channels.
 - [Messages](../ai/messages.mdx) for the stop reasons and the tool result role.
+- [Run an Agent](run-an-agent.mdx) to let an agent run the loop.

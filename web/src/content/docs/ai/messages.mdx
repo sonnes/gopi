@@ -40,7 +40,7 @@ ai.SystemMessage(ai.Text{Text: "Answer in French from now on."})
 
 ## System Messages
 
-The `ai.SystemPrompt` option is the prompt in front of the conversation. A system message adds instructions from its place, so you can change the prompt mid-session without a change to the start of the request.
+The `ai.SystemPrompt` option is the prompt in front of the conversation. A system message adds instructions from its place, so you can change the prompt in the middle of a conversation without a change to the start of the request.
 
 A provider sends the message with the system role of its API: `system` for `anthropic` and `openaichat`, `developer` for `openai`. The message waits until the next assistant message, so it never comes between a tool call and its result.
 
@@ -81,6 +81,8 @@ msg.Usage         // the token counts of this response
 />
 
 `length` means that the output cap or the context is full. `refusal` means that a safety classifier stopped the turn, and `msg.StopDetail` holds the reason that the API gave.
+
+A provider never sets `aborted` or `error`. A caller that keeps a partial message sets one of them, so a later reader knows that the message is incomplete. The [agent](../agent/index.mdx) does this when a cancel or a failure cuts a reply short, and `error` puts the error in `msg.StopDetail`.
 
 ## Usage
 
@@ -128,4 +130,4 @@ Each block carries a type tag, and an unknown tag fails the read. A store cannot
 - [Tools](../tool/index.mdx) produce the tool result that goes into a message.
 - [Streams](streams.mdx) deliver the final message.
 
-The decisions are in [docs/concepts/ai/message.md](../../../../../docs/concepts/ai/message.md).
+The design is in [docs/concepts/ai/message.md](../../../../../docs/concepts/ai/message.md).

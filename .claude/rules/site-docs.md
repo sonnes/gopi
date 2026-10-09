@@ -12,13 +12,13 @@ These rules apply to every page under `web/src/content/docs/`. The pages are for
 | Question                                   | Source                          |
 | ------------------------------------------ | ------------------------------- |
 | What is the signature, the field, the flag | GoDoc                           |
-| What is this thing, and how do I use it    | `ai/` and `tool/`, one page per abstraction |
+| What is this thing, and how do I use it    | `ai/`, `tool/`, and `agent/`, one page per abstraction |
 | What does one provider add to a call       | `providers/`, one page per provider |
 | How do I do one job                        | `guides/*.mdx`, one page per job  |
 | Why is it built this way, which file to open | `docs/concepts/`, on GitHub   |
 | One name for one thing                     | the glossary in `docs/README.md` |
 
-Do not write a type list, a method list, or a field table. Link GoDoc. Do not write a decision or its reason. Link the concept page.
+Do not write a type list, a method list, or a field table. Link GoDoc. Do not write a design rule or its reason. Link the concept page. Do not compare gopi with another project.
 
 ## Frontmatter
 
@@ -39,12 +39,12 @@ The first paragraph comes after the lede. Do not repeat the summary in it.
 2. Draw it with a figure. [Figures](#figures) says how to pick the form.
 3. Show how to use it. Keep a fragment at 15 lines or fewer.
 4. Link the pages that it depends on.
-5. End with one line: "The decisions are in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)."
+5. End with one line: "The design is in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)."
 
 ## A Guide
 
-A guide covers one job, not one call. There are four: call a model, stream a
-response, use tools, write a provider. Add a section to one of them before
+A guide covers one job, not one call. There are five: call a model, stream a
+response, use tools, write a provider, run an agent. Add a section to one of them before
 you add a page.
 
 1. Open with the smallest call that does the job.

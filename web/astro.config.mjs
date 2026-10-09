@@ -111,6 +111,17 @@ export default defineConfig({
           items: [{ label: "Tools", slug: "docs/tool" }],
         },
         {
+          label: "pkg/agent",
+          items: [
+            { label: "Agents", slug: "docs/agent" },
+            { label: "Events", slug: "docs/agent/events" },
+            { label: "Hooks", slug: "docs/agent/hooks" },
+            { label: "Steer and Follow-Up", slug: "docs/agent/steer" },
+            { label: "Sections", slug: "docs/agent/sections" },
+            { label: "Tool Changes", slug: "docs/agent/tool-changes" },
+          ],
+        },
+        {
           label: "Providers",
           items: [
             { label: "Anthropic", slug: "docs/providers/anthropic" },
@@ -125,6 +136,7 @@ export default defineConfig({
             { label: "Stream a Response", slug: "docs/guides/stream-a-response" },
             { label: "Use Tools", slug: "docs/guides/use-tools" },
             { label: "Write a Provider", slug: "docs/guides/write-a-provider" },
+            { label: "Run an Agent", slug: "docs/guides/run-an-agent" },
           ],
         },
         {

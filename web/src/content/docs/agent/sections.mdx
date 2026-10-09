@@ -1,0 +1,106 @@
+---
+title: Sections
+summary: A section is a named part of the system prompt. The agent adds each change to a section as a system message, so the start of the request stays cached.
+---
+
+import PrefixBar from "../../../components/figures/PrefixBar.astro";
+
+The `agent.System` option builds the system prompt as a list of sections. A part that never changes is one section. A part that changes during a conversation, such as a todo list or a mode, is another section.
+
+Before each model call, the agent compares the sections with the sections of the history. If they differ, the agent adds one system message with the change. The message goes after `turn_start` and before the new messages of the turn. Thus the model reads the prompt before the messages that it applies to.
+
+<PrefixBar
+  alt="A request after a section changed. The base, with the first sections and the tools, and the history are the same as on the last call, so they are cached. The change to the todos section comes after the history, then the new messages of the turn."
+  provider="anthropic"
+  says="a section change goes after the history"
+  segments={[
+    { label: "base: sections + tools", width: 32, state: "hot", mark: true },
+    { label: "history", width: 32, state: "hot" },
+    { label: "todos changed", width: 18, state: "fresh" },
+    { label: "new turn", width: 18, state: "fresh", mark: true },
+  ]}
+  brackets={[
+    { parts: 2, label: "same as the last call", note: "cached" },
+    { parts: 2, label: "new in this call" },
+  ]}
+/>
+
+## Set the Sections
+
+Give `agent.System` a function that returns the sections in order. The agent calls the function before each model call.
+
+```go
+a := agent.New(model,
+	agent.System(func(ctx context.Context) ([]ai.Section, error) {
+		return []ai.Section{
+			{Name: "base", Text: "You are a coding agent."},
+			{Name: "todos", Text: "<todos>\n" + todos() + "\n</todos>"},
+		}, nil
+	}),
+)
+```
+
+Put each section in a tag, or start it with a heading. Then the model can match a change to the old text.
+
+## The Base
+
+The first change of a new history is the base. It is the first message of the history, with every section and every tool. Each model call sends the base as `ai.SystemPrompt` and `ai.Tools`. The provider puts it in the system prompt and the tool list of its API. The base does not change, so the cached prefix stays the same on every call.
+
+## The Change
+
+Each later change is one system message. The blocks of a section change come first:
+
+| The function returns              | The system message holds                                 |
+| --------------------------------- | -------------------------------------------------------- |
+| The same sections                 | No message                                               |
+| A changed text                    | An `ai.Section` with the new text, in its place          |
+| No section with a known name      | An `ai.SectionRemoved` block                             |
+| A new name, after the others      | An `ai.Section`, at the end                              |
+| An order that a change cannot keep | An `ai.SectionRemoved` for each section, then every section again |
+
+If the tools changed too, the same message holds the [tool change](tool-changes.mdx), after the sections. A turn adds one system message at most.
+
+## The Frame
+
+A provider sends each later change in its place in the messages. It frames a new or changed section by its name:
+
+```
+Updated system prompt section "todos":
+
+<todos>
+- [x] read the tests
+</todos>
+```
+
+A removal reads `Removed system prompt section "todos".` A model that takes no system message in the conversation gets this text as a `<system-reminder>` in a user message.
+
+## Save and Resume
+
+The agent keeps the history in memory. To keep a conversation and resume it later:
+
+1. Save the message of each `message_end` event.
+2. Give the saved messages to `agent.History`.
+
+```go
+a := agent.New(model,
+	agent.History(saved...),
+	agent.System(prompt),
+)
+```
+
+The first saved message stays the base. The agent reads the sections from the history, so it adds a change only if the prompt differs.
+
+## Rules
+
+- If the function returns an error, the run fails before the model call.
+- An agent without `System` leaves the sections of the history as they are.
+
+## Related
+
+- [Agents](index.mdx) run the loop that adds the change.
+- [Events](events.mdx) carry each message that the agent adds to the history.
+- [Tool Changes](tool-changes.mdx) use the same system message.
+- [Tools](../tool/index.mdx) go in the base with the sections.
+- [Messages](../ai/messages.mdx) hold the section blocks.
+
+The design is in [docs/concepts/agent/section.md](../../../../../docs/concepts/agent/section.md).
