@@ -5,7 +5,7 @@ summary: A hook is a function that the agent loop calls before and after a model
 
 import HookRail from "../../../components/figures/HookRail.astro";
 
-`agent.Hook` has a method for each point. A hook embeds `agent.BaseHook` and overrides the methods that it needs. Each method gets a copy of `agent.State` and returns the value that the loop uses. A hook that needs more data than the state keeps it in its own value.
+Add a hook when a run needs a rule that the loop does not have, such as a token budget or an approval for each tool call. Without hooks, the agent runs each tool call that the model makes. It stops when a turn makes no tool calls and the queues are empty.
 
 <HookRail
   alt="One turn of the loop, top to bottom. BeforeCall changes the request before the model call. AfterCall changes the message before message_end. For each tool call, BeforeTool runs after tool_execution_start and can block the call with Deny, then the tool runs, then AfterTool changes the result before tool_execution_end. AfterTurn runs after turn_end and adds messages. If the turn made no tool calls and the queues are empty, BeforeStop runs, and its messages start the next turn."
@@ -30,7 +30,7 @@ import HookRail from "../../../components/figures/HookRail.astro";
 
 ## Add a Hook
 
-`agent.Hooks` adds hook values to the agent. One value can act at more than one point.
+`agent.Hook` has a method for each point. A hook embeds `agent.BaseHook` and overrides the methods that it needs. Each method gets a copy of `agent.State`. `agent.Hooks` adds hook values to the agent, and one value can act at more than one point.
 
 ```go
 type Budget struct {
@@ -50,11 +50,13 @@ a := agent.New(lm, agent.Hooks(Budget{Max: 50_000}))
 
 For one point, use the option of that point, such as `agent.BeforeTool`. The hooks run in the order that you add them. Each hook gets the value that the hook before it returned.
 
+A hook that embeds `agent.BaseHook` keeps compiling when gopi adds a hook point, but a misspelled method also compiles and never runs.
+
 ## Change One Model Call
 
 A `BeforeCall` hook gets the `agent.Request` of one call: the messages and the options. The agent sends the request that the last hook returns, and the history does not change. To add an option, use `ai.JoinOptions`. To change a message, change a copy of it, because the messages share their arrays with the history.
 
-The agent has no cap on the turns of a run. To set a cap, return an error from a `BeforeCall` hook. The run then fails before the model call.
+The agent has no cap on the turns of a run. To set one, return an error from a `BeforeCall` hook.
 
 ```go
 maxTurns := agent.BeforeCall(func(ctx context.Context, s agent.State, r agent.Request) (agent.Request, error) {
@@ -88,9 +90,9 @@ When the calls of a message run at the same time, the `BeforeTool` hooks of ever
 
 ## Change a Result
 
-An `AfterTool` hook changes the result before `tool_execution_end`. The hooks run in the goroutine of each call, so an `AfterTool` hook must be safe for concurrent use.
+An `AfterTool` hook changes the result before `tool_execution_end`. It runs in the goroutine of its call, so it must be safe for concurrent use.
 
-A [middleware](../tool/index.mdx) wraps one tool. A tool hook covers every tool of the agent and reads the state.
+A tool hook covers every tool of the agent, and a [middleware](../tool/index.mdx) wraps one tool.
 
 ## Add Messages
 
@@ -117,7 +119,7 @@ untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]ai.Me
 | `AfterTool`               | The error text is the error result of the call.           |
 | `AfterTurn`, `BeforeStop` | The run fails.                                            |
 
-The hooks after the failed hook do not run. If the context of the run is canceled, the run fails.
+The hooks after the failed hook do not run.
 
 ## Related
 

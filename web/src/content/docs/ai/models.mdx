@@ -55,6 +55,8 @@ msg, err := model.StreamText(ctx, messages).Wait()
 fmt.Printf("$%.4f\n", msg.Usage.Cost.Total())
 ```
 
+A model with only its `ID` works with its provider, but its cost is zero until you set `Pricing`.
+
 ## Wrap
 
 The binding is a struct, so a wrapper goes around the provider. A wrapper implements `StreamText` and calls the inner provider.

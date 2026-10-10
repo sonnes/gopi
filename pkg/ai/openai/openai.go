@@ -55,7 +55,9 @@ var (
 type Error = sdk.Error
 
 // The text models that this package serves. Each one carries its output
-// cap, so a call without [ai.MaxTokens] gets the full cap. The models
+// cap, so a call without [ai.MaxTokens] gets the full cap. For a model
+// with no cap, the request omits the cap, and the API uses the cap of
+// the model. The models
 // are values, so a model from another package, such as
 // openaichat, can use them too. The values come from the model pages
 // and the pricing page of the OpenAI docs. A prompt of more than
@@ -205,13 +207,14 @@ func APIKey(key string) Option {
 }
 
 // BaseURL sets the base URL of the API, for a compatible API, a proxy,
-// or a test server.
+// or a test server. If it is unset, the SDK reads OPENAI_BASE_URL. If
+// that is unset too, the SDK uses https://api.openai.com/v1.
 func BaseURL(url string) Option {
 	return func(c *config) { c.baseURL = url }
 }
 
 // HTTPClient sets the HTTP client. A test passes a client that records
-// and replays traffic.
+// and replays traffic. If it is unset, the SDK uses its own client.
 func HTTPClient(client *http.Client) Option {
 	return func(c *config) { c.httpClient = client }
 }

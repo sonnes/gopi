@@ -71,6 +71,8 @@ for ev, err := range stream.Events() {
 msg, err := stream.Wait()
 ```
 
+`Wait` returns the final message or the error that ended the call, even if you break out of `Events` early.
+
 ## Events
 
 | Type                                            | Carries                             |

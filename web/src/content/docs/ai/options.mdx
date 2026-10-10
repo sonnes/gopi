@@ -6,7 +6,7 @@ summary: An option is one typed setting of a call, and a later value wins.
 import OptionTape from "../../../components/figures/OptionTape.astro";
 import ValuePair from "../../../components/figures/ValuePair.astro";
 
-The messages are the only argument of a call. Every other setting, such as the system prompt or the tools, travels as an option. A [system message](messages.mdx#system-messages) adds to the prompt from its place in the conversation.
+Add an option when a call needs a system prompt, tools, retries, or a setting other than the default. Without options, each setting takes the default in the table below. A [system message](messages.mdx#system-messages) adds to the prompt from its place in the conversation.
 
 ## The Built-In Options
 
@@ -32,7 +32,7 @@ ai.SystemPrompt([]ai.Content{
 })
 ```
 
-A provider retries only before the first event of a stream, and only after an error that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. A provider does not send `ai.Temperature` to a model that rejects it.
+A provider retries only when you set `ai.MaxRetries`, and never after the first event of the stream. The error must be one that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. A provider does not send `ai.Temperature` to a model that rejects it.
 
 ## Two Rules
 

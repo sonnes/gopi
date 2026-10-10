@@ -10,7 +10,8 @@ type Model struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	// MaxTokens is the output cap of the model. If a call sets no
-	// [MaxTokens] option, the provider uses this value.
+	// [MaxTokens] option, the provider uses this value. If it is zero,
+	// the provider uses its own default.
 	MaxTokens int `json:"max_tokens,omitempty"`
 	// ContextWindow is the most tokens that one request can hold: the
 	// prompt, the history, and the output.

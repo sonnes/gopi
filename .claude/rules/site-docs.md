@@ -37,9 +37,11 @@ The first paragraph comes after the lede. Do not repeat the summary in it.
 
 1. In `summary`, say what the abstraction is, in the terms of the glossary.
 2. Draw it with a figure. [Figures](#figures) says how to pick the form.
-3. Show how to use it. Keep a fragment at 15 lines or fewer.
-4. Link the pages that it depends on.
-5. End with one line: "The design is in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)."
+3. If the abstraction is opt-in, start with the case that needs it. Say what the caller gets without it.
+4. Show how to use it. Keep a fragment at 15 lines or fewer.
+5. Say what a caller can depend on, in one sentence. Do not give the reason.
+6. Link the pages that it depends on.
+7. End with one line: "The design is in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)."
 
 ## A Guide
 

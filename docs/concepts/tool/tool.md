@@ -23,8 +23,8 @@ Chain(t, a, b)
 ## Design
 
 - A tool is in its own package, and `pkg/ai` keeps the info, the call, and the result. A provider then does not depend on the code that runs a tool. The result stays in `pkg/ai`, because its JSON uses the content codec there.
-- The deferred flag and the sequential flag are fields of the info, and the agent reads them. A middleware builds on `Wrap`, which passes the info on, so the wrapped tool keeps its schema and its flags. The fields have no JSON, so they never reach the model or the log.
-- An error result is a failure that the model reads and can correct. A Go error is a failure of the run function, such as a transport that is down, and a retry middleware acts on it. The agent turns a Go error that is left into an error result, and stops the run only on a canceled or expired context.
+- The deferred flag and the sequential flag are fields of the info with no JSON, so they never reach the model or the log. A middleware that builds on `Wrap` passes the info on, so the wrapped tool keeps its schema and its flags. A middleware that returns its own type of tool loses the flags if it does not copy the info.
+- An error result is a failure that the model reads and can correct. A Go error is a failure of the run function, such as a transport that is down, and a retry middleware acts on it. [Loop](../agent/loop.md) has what the agent does with a Go error that is left.
 - A middleware receives the context and the call and nothing else, so `pkg/tool` holds no agent concept. A layer with more state closes over the state or puts it in the context.
 - A middleware wraps one tool and goes with it to any agent. A `BeforeTool` or `AfterTool` hook covers every tool of the agent, `tool_search` too, and reads the state of the agent. A rule of one tool goes in a middleware, and a policy of the agent goes in a hook.
 

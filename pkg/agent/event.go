@@ -13,7 +13,9 @@ import (
 // not part of the result, because the caller already has it.
 type Stream = stream.Stream[Event, []ai.Message]
 
-// Event is one thing that happened in a run. The interface is sealed.
+// Event is one thing that happened in a run. The interface is sealed,
+// like [ai.Content], so a consumer reads only the fields that the event
+// carries.
 // The types are [EventAgentStart], [EventAgentEnd], [EventTurnStart],
 // [EventTurnEnd], [EventMessageStart], [EventMessageUpdate],
 // [EventMessageEnd], [EventToolExecutionStart], and
@@ -219,8 +221,9 @@ func marshalEvent(e Event) ([]byte, error) {
 	return json.Marshal(w)
 }
 
-// UnmarshalEvent decodes an event that json.Marshal encoded. An
-// unknown type is an error.
+// UnmarshalEvent decodes an event that json.Marshal encoded. Go cannot
+// decode JSON into an interface, so UnmarshalEvent reads the "type"
+// field first. An unknown type is an error.
 func UnmarshalEvent(data []byte) (Event, error) {
 	var w eventJSON
 	if err := json.Unmarshal(data, &w); err != nil {

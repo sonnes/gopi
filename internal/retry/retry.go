@@ -39,9 +39,13 @@ const (
 
 // Policy is how a call retries a request that fails.
 type Policy struct {
+	// MaxRetries is how many times [Do] sends the request again. If
+	// [ai.MaxRetries] is unset, [PolicyOf] sets it to zero, so the call
+	// does not retry.
 	MaxRetries int
 	// MaxDelay caps the wait that a server can ask for. Zero removes
-	// the cap.
+	// the cap. If [ai.MaxRetryDelay] is unset, [PolicyOf] sets it to
+	// [DefaultMaxDelay].
 	MaxDelay time.Duration
 }
 

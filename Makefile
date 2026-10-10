@@ -5,7 +5,7 @@
 # MODULES lists the directory of each module. go.work joins them, but
 # ./... stops at the root of a nested module, so each target runs in
 # each module.
-MODULES := . pkg/ai/anthropic pkg/ai/openai pkg/ai/openaichat examples
+MODULES := . pkg/ai/anthropic pkg/ai/openai pkg/ai/openaichat examples cmd/gopi
 
 # Run the tests. Pass flags to go test with ARGS, for example
 # `make test ARGS="-run TestStreamText -v"`. To test some packages only,
@@ -34,10 +34,12 @@ check: tidy
 fmt:
 	gofmt -w .
 
-# Build every binary under cmd/ into .bin/.
+# Build every binary under cmd/ into .bin/. Each command is its own
+# module, so ./cmd/... matches no package of the root module. The target
+# names each command, and go.work resolves it.
 build:
 	mkdir -p .bin
-	go build -o .bin/ ./cmd/...
+	go build -o .bin/ ./cmd/gopi
 
 tidy:
 	@for m in $(MODULES); do (cd $$m && go mod tidy) || exit 1; done

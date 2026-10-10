@@ -9,7 +9,9 @@ import "github.com/sonnes/gopi/pkg/ai"
 // Run drains the queue after its input, so a steer before Run goes after
 // the input.
 //
-// Steer does not start a run. If no run is active, call [Agent.Run]. If
+// Steer does not start a run, because the agent has no goroutine of
+// its own and the caller reads the stream of each run. If no run is
+// active, call [Agent.Run]. If
 // a failure stops the run first, the messages wait for the next Run.
 // Steer is safe for concurrent use.
 func (a *Agent) Steer(msgs ...ai.Message) {
@@ -28,7 +30,8 @@ func (a *Agent) FollowUp(msgs ...ai.Message) {
 	a.state.followUp = append(a.state.followUp, msgs...)
 }
 
-// drain takes every message of the queue q.
+// drain takes every message of the queue q. A person who sends three
+// corrections wants the model to read all three before its next call.
 func (a *Agent) drain(q *[]ai.Message) []ai.Message {
 	a.mu.Lock()
 	defer a.mu.Unlock()

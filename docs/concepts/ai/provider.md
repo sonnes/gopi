@@ -27,13 +27,14 @@ SpeechModel{Model, Provider} -> SpeechProvider
 
 ## Design
 
-- An option of `ai` is a setting that each provider API has, such as retries, temperature, or cache retention. A setting that one provider reads is an option of that provider package, and it travels in the same list. There is no session ID option, because only OpenRouter reads one.
-- Each provider retries a request with `internal/retry`, and only before the first event of the stream, because a retry after an event repeats output. The SDK of a provider does not retry, so `internal/retry` can cap the wait that a server asks for. A provider retries only when the call sets `ai.MaxRetries`, so the layer above sets the policy.
+- An option of `ai` is a setting that each provider API has, such as retries, temperature, or cache retention. A setting that one provider reads is an option of that provider package, and it travels in the same list.
+- Each provider retries a request only before the first event of the stream, because a retry after an event repeats output. An error after the first event, such as a dropped connection, ends the stream with no retry.
+- The SDK of a provider does not retry, so `internal/retry` can cap the wait that a server asks for. A provider retries only when the call sets `ai.MaxRetries`, so the layer above sets the policy.
 - `internal/transcript` holds the rules that every provider applies to the messages, and `internal/providertest` holds the cases that every provider must pass. Each provider module uses the same copy, so the providers do not drift apart.
 - Each provider package fills the limits, levels, and prices of its models from the docs of its API, so a caller needs no second table. A zero field is unknown, so a pass-through model works with only its ID. A provider does not check a thinking level against the model, and the API rejects a level that the model does not take.
-- Each provider is its own module under `pkg/ai`, so a program that uses one provider does not download the SDK of another. The root module has no provider SDK, and `go.work` joins the modules in this repository.
+- Each provider is its own module under `pkg/ai`, so a program that uses one provider does not download the SDK of another. `go.work` joins the modules in this repository.
 - The Anthropic provider puts a cache marker on the last system block and on the last tool. It also marks the last block of the last user or system message. The system prompt, the tools, and the history then each have a breakpoint.
-- If a model takes tool changes and the call has first tools, the Anthropic tool list holds the first tools and a placeholder tool. The API adds a hidden scaffold for tool changes, and the placeholder puts the scaffold in the cached prefix from the first request. The tool list then never changes, and the first tool change keeps the cache.
+- If a model takes tool changes and the call has first tools, the Anthropic tool list holds the first tools and a placeholder tool. The API adds a hidden scaffold for tool changes, and the placeholder puts it in the cached prefix from the first request, so the first tool change keeps the cache.
 - Anthropic object generation uses structured outputs, because Claude Fable 5.1, Opus 5.5, and Sonnet 5.5 reject a forced tool call.
 - A model that manages its effort gets the same effort at the top of each request. An effort message goes before each assistant message and at the end, so a change of level changes only the end of the request.
 - A model that manages its effort always thinks adaptively, so off is not one of its levels. The API drops a thinking block whose prefix does not match, so a change of effort causes no error.

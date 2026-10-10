@@ -86,17 +86,17 @@ With no messages, the run continues from the last message of the history. So aft
 
 ## Rules
 
+The model reads a result for each of its tool calls, and if a failure stops a call, that result is an error.
+
 - Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream, with no event.
-- Each run that starts ends with `agent_end`, also a run that fails.
 - The tool calls of one message run at the same time. The results go into the history in call order. If a message calls a tool marked `tool.Sequential()`, every call of that message runs in order.
-- A Go error from a tool goes to the model as an error result, and the run goes on. If the context of the run is canceled, the run fails.
-- If the model calls a tool that the agent does not have, the model gets an error result.
+- A Go error from a tool, or a call to a tool that the agent does not have, goes to the model as an error result, and the run goes on. If the context of the run is canceled, the run fails.
 - If two tools have the same name, `New` panics.
-- The agent has no cap on the turns of a run. To set a cap, add a `BeforeCall` hook that reads `State.Turn()` and returns an error.
+- The agent has no cap on the turns of a run. A `BeforeCall` [hook](hooks.mdx) can set one.
 
 ## Save and Resume
 
-`a.State().Messages()` returns the history. Each message of the history arrives on the stream as one `message_end` event. This includes the input. To save a conversation, save the message of each `message_end`.
+`a.State().Messages()` returns the history. To save a conversation, save the message of each `message_end` event.
 
 ```go
 case agent.EventMessageEnd:

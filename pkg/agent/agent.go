@@ -102,20 +102,23 @@ func System(fn SystemFunc) Option {
 }
 
 // MaxTokens caps the output tokens of every model call. See
-// [ai.MaxTokens].
+// [ai.MaxTokens]. Without MaxTokens, the provider uses
+// [ai.Model.MaxTokens], then its own default.
 func MaxTokens(n int) Option {
 	return func(a *Agent) { a.cfg.callOpts = ai.JoinOptions(a.cfg.callOpts, ai.MaxTokens(n)) }
 }
 
 // Thinking sets the thinking level of every model call. See
-// [ai.Thinking].
+// [ai.Thinking]. Without Thinking, the provider uses the default of the
+// model.
 func Thinking(level ai.ThinkingLevel) Option {
 	return func(a *Agent) { a.cfg.callOpts = ai.JoinOptions(a.cfg.callOpts, ai.Thinking(level)) }
 }
 
 // New returns an agent. New does no I/O, so it returns no error and
 // takes no context. If two tools have the same name, New panics,
-// because that is a bug in the caller.
+// because that is a bug in the caller. A deferred tool counts, because
+// a change can add it to a later call.
 func New(lm ai.LanguageModel, opts ...Option) *Agent {
 	a := &Agent{lm: lm}
 	for _, opt := range opts {

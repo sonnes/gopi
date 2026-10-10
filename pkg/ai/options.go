@@ -99,7 +99,8 @@ const (
 var MaxTokens = NewOption[int]()
 
 // Thinking sets the thinking level. If it is unset, a provider uses the
-// default of the model.
+// default of the model. A provider package names each model that gets
+// another default from the provider.
 var Thinking = NewOption[ThinkingLevel]()
 
 // SystemPrompt sets the system prompt of a call to blocks, in order. A
@@ -120,10 +121,12 @@ var SystemPrompt = NewOption[[]Content]()
 var Tools = NewOption[[]ToolInfo]()
 
 // ImageSize sets the size of a generated image, for example "1024x1024".
-// A provider that does not support the size ignores it.
+// A provider that does not support the size ignores it. If it is unset,
+// the API of the provider picks the size.
 var ImageSize = NewOption[string]()
 
-// ImageCount sets the number of images to generate.
+// ImageCount sets the number of images to generate. If it is unset, the
+// API of the provider picks the number.
 var ImageCount = NewOption[int]()
 
 // MaxRetries sets how many times a provider sends a request again after
@@ -139,7 +142,8 @@ var MaxRetries = NewOption[int]()
 var MaxRetryDelay = NewOption[time.Duration]()
 
 // Temperature sets the sampling temperature. A provider does not send
-// it to a model that rejects it.
+// it to a model that rejects it. If it is unset, the model uses its own
+// temperature.
 var Temperature = NewOption[float64]()
 
 // Headers adds HTTP headers to each request of a call. A header with the

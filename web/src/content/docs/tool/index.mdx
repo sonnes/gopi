@@ -132,6 +132,8 @@ func Reminder(text string) tool.Middleware {
 }
 ```
 
+A middleware keeps the schema and the flags of the tool if it uses `tool.Wrap` or copies the info.
+
 ## Related
 
 - [Messages](../ai/messages.mdx) carry the tool call in and the tool result back.

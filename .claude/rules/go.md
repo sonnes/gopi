@@ -20,6 +20,7 @@ The code is the source of truth, and a doc never restates it. So the code must s
 - Give each package a doc comment. Say what the package is and the rules that a caller must obey.
 - Give each exported name a doc comment. If a choice has a reason, write the reason in the comment.
 - Give each number a named constant.
+- If a field or an option has a default, say the default in its doc comment. If a condition changes the default, say the condition.
 - Link a type in a doc comment as `[pkg.Type]`.
 
 If you add an abstraction, or make or reverse a decision, update `docs/concepts/` in the same change. If you change only a behavior, update the doc comment. Read `.claude/rules/concepts.md` first.

@@ -185,11 +185,12 @@ func (a *Agent) turn(
 		return out, false, err
 	}
 
-	// A finished call runs whatever the stop reason. A call that does
-	// not run gets an error result from the provider, and the model
-	// never reads the output of the tool.
+	// A finished call runs whatever the stop reason, except a refusal: a
+	// safety classifier stopped the message, so its calls must not run.
+	// A call that does not run gets an error result from the provider,
+	// and the model never reads the output of the tool.
 	calls := assistant.ToolCalls()
-	if len(calls) == 0 {
+	if len(calls) == 0 || assistant.StopReason == ai.StopReasonRefusal {
 		return out, false, nil
 	}
 	// The tools that the model can call change only at the next model

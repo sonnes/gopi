@@ -31,3 +31,10 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [State](agent/state.md)             | How an agent keeps what it knows in one value that only events change, so a viewer and a hook read the same state as the loop. |
 | [Section](agent/section.md)         | How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it. |
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
+
+## sandbox
+
+| Concept                        | Description                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| [Sandbox](sandbox/sandbox.md)  | How the file and shell tools reach a directory on this host or a remote machine through one small interface.   |
+| [Fence](sandbox/fence.md)      | How a command runs inside an OS sandbox that limits its writes, its reads, its network, and its environment.   |

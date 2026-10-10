@@ -10,7 +10,7 @@ read_when:
 
 # Tool Change
 
-A tool change adds tools to the tools that the model can call, or removes tools, from a place in the conversation. A deferred tool is a tool that the agent can run but does not send, until a change adds it. The search tool of the agent loads a deferred tool.
+A tool change adds tools to the tools that the model can call, or removes tools, from a place in the conversation. The search tool of the agent loads a deferred tool.
 
 ```
   Toolset   not deferred: in the base of a new history
@@ -37,16 +37,15 @@ A tool change adds tools to the tools that the model can call, or removes tools,
 
 ## Design
 
-- A change is a system message with `ToolAdded` and `ToolRemoved` blocks, and the agent sends the tools of the base as `ai.Tools`. A deploy that changes a tool then adds a change in place, so the cache of a saved history holds.
-- The history declares the tools that the model can call, and `State.Tools` reads them. Before each model call, the agent compares them with the wanted tools and adds one system message with the difference. The search keeps the loaded tools in the agent and does not write to the history.
+- A change is a system message with `ToolAdded` and `ToolRemoved` blocks, and the base stays the same, as in [Section](section.md). A deploy that changes a tool then keeps the cache of a saved history. The cache misses on a call where the provider sends a new tool list.
+- The history declares the tools that the model can call. The search keeps the loaded tools in the agent and writes nothing to the history, so only the next model call writes a change.
 - The agent and each provider fold the tools with `transcript.CurrentTools`, so they agree on the tools at each place. The fold is in `internal/transcript`, because `pkg/ai` holds no conversation state.
-- The agent finds each tool of the history in its `Toolset` by name. If the agent does not know a tool, the next call removes it, so the model never sees a tool that is gone. The search only adds, so this is the one source of a removal.
-- A deferred tool is a tool of the one `Toolset` with a flag on its info. The agent then has one list of tools, with one rule for names and order. The reasons for the flag are in [Tool](../tool/tool.md).
-- The search is a tool of the agent, because it changes the tools that the agent declares. It is the one loader, and the agent has no public method that adds or removes a tool.
-- If the model takes a form for a change, the provider sends the change in place. Otherwise, it sends the current tools as the list. A replacement, and an addition on Chat Completions, change the list, and the cache misses on that call.
-- The description of the search names each deferred tool. The model then knows the tools that it can load, and loads one by its name. `Toolset` is fixed at `New`, so the description never changes, and a provider caches it.
-- The search matches a query in the process, by name or by keyword, with no index. It then works with every provider, and the history keeps the tools that it loads.
-- The loaded tools outlive the run, because a failure or a cancel can end a run after the search and before the next model call. The next run then declares the tools, so the model can call a tool that the search told it about.
+- If a tool of the history is not in `Toolset`, the next call removes it, so the model never sees a tool that is gone. The search only adds, so this is the one source of a removal.
+- A deferred tool is in the one `Toolset`, with a flag on its info, so the agent has one rule for names and order. The reasons for the flag are in [Tool](../tool/tool.md).
+- The search is a tool of the agent, because it changes the tools that the agent declares. It is the one loader: the agent has no public method that adds or removes a tool.
+- The description of the search names each deferred tool, so the model loads a tool by its name. The cost: each name costs tokens. `Toolset` is fixed at `New`, so a provider caches the description. An agent with other deferred tools replaces the search tool in a saved history.
+- The search matches a query by name or by keyword in the process, with no index, so it works with every provider. The cost: a synonym of a word of a tool does not match.
+- The loaded tools outlive the run, because a failure or a cancel can end a run after the search and before the next model call. The next run then declares them, so the model can call a tool that the search told it about.
 
 ## Map
 

@@ -90,6 +90,24 @@ func TestRunToolCallsWithAnotherStopReason(t *testing.T) {
 	)
 }
 
+func TestRunSkipsToolCallsOfRefusal(t *testing.T) {
+	ran := false
+	spy := tool.Func("spy", func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+		ran = true
+		return textResult("spy"), nil
+	})
+	call := toolCall("c1", "spy", `{}`)
+	call.StopReason = ai.StopReasonRefusal
+	p := &script{responses: []ai.Message{call}}
+	a := agent.New(model(p), agent.Toolset(spy))
+
+	events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	assert.False(t, ran, "a call of a refusal does not run")
+	assert.Equal(t, []string{"hi", ""}, historyTexts(a), "the run stops after the refusal")
+}
+
 // counter is a tool that records the most calls that ran at one time.
 type counter struct {
 	running atomic.Int32

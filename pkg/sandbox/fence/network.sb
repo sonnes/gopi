@@ -1,0 +1,45 @@
+; The network rules of the Seatbelt profile of pkg/sandbox/fence, for a
+; fence with the network on.
+;
+; Adapted from seatbelt_network_policy.sbpl of OpenAI Codex
+; (https://github.com/openai/codex/blob/696b4502dfaacd91133c3691a23dc91ae3b14bc9/codex-rs/sandboxing/src/seatbelt_network_policy.sbpl),
+; under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+; Changes: this header, "(allow network*)" in place of the proxy rules,
+; and the deny of unix sockets.
+
+(allow network*)
+
+; A unix socket reaches a process outside the fence, such as ssh-agent,
+; Docker, or Podman. The resolver of macOS is the one exception: without
+; it, a host name does not resolve.
+(deny network-outbound (remote unix-socket))
+(allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))
+
+
+; allow only safe AF_SYSTEM sockets used for local platform services.
+(allow system-socket
+  (require-all
+    (socket-domain AF_SYSTEM)
+    (socket-protocol 2)
+  )
+)
+
+(allow mach-lookup
+    ; Used by platform helpers that resolve user directory locations.
+    (global-name "com.apple.bsd.dirhelper")
+    (global-name "com.apple.system.opendirectoryd.membership")
+
+    ; Communicate with the security server for TLS certificate information.
+    (global-name "com.apple.SecurityServer")
+    (global-name "com.apple.networkd")
+    (global-name "com.apple.ocspd")
+    (global-name "com.apple.trustd.agent")
+
+    ; Read network configuration.
+    (global-name "com.apple.SystemConfiguration.DNSConfiguration")
+    (global-name "com.apple.SystemConfiguration.configd")
+)
+
+(allow sysctl-read
+  (sysctl-name-regex #"^net.routetable")
+)

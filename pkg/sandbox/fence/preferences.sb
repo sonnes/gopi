@@ -1,0 +1,14 @@
+; The preferences rules of the Seatbelt profile of pkg/sandbox/fence. A
+; fence lets a command read all files, so it can also read preferences.
+;
+; Adapted from seatbelt_preferences_policy.sbpl of OpenAI Codex
+; (https://github.com/openai/codex/blob/696b4502dfaacd91133c3691a23dc91ae3b14bc9/codex-rs/sandboxing/src/seatbelt_preferences_policy.sbpl),
+; under the Apache License 2.0 (https://www.apache.org/licenses/LICENSE-2.0).
+; Changes: this header, in place of the two comment lines at the top.
+
+(allow ipc-posix-shm-read* (ipc-posix-name-prefix "apple.cfprefs."))
+(allow mach-lookup
+  (global-name "com.apple.cfprefsd.daemon")
+  (global-name "com.apple.cfprefsd.agent")
+  (local-name "com.apple.cfprefsd.agent"))
+(allow user-preference-read)

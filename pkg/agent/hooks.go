@@ -284,6 +284,8 @@ func BeforeStop(fn BeforeStopFunc) Option {
 // DenyError blocks a tool call. A [BeforeToolFunc] returns one through
 // [Deny]. The model reads the reason as an error result.
 type DenyError struct {
+	// Reason is the text of the error result. If it is empty, the text
+	// is "the tool call was blocked".
 	Reason string
 }
 

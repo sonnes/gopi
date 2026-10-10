@@ -5,7 +5,7 @@ summary: A tool change is a system message that adds or removes the tools that t
 
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
-The tools of `agent.Toolset` that are not deferred go in the base. The base is the first message of a new history. Each model call sends the base as `ai.Tools`. A deferred tool is not in the base. The agent can run it, but the model cannot call it until a tool change adds it. The change goes after the history, so the start of the request stays the same.
+Defer a tool when the agent has more tools than you want to send on each model call. Without deferred tools, every tool of `agent.Toolset` goes in the [base](sections.mdx#the-base), and each model call sends all of them. A deferred tool is not in the base. The agent can run it, but the model cannot call it until a tool change adds it.
 
 <PrefixBar
   alt="A request after a tool change. The base, with the system prompt and the tools that are not deferred, and the history are the same as on the last call, so they are cached. The tool change that adds get_weather comes after the history, then the new messages of the turn."
@@ -51,7 +51,7 @@ If a tool is deferred, the agent adds the `tool_search` tool after the tools of 
 
 A keyword in the name of a tool counts twice as much as a keyword in its description or input properties. If two tools have the same score, the tool that comes first in `Toolset` wins. If the model calls a deferred tool before a search loads it, the result tells it to search first.
 
-At the start of the next turn, the agent adds one system message with an `ai.ToolAdded` block for each loaded tool. A loaded tool stays loaded after the run ends. If a run ends after the search and before the next model call, the next run declares the tool.
+At the start of the next turn, the agent adds one system message with an `ai.ToolAdded` block for each loaded tool.
 
 ## Resume a History
 
@@ -79,6 +79,8 @@ A provider sends a change in place when its API has a form for it. Otherwise, it
 The pages for [anthropic](../providers/anthropic.mdx), [openai](../providers/openai.mdx), and [openaichat](../providers/openai-chat.mdx) name the models that take these forms.
 
 ## Rules
+
+A loaded tool stays loaded after the run ends, also when a failure or a cancel ends the run before the next model call.
 
 - If the model calls a deferred tool that the search did not load, it gets an error result. A removed tool gets the same result.
 - Each tool needs a unique name. If a tool is deferred, a tool of your own named `tool_search` clashes with the search, and `agent.New` panics.

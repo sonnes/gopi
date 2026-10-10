@@ -75,13 +75,15 @@ func APIKey(key string) Option {
 
 // BaseURL sets the base URL of the API, for another server, a proxy, or
 // a test server. For example, https://openrouter.ai/api/v1 or
-// https://api.fireworks.ai/inference/v1.
+// https://api.fireworks.ai/inference/v1. If it is unset, the SDK reads
+// OPENAI_BASE_URL. If that is unset too, the SDK uses
+// https://api.openai.com/v1.
 func BaseURL(url string) Option {
 	return func(c *config) { c.baseURL = url }
 }
 
 // HTTPClient sets the HTTP client. A test passes a client that records
-// and replays traffic.
+// and replays traffic. If it is unset, the SDK uses its own client.
 func HTTPClient(client *http.Client) Option {
 	return func(c *config) { c.httpClient = client }
 }

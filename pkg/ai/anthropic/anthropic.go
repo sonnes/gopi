@@ -50,8 +50,15 @@ var (
 type Error = sdk.Error
 
 // The models that this package serves. Each one carries its output cap,
-// so a call without [ai.MaxTokens] gets the full cap. The values come
-// from the models overview and the pricing page of the Claude docs.
+// so a call without [ai.MaxTokens] gets the full cap. A model with no
+// cap, such as a model that a caller passes by ID, gets 64000 tokens.
+//
+// If a call sets no [ai.Thinking] level, [Fable5_1], [Opus5_5], [Opus5],
+// and [Sonnet5_5] use the effort high. Their IDs on OpenRouter get the
+// same default. Another model uses its own default.
+//
+// The values come from the models overview and the pricing page of the
+// Claude docs.
 // CacheWrite is the price of the 5-minute cache. CacheWriteLong is the
 // price of the 1-hour cache, two times the input price.
 var (
@@ -191,12 +198,14 @@ func APIKey(key string) Option {
 }
 
 // BaseURL sets the base URL of the API, for a proxy or a test server.
+// If it is unset, the SDK reads ANTHROPIC_BASE_URL. If that is unset
+// too, the SDK uses https://api.anthropic.com.
 func BaseURL(url string) Option {
 	return func(c *config) { c.baseURL = url }
 }
 
 // HTTPClient sets the HTTP client. A test passes a client that records
-// and replays traffic.
+// and replays traffic. If it is unset, the SDK uses its own client.
 func HTTPClient(client *http.Client) Option {
 	return func(c *config) { c.httpClient = client }
 }

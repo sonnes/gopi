@@ -34,6 +34,8 @@ Do not write a type list, a method list, or a flag list. Do not write an environ
 
 - Write a procedure as a numbered list in the imperative. Keep each step at 20 words or fewer. Put the condition before the command.
 - Use one name for one thing. The glossary in `docs/README.md` has the names. If you need a new term, add it to the glossary.
+- Write each fact on one page. Link to it from the other pages.
+- Do not write a vague size or rate, such as "fast", "large", or "rare". Name the condition, or link the constant in the code.
 - Use title case for headings.
 - If a shape is hard to read as a sentence, draw it. A flow, a hierarchy, and a sequence are shapes.
 - Draw a diagram in ASCII, in a fenced block. Do not use Mermaid, an image, or a Unicode box character.

@@ -41,7 +41,8 @@ for ev, err := range s.Events() {
 }
 ```
 
-- The run does not wait for your save. If the process stops, a message that the stream holds and that you did not save is lost.
+Your save holds every message of the run, unless the process stops before the save or you break out of `Events`.
+
 - If a `message_end` carries an assistant message with no content, do not save it. The history does not keep it.
 - To give the saved messages to a new agent, use the `History` option of [`New`](index.mdx).
 

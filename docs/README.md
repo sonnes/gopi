@@ -47,6 +47,8 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | steer         | A message that the agent reads before its next model call    | interrupt, injection        |
 | follow-up     | A message that the agent reads when the run would stop       | next prompt, queued prompt  |
 | middleware    | A function that wraps a tool and returns a tool              | wrapper, decorator, hook    |
+| sandbox       | The place where the tools read files, write files, and run commands | box, environment, workspace |
+| fence         | An OS sandbox that limits the writes, reads, network, and environment of a command | jail, cage |
 | system reminder | The text of a system message, in a user message, for a model that takes no system messages | injected note, hint |
 | effort        | How much a model reasons, in the words of its provider API. A thinking level maps to one | reasoning budget, intensity |
 | effort message | A system message with no content that sets the effort of the next assistant turn | effort update, level message |

@@ -22,11 +22,11 @@ provider goroutine                    consumer
 
 ## Design
 
-- The final message and the terminal error are the result of the stream. Events yields the error as its last item, and Wait returns the error with the message.
+- The final message and the terminal error are the result of the stream. Events yields the error as its last item, and Wait returns it. A consumer that breaks out of Events early does not see the error, so it calls Wait.
 - `StreamText` is the only entry point for text. A caller that wants only the message calls Wait, so a provider has one code path.
 - An event carries the index of its content block. A response holds several blocks, and a consumer that shows thinking next to text needs to know which block a delta belongs to.
-- A tool end event carries the full tool call with its ID. A consumer that builds a partial message from the events gets each finished call, and the agent keeps those calls when a stream fails.
-- An early break out of Events does not stop the producer. The producer runs to its end, and the stream drops the later pushes. A cancel goes through the context of the call.
+- A provider returns no final message when its stream fails. A consumer that keeps the partial message builds it from the events, and each tool end event carries a finished call with its ID. The rules of the agent for that message are in [Run Stream](../agent/run-stream.md).
+- An early break out of Events does not stop the producer, because a cancel goes through the context of the call. The response then runs to its end, and the stream drops the later pushes.
 - A provider that cannot build a request returns a stream that fails immediately. The caller then has one error path.
 - An event round-trips through JSON with its zero fields omitted. An application forwards a stream to a client without a second type.
 

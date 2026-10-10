@@ -6,4 +6,5 @@ use (
 	./pkg/ai/openai
 	./pkg/ai/openaichat
 	./examples
+	./cmd/gopi
 )

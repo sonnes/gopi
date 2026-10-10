@@ -5,9 +5,9 @@ summary: A section is a named part of the system prompt. The agent adds each cha
 
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
-The `agent.System` option builds the system prompt as a list of sections. A part that never changes is one section. A part that changes during a conversation, such as a todo list or a mode, is another section.
+Split the system prompt into sections when a part of it changes during a conversation, such as a todo list or a mode. With one section, each change sends the whole prompt again. Without `agent.System`, the agent keeps the prompt that the history holds.
 
-Before each model call, the agent compares the sections with the sections of the history. If they differ, the agent adds one system message with the change. The message goes after `turn_start` and before the new messages of the turn. Thus the model reads the prompt before the messages that it applies to.
+Before each model call, the agent compares the sections with the sections of the history. If they differ, the agent adds one system message with the change. The message goes after `turn_start` and before the new messages of the turn.
 
 <PrefixBar
   alt="A request after a section changed. The base, with the first sections and the tools, and the history are the same as on the last call, so they are cached. The change to the todos section comes after the history, then the new messages of the turn."
@@ -44,7 +44,7 @@ Put each section in a tag, or start it with a heading. Then the model can match 
 
 ## The Base
 
-The first change of a new history is the base. It is the first message of the history, with every section and every tool. Each model call sends the base as `ai.SystemPrompt` and `ai.Tools`. The provider puts it in the system prompt and the tool list of its API. The base does not change, so the cached prefix stays the same on every call.
+The first change of a new history is the base. It is the first message of the history, with every section and every tool. Each model call sends the base as `ai.SystemPrompt` and `ai.Tools`. The provider puts it in the system prompt and the tool list of its API.
 
 ## The Change
 
@@ -92,8 +92,9 @@ The first saved message stays the base. The agent reads the sections from the hi
 
 ## Rules
 
+A section change keeps the cache of the base and the history, unless the provider sends a new tool list on the same call.
+
 - If the function returns an error, the run fails before the model call.
-- An agent without `System` leaves the sections of the history as they are.
 
 ## Related
 
