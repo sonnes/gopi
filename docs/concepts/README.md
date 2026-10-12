@@ -21,6 +21,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | Concept                   | Description                                                                  |
 | ------------------------- | ---------------------------------------------------------------------------- |
 | [Tool](tool/tool.md)      | How a tool is defined, deferred, run, and wrapped by middleware.             |
+| [MCP](tool/mcp.md)        | How the tools of an MCP server become tools of an agent, and how the CLI starts the servers of an mcp.json file. |
 
 ## agent
 

@@ -7,13 +7,19 @@
 // If you give a prompt, gopi runs it and stops. If you give no prompt,
 // gopi reads stdin line by line. Each line is one run of the same
 // conversation. gopi prints each run as a tree of its turns, its text,
-// and its tool calls. During a run, an interrupt cancels the run.
+// and its tool calls. With --json, gopi prints each event as one line
+// of JSON instead. During a run, an interrupt cancels the run.
 //
 // The agent has the tools of gopi on a local sandbox in the root
 // folder. By default, the sandbox has the fence.Workspace policy: a
 // command can write only to the root, the temp folder, and the cache
 // folder, and it has no network. The file tools obey the same rules.
 // ask_user_question asks on the terminal.
+//
+// With --mcp, gopi also starts the MCP servers of an mcp.json file, in
+// the format of Claude Code, and gives their tools to the agent. The
+// fence does not confine them. A stdio server runs as a normal process
+// of the user, with full access to the files and the network.
 package main
 
 import (
@@ -64,6 +70,13 @@ type options struct {
 	root     string
 	fence    bool
 	tools    string
+	// thinking is the thinking level of each model call. Empty means
+	// the default of the model.
+	thinking string
+	// json prints the events as JSON lines instead of the tree.
+	json bool
+	// mcp is the path of an mcp.json file. Empty means no MCP server.
+	mcp string
 }
 
 func main() {
@@ -99,6 +112,18 @@ func main() {
 				Value: defaultTools,
 				Usage: "the tools of the agent, with commas. An empty value gives no tool",
 			},
+			&cli.StringFlag{
+				Name:  "thinking",
+				Usage: "the thinking level: off, low, medium, high, xhigh, or max. If unset, the model uses its default",
+			},
+			&cli.BoolFlag{
+				Name:  "json",
+				Usage: "print each event as one line of JSON instead of the tree",
+			},
+			&cli.StringFlag{
+				Name:  "mcp",
+				Usage: "the path of an mcp.json file. gopi starts its servers and gives their tools to the agent. The fence does not confine the servers",
+			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := options{
@@ -108,6 +133,9 @@ func main() {
 				root:     c.String("root"),
 				fence:    c.Bool("fence"),
 				tools:    c.String("tools"),
+				thinking: c.String("thinking"),
+				json:     c.Bool("json"),
+				mcp:      c.String("mcp"),
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
@@ -141,14 +169,33 @@ func run(ctx context.Context, o options, args []string) error {
 	if err != nil {
 		return fenceError(err)
 	}
+	if o.mcp != "" {
+		mcpTools, closeMCP, err := loadMCP(ctx, o.mcp, os.Environ(), os.Stderr)
+		if err != nil {
+			return err
+		}
+		defer closeMCP()
+		tools = append(tools, mcpTools...)
+	}
 
 	opts := []agent.Option{agent.Toolset(tools...)}
 	if o.turns > 0 {
 		opts = append(opts, maxTurns(o.turns))
 	}
+	if o.thinking != "" {
+		level, err := parseThinking(o.thinking)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, agent.Thinking(level))
+	}
 	a := agent.New(lm, opts...)
-	t := newTree(os.Stdout, name+"/"+lm.Model.ID, isTerminal(os.Stdout))
-	t.shown = shown
+	var t printer = jsonLines{w: os.Stdout}
+	if !o.json {
+		tr := newTree(os.Stdout, name+"/"+lm.Model.ID, isTerminal(os.Stdout))
+		tr.shown = shown
+		t = tr
+	}
 
 	if len(args) > 0 {
 		if err := runPrompt(ctx, a, t, strings.Join(args, " ")); err != nil {
@@ -228,7 +275,7 @@ func newTools(root, names string, fenced bool, answers askquestion.Responder) ([
 
 // runPrompt runs one prompt and prints its events. An interrupt during
 // the run cancels the run. Outside a run, an interrupt stops gopi.
-func runPrompt(ctx context.Context, a *agent.Agent, t *tree, prompt string) error {
+func runPrompt(ctx context.Context, a *agent.Agent, t printer, prompt string) error {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
 	defer stop()
 	// After the first interrupt, a second one stops gopi, in case the

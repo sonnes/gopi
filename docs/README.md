@@ -54,3 +54,5 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | effort message | A system message with no content that sets the effort of the next assistant turn | effort update, level message |
 | cache retention | How long a provider keeps the cached prefix of a call: none, short, or long | cache TTL, cache mode |
 | placeholder tool | A deferred tool that a request with tool changes declares, so the first change keeps the cache | dummy tool, stub tool |
+| MCP server    | A process or an HTTP endpoint that offers tools over the Model Context Protocol | MCP plugin, tool server |
+| MCP session   | One connection of gopi to one MCP server                     | MCP client, connection      |
