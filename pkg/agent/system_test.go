@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 // blocks returns the sections as content blocks, in order.
@@ -42,7 +43,7 @@ func twoTurns(t *testing.T, fn func(context.Context) ([]ai.Section, error)) (*sc
 		text("done"),
 	}}
 	a := agent.New(model(p), agent.Toolset(echo), agent.System(fn))
-	events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 
@@ -126,7 +127,7 @@ func TestSectionsError(t *testing.T) {
 		return nil, boom
 	}))
 
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.ErrorIs(t, err, boom)
 	assert.Empty(t, p.received(), "the agent calls no model without its sections")
 }
@@ -138,12 +139,12 @@ func TestNoSectionsOptionKeepsTheHistory(t *testing.T) {
 	a := agent.New(model(p),
 		agent.System(sequence([]ai.Section{rules})),
 	)
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	q := &script{responses: []ai.Message{text("two")}}
-	b := agent.New(model(q), agent.History(history(a)...))
-	_, _, err = collect(t, b.Run(ctx, ai.UserMessage("second")))
+	b := resume(t, model(q), history(a))
+	_, _, err = collect(t, b.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	calls := q.received()
@@ -164,15 +165,15 @@ func TestHistoryReplaysSections(t *testing.T) {
 		agent.Toolset(echo, weather),
 		agent.System(sequence([]ai.Section{rules})),
 	)
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	q := &script{responses: []ai.Message{text("done")}}
-	b := agent.New(model(q), agent.History(history(a)...),
+	b := resume(t, model(q), history(a),
 		agent.Toolset(echo),
 		agent.System(sequence([]ai.Section{thorough})),
 	)
-	_, _, err = collect(t, b.Run(ctx, ai.UserMessage("second")))
+	_, _, err = collect(t, b.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	calls := q.received()
@@ -195,7 +196,7 @@ func TestBaseGoesInTheOptions(t *testing.T) {
 		agent.Toolset(echo),
 		agent.System(sequence([]ai.Section{rules})),
 	)
-	_, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 
 	require.NotEmpty(t, msgs)
@@ -216,12 +217,12 @@ func TestHistoryWithoutABase(t *testing.T) {
 
 	p := &script{responses: []ai.Message{text("one")}}
 	a := agent.New(model(p))
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	q := &script{responses: []ai.Message{text("two")}}
-	b := agent.New(model(q), agent.History(history(a)...), agent.Toolset(echo))
-	_, _, err = collect(t, b.Run(ctx, ai.UserMessage("second")))
+	b := resume(t, model(q), history(a), agent.Toolset(echo))
+	_, _, err = collect(t, b.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	calls := q.received()

@@ -30,7 +30,7 @@ An MCP server is a process or an HTTP endpoint that offers tools over the Model 
 - An MCP result with `isError` becomes an error result, and a failed call becomes a Go error. This obeys the two failure channels in [Tool](tool.md).
 - Text and images keep their type, and a text resource becomes its text. Each other block, such as audio or a binary resource, becomes its JSON text, because `ai.Content` has no block for it. If a result has only structured content, the model gets its JSON text.
 - `mcp.Tools` changes each character that a provider rejects in a tool name to `_`, and it cuts the name to the length limit of the providers. If two tools then have the same name, `mcp.Tools` returns an error, because the model calls a tool by its name.
-- The tools are fixed when `mcp.Tools` returns. `agent.Toolset` is fixed at `agent.New`, so a change of the tool list that a server announces does not reach the model.
+- The tools are fixed when `mcp.Tools` returns. `agent.Toolset` is fixed at `agent.New` or `agent.Durable`, so a change of the tool list that a server announces does not reach the model.
 - The CLI defers each MCP tool, because one server can have many tools. The search tool loads them, as in [Tool Change](../agent/tool-change.md).
 - The CLI names each tool `mcp__<server>__<tool>`, so two servers with the same tool name do not collide. If two server names, such as `a.b` and `a_b`, give one tool name, the CLI keeps the first server and warns about the other.
 - If a server does not connect, the CLI writes a warning and continues without its tools. One server that is down then does not stop the work. A file that the CLI cannot read stops gopi.

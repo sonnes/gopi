@@ -11,7 +11,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept                      | Description                                                                  |
 | ---------------------------- | ---------------------------------------------------------------------------- |
-| [Message](ai/message.md)     | How one turn of a conversation is typed, stored, and sent to a model.        |
+| [Message](ai/message.md)     | How one message of a conversation is typed, stored, and sent to a model.     |
 | [Stream](ai/stream.md)       | How one model call reports its events and its final message.                 |
 | [Provider](ai/provider.md)   | How a provider serves a model call, and how the Anthropic provider builds its requests. |
 | [OpenAI Providers](ai/openai.md) | How the two OpenAI providers build their requests, keep reasoning between calls, and serve compatible servers. |
@@ -27,11 +27,20 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept                             | Description                                                                                   |
 | ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| [Loop](agent/loop.md)               | How an agent runs a model with tools until the work is done, and where its history lives.     |
-| [Run Stream](agent/run-stream.md)   | How one run reports its events in order, and how a caller saves the messages of a run.        |
+| [Loop](agent/loop.md)               | How an agent runs a model with tools until the work is done, and where a hook changes a run. |
+| [Durability](agent/durability.md)   | How a run stores each message before its event, what a crash loses, and how an agent resumes a session. |
+| [Run Stream](agent/run-stream.md)   | How one run reports its events in order, and what a message_end promises about the log.       |
 | [State](agent/state.md)             | How an agent keeps what it knows in one value that only events change, so a viewer and a hook read the same state as the loop. |
 | [Section](agent/section.md)         | How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it. |
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
+
+## session
+
+| Concept                    | Description                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------------------------- |
+| [Log](session/log.md)      | How a session keeps its history as an append-only list of entries that the model reads in order. |
+| [Store](session/store.md)  | How a session record, its entry log, and its values are kept, and what a store must promise.  |
+| [Value](session/value.md)  | How a session keeps application state next to its entries, and why the model never reads it.  |
 
 ## sandbox
 

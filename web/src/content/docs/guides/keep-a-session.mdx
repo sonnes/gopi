@@ -1,0 +1,88 @@
+---
+title: Keep a Session
+summary: Store the history of an agent in a file, resume it in the next process, and add context for one run.
+---
+
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/keep-a-session/main.go?raw";
+
+:::note
+The program in this guide needs `ANTHROPIC_API_KEY`.
+:::
+
+`agent.Durable` takes a session ID, and the `Store` option sets where the session lives. If the session does not exist, `Durable` creates it. If it exists, `Durable` resumes it after its last entry.
+
+```go
+store, err := jsonl.New(dir)
+if err != nil {
+	log.Fatal(err)
+}
+
+a, err := agent.Durable(ctx, model, "demo",
+	agent.Store(store),
+	agent.Name("helper"),
+)
+```
+
+Without `Store`, the session lives in memory and ends with the process. `Name` sets the author of each assistant message and tool result.
+
+## Resume in the Next Process
+
+The log of a resumed session holds the earlier entries. The model reads them on the next call.
+
+```go
+question := "My name is Ada. Remember it."
+if len(a.Log().Entries()) > 0 {
+	question = "What is my name?"
+}
+```
+
+A resumed agent keeps the tools that a search loaded in the session.
+
+## Wait for the Stored Message
+
+The log stores each message before its `message_end` event. If the store fails, the run fails. So when a `message_end` arrives, its message is in the file, unless the message is ephemeral or has no content.
+
+```go
+if end, ok := ev.(agent.EventMessageEnd); ok && !end.Ephemeral {
+	fmt.Printf("stored %s\n", end.Message.Role)
+}
+```
+
+Tell a user that a message is saved only after its `message_end` arrives. A crash loses at most the message in flight.
+
+## Add Context for One Run
+
+An ephemeral entry reaches the model in this run only. The store never holds it.
+
+```go
+stream := a.Run(ctx,
+	session.Text(question, session.Author("user-1")),
+	session.Text(clock, session.Ephemeral()),
+)
+```
+
+For context that must stay, such as a skill, add an ordinary entry with its own author. The store keeps it. To hide it, your UI skips the entries of that author. [Sessions](../session/index.mdx) compares the kinds of entry.
+
+## Use Your Own Database
+
+The `jsonl` store is for one process on one machine. For a service, implement `session.Storer` over your database. [Sessions](../session/index.mdx#stores) lists the stores.
+
+## The Full Example
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/keep-a-session/main.go" />
+</div>
+
+## Read the Output
+
+- The first run prints three `stored` lines: the `system` message that `System` built, the question, and the answer. The clock has no line, because it is ephemeral.
+- The second run prints two `stored` lines, because the prompt did not change. It answers with the name from the first run.
+- After the `stored` lines, the program prints the answer and the path of the file. The first line of the file is the record. Each line after it is one entry.
+- To start again, delete the file.
+
+## Related
+
+- [Sessions](../session/index.mdx) for entries, values, stores, and the file format.
+- [Agents](../agent/index.mdx) for the two constructors.
+- [Events](../agent/events.mdx) for `message_end`.

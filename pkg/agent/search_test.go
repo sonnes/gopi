@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -33,7 +34,7 @@ var stock = tool.New("stock_price",
 func search(t *testing.T, p *script) []ai.Message {
 	t.Helper()
 	a := agent.New(model(p), agent.Toolset(echo, weather, stock))
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	return msgs
@@ -87,7 +88,7 @@ func TestSearchOutlivesTheRun(t *testing.T) {
 		text("done"),
 	}}
 	failed := false
-	stopOnce := agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
+	stopOnce := agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 		if failed {
 			return nil, nil
 		}
@@ -96,9 +97,9 @@ func TestSearchOutlivesTheRun(t *testing.T) {
 	})
 	a := agent.New(model(p), agent.Toolset(echo, weather), stopOnce)
 
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("weather?")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("weather?")))
 	require.Error(t, err, "the run ends after the search and before the next model call")
-	_, msgs, err := collect(t, a.Run(ctx, ai.UserMessage("go on")))
+	_, msgs, err := collect(t, a.Run(ctx, session.Text("go on")))
 	require.NoError(t, err)
 
 	results := toolResults(msgs)

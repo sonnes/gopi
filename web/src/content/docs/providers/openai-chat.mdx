@@ -102,7 +102,7 @@ An API error wraps `openaichat.Error`. An error that OpenRouter reports after th
 
 ## Tool Results With Files
 
-The Chat API takes only text in a tool result. The provider sends the text as the result, and each image in a user message after the results.
+The Chat API takes only text in a tool result. The provider sends the text as the result. It sends each file of the results in a user message after the results: an image as an image part, and a PDF as a file part.
 
 ## Related
 

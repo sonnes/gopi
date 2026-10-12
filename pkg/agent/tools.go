@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
 
@@ -12,7 +13,7 @@ import (
 // addTools adds the named tools to the tools that the model can call.
 // The search tool calls it with the names of deferred tools. A name
 // that the agent does not know adds nothing. The next model call
-// declares the change with a system message, and the history keeps it.
+// declares the change with a system message, and the log keeps it.
 func (a *Agent) addTools(names []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -21,6 +22,36 @@ func (a *Agent) addTools(names []string) {
 			a.state.loaded = append(a.state.loaded, name)
 		}
 	}
+}
+
+// reload runs each search of msgs again, so a resumed agent can call
+// each tool that a search loaded. A crash after a search result and
+// before the next model call loses the change that declares the tools.
+// The search is pure, so a second run loads the same tools. Only a
+// search with a result that is not an error loaded tools.
+func (a *Agent) reload(ctx context.Context, msgs []ai.Message) error {
+	search := a.known(searchToolName)
+	if search == nil {
+		return nil
+	}
+	ok := make(map[string]bool)
+	for _, m := range msgs {
+		if m.Role == ai.RoleToolResult && !m.IsError {
+			ok[m.ToolCallID] = true
+		}
+	}
+	for _, m := range msgs {
+		for _, tc := range m.ToolCalls() {
+			loaded := tc.Name == searchToolName && ok[tc.ID]
+			if !loaded {
+				continue
+			}
+			if _, err := search.Run(ctx, tc); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // known returns the tool of Toolset named name, or nil if there is
@@ -106,7 +137,7 @@ func (a *Agent) toolChange(msgs []ai.Message) []ai.Content {
 }
 
 // sameInfo reports if two infos tell the model the same thing. It
-// compares the JSON, because an info from a saved history has a schema
+// compares the JSON, because an info from a stored entry has a schema
 // that was decoded, and the pointers differ.
 func sameInfo(x, y ai.ToolInfo) bool {
 	xj, xerr := json.Marshal(x)

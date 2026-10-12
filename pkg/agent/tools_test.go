@@ -9,6 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -21,15 +22,15 @@ func TestHistoryReplaysTools(t *testing.T) {
 		text("loaded"),
 	}}
 	a := agent.New(model(p), opts...)
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	q := &script{responses: []ai.Message{
 		toolCall("c2", "get_weather", `{"city":"Paris"}`),
 		text("done"),
 	}}
-	b := agent.New(model(q), append(opts, agent.History(history(a)...))...)
-	_, msgs, err := collect(t, b.Run(ctx, ai.UserMessage("second")))
+	b := resume(t, model(q), history(a), opts...)
+	_, msgs, err := collect(t, b.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	calls := q.received()
@@ -50,12 +51,12 @@ func TestHistoryRemovesUnknownTools(t *testing.T) {
 	a := agent.New(model(p),
 		agent.Toolset(echo, weather),
 	)
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	q := &script{responses: []ai.Message{text("done")}}
-	b := agent.New(model(q), agent.History(history(a)...), agent.Toolset(echo))
-	_, _, err = collect(t, b.Run(ctx, ai.UserMessage("second")))
+	b := resume(t, model(q), history(a), agent.Toolset(echo))
+	_, _, err = collect(t, b.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	calls := q.received()
@@ -104,12 +105,12 @@ func TestHistoryKeepsTheBaseTools(t *testing.T) {
 
 			p := &script{responses: []ai.Message{text("one")}}
 			a := agent.New(model(p), agent.Toolset(tt.first...))
-			_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+			_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 			require.NoError(t, err)
 
 			q := &script{responses: []ai.Message{text("two")}}
-			b := agent.New(model(q), agent.History(history(a)...), agent.Toolset(tt.second...))
-			_, _, err = collect(t, b.Run(ctx, ai.UserMessage("second")))
+			b := resume(t, model(q), history(a), agent.Toolset(tt.second...))
+			_, _, err = collect(t, b.Run(ctx, session.Text("second")))
 			require.NoError(t, err)
 
 			calls := q.received()

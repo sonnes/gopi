@@ -11,6 +11,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 // view is what a caller reads from a [agent.State].
@@ -50,12 +51,12 @@ func TestStateApplyMatchesAgent(t *testing.T) {
 		name  string
 		p     *script
 		opts  []agent.Option
-		input []ai.Message
+		input []session.Entry
 	}{
 		{
 			name:  "text",
 			p:     &script{responses: []ai.Message{text("hello")}},
-			input: []ai.Message{ai.UserMessage("hi")},
+			input: []session.Entry{session.Text("hi")},
 		},
 		{
 			name: "a tool call",
@@ -64,7 +65,7 @@ func TestStateApplyMatchesAgent(t *testing.T) {
 				text("done"),
 			}},
 			opts:  []agent.Option{agent.Toolset(echo)},
-			input: []ai.Message{ai.UserMessage("hi")},
+			input: []session.Entry{session.Text("hi")},
 		},
 		{
 			name: "a search loads a tool",
@@ -73,18 +74,26 @@ func TestStateApplyMatchesAgent(t *testing.T) {
 				text("loaded"),
 			}},
 			opts:  []agent.Option{agent.Toolset(echo, weather)},
-			input: []ai.Message{ai.UserMessage("hi")},
+			input: []session.Entry{session.Text("hi")},
 		},
 		{
 			name:  "sections",
 			p:     &script{responses: []ai.Message{text("ok")}},
 			opts:  []agent.Option{agent.System(sequence([]ai.Section{rules}))},
-			input: []ai.Message{ai.UserMessage("hi")},
+			input: []session.Entry{session.Text("hi")},
 		},
 		{
 			name:  "a failure",
 			p:     &script{fail: errors.New("boom")},
-			input: []ai.Message{ai.UserMessage("hi")},
+			input: []session.Entry{session.Text("hi")},
+		},
+		{
+			name: "an ephemeral entry",
+			p:    &script{responses: []ai.Message{text("ok")}},
+			input: []session.Entry{
+				session.Text("hi"),
+				session.Text("the time is 9:00", session.Ephemeral()),
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -107,7 +116,7 @@ func TestStateSnapshotRoundTrips(t *testing.T) {
 		text("done"),
 	}}
 	a := agent.New(model(p), agent.Toolset(echo))
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 
 	data, err := json.Marshal(a.State())
@@ -153,10 +162,10 @@ func TestStateSnapshotBetweenRuns(t *testing.T) {
 			}
 			a := agent.New(model(&script{responses: tt.responses}), opts...)
 
-			_, _, _ = collect(t, a.Run(ctx, ai.UserMessage("first")))
+			_, _, _ = collect(t, a.Run(ctx, session.Text("first")))
 
 			viewer := a.State()
-			for evt := range a.Run(context.Background(), ai.UserMessage("second")).Events() {
+			for evt := range a.Run(context.Background(), session.Text("second")).Events() {
 				viewer.Apply(evt)
 			}
 			assert.Equal(t, viewOf(a.State()), viewOf(viewer))
@@ -167,7 +176,7 @@ func TestStateSnapshotBetweenRuns(t *testing.T) {
 func TestStateCopyDoesNotAllocate(t *testing.T) {
 	p := &script{responses: []ai.Message{text("one")}}
 	a := agent.New(model(p))
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 
 	allocs := testing.AllocsPerRun(100, func() {
@@ -182,11 +191,11 @@ func TestStateCopyKeepsItsLength(t *testing.T) {
 	ctx := context.Background()
 	p := &script{responses: []ai.Message{text("one"), text("two")}}
 	a := agent.New(model(p))
-	_, _, err := collect(t, a.Run(ctx, ai.UserMessage("first")))
+	_, _, err := collect(t, a.Run(ctx, session.Text("first")))
 	require.NoError(t, err)
 
 	before := a.State()
-	_, _, err = collect(t, a.Run(ctx, ai.UserMessage("second")))
+	_, _, err = collect(t, a.Run(ctx, session.Text("second")))
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"first", "one"}, msgTexts(before.Messages()), "a later run does not change a copy")

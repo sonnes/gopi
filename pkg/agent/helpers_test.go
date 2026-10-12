@@ -14,6 +14,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -138,6 +139,23 @@ func as[T agent.Event](t *testing.T, e agent.Event) T {
 	v, ok := e.(T)
 	require.Truef(t, ok, "event is %T", e)
 	return v
+}
+
+// resume returns a durable agent over a session that holds msgs, as a
+// new process that resumes a saved conversation.
+func resume(t *testing.T, lm ai.LanguageModel, msgs []ai.Message, opts ...agent.Option) *agent.Agent {
+	t.Helper()
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	l, err := session.Open(ctx, store, "s1")
+	require.NoError(t, err)
+	for _, m := range msgs {
+		_, err := l.Append(ctx, session.NewEntry(m))
+		require.NoError(t, err)
+	}
+	a, err := agent.Durable(ctx, lm, "s1", append(opts, agent.Store(store))...)
+	require.NoError(t, err)
+	return a
 }
 
 // history returns the messages that the model of a reads next.
@@ -283,11 +301,11 @@ func toolNames(opts ai.Options) []string {
 // the text s.
 func once(s string) agent.BeforeStopFunc {
 	done := false
-	return func(context.Context, agent.State) ([]ai.Message, error) {
+	return func(context.Context, agent.State) ([]session.Entry, error) {
 		if done {
 			return nil, nil
 		}
 		done = true
-		return []ai.Message{ai.UserMessage(s)}, nil
+		return []session.Entry{session.Text(s)}, nil
 	}
 }

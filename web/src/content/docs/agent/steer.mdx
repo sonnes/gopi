@@ -1,11 +1,11 @@
 ---
 title: Steer and Follow-Up
-summary: A steer is a message that the agent reads before its next model call. A follow-up is a message that the agent reads when the run would stop.
+summary: A steer is an entry that the agent reads before its next model call. A follow-up is an entry that the agent reads when the run would stop.
 ---
 
 import Lanes from "../../../components/figures/Lanes.astro";
 
-Use `Steer` and `FollowUp` when a run is active and you have a message for the agent, such as a correction or the next task. Without them, you wait for the run to end, because a second `Run` fails while a run is active. Each call adds messages to a queue. The agent drains a queue at fixed points of the loop, and it takes every message of the queue at one time.
+Use `Steer` and `FollowUp` when a run is active and you have a message for the agent, such as a correction or the next task. Without them, you wait for the run to end, because a second `Run` fails while a run is active. Each call adds [entries](../session/index.mdx#entries) to a queue. The agent drains a queue at fixed points of the loop, and it takes every entry of the queue at one time.
 
 <Lanes
   alt="A timeline of one run. The caller calls Run, and turn 1 runs a tool call. During the call, the caller steers with 'use v2'. After turn 1, the agent drains the steer queue, and turn 2 reads the steer. During turn 2, the caller sends a follow-up. Turn 2 makes no tool calls, so the agent drains the follow-up queue, and turn 3 reads it. Turn 3 makes no tool calls and both queues are empty, so the run stops."
@@ -45,29 +45,30 @@ Use `Steer` and `FollowUp` when a run is active and you have a message for the a
 ## Steer
 
 ```go
-a.Steer(ai.UserMessage("Use the v2 API."))
+a.Steer(session.Text("Use the v2 API."))
 ```
 
-The agent drains the steer queue after the turn in progress. Every tool call of that turn runs first. If the queue has messages, the run goes on, also when the turn made no tool calls.
+The agent drains the steer queue after the turn in progress. Every tool call of that turn runs first. If the queue has entries, the run goes on, also when the turn made no tool calls.
 
 A steer from before `Run` goes after the input of `Run`.
 
 ## Follow-Up
 
 ```go
-a.FollowUp(ai.UserMessage("Then add a test."))
+a.FollowUp(session.Text("Then add a test."))
 ```
 
 The agent drains the follow-up queue when the run would stop: the turn made no tool calls, and the steer queue is empty. The agent drains it before the [`BeforeStop` hooks](hooks.mdx) run. A `BeforeStop` hook runs only if the follow-up queue is empty.
 
 ## Rules
 
-The agent reads each queued message in this run or the next one, also after a failure, unless the process stops first.
+The agent reads each queued entry in this run or the next one, also after a failure, unless the process stops first.
 
 - `Steer` and `FollowUp` do not start a run. If no run is active, call `Run`.
 - The queues are in memory only. A snapshot of the [state](events.mdx#state) does not hold them.
 - You can call `Steer` and `FollowUp` from any goroutine.
-- Each message from a queue arrives on the [stream](events.mdx) as a `message_start` and a `message_end`, after the `turn_start` of the turn that reads it.
+- A hook calls `Steer` and `FollowUp` on its state. [Hooks](hooks.mdx#steer-from-a-hook) shows how.
+- The agent stores each entry from a queue in the log when the turn reads it. Each message entry arrives on the [stream](events.mdx) as a `message_start` and a `message_end`, after the `turn_start` of that turn.
 
 ## Related
 

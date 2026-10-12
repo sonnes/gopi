@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 // Hook changes the loop at six points. Each method gets a copy of the
@@ -14,6 +15,11 @@ import (
 // The loop calls each method of each hook, in the order of
 // registration. A method gets the value that the hook before it
 // returned.
+//
+// A hook reads the session from [State.Log], and sets values through
+// it. A hook adds entries only through AfterTurn and BeforeStop, or
+// queues them with [State.Steer] and [State.FollowUp], so the agent
+// stores each entry and sends its events in one order.
 type Hook interface {
 	// BeforeCall changes one model call. See [BeforeCall].
 	BeforeCall(ctx context.Context, s State, r Request) (Request, error)
@@ -23,10 +29,10 @@ type Hook interface {
 	BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.ToolCall, error)
 	// AfterTool changes the result of one tool call. See [AfterTool].
 	AfterTool(ctx context.Context, s State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error)
-	// AfterTurn adds messages after a turn. See [AfterTurn].
-	AfterTurn(ctx context.Context, s State) ([]ai.Message, error)
+	// AfterTurn adds entries after a turn. See [AfterTurn].
+	AfterTurn(ctx context.Context, s State) ([]session.Entry, error)
 	// BeforeStop continues a run that would stop. See [BeforeStop].
-	BeforeStop(ctx context.Context, s State) ([]ai.Message, error)
+	BeforeStop(ctx context.Context, s State) ([]session.Entry, error)
 
 	// nop makes every Hook embed BaseHook. A new point of the loop then
 	// does not break a hook.
@@ -34,7 +40,7 @@ type Hook interface {
 }
 
 // BaseHook is a [Hook] that changes nothing. Each method returns the
-// value that it gets, and adds no messages.
+// value that it gets, and adds no entries.
 type BaseHook struct{}
 
 // BeforeCall returns r.
@@ -67,11 +73,11 @@ func (BaseHook) AfterTool(
 	return r, nil
 }
 
-// AfterTurn returns no messages.
-func (BaseHook) AfterTurn(context.Context, State) ([]ai.Message, error) { return nil, nil }
+// AfterTurn returns no entries.
+func (BaseHook) AfterTurn(context.Context, State) ([]session.Entry, error) { return nil, nil }
 
-// BeforeStop returns no messages.
-func (BaseHook) BeforeStop(context.Context, State) ([]ai.Message, error) { return nil, nil }
+// BeforeStop returns no entries.
+func (BaseHook) BeforeStop(context.Context, State) ([]session.Entry, error) { return nil, nil }
 
 func (BaseHook) nop() {}
 
@@ -83,10 +89,9 @@ func Hooks(hs ...Hook) Option {
 
 // Request is one model call, as a [BeforeCallFunc] sees it.
 //
-// Messages are what the model reads: the history of the run, with the
-// system change of this call at the end. An append to Messages does not
-// change the history. A hook that changes a message must change a copy
-// of it.
+// Messages are the messages of the state after the base. The base is
+// in Options, as [ai.SystemPrompt] and [ai.Tools]. An append to Messages does not change the state. A hook
+// that changes a message must change a copy of it.
 //
 // A provider reads the sections and the tool changes from the system
 // messages. If a hook removes a system message, the request does not
@@ -113,9 +118,9 @@ func (h beforeCall) BeforeCall(ctx context.Context, s State, r Request) (Request
 
 // BeforeCall adds a hook that runs before each model call. The state is
 // the state before the call, and its turn is the turn of the call. The
-// agent sends the request that the last hook returns. The history does
-// not change, and no event is sent. If a hook returns an error, the run fails before the model
-// call.
+// agent sends the request that the last hook returns. The state and
+// the log do not change, and no event is sent. If a hook returns an
+// error, the run fails before the model call.
 func BeforeCall(fn BeforeCallFunc) Option {
 	return Hooks(beforeCall{fn: fn})
 }
@@ -145,16 +150,15 @@ func (h afterCall) AfterCall(
 // AfterCall adds a hook that runs after each model call that ends
 // without an error. The request is the request that the model read.
 // The message is the final message of the model. The hook runs before
-// message_end, so message_end and the history have the message that
-// the last hook returns. The loop runs the tool calls of
-// that message.
+// message_end, so message_end and the log have the message that the
+// last hook returns. The loop runs the tool calls of that message.
 //
 // The message_update events carry the message of the model before the
 // hooks. If the stream fails, no hook runs, and the agent keeps the
 // partial message.
 //
 // If a hook returns an error, the run fails, the hooks after it do not
-// run, and the history does not keep the message.
+// run, and the log does not keep the message.
 func AfterCall(fn AfterCallFunc) Option {
 	return Hooks(afterCall{fn: fn})
 }
@@ -174,8 +178,8 @@ func (h beforeTool) BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.
 // BeforeTool adds a hook that runs before each tool call. The state
 // holds the assistant message of the call, and the results of the calls
 // before it if the calls run in order. The agent runs the call that the
-// last hook returns. If a hook changes the name,
-// the agent finds the tool again. The ID of the call stays, so the
+// last hook returns. If a hook changes the name, the agent finds the
+// tool again. The ID of the call stays, so the
 // result answers the call of the model.
 //
 // The hooks run after the agent finds the tool. A call to an unknown
@@ -220,7 +224,7 @@ func (h afterTool) AfterTool(
 // tool_execution_end, so the event has the final result. The call is
 // the call that ran, with the changes of the BeforeTool hooks.
 // [State.Pending] still holds the call as the model sent it. The agent
-// adds the result that the last hook returns.
+// stores the result that the last hook returns as the call ends.
 //
 // The calls of one message run at the same time, and the hooks run in
 // the goroutine of each call. So a hook must be safe for concurrent
@@ -233,50 +237,53 @@ func AfterTool(fn AfterToolFunc) Option {
 	return Hooks(afterTool{fn: fn})
 }
 
-// AfterTurnFunc reads a finished turn and returns messages to add.
+// AfterTurnFunc reads a finished turn and returns entries to add.
 // See [AfterTurn].
-type AfterTurnFunc func(ctx context.Context, s State) ([]ai.Message, error)
+type AfterTurnFunc func(ctx context.Context, s State) ([]session.Entry, error)
 
 type afterTurn struct {
 	BaseHook
 	fn AfterTurnFunc
 }
 
-func (h afterTurn) AfterTurn(ctx context.Context, s State) ([]ai.Message, error) {
+func (h afterTurn) AfterTurn(ctx context.Context, s State) ([]session.Entry, error) {
 	return h.fn(ctx, s)
 }
 
 // AfterTurn adds a hook that runs after each turn, after turn_end.
 //
-// After each hook, the agent adds the messages of the hook to the
-// history, and sends message_start and message_end for each one. The
-// next hook then sees them in its state. The messages do not start
-// another turn. If the run
-// continues, the next model call reads them. If not, the next run reads
-// them. If a hook returns an error, the run fails.
+// After each hook, the agent stores the entries of the hook in the
+// log. Each message entry gets message_start and message_end, and the
+// next hook sees it in its state. A custom entry, from
+// [session.Custom], gets no event, and the model does not read it. An
+// ephemeral entry reaches the state and not the store. The entries do
+// not start another turn. If the run continues, the next model call
+// reads them. If not, the next run reads them, except an ephemeral
+// entry. If a hook returns an
+// error, the run fails.
 func AfterTurn(fn AfterTurnFunc) Option {
 	return Hooks(afterTurn{fn: fn})
 }
 
 // BeforeStopFunc continues a run that would stop. See [BeforeStop].
-type BeforeStopFunc func(ctx context.Context, s State) ([]ai.Message, error)
+type BeforeStopFunc func(ctx context.Context, s State) ([]session.Entry, error)
 
 type beforeStop struct {
 	BaseHook
 	fn BeforeStopFunc
 }
 
-func (h beforeStop) BeforeStop(ctx context.Context, s State) ([]ai.Message, error) {
+func (h beforeStop) BeforeStop(ctx context.Context, s State) ([]session.Entry, error) {
 	return h.fn(ctx, s)
 }
 
 // BeforeStop adds a hook that runs when the run would stop: the turn
 // made no tool calls, and the queues are empty. The first hook that
-// returns messages wins, and the hooks after it do not run.
+// returns entries wins, and the hooks after it do not run.
 //
-// The agent starts the next turn, and adds the messages after its
-// turn_start, with message_start and message_end for each one. If no
-// hook returns messages, the run stops. If a hook returns an error, the run fails.
+// The agent starts the next turn, and stores the entries after its
+// turn_start, as AfterTurn does. If no hook returns entries, the run
+// stops. If a hook returns an error, the run fails.
 func BeforeStop(fn BeforeStopFunc) Option {
 	return Hooks(beforeStop{fn: fn})
 }

@@ -122,6 +122,10 @@ export default defineConfig({
           ],
         },
         {
+          label: "pkg/session",
+          items: [{ label: "Sessions", slug: "docs/session" }],
+        },
+        {
           label: "Providers",
           items: [
             { label: "Anthropic", slug: "docs/providers/anthropic" },
@@ -137,6 +141,7 @@ export default defineConfig({
             { label: "Use Tools", slug: "docs/guides/use-tools" },
             { label: "Write a Provider", slug: "docs/guides/write-a-provider" },
             { label: "Run an Agent", slug: "docs/guides/run-an-agent" },
+            { label: "Keep a Session", slug: "docs/guides/keep-a-session" },
           ],
         },
         {

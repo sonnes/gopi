@@ -8,7 +8,7 @@ import HookRail from "../../../components/figures/HookRail.astro";
 Add a hook when a run needs a rule that the loop does not have, such as a token budget or an approval for each tool call. Without hooks, the agent runs each tool call that the model makes. It stops when a turn makes no tool calls and the queues are empty.
 
 <HookRail
-  alt="One turn of the loop, top to bottom. BeforeCall changes the request before the model call. AfterCall changes the message before message_end. For each tool call, BeforeTool runs after tool_execution_start and can block the call with Deny, then the tool runs, then AfterTool changes the result before tool_execution_end. AfterTurn runs after turn_end and adds messages. If the turn made no tool calls and the queues are empty, BeforeStop runs, and its messages start the next turn."
+  alt="One turn of the loop, top to bottom. BeforeCall changes the request before the model call. AfterCall changes the message before message_end. For each tool call, BeforeTool runs after tool_execution_start and can block the call with Deny, then the tool runs, then AfterTool changes the result before tool_execution_end. AfterTurn runs after turn_end and adds entries. If the turn made no tool calls and the queues are empty, BeforeStop runs, and its entries start the next turn."
   rows={[
     { step: "turn_start" },
     { hook: "BeforeCall", io: "Request -> Request", does: "change the messages and the options of one call" },
@@ -21,9 +21,9 @@ Add a hook when a run needs a rule that the loop does not have, such as a token 
     { hook: "AfterTool", io: "ToolResult -> ToolResult", does: "change the result" },
     { step: "tool_execution_end" },
     { step: "turn_end" },
-    { hook: "AfterTurn", io: "State -> []Message", does: "add messages, no new turn" },
+    { hook: "AfterTurn", io: "State -> []Entry", does: "add entries, no new turn" },
     { step: "no tool calls, queues empty?", muted: true },
-    { hook: "BeforeStop", io: "State -> []Message", does: "the first hook with messages wins", loop: "next turn" },
+    { hook: "BeforeStop", io: "State -> []Entry", does: "the first hook with entries wins", loop: "next turn" },
   ]}
   groups={[{ from: 5, to: 9, label: "each tool call" }]}
 />
@@ -49,6 +49,8 @@ a := agent.New(lm, agent.Hooks(Budget{Max: 50_000}))
 ```
 
 For one point, use the option of that point, such as `agent.BeforeTool`. The hooks run in the order that you add them. Each hook gets the value that the hook before it returned.
+
+A hook reads the [session](../session/index.mdx#in-a-hook) from `State.Log()`: the entries, the messages, and the values. It can set values through it, and it cannot append an entry.
 
 A hook that embeds `agent.BaseHook` keeps compiling when gopi adds a hook point, but a misspelled method also compiles and never runs.
 
@@ -94,20 +96,35 @@ An `AfterTool` hook changes the result before `tool_execution_end`. It runs in t
 
 A tool hook covers every tool of the agent, and a [middleware](../tool/index.mdx) wraps one tool.
 
-## Add Messages
+## Add Entries
 
-An `AfterTurn` hook returns messages to add after `turn_end`. Each message gets `message_start` and `message_end` on the [stream](events.mdx). The messages do not start a turn. The next model call reads them, in this run or in the next run.
+An `AfterTurn` hook returns [entries](../session/index.mdx#entries) to add after `turn_end`. The agent stores them in the log. Each message entry gets `message_start` and `message_end` on the [stream](events.mdx). A custom entry gets no event, and the model does not read it. The entries do not start a turn. The next model call reads them, in this run or in the next run. An ephemeral entry goes to the state and not to the store, and `agent_end` removes it. So only a later model call of this run reads it.
 
-A `BeforeStop` hook runs when the turn made no tool calls and the [steer and follow-up queues](steer.mdx) are empty. The first hook that returns messages starts a new turn with them. The hooks after it do not run.
+A `BeforeStop` hook runs when the turn made no tool calls and the [steer and follow-up queues](steer.mdx) are empty. The first hook that returns entries starts a new turn with them. The hooks after it do not run.
 
 ```go
-untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]ai.Message, error) {
+untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]session.Entry, error) {
 	if testsPass() {
 		return nil, nil
 	}
-	return []ai.Message{ai.UserMessage("The tests fail. Fix them.")}, nil
+	return []session.Entry{session.Text("The tests fail. Fix them.")}, nil
 })
 ```
+
+## Steer From a Hook
+
+A hook steers the run through its state. `s.Steer` and `s.FollowUp` add entries to the [queues](steer.mdx) of the agent, as `a.Steer` and `a.FollowUp` do. Use them from a hook in the middle of a turn, where a returned entry has no place.
+
+```go
+checkErrors := agent.AfterTool(func(ctx context.Context, s agent.State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
+	if r.IsError {
+		s.Steer(session.Text("That call failed. Read the error before you retry."))
+	}
+	return r, nil
+})
+```
+
+A state that a viewer decoded from JSON has no queues, so the two calls do nothing there.
 
 ## Errors
 
@@ -125,7 +142,8 @@ The hooks after the failed hook do not run.
 
 - [Agents](index.mdx) run the loop.
 - [Events](events.mdx) are what a run reports.
-- [Steer and Follow-Up](steer.mdx) add messages from outside the run.
+- [Steer and Follow-Up](steer.mdx) add entries from outside the run.
+- [Sessions](../session/index.mdx) hold the log that a hook reads.
 - [Tools](../tool/index.mdx) have middleware for the rules of one tool.
 
 The design is in [docs/concepts/agent/loop.md](../../../../../docs/concepts/agent/loop.md).

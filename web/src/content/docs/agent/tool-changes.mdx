@@ -53,9 +53,9 @@ A keyword in the name of a tool counts twice as much as a keyword in its descrip
 
 At the start of the next turn, the agent adds one system message with an `ai.ToolAdded` block for each loaded tool.
 
-## Resume a History
+## Resume a Session
 
-A history from `agent.History` keeps the tools of its base. Before the next model call, the agent compares the tools of the history with its `Toolset`:
+A session that `agent.Durable` resumes keeps the tools of its base. Before the next model call, the agent compares the tools of the history with its `Toolset`:
 
 | A tool                                       | The system message holds        |
 | -------------------------------------------- | ------------------------------- |
@@ -64,7 +64,7 @@ A history from `agent.History` keeps the tools of its base. Before the next mode
 | In the history, not in `Toolset`             | `ai.ToolRemoved`                |
 | In the history and in `Toolset`, with the same info | No block                 |
 
-A tool that the search loaded is in the history, so it stays. If the [sections](sections.mdx) changed too, the same message holds both changes, with the sections first.
+`Durable` runs each successful `tool_search` call of the session again, so a tool that the search loaded stays loaded. If the [sections](sections.mdx) changed too, the same message holds both changes, with the sections first.
 
 ## Providers
 
@@ -83,7 +83,7 @@ The pages for [anthropic](../providers/anthropic.mdx), [openai](../providers/ope
 A loaded tool stays loaded after the run ends, also when a failure or a cancel ends the run before the next model call.
 
 - If the model calls a deferred tool that the search did not load, it gets an error result. A removed tool gets the same result.
-- Each tool needs a unique name. If a tool is deferred, a tool of your own named `tool_search` clashes with the search, and `agent.New` panics.
+- Each tool needs a unique name. If a tool is deferred, a tool of your own named `tool_search` clashes with the search. Then `agent.New` panics, and `agent.Durable` returns an error.
 
 ## Related
 

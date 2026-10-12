@@ -14,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -128,7 +129,7 @@ func TestBeforeCall(t *testing.T) {
 			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
 			a := agent.New(model(p), opts...)
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			emittest.CheckEvents(t, events)
 			tt.check(t, p, a, &tr, err)
 		})
@@ -231,7 +232,7 @@ func TestAfterCall(t *testing.T) {
 			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
 			a := agent.New(model(p), opts...)
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			emittest.CheckEvents(t, events)
 			tt.check(t, p, a, &tr, events, err)
 		})
@@ -353,7 +354,7 @@ func TestBeforeTool(t *testing.T) {
 			opts := append([]agent.Option{agent.Toolset(echo, upper)}, tt.hooks(&tr)...)
 			a := agent.New(model(p), opts...)
 
-			events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
 			emittest.CheckEvents(t, events)
 			msgs = afterBase(t, msgs)
@@ -378,7 +379,7 @@ func TestBeforeToolCanceled(t *testing.T) {
 		}),
 	)
 
-	events, _, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(ctx, session.Text("hi")))
 	assert.ErrorIs(t, err, context.Canceled)
 	emittest.CheckEvents(t, events)
 	assert.Equal(t, []string{"hi", ""}, historyTexts(a), "the result is not added")
@@ -398,7 +399,7 @@ func TestBeforeToolStopsAfterCancel(t *testing.T) {
 		}),
 	)
 
-	events, _, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(ctx, session.Text("hi")))
 	assert.ErrorIs(t, err, context.Canceled)
 	emittest.CheckEvents(t, events)
 	assert.Equal(t, []string{"c1"}, tr.get(), "no hook runs after the cancel")
@@ -468,7 +469,7 @@ func TestAfterTool(t *testing.T) {
 			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
 			a := agent.New(model(p), opts...)
 
-			events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
 			emittest.CheckEvents(t, events)
 			msgs = afterBase(t, msgs)
@@ -505,12 +506,12 @@ func TestAfterToolInParallel(t *testing.T) {
 		}),
 	)
 
-	events, msgs, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(ctx, session.Text("hi")))
 	require.NoError(t, err, "the calls still run at the same time")
 	emittest.CheckEvents(t, events)
 
 	assert.ElementsMatch(t, []string{"first", "second"}, tr.get())
-	assert.Equal(t, []string{"first!", "second!"}, resultTexts(msgs))
+	assert.ElementsMatch(t, []string{"first!", "second!"}, resultTexts(msgs))
 }
 
 func TestAfterTurn(t *testing.T) {
@@ -525,8 +526,8 @@ func TestAfterTurn(t *testing.T) {
 			name:      "an append starts no turn",
 			responses: []ai.Message{text("ok")},
 			hooks: []agent.Option{
-				agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
-					return []ai.Message{ai.UserMessage("note")}, nil
+				agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+					return []session.Entry{session.Text("note")}, nil
 				}),
 			},
 			calls:   1,
@@ -539,8 +540,8 @@ func TestAfterTurn(t *testing.T) {
 				text("done"),
 			},
 			hooks: []agent.Option{
-				agent.AfterTurn(func(_ context.Context, s agent.State) ([]ai.Message, error) {
-					return []ai.Message{ai.UserMessage(fmt.Sprintf("after %d", s.Turn()))}, nil
+				agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
+					return []session.Entry{session.Text(fmt.Sprintf("after %d", s.Turn()))}, nil
 				}),
 			},
 			calls:   2,
@@ -550,12 +551,12 @@ func TestAfterTurn(t *testing.T) {
 			name:      "a hook sees the appends of the hooks before it",
 			responses: []ai.Message{text("ok")},
 			hooks: []agent.Option{
-				agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
-					return []ai.Message{ai.UserMessage("one")}, nil
+				agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+					return []session.Entry{session.Text("one")}, nil
 				}),
-				agent.AfterTurn(func(_ context.Context, s agent.State) ([]ai.Message, error) {
+				agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
 					msgs := s.Messages()
-					return []ai.Message{ai.UserMessage("saw " + msgs[len(msgs)-1].Text())}, nil
+					return []session.Entry{session.Text("saw " + msgs[len(msgs)-1].Text())}, nil
 				}),
 			},
 			calls:   1,
@@ -568,7 +569,7 @@ func TestAfterTurn(t *testing.T) {
 			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks...)
 			a := agent.New(model(p), opts...)
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
 			emittest.CheckEvents(t, events)
 
@@ -581,15 +582,15 @@ func TestAfterTurn(t *testing.T) {
 func TestAfterTurnEvents(t *testing.T) {
 	p := &script{responses: []ai.Message{text("ok")}}
 	a := agent.New(model(p),
-		agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
-			return []ai.Message{
-				ai.UserMessage("note"),
-				ai.UserMessage("now"),
+		agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+			return []session.Entry{
+				session.Text("note"),
+				session.Text("now"),
 			}, nil
 		}),
 	)
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 
@@ -630,7 +631,7 @@ func TestBeforeStop(t *testing.T) {
 			name:      "the first hook with messages wins",
 			responses: []ai.Message{text("one"), text("two"), text("three")},
 			opts: []agent.Option{
-				agent.BeforeStop(func(context.Context, agent.State) ([]ai.Message, error) {
+				agent.BeforeStop(func(context.Context, agent.State) ([]session.Entry, error) {
 					return nil, nil
 				}),
 				agent.BeforeStop(once("second")),
@@ -645,7 +646,7 @@ func TestBeforeStop(t *testing.T) {
 			p := &script{responses: tt.responses}
 			a := agent.New(model(p), tt.opts...)
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
 			emittest.CheckEvents(t, events)
 
@@ -686,7 +687,7 @@ func TestHooks(t *testing.T) {
 		agent.Hooks(policy{tr: &tr}),
 	)
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 

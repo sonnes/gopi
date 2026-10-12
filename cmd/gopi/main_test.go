@@ -189,3 +189,44 @@ func TestFenceError(t *testing.T) {
 	assert.ErrorContains(t, err, "--fence=false")
 	assert.Equal(t, errors.New("boom"), fenceError(errors.New("boom")))
 }
+
+func TestSessionsDir(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{
+			name: "GOPI_HOME",
+			env:  map[string]string{"GOPI_HOME": "/data/gopi", "HOME": "/home/ada"},
+			want: "/data/gopi/sessions",
+		},
+		{
+			name: "the home of the user",
+			env:  map[string]string{"HOME": "/home/ada"},
+			want: "/home/ada/.gopi/sessions",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getenv := func(k string) string { return tt.env[k] }
+			got, err := sessionsDir(getenv)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNewAgentKeepsASession(t *testing.T) {
+	dir := t.TempDir()
+	lm := ai.LanguageModel{Model: ai.Model{ID: "test"}}
+
+	a, err := newAgent(t.Context(), lm, nil, "ada", dir)
+	require.NoError(t, err)
+	assert.Equal(t, "ada", a.Log().Session().ID)
+	assert.FileExists(t, filepath.Join(dir, "ada.jsonl"))
+
+	b, err := newAgent(t.Context(), lm, nil, "", dir)
+	require.NoError(t, err)
+	assert.Empty(t, b.Log().Session().ID, "with no session ID, the agent keeps no session")
+}

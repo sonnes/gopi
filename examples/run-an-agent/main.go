@@ -1,6 +1,7 @@
 // Command run-an-agent gives an agent one tool and prints the events of
 // one run: the text, each tool call, and the usage. Then it prints the
-// role of each message in the history of the agent.
+// role of each message in the state of the agent, and the size of its
+// log.
 //
 // The model is the fake provider with scripted replies, so the program
 // needs no key.
@@ -16,6 +17,7 @@ import (
 	fake "github.com/sonnes/gopi/examples/fake-provider"
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -87,8 +89,7 @@ func main() {
 		capTurns,
 	)
 
-	var saved []ai.Message
-	stream := a.Run(ctx, ai.UserMessage("Is it warmer in Lisbon or in Oslo?"))
+	stream := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?"))
 	for ev, err := range stream.Events() {
 		if err != nil {
 			log.Fatal(err)
@@ -102,20 +103,18 @@ func main() {
 			fmt.Printf("-> %s %s\n", ev.ToolName, ev.Args)
 		case agent.EventToolExecutionEnd:
 			fmt.Printf("<- %s error=%v\n", ev.ToolName, ev.Result.IsError)
-		case agent.EventMessageEnd:
-			saved = append(saved, ev.Message)
 		case agent.EventAgentEnd:
 			fmt.Printf("\n%d tokens in, %d tokens out\n", ev.Usage.Input, ev.Usage.Output)
 		}
 	}
 
-	// The history holds the system message, the input, and each
-	// message of the run.
+	// The state holds the system message, the input, and each message
+	// of the run.
 	for _, m := range a.State().Messages() {
 		fmt.Println(m.Role)
 	}
 
-	// saved holds the same messages. A new agent resumes from them.
-	resumed := agent.New(lm, agent.History(saved...), agent.Toolset(weather))
-	fmt.Printf("%d messages to resume\n", len(resumed.State().Messages()))
+	// The log stores each message before its message_end, so it holds
+	// the same messages.
+	fmt.Printf("%d entries in the log\n", len(a.Log().Entries()))
 }

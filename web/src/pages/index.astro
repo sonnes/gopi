@@ -60,22 +60,85 @@ for _, call := range msg.ToolCalls() {
     )
 }`;
 
-const middlewareCode = `
-// A middleware wraps a tool and returns a tool.
-func deny(reason string) tool.Middleware {
-    return func(next tool.Tool) tool.Tool {
-        run := func(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
-            return ai.ToolResult{
-                Content: []ai.Content{ai.Text{Text: reason}},
-                IsError: true,
-            }, nil
+const hooksCode = `
+a := agent.New(model,
+    agent.Toolset(listIssues, readIssue, closeIssue),
+
+    // Fail a run that loops.
+    agent.BeforeCall(func(
+        ctx context.Context, s agent.State, r agent.Request,
+    ) (agent.Request, error) {
+        if s.Turn() > 20 {
+            return r, errors.New("the run used too many turns")
         }
-        return tool.Wrap(next, run)
+        return r, nil
+    }),
+
+    // Block a call. The model reads the reason.
+    agent.BeforeTool(func(
+        ctx context.Context, s agent.State, c ai.ToolCall,
+    ) (ai.ToolCall, error) {
+        if c.Name == "close_issue" {
+            return c, agent.Deny("ask a maintainer to close issues")
+        }
+        return c, nil
+    }),
+
+    // Continue a run that stops before it posts a summary.
+    agent.BeforeStop(func(
+        ctx context.Context, s agent.State,
+    ) ([]session.Entry, error) {
+        if posted(s.Messages()) {
+            return nil, nil
+        }
+        return []session.Entry{session.Text("Post the summary first.")}, nil
+    }),
+)`;
+
+const agentCode = `
+a := agent.New(model, agent.Toolset(weather))
+
+stream := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?"))
+for event, err := range stream.Events() {
+    if err != nil {
+        log.Fatal(err)
+    }
+    switch e := event.(type) {
+    case agent.EventToolExecutionStart:
+        fmt.Println("->", e.ToolName, string(e.Args))
+    case agent.EventMessageUpdate:
+        if e.AssistantEvent.Type == ai.EventTextDelta {
+            fmt.Print(e.AssistantEvent.Delta)
+        }
+    }
+}`;
+
+const durableCode = `
+store, err := jsonl.New("sessions")
+
+a, err := agent.Durable(ctx, model, "triage",
+    agent.Store(store),
+    agent.Toolset(listIssues, readIssue),
+)
+
+// With no input, the run continues from the last message.
+var input []session.Entry
+if len(os.Args) > 1 {
+    input = append(input, session.Text(os.Args[1]))
+}
+
+stream := a.Run(ctx, input...)
+for event, err := range stream.Events() {
+    if err != nil {
+        log.Fatal(err)
+    }
+    if e, ok := event.(agent.EventToolExecutionStart); ok {
+        fmt.Println("->", e.ToolName, string(e.Args))
     }
 }
 
-// The first middleware is the outermost one.
-guarded := tool.Chain(weather, deny("not in this region"), logCalls)`;
+msgs, err := stream.Wait()
+fmt.Println(msgs[len(msgs)-1].Text())`;
 
 const providers = [
   ["anthropic", "http", "key", "the Messages API", "pkg/ai/anthropic"],
@@ -94,10 +157,10 @@ const providers = [
       <div class="cell cell--words">
         <p class="label">Go SDK / AI agents</p>
         <h1><img class="hero-wordmark" src={wordmark.src} alt="agent gopi" width={wordmark.width} height={wordmark.height} fetchpriority="high" /></h1>
-        <p class="hero-description">Talk to a model from Go.</p>
+        <p class="hero-description">Build AI agents in Go.</p>
         <p class="lede">
-          Build a prompt, give the model Go functions as tools, and read the answer as a
-          stream of typed events. One package, one call.
+          Call a model, give it Go functions as tools, and let an agent run the loop. A
+          session keeps the history, so the agent picks up where it stopped.
         </p>
 
         <div class="install">
@@ -124,12 +187,120 @@ const providers = [
     </div>
   </header>
 
+  {/* ============ 01 · a pair ============ */}
+  <section class="row" id="session">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/agent · durable</p>
+        <h2>Durable Agents in Go</h2>
+        <p>
+          <code>agent.Durable</code> opens a session by its ID. The log stores each message
+          before its event, so a crash loses at most the message in flight.
+        </p>
+        <p>
+          Each tool result is stored when its call ends. A call that a crash cut short gets
+          an error result, and the next run continues from there.
+        </p>
+        <a class="more" href={`${docs}guides/keep-a-session/`}>Keep a session</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="triage.go" code={durableCode}>
+          <pre class="shell shell--out"><span class="p">$</span> go run ./triage.go "Triage the open issues"
+{`-> list_issues {"state":"open"}
+-> read_issue {"number":41}
+-> read_issue {"number":42}`}
+signal: killed
+<span class="p">$</span> go run ./triage.go
+{`-> read_issue {"number":42}`}
+Two issues are open: #41 is a bug, #42 asks for a feature.</pre>
+        </CodeFrame>
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 02 · a pair ============ */}
+  <section class="row" id="agent">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/agent · the loop</p>
+        <h2>An Agent Runs the Loop</h2>
+        <p>
+          <code>Run</code> calls the model, runs each tool call, and calls the model again,
+          until the model answers without a tool call.
+        </p>
+        <p>
+          Each step is a typed event on one stream, so a UI can show the run as it
+          happens.
+        </p>
+        <a class="more" href={`${docs}agent/`}>Read about agents</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="agent.go" code={agentCode}>
+          <pre class="shell shell--out"><span class="p">$</span> go run ./agent.go
+{`-> weather {"city":"Lisbon"}
+-> weather {"city":"Oslo"}`}
+Lisbon is warmer: 21 degrees against 9.</pre>
+        </CodeFrame>
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 03 · a pair ============ */}
+  <section class="row" id="hooks">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/agent · hooks</p>
+        <h2>Change the Loop With Hooks</h2>
+        <p>
+          A hook runs at one point of the loop: before a model call, before or after a tool
+          call, after a turn, or before the run stops. It reads a copy of the state.
+        </p>
+        <p>
+          The hooks run in the order that you add them.
+          An error from a <code>BeforeTool</code> hook blocks the call, and the model reads
+          the reason.
+        </p>
+        <a class="more" href={`${docs}agent/hooks/`}>Read about hooks</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="hooks.go" code={hooksCode} />
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 04 · a pair ============ */}
+  <section class="row" id="tools">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/tool · tools</p>
+        <h2>A Tool Is a Go Function</h2>
+        <p>
+          <code>tool.New</code> takes a Go function and derives the JSON schema from its
+          input type. The function receives the typed input.
+        </p>
+        <p>
+          An agent runs each tool call for you.
+          Without an agent, <code>ai.Tools</code> declares the tools on one model call,
+          and your code runs the calls.
+        </p>
+        <a class="more" href={docs}>Read the documentation</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="tools.go" code={toolCode} />
+      </div>
+    </div>
+  </section>
+
+  {/* ============ 05 · a pair ============ */}
   <section class="row" id="first-call">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">pkg/ai · first call</p>
-        <h2>Talk to a Model From Go</h2>
-        <p>Build a prompt and read the answer as a stream of typed events.</p>
+        <p class="label">pkg/ai · one call</p>
+        <h2>Call a Model Without an Agent</h2>
+        <p>
+          Under the agent is one model call. Build a prompt, bind a model to a provider,
+          and read the answer.
+        </p>
         <a class="more" href={`${docs}start/`}>Make your first call</a>
       </div>
       <div class="cell cell--work">
@@ -141,11 +312,11 @@ Hello! How can I help you today?</pre>
     </div>
   </section>
 
-  {/* ============ 01 · a pair ============ */}
+  {/* ============ 06 · a pair ============ */}
   <section class="row" id="stream">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">pkg/ai</p>
+        <p class="label">pkg/ai · streams</p>
         <h2>One Prompt, One Stream</h2>
         <p>
           <code>StreamText</code> returns at once. The stream yields typed events as the
@@ -163,51 +334,7 @@ Hello! How can I help you today?</pre>
     </div>
   </section>
 
-  {/* ============ 02 · a pair ============ */}
-  <section class="row" id="tools">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/tool · tools</p>
-        <h2>A Tool Is a Go Function</h2>
-        <p>
-          <code>tool.New</code> takes a Go function and derives the JSON schema from its
-          input type. The function receives the typed input.
-        </p>
-        <p>
-          The model returns tool calls. Your code runs them, appends a tool result for each
-          one, and calls the model again.
-        </p>
-        <a class="more" href={docs}>Read the documentation</a>
-      </div>
-      <div class="cell cell--work">
-        <CodeFrame path="tools.go" code={toolCode} />
-      </div>
-    </div>
-  </section>
-
-  {/* ============ 03 · a pair ============ */}
-  <section class="row" id="middleware">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/tool · middleware</p>
-        <h2>Wrap a Tool With a Rule</h2>
-        <p>
-          A middleware is a function from a tool to a tool. It can rename the tool, deny a
-          call, or add a note to the result.
-        </p>
-        <p>
-          <code>tool.Chain</code> applies a list of middleware. The first one is the
-          outermost, so it runs first and answers last.
-        </p>
-        <a class="more" href={docs}>Read the documentation</a>
-      </div>
-      <div class="cell cell--work">
-        <CodeFrame path="middleware.go" code={middlewareCode} />
-      </div>
-    </div>
-  </section>
-
-  {/* ============ 04 · the width of the sheet ============ */}
+  {/* ============ 07 · the width of the sheet ============ */}
   <section class="row row--wide" id="providers">
     <div class="wide-inner">
       <div class="wide-head">
@@ -262,6 +389,8 @@ Hello! How can I help you today?</pre>
         <li><a href={docs}>Overview</a><span>what gopi is</span></li>
         <li><a href={`${docs}start/`}>Get Started</a><span>install gopi and make one call</span></li>
         <li><a href={`${docs}ai/`}>The Layer</a><span>the types of one model call</span></li>
+        <li><a href={`${docs}agent/`}>Agents</a><span>the loop of model calls and tools</span></li>
+        <li><a href={`${docs}session/`}>Sessions</a><span>the history that an agent resumes</span></li>
         <li><a href={`${docs}guides/call-a-model/`}>The Guides</a><span>one page for each job</span></li>
       </ul>
     </div>

@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 func TestRunProviderFailure(t *testing.T) {
@@ -18,7 +19,7 @@ func TestRunProviderFailure(t *testing.T) {
 	p := &script{fail: boom}
 	a := agent.New(model(p))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	assert.ErrorIs(t, err, boom)
 	emittest.CheckEvents(t, events)
 
@@ -42,7 +43,7 @@ func TestRunCanceledModelCall(t *testing.T) {
 	p := &script{responses: []ai.Message{text("ok")}, gate: gate}
 	a := agent.New(model(p))
 
-	s := a.Run(ctx, ai.UserMessage("hi"))
+	s := a.Run(ctx, session.Text("hi"))
 	cancel()
 	events, _, err := collect(t, s)
 	assert.ErrorIs(t, err, context.Canceled)
@@ -55,7 +56,7 @@ func TestRunDropsUnfinishedToolCalls(t *testing.T) {
 	p := &script{fail: boom, failWithToolStart: true}
 	a := agent.New(model(p), agent.Toolset(echo))
 
-	_, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	assert.ErrorIs(t, err, boom)
 	msgs = afterBase(t, msgs)
 
@@ -116,7 +117,7 @@ func TestRunMessageEvents(t *testing.T) {
 			lm := ai.LanguageModel{Model: ai.Model{ID: "test"}, Provider: tt.p}
 			a := agent.New(lm, tt.opts...)
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 			} else {

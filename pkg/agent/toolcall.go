@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -25,42 +26,55 @@ func (a *Agent) runsInOrder(declared []ai.ToolInfo, calls []ai.ToolCall) bool {
 
 // runTools runs one batch of calls at the same time. It emits every
 // tool_execution_start in call order, and runs the BeforeTool hooks of
-// each call after its start. Then it runs the calls, and emits each
-// tool_execution_end as its call finishes. After every call finishes,
-// it adds the results in call order, so the history is the same as for
-// calls in order. If ctx is done, it adds no result. Calls in order run
-// as batches of one call.
+// each call after its start. Then it runs the calls. As each call
+// finishes, it emits its tool_execution_end and stores its result, so
+// a crash keeps each result that finished. The results are in the order
+// in which the calls finish. If ctx is done, a call that did not finish
+// adds no result. Turn 1 of the next run adds a [session.Interrupted]
+// result for it. Calls in order run as batches of one call.
 func (a *Agent) runTools(
 	ctx context.Context,
 	declared []ai.ToolInfo,
 	calls []ai.ToolCall,
-	emit func(Event),
+	em *emitter,
 ) ([]ai.Message, error) {
 	prepared := make([]pending, len(calls))
 	for i, tc := range calls {
-		emit(startEvent(tc))
+		em.emit(startEvent(tc))
 		prepared[i] = a.prepare(ctx, declared, tc)
 	}
 
-	results := make([]ai.ToolResult, len(calls))
+	var (
+		mu  sync.Mutex
+		out = make([]ai.Message, 0, len(calls))
+	)
 	errs := make([]error, len(calls))
 	var wg sync.WaitGroup
 	for i, tc := range calls {
 		wg.Go(func() {
-			results[i], errs[i] = a.execute(ctx, prepared[i])
-			emit(endEvent(tc, results[i]))
+			result, err := a.execute(ctx, prepared[i])
+			// The lock keeps the end and the result of one call together,
+			// and out in the order of the log.
+			mu.Lock()
+			defer mu.Unlock()
+			em.emit(endEvent(tc, result))
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			msg, err := a.addResult(ctx, em, tc, result)
+			if err != nil {
+				errs[i] = err
+				return
+			}
+			out = append(out, msg)
 		})
 	}
 	wg.Wait()
-	if err := errors.Join(errs...); err != nil {
-		return nil, ctx.Err()
+	if err := ctx.Err(); err != nil {
+		return out, err
 	}
-
-	out := make([]ai.Message, 0, len(calls))
-	for i, tc := range calls {
-		out = append(out, a.addResult(emit, tc, results[i]))
-	}
-	return out, nil
+	return out, errors.Join(errs...)
 }
 
 func startEvent(tc ai.ToolCall) Event {
@@ -79,13 +93,19 @@ func endEvent(tc ai.ToolCall, result ai.ToolResult) Event {
 	}
 }
 
-// addResult adds the result of tc to the history as a tool result
-// message, and returns the message.
-func (a *Agent) addResult(emit func(Event), tc ai.ToolCall, result ai.ToolResult) ai.Message {
+// addResult stores the result of tc in the log as a tool result
+// message, sends its events, and returns the message.
+func (a *Agent) addResult(
+	ctx context.Context,
+	em *emitter,
+	tc ai.ToolCall,
+	result ai.ToolResult,
+) (ai.Message, error) {
 	msg := ai.ToolResultMessage(tc.ID, result.Content...)
 	msg.IsError = result.IsError
-	a.add(emit, msg)
-	return msg
+	entry := session.NewEntry(msg, session.Author(a.cfg.name))
+	_, err := a.add(ctx, em, entry)
+	return msg, err
 }
 
 // pending is a tool call after its BeforeTool hooks. If tool is nil,

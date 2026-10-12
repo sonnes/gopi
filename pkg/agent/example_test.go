@@ -6,6 +6,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 // A BeforeTool hook blocks a tool for every call of the agent. The
@@ -59,11 +60,11 @@ func ExampleBeforeStop() {
 	var lm ai.LanguageModel // a model from a catalog
 	testsPass := func() bool { return true }
 
-	untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]ai.Message, error) {
+	untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]session.Entry, error) {
 		if testsPass() {
 			return nil, nil
 		}
-		return []ai.Message{ai.UserMessage("The tests fail. Fix them.")}, nil
+		return []session.Entry{session.Text("The tests fail. Fix them.")}, nil
 	})
 	a := agent.New(lm, untilGreen)
 	_ = a

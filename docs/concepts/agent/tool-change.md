@@ -4,7 +4,7 @@ description: How an agent loads a deferred tool on demand, and how it adds and r
 package: pkg/ai, pkg/tool, pkg/agent
 read_when:
   - You give an agent more tools than a model call can hold
-  - A saved history has more or fewer tools than the agent declares
+  - A resumed session has more or fewer tools than the agent declares
   - A provider sends a tool list that you do not expect
 ---
 
@@ -37,13 +37,14 @@ A tool change adds tools to the tools that the model can call, or removes tools,
 
 ## Design
 
-- A change is a system message with `ToolAdded` and `ToolRemoved` blocks, and the base stays the same, as in [Section](section.md). A deploy that changes a tool then keeps the cache of a saved history. The cache misses on a call where the provider sends a new tool list.
+- A change is a system message with `ToolAdded` and `ToolRemoved` blocks, and the base stays the same, as in [Section](section.md). A deploy that changes a tool then keeps the cache of a resumed session. The cache misses on a call where the provider sends a new tool list.
 - The history declares the tools that the model can call. The search keeps the loaded tools in the agent and writes nothing to the history, so only the next model call writes a change.
 - The agent and each provider fold the tools with `transcript.CurrentTools`, so they agree on the tools at each place. The fold is in `internal/transcript`, because `pkg/ai` holds no conversation state.
 - If a tool of the history is not in `Toolset`, the next call removes it, so the model never sees a tool that is gone. The search only adds, so this is the one source of a removal.
 - A deferred tool is in the one `Toolset`, with a flag on its info, so the agent has one rule for names and order. The reasons for the flag are in [Tool](../tool/tool.md).
 - The search is a tool of the agent, because it changes the tools that the agent declares. It is the one loader: the agent has no public method that adds or removes a tool.
-- The description of the search names each deferred tool, so the model loads a tool by its name. The cost: each name costs tokens. `Toolset` is fixed at `New`, so a provider caches the description. An agent with other deferred tools replaces the search tool in a saved history.
+- The description of the search names each deferred tool, so the model loads a tool by its name. The cost: each name costs tokens.
+- `Toolset` is fixed at `New` or `Durable`, so a provider caches the description. An agent with other deferred tools replaces the search tool in a resumed session.
 - The search matches a query by name or by keyword in the process, with no index, so it works with every provider. The cost: a synonym of a word of a tool does not match.
 - The loaded tools outlive the run, because a failure or a cancel can end a run after the search and before the next model call. The next run then declares them, so the model can call a tool that the search told it about.
 
@@ -64,3 +65,4 @@ A tool change adds tools to the tools that the model can call, or removes tools,
 - [Loop](loop.md)
 - [Message](../ai/message.md)
 - [State](state.md)
+- [Durability](durability.md)

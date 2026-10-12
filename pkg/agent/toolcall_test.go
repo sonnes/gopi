@@ -3,6 +3,8 @@ package agent_test
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -23,7 +26,7 @@ func TestRunUnknownTool(t *testing.T) {
 	}}
 	a := agent.New(model(p), agent.Toolset(echo))
 
-	_, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	msgs = afterBase(t, msgs)
 
@@ -42,7 +45,7 @@ func TestRunToolFailure(t *testing.T) {
 	}}
 	a := agent.New(model(p), agent.Toolset(broken))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err, "a Go error from a tool does not fail the run")
 	emittest.CheckEvents(t, events)
 	msgs = afterBase(t, msgs)
@@ -63,7 +66,7 @@ func TestRunToolCanceled(t *testing.T) {
 	p := &script{responses: []ai.Message{toolCall("c1", "stop", `{}`)}}
 	a := agent.New(model(p), agent.Toolset(stop))
 
-	events, msgs, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(ctx, session.Text("hi")))
 	assert.ErrorIs(t, err, context.Canceled, "a canceled run fails")
 	assert.Len(t, afterBase(t, msgs), 1, "the assistant message is kept")
 	emittest.CheckEvents(t, events)
@@ -80,7 +83,7 @@ func TestRunToolCallsWithAnotherStopReason(t *testing.T) {
 	p := &script{responses: []ai.Message{call, text("done")}}
 	a := agent.New(model(p), agent.Toolset(echo))
 
-	events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	assert.Equal(t,
@@ -101,7 +104,7 @@ func TestRunSkipsToolCallsOfRefusal(t *testing.T) {
 	p := &script{responses: []ai.Message{call}}
 	a := agent.New(model(p), agent.Toolset(spy))
 
-	events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	assert.False(t, ran, "a call of a refusal does not run")
@@ -139,7 +142,7 @@ func TestRunToolsInParallel(t *testing.T) {
 	}}
 	a := agent.New(model(p), agent.Toolset(first, second))
 
-	events, msgs, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(ctx, session.Text("hi")))
 	require.NoError(t, err, "the calls of one message run at the same time")
 	emittest.CheckEvents(t, events)
 	msgs = afterBase(t, msgs)
@@ -157,17 +160,23 @@ func TestRunToolsInParallel(t *testing.T) {
 			}
 		}
 	}
-	assert.Equal(t, []string{
-		"start c1", "start c2",
-		"end c2", "end c1",
-		"result c1", "result c2",
-	}, order, "starts and results in call order, ends as each call finishes")
+	require.Len(t, order, 6)
+	assert.Equal(t, []string{"start c1", "start c2"}, order[:2], "the starts come in call order")
+	var results []string
+	for _, id := range []string{"c1", "c2"} {
+		assert.Equal(t, slices.Index(order, "end "+id)+1, slices.Index(order, "result "+id),
+			"the result of %s comes right after its end", id)
+	}
+	for _, o := range order {
+		if id, ok := strings.CutPrefix(o, "result "); ok {
+			results = append(results, id)
+		}
+	}
 
 	require.Len(t, msgs, 4)
-	assert.Equal(t, "first", msgs[1].Text())
-	assert.Equal(t, "second", msgs[2].Text())
-	assert.Equal(t, []string{"hi", "", "first", "second", "done"}, historyTexts(a),
-		"the history keeps the results in call order")
+	assert.Equal(t, results, []string{msgs[1].ToolCallID, msgs[2].ToolCallID},
+		"the history keeps the results in the order in which the calls finish")
+	assert.ElementsMatch(t, []string{"first", "second"}, []string{msgs[1].Text(), msgs[2].Text()})
 }
 
 func TestRunToolsSequential(t *testing.T) {
@@ -182,7 +191,7 @@ func TestRunToolsSequential(t *testing.T) {
 		c.tool("three"),
 	))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	msgs = afterBase(t, msgs)
@@ -207,10 +216,10 @@ func TestRunToolsCanceledInParallel(t *testing.T) {
 	p := &script{responses: []ai.Message{toolCalls("wait", "stop")}}
 	a := agent.New(model(p), agent.Toolset(wait, stop))
 
-	events, msgs, err := collect(t, a.Run(ctx, ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(ctx, session.Text("hi")))
 	assert.ErrorIs(t, err, context.Canceled)
-	assert.Len(t, afterBase(t, msgs), 1, "a canceled batch adds no result")
-	assert.Equal(t, []string{"hi", ""}, historyTexts(a))
+	assert.Len(t, afterBase(t, msgs), 2, "a canceled batch adds the results that finished")
+	assert.Equal(t, []string{"hi", "", "stopped"}, historyTexts(a))
 	emittest.CheckEvents(t, events)
 	assert.IsType(t, agent.EventTurnEnd{}, events[len(events)-2])
 	assert.Empty(t, a.State().Pending(), "agent_end clears the pending calls")

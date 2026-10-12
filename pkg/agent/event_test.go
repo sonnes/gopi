@@ -65,6 +65,14 @@ func TestEventJSON(t *testing.T) {
 			want:  `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}`,
 		},
 		{
+			name: "message_end marks an ephemeral message",
+			event: agent.EventMessageEnd{
+				Message:   msg,
+				Ephemeral: true,
+			},
+			want: `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]},"ephemeral":true}`,
+		},
+		{
 			name: "tool_execution_start carries the call",
 			event: agent.EventToolExecutionStart{
 				ToolCallID: "c1",

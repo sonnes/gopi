@@ -64,7 +64,7 @@ The glossary in [docs/README.md](../../../../../docs/README.md) keeps one name f
 
 ## The Optional Capabilities
 
-A provider always streams text. It can also do these. Each one is a function on the binding that asserts the interface on the provider. If the provider lacks the interface, the function returns an error.
+A provider always streams text. It can also do these. `ai.GenerateObject` and `ai.CountTokens` are functions that take a language model and assert the interface on its provider. If the provider lacks the interface, the function returns an error. Images and speech have their own bindings, `ai.ImageModel` and `ai.SpeechModel`. Each binding takes only a provider that implements its interface, so a binding to a provider without it does not compile.
 
 <CheckMatrix
   alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, and image interfaces. OpenAI Chat implements the object interface only. No provider implements speech."
@@ -80,7 +80,7 @@ A provider always streams text. It can also do these. Each one is a function on 
     { label: "OpenAI", code: "openai", cells: ["yes", "yes", "yes", "no"] },
     { label: "OpenAI Chat", code: "openaichat", cells: ["yes", "no", "no", "no"] },
   ]}
-  legend={[["yes", "implements the interface"], ["no", "the function returns an error"]]}
+  legend={[["yes", "implements the interface"], ["no", "objects and token counts: an error at run time. Images and speech: a compile error"]]}
   colWidth="112px"
 />
 

@@ -5,7 +5,7 @@ package: pkg/ai, pkg/agent
 read_when:
   - A part of the system prompt changes during a conversation
   - A provider sends system text that you do not expect
-  - A saved history has a prompt that you do not expect
+  - A resumed session has a prompt that you do not expect
 ---
 
 # Section
@@ -35,7 +35,7 @@ A section is a named part of the system prompt. A system message sets a section 
 
 - A section is a content block of a system message, as in [Message](../ai/message.md). The content of a message is an ordered list, so the history keeps the order of the sections.
 - A removal is its own block, `SectionRemoved`, because a section with an empty text is a valid section.
-- The agent has one prompt option, `System`, and its function returns the sections. The whole prompt then lives in the history, and a saved history records the prompt that the model read.
+- The agent has one prompt option, `System`, and its function returns the sections. The whole prompt then lives in the history, and the log records the prompt that the model read.
 - The agent calls the function one time for each model call. The change goes before the new messages of the turn, so the model reads the prompt before the messages that it applies to.
 - A provider puts the base in the system prompt and the tool list of its API, with no frame. The base never changes, so the cached prefix stays the same across a change, and a change costs only the tokens of its system message. The prefix changes on a call where a provider sends a new tool list, as [Tool Change](tool-change.md) shows.
 - The agent folds the sections, and a provider does not, because only the agent compares the history with the sections that it wants. A provider adds only the frame of [Message](../ai/message.md), so a tag or a heading in the text is the choice of the caller.

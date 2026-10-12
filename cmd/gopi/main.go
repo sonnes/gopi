@@ -16,6 +16,10 @@
 // folder, and it has no network. The file tools obey the same rules.
 // ask_user_question asks on the terminal.
 //
+// With --session-id, gopi keeps the conversation in a JSONL file of
+// that name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The first run
+// creates the session, and each later run with the same ID resumes it.
+//
 // With --mcp, gopi also starts the MCP servers of an mcp.json file, in
 // the format of Claude Code, and gives their tools to the agent. The
 // fence does not confine them. A stdio server runs as a normal process
@@ -29,6 +33,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
@@ -44,6 +49,8 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox/grep"
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/sandbox/write"
+	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/session/jsonl"
 	"github.com/sonnes/gopi/pkg/tool"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 	"github.com/sonnes/gopi/pkg/tool/todowrite"
@@ -77,6 +84,9 @@ type options struct {
 	json bool
 	// mcp is the path of an mcp.json file. Empty means no MCP server.
 	mcp string
+	// sessionID is the ID of the session that keeps the conversation.
+	// Empty means no session: the conversation ends with gopi.
+	sessionID string
 }
 
 func main() {
@@ -121,21 +131,27 @@ func main() {
 				Usage: "print each event as one line of JSON instead of the tree",
 			},
 			&cli.StringFlag{
+				Name:    "session-id",
+				Aliases: []string{"s"},
+				Usage:   "keep the conversation in the session with this ID. The first run creates it, and a later run resumes it",
+			},
+			&cli.StringFlag{
 				Name:  "mcp",
 				Usage: "the path of an mcp.json file. gopi starts its servers and gives their tools to the agent. The fence does not confine the servers",
 			},
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := options{
-				provider: c.String("provider"),
-				model:    c.String("model"),
-				turns:    c.Int("turns"),
-				root:     c.String("root"),
-				fence:    c.Bool("fence"),
-				tools:    c.String("tools"),
-				thinking: c.String("thinking"),
-				json:     c.Bool("json"),
-				mcp:      c.String("mcp"),
+				provider:  c.String("provider"),
+				model:     c.String("model"),
+				turns:     c.Int("turns"),
+				root:      c.String("root"),
+				fence:     c.Bool("fence"),
+				tools:     c.String("tools"),
+				thinking:  c.String("thinking"),
+				json:      c.Bool("json"),
+				mcp:       c.String("mcp"),
+				sessionID: c.String("session-id"),
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
@@ -189,7 +205,14 @@ func run(ctx context.Context, o options, args []string) error {
 		}
 		opts = append(opts, agent.Thinking(level))
 	}
-	a := agent.New(lm, opts...)
+	dir, err := sessionsDir(os.Getenv)
+	if err != nil {
+		return err
+	}
+	a, err := newAgent(ctx, lm, opts, o.sessionID, dir)
+	if err != nil {
+		return err
+	}
 	var t printer = jsonLines{w: os.Stdout}
 	if !o.json {
 		tr := newTree(os.Stdout, name+"/"+lm.Model.ID, isTerminal(os.Stdout))
@@ -219,6 +242,40 @@ func run(ctx context.Context, o options, args []string) error {
 		fmt.Fprint(os.Stderr, prompt)
 	}
 	return nil
+}
+
+// newAgent returns the agent of gopi. With a session ID, the agent
+// keeps the conversation in the JSONL store in dir. Without one, the
+// conversation ends with gopi.
+func newAgent(
+	ctx context.Context,
+	lm ai.LanguageModel,
+	opts []agent.Option,
+	sessionID string,
+	dir string,
+) (*agent.Agent, error) {
+	if sessionID == "" {
+		return agent.New(lm, opts...), nil
+	}
+	store, err := jsonl.New(dir)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(slices.Clip(opts), agent.Store(store))
+	return agent.Durable(ctx, lm, sessionID, opts...)
+}
+
+// sessionsDir returns the folder of the session files:
+// $GOPI_HOME/sessions, or ~/.gopi/sessions.
+func sessionsDir(getenv func(string) string) (string, error) {
+	if home := getenv("GOPI_HOME"); home != "" {
+		return filepath.Join(home, "sessions"), nil
+	}
+	home := getenv("HOME")
+	if home == "" {
+		return "", errors.New("no home folder: set HOME or GOPI_HOME")
+	}
+	return filepath.Join(home, ".gopi", "sessions"), nil
 }
 
 // fenceError explains an error of a fence that has no backend on this
@@ -282,7 +339,7 @@ func runPrompt(ctx context.Context, a *agent.Agent, t printer, prompt string) er
 	// cancel of the run waits.
 	context.AfterFunc(ctx, stop)
 
-	for e, err := range a.Run(ctx, ai.UserMessage(prompt)).Events() {
+	for e, err := range a.Run(ctx, session.Text(prompt)).Events() {
 		if err != nil {
 			return err
 		}

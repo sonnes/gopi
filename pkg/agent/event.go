@@ -9,8 +9,11 @@ import (
 )
 
 // Stream is the event stream of one run. Its final result is the
-// messages that the run produced, in order. The input of the caller is
-// not part of the result, because the caller already has it.
+// messages that the run produced, in the order of the log. The input of
+// the caller is not part of the result, because the caller already has
+// it. The results that turn 1 adds for the interrupted tool calls of an
+// earlier run come first, so a caller that keeps the result has an
+// answer for each call.
 type Stream = stream.Stream[Event, []ai.Message]
 
 // Event is one thing that happened in a run. The interface is sealed,
@@ -53,7 +56,9 @@ type EventTurnEnd struct {
 	// Message is the assistant message of the turn. It is nil if the
 	// turn failed before the model sent a message.
 	Message *ai.Message
-	// ToolResults are the tool results of the turn.
+	// ToolResults are the tool results of the turn, in the order in
+	// which the calls ended. The interrupted results of turn 1 are not
+	// in it.
 	ToolResults []ai.Message
 }
 
@@ -73,11 +78,16 @@ type EventMessageUpdate struct {
 	AssistantEvent ai.Event
 }
 
-// EventMessageEnd carries the final message. [State.Apply] adds it to
-// the history, unless it is an assistant message with no content. A
-// caller that saves the conversation saves the message of this event.
+// EventMessageEnd carries the final message. The log stores it before
+// the event, unless it is ephemeral. [State.Apply] appends it to the
+// messages of the state, unless it is an assistant message with no
+// content.
 type EventMessageEnd struct {
 	Message ai.Message
+	// Ephemeral marks a message of an ephemeral entry. The model reads
+	// it in this run, and the store does not keep it. [State.Apply]
+	// removes it at agent_end.
+	Ephemeral bool
 }
 
 // EventToolExecutionStart marks the start of one tool call.
@@ -164,6 +174,8 @@ type eventJSON struct {
 	Message *ai.Message `json:"message,omitempty"`
 	// message_update
 	AssistantEvent *ai.Event `json:"assistant_event,omitempty"`
+	// message_end
+	Ephemeral bool `json:"ephemeral,omitempty"`
 
 	// tool_execution_start and tool_execution_end
 	ToolCallID string          `json:"tool_call_id,omitempty"`
@@ -200,7 +212,11 @@ func marshalEvent(e Event) ([]byte, error) {
 			AssistantEvent: &v.AssistantEvent,
 		}
 	case EventMessageEnd:
-		w = eventJSON{Type: typeMessageEnd, Message: &v.Message}
+		w = eventJSON{
+			Type:      typeMessageEnd,
+			Message:   &v.Message,
+			Ephemeral: v.Ephemeral,
+		}
 	case EventToolExecutionStart:
 		w = eventJSON{
 			Type:       typeToolExecutionStart,
@@ -246,7 +262,10 @@ func UnmarshalEvent(data []byte) (Event, error) {
 			AssistantEvent: deref(w.AssistantEvent),
 		}, nil
 	case typeMessageEnd:
-		return EventMessageEnd{Message: deref(w.Message)}, nil
+		return EventMessageEnd{
+			Message:   deref(w.Message),
+			Ephemeral: w.Ephemeral,
+		}, nil
 	case typeToolExecutionStart:
 		return EventToolExecutionStart{
 			ToolCallID: w.ToolCallID,

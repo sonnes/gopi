@@ -10,13 +10,14 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
 func TestRunText(t *testing.T) {
 	p := &script{responses: []ai.Message{text("hello")}}
 	a := agent.New(model(p))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 
 	emittest.CheckEvents(t, events)
@@ -60,7 +61,7 @@ func TestRunToolLoop(t *testing.T) {
 	}}
 	a := agent.New(model(p), agent.Toolset(echo))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	msgs = afterBase(t, msgs)
@@ -128,7 +129,7 @@ func TestRunContinuesWithoutInput(t *testing.T) {
 	p := &script{responses: []ai.Message{text("one"), text("two")}}
 	a := agent.New(model(p))
 
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	_, msgs, err := collect(t, a.Run(context.Background()))
 	require.NoError(t, err)
@@ -144,7 +145,7 @@ func TestMessageEndCarriesTheHistory(t *testing.T) {
 	}}
 	a := agent.New(model(p), agent.Toolset(echo))
 
-	events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 
 	var saved []ai.Message

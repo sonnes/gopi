@@ -123,7 +123,9 @@ var back []ai.Message
 err = json.Unmarshal(data, &back)
 ```
 
-A saved message reads back with every block, or the read fails, for example when an older build of gopi reads a newer block type. A field that does not apply to the role is left out, so a user message has no usage. The timestamp is in UTC. The program is [examples/save-a-conversation/main.go](../../../../../examples/save-a-conversation/main.go).
+A saved message reads back with every block, or the read fails, for example when an older build of gopi reads a newer block type. A field that does not apply to the role is left out, so a user message has no usage. The program is [examples/save-a-conversation/main.go](../../../../../examples/save-a-conversation/main.go).
+
+An agent stores its messages in the log of a [session](../session/index.mdx), so you do not save them yourself.
 
 ## Related
 

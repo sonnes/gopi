@@ -47,8 +47,8 @@ The deferred tools are:`
 //
 // The added tools arrive in a system message after the tool result, so
 // the tools of the first call stay the same, and a provider can cache
-// them. The history keeps the change, so a resumed history keeps the
-// tools.
+// them. The log keeps the change, so a resumed session keeps the
+// tools. If a crash loses the change, [Durable] runs the search again.
 type searchTool struct {
 	agent *Agent
 	tools []tool.Tool

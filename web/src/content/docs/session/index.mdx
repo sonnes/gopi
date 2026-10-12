@@ -1,0 +1,200 @@
+---
+title: Sessions
+summary: A session is one conversation that a store keeps, with an ID that the application chooses. Its log holds the entries in append order, and the values.
+---
+
+import Ledger from "../../../components/figures/Ledger.astro";
+import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
+import Rails from "../../../components/figures/Rails.astro";
+import FileView from "../../../components/figures/FileView.astro";
+
+An agent writes each message of a run to its log before the `message_end` event. The model reads the messages of the entries in append order. A value holds application state, such as a title, and the model never reads it.
+
+<Ledger
+  alt="A log holds the entries of a session in append order: a user message, an assistant message with a tool call, the tool result, and the answer. The model reads the entries. Next to them, the values are kept by name, and the model never reads them. The value app.label has the key e2."
+  tape="entries, in append order"
+  reads="the model reads"
+  entries={[
+    { id: "e1", kind: "user", text: "user: hi" },
+    { id: "e2", kind: "assistant", text: "assistant: calls read", tagged: true },
+    { id: "e3", kind: "tool", text: "tool result" },
+    { id: "e4", kind: "assistant", text: "assistant" },
+  ]}
+  append="append: the only way in"
+  drawer={["values, by name", "JSON"]}
+  values={[
+    { name: "app.title", value: '"Trip to Lisbon"' },
+    { name: "app.label", key: "e2", value: '"checkpoint"', tagged: true },
+  ]}
+  foot="set replaces, delete removes"
+  note="the model never reads these"
+/>
+
+## The Log
+
+`agent.New` runs over a log in memory, and the log ends with the process. `agent.Durable` opens the log of a session in a store, so a later process resumes it. `a.Log()` returns the log of an agent.
+
+```go
+a, err := agent.Durable(ctx, model, "user-42", agent.Store(store))
+
+entries := a.Log().Entries() // every stored entry, in append order
+msgs := a.Log().Messages()   // what the model reads
+```
+
+A session has one writer. Two logs on one session interleave their entries, and a provider can reject the result.
+
+## Entries
+
+An entry holds one message, or the data of a custom entry. You set the author and the ephemeral mark. The log sets the ID and the time.
+
+```go
+session.Text("hi", session.Author("user-42"))
+session.Text("The time is 9:14 AM.", session.Ephemeral())
+session.NewEntry(msg, session.Author("importer"))
+marker, err := session.Custom("compaction", summary)
+```
+
+<CheckMatrix
+  alt="A message entry goes to the model and the store. An ephemeral entry goes to the model in this run only, and not to the store. A custom entry goes to the store, and the model never reads it."
+  corner="entry · use it for"
+  columns={[{ label: "model reads" }, { label: "store keeps" }]}
+  rows={[
+    { label: "Text()", kind: "user", code: 'session.Text("hi")', sub: "a turn, or context that stays true", cells: ["yes", "yes"] },
+    { label: "Ephemeral()", kind: "ephemeral", code: "session.Text(now, session.Ephemeral())", sub: "context that is true only now, such as the time", cells: [{ mark: "half", label: "this run" }, "no"] },
+    { label: "Custom()", kind: "meta", code: 'session.Custom("compaction", summary)', sub: "a fact of the application, in its place", cells: ["no", "yes"] },
+  ]}
+  legend={[["yes", "yes"], ["no", "no"], ["half", "in this run only"]]}
+/>
+
+To add entries, pass them to `Run`, `Steer`, or `FollowUp` of the [agent](../agent/index.mdx), or return them from an `AfterTurn` or `BeforeStop` [hook](../agent/hooks.mdx).
+
+The author is a user ID or an agent name. The `Name` option of an agent sets the author of each assistant message and tool result. A UI can choose which entries to show by the author.
+
+A custom entry keeps a fact of the application in its place among the messages, such as the summary of a compaction. `Messages` skips it. The kind `gopi` and each kind that starts with `gopi.` belong to gopi.
+
+## Values
+
+A value has a namespace, a key, and a type. Declare it once, then read and write it through the log. The store keeps it as JSON.
+
+```go
+var title = session.Value[string]{Namespace: "app.title"}
+
+err := title.Set(ctx, a.Log(), "Trip to Lisbon")
+t, ok, err := title.Get(a.Log())
+err = title.Delete(ctx, a.Log())
+```
+
+| Call     | Result                                                                    |
+| -------- | ------------------------------------------------------------------------- |
+| `Set`    | Encodes the value as JSON and stores it. A later set replaces it          |
+| `Get`    | Returns the value. `ok` is false if the value is not set                  |
+| `Delete` | Removes the value. A delete of a value that is not set does nothing       |
+| `Read`   | Returns the value from a `session.Snapshot`, before you open the session  |
+
+```go
+snap, err := store.Load(ctx, "user-42")
+t, ok, err := title.Read(snap)
+```
+
+The JSONL store can repair the file in `Load`. Call `Load` only when no other process writes the session.
+
+A key names one value in a namespace, for example a label for each entry: `session.Value[string]{Namespace: "app.label", Key: entryID}`. The namespace `gopi` and each namespace that starts with `gopi.` belong to gopi. To give the model a value, append it as an entry.
+
+## In a Hook
+
+A hook reads the session from `State.Log()`: the entries, the messages, and the values. It can set and delete values. It cannot append an entry. To add entries, return them from an `AfterTurn` or `BeforeStop` hook, or queue them with [`s.Steer` or `s.FollowUp`](../agent/hooks.mdx#steer-from-a-hook).
+
+```go
+var turns = session.Value[int]{Namespace: "app.turns"}
+
+count := agent.AfterTurn(func(ctx context.Context, s agent.State) ([]session.Entry, error) {
+	n, _, err := turns.Get(s.Log())
+	if err != nil {
+		return nil, err
+	}
+	return nil, turns.Set(ctx, s.Log(), n+1)
+})
+```
+
+A value is in the store when `Set` returns, also if the run fails after it. A state that a viewer decoded from JSON has no log, so its `Log` returns nil.
+
+## After a Crash
+
+A crash loses at most the message in flight. It can leave a tool call with no result, and a provider rejects that.
+
+<Rails
+  legend
+  title="A Crash Between a Tool Call and Its Result"
+  call={`a.Log().Messages()`}
+  alt="The assistant called read and grep. The read result is stored. The process stopped before the grep result, so Messages adds an error result for grep each time it builds the messages. The store never holds that result."
+  tiles={[
+    { id: "u1", kind: "user", text: "user" },
+    { id: "a1", kind: "assistant", sub: "calls read, grep" },
+    { id: "t1", kind: "tool", sub: "read result" },
+    { id: "grep", kind: "error", sub: "tool execution interrupted", width: 1.15 },
+  ]}
+  cut={{ before: 3, label: "crash" }}
+  reads={["read", "read", "read", "bad"]}
+  span={{ from: 3, to: 3, text: "added by Messages()" }}
+  disk={["kept", "kept", "kept", "syn"]}
+>
+  `Messages` adds the error result each time it builds the messages. The store never holds it.
+</Rails>
+
+If a run fails in its tool calls and the process lives on, the next run stores the error results first, with their events.
+
+## Stores
+
+| Store                      | Keeps                              | Use it for                 |
+| -------------------------- | ---------------------------------- | -------------------------- |
+| `session.NewMemoryStore()` | Maps in process memory             | Tests. `Durable` uses it when you set no `Store` |
+| `jsonl.New(dir)`           | One append-only file per session   | One process on one machine |
+
+For a service, implement [`session.Storer`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/session#Storer) over your database.
+
+## The JSONL File
+
+The file of a session is `<dir>/<id>.jsonl`. The first line is the record. Each line after it is one entry or one value write. The store never rewrites a line.
+
+<FileView
+  alt="The file demo.jsonl holds the record on line 1, an entry on line 2, and a value write on line 3. The next entry or value write goes on line 4."
+  name="demo.jsonl"
+  note="the session ID is the file name"
+  lines={[
+    { tag: "record", text: '{"type":"session_init","id":"demo","created_at":"2026-09-23T09:14:00Z"}' },
+    { tag: "entry", text: '{"type":"message","id":"9f2c41d07a3be815","author":"user-1","message":{...}}' },
+    { tag: "value", text: '{"type":"value","op":"set","namespace":"app.title","key":"","value":"Trip to Lisbon"}' },
+  ]}
+  next="+ the next entry or value write"
+  grow="the file only grows"
+/>
+
+- A custom entry is a `message` line too.
+- The load replays the value lines in order, so a later set replaces an earlier one. Each set adds a line.
+- If a complete line does not decode, the load fails.
+- An ID that holds `/` or `\`, or that is `.` or `..`, is an error.
+
+<FileView
+  caption="A Crash Tears the Last Line"
+  alt="A crash stops a write in the middle of line 4, so line 4 has no newline. Load replays lines 1 to 3, cuts line 4 from the file, and returns the record, u1, and a1 with no error."
+  call={`store.Load(ctx, "demo")`}
+  name="demo.jsonl"
+  note="after a crash in the middle of a write"
+  lines={[
+    { tag: "record", text: '{"type":"session_init","id":"demo",...}', status: { text: "replayed" } },
+    { tag: "entry", text: '{"type":"message","id":"u1",...}', status: { text: "replayed" } },
+    { tag: "entry", text: '{"type":"message","id":"a1",...}', status: { text: "replayed" } },
+    { tag: "torn", text: '{"type":"message","id":"e3","mess', status: { text: "no newline: cut", drop: true } },
+  ]}
+  result={{ label: "Load returns", chips: [["record demo", "plain"], ["u1", "user"], ["a1", "assistant"]], note: "and no error" }}
+>
+  The load cuts the torn line from the file, so the next append starts on a new line.
+</FileView>
+
+## Related
+
+- [Agents](../agent/index.mdx) write to a log.
+- [Hooks](../agent/hooks.mdx) read the log of a run.
+- [Keep a Session](../guides/keep-a-session.mdx) is the guide.
+
+The design is in [docs/concepts/session/log.md](../../../../../docs/concepts/session/log.md), [docs/concepts/session/value.md](../../../../../docs/concepts/session/value.md), and [docs/concepts/session/store.md](../../../../../docs/concepts/session/store.md).

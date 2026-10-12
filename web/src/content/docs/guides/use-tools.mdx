@@ -97,7 +97,7 @@ return func(next tool.Tool) tool.Tool {
 }
 ```
 
-`tool.Chain` applies one chain to a tool. The first middleware is the outermost, so `Log` sees the result of `Deny`.
+`tool.Chain` applies one chain to a tool. The first middleware is the outermost, so `Log` sees the result of `Deny`. `Log` also adds `(logged)` to each description, so the model sees the change. `Retry` runs the tool again only on a Go error. An error result passes through to the model.
 
 ```go
 func guard(t tool.Tool) tool.Tool {
@@ -131,8 +131,6 @@ return res, nil
 
 - Each `->` line is one tool call with its input. The model calls the weather tool once per city.
 - Each `log:` line comes from the `Log` middleware. It writes the name, the result flag, and the Go error.
-- The descriptions end in `(logged)`. A middleware can edit the info, so the model sees the change.
-- `Retry` acts on a Go error only. An error result passes through, because the model handles it.
 
 ## Related
 

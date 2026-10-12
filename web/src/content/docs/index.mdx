@@ -8,15 +8,16 @@ import AnnotatedCode from "../../components/figures/AnnotatedCode.astro";
 import { Card, CardGrid, Code } from "@astrojs/starlight/components";
 import hello from "../../../../examples/hello/main.go?raw";
 
-gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream. An agent runs the calls and the tools in a loop, and keeps its history in memory.
+gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream. An agent runs the calls and the tools in a loop, and a session keeps its history.
 
 ## The Stack
 
 <LayerStack
-  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/agent, or pkg/ai directly. pkg/agent runs the tools of pkg/tool. The providers plug into pkg/ai from the side."
+  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/agent, or pkg/ai directly. pkg/agent runs the tools of pkg/tool, and writes its history to pkg/session. The providers plug into pkg/ai from the side."
   layers={[
     { name: "your application", job: "calls pkg/agent, or pkg/ai directly" },
     { name: "pkg/agent", job: "the loop: model calls, tools, hooks", hue: "agent" },
+    { name: "pkg/session", job: "the history: entries, values, stores", hue: "durable" },
     { name: "pkg/tool", job: "the tools: typed input, deferral, middleware", hue: "wire" },
     {
       name: "pkg/ai",
@@ -87,6 +88,11 @@ fmt.Println(msg.Text())`,
     The loop that runs a model with tools, its events, and its hooks.
 
     [pkg/agent](agent/index.mdx)
+  </Card>
+  <Card title="Sessions" icon="open-book">
+    The log of an agent, its entries and values, and the stores that keep it.
+
+    [pkg/session](session/index.mdx)
   </Card>
   <Card title="Guides" icon="list-format">
     One page for each job, with snippets for the choices and one complete program that compiles.

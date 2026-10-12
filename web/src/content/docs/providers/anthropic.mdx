@@ -71,14 +71,14 @@ import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
 On a model that always thinks, the provider sends the effort as a system message before each assistant message. Each assistant message keeps the effort that it used, so a change of level does not change the cached prefix. `msg.Effort` holds the effort that the API used.
 
-A thinking block comes back signed. Send the assistant message back unchanged, and the API verifies it. If a block does not match its prefix, the API drops the block and the call goes on. [Stream a Response](../guides/stream-a-response.mdx) shows the round trip.
+A thinking block comes back signed. Send the assistant message back unchanged, and the API verifies it. On a model that always thinks, the provider asks the API to drop a block that does not match its prefix. Then the call goes on. [Stream a Response](../guides/stream-a-response.mdx) shows the round trip.
 
 ## Caching
 
 <PrefixBar
   alt="The provider puts a cache mark at the end of the system prompt, on the last tool, and on the last user or system message. The prefix up to the last mark is cached when it has at least 512 to 4096 tokens, for each model. A shorter prefix is not cached, and the call does not fail."
   provider="anthropic"
-  says="marks the system prompt, the last tool, and the last user message"
+  says="marks the system prompt, the last tool, and the last user or system message"
   segments={[
     { label: "system prompt + tools", width: 26, state: "hot", mark: true },
     { label: "stable history", width: 50, state: "hot" },
@@ -97,7 +97,7 @@ Put the stable part of a prompt first, so the prefix stays the same between call
 
 ## System Messages
 
-Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 take a system message in the conversation, and the provider sends it in its place. On these models, a tool change goes in place too, so the cached prefix stays the same. Every other model gets the text as a `<system-reminder>` in a user message, and the tool list of the request holds the current tools.
+Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 take a system message in the conversation, and the provider sends it in its place. On these models, if `ai.Tools` holds at least one tool, a tool change goes in place too. Then the cached prefix stays the same. An OpenRouter ID of these models never gets a tool change in place. Every other model gets the text as a `<system-reminder>` in a user message. If a tool change does not go in place, the tool list of the request holds the current tools.
 
 ## Objects
 

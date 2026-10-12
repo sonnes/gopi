@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -35,10 +36,10 @@ func TestSteerDuringToolCall(t *testing.T) {
 	}, tool.Sequential())
 	a := agent.New(model(p), agent.Toolset(wait, wait2))
 
-	s := a.Run(context.Background(), ai.UserMessage("hi"))
+	s := a.Run(context.Background(), session.Text("hi"))
 	go func() {
 		<-started
-		a.Steer(ai.UserMessage("use the other file"))
+		a.Steer(session.Text("use the other file"))
 		close(release)
 	}()
 	events, _, err := collect(t, s)
@@ -58,9 +59,9 @@ func TestSteerDuringToolCall(t *testing.T) {
 func TestSteerBeforeRun(t *testing.T) {
 	p := &script{responses: []ai.Message{text("ok")}}
 	a := agent.New(model(p))
-	a.Steer(ai.UserMessage("first"))
+	a.Steer(session.Text("first"))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 
@@ -105,7 +106,7 @@ func TestQueueOrder(t *testing.T) {
 				text("one"),
 				text("two"),
 			},
-			before:  func(a *agent.Agent) { a.FollowUp(ai.UserMessage("next")) },
+			before:  func(a *agent.Agent) { a.FollowUp(session.Text("next")) },
 			history: []string{"hi", "", "echo:x", "one", "next", "two"},
 		},
 		{
@@ -114,7 +115,7 @@ func TestQueueOrder(t *testing.T) {
 			setup: func(a **agent.Agent) []agent.Option {
 				return []agent.Option{steerOnTurn(a, 1, "steer")}
 			},
-			before:  func(a *agent.Agent) { a.FollowUp(ai.UserMessage("follow")) },
+			before:  func(a *agent.Agent) { a.FollowUp(session.Text("follow")) },
 			history: []string{"hi", "one", "steer", "two", "follow", "three"},
 		},
 		{
@@ -124,7 +125,7 @@ func TestQueueOrder(t *testing.T) {
 				return []agent.Option{agent.BeforeStop(once("hook"))}
 			},
 			before: func(a *agent.Agent) {
-				a.FollowUp(ai.UserMessage("follow"), ai.UserMessage("up"))
+				a.FollowUp(session.Text("follow"), session.Text("up"))
 			},
 			history: []string{"hi", "one", "follow", "up", "two", "hook", "three"},
 		},
@@ -142,7 +143,7 @@ func TestQueueOrder(t *testing.T) {
 				tt.before(a)
 			}
 
-			events, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
 			emittest.CheckEvents(t, events)
 
@@ -156,7 +157,7 @@ func TestQueueOrder(t *testing.T) {
 func steerOnTurn(a **agent.Agent, turn int, s string) agent.Option {
 	return agent.BeforeCall(func(_ context.Context, st agent.State, r agent.Request) (agent.Request, error) {
 		if st.Turn() == turn {
-			(*a).Steer(ai.UserMessage(s))
+			(*a).Steer(session.Text(s))
 		}
 		return r, nil
 	})
@@ -171,18 +172,18 @@ func TestQueueKeptAfterFailure(t *testing.T) {
 	var a *agent.Agent
 	failed := false
 	a = agent.New(model(p),
-		agent.AfterTurn(func(context.Context, agent.State) ([]ai.Message, error) {
+		agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 			if failed {
 				return nil, nil
 			}
 			failed = true
-			a.Steer(ai.UserMessage("steer"))
+			a.Steer(session.Text("steer"))
 			return nil, errors.New("stop")
 		}),
 	)
-	a.FollowUp(ai.UserMessage("follow"))
+	a.FollowUp(session.Text("follow"))
 
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.Error(t, err)
 	assert.Equal(t, []string{"hi", "one"}, historyTexts(a), "the failure stops the run before a drain")
 
@@ -207,13 +208,13 @@ func TestQueueConcurrent(t *testing.T) {
 	p := &script{responses: responses}
 	a := agent.New(model(p))
 
-	s := a.Run(context.Background(), ai.UserMessage("hi"))
+	s := a.Run(context.Background(), session.Text("hi"))
 	var wg sync.WaitGroup
 	for range writers {
 		wg.Go(func() {
 			for range each {
-				a.Steer(ai.UserMessage("steer"))
-				a.FollowUp(ai.UserMessage("follow"))
+				a.Steer(session.Text("steer"))
+				a.FollowUp(session.Text("follow"))
 			}
 		})
 	}
@@ -226,4 +227,56 @@ func TestQueueConcurrent(t *testing.T) {
 	got := strings.Join(historyTexts(a), " ")
 	assert.Equal(t, writers*each, strings.Count(got, "steer"), "every steer reaches the history")
 	assert.Equal(t, writers*each, strings.Count(got, "follow"), "every follow-up reaches the history")
+}
+
+func TestHookSteersThroughTheState(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		toolCall("c1", "echo", `{"s":"x"}`),
+		text("done"),
+	}}
+	a := agent.New(model(p),
+		agent.Toolset(echo),
+		agent.AfterTool(func(_ context.Context, s agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
+			s.Steer(session.Text("check the output"))
+			return r, nil
+		}),
+	)
+
+	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	calls := p.received()
+	require.Len(t, calls, 2)
+	assert.Equal(t, []string{"hi", "", "echo:x", "check the output"}, msgTexts(calls[1]),
+		"the next model call reads the steer")
+}
+
+func TestHookFollowsUpThroughTheState(t *testing.T) {
+	p := &script{responses: []ai.Message{text("one"), text("two")}}
+	done := false
+	a := agent.New(model(p),
+		agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
+			if !done {
+				done = true
+				s.FollowUp(session.Text("go on"))
+			}
+			return nil, nil
+		}),
+	)
+
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
+	require.NoError(t, err)
+	assert.Len(t, p.received(), 2, "the follow-up continues the run")
+	assert.Equal(t, []string{"hi", "one", "go on", "two"}, historyTexts(a))
+}
+
+func TestDecodedStateCannotQueue(t *testing.T) {
+	var s agent.State
+	require.NoError(t, s.UnmarshalJSON([]byte(`{}`)))
+
+	assert.NotPanics(t, func() {
+		s.Steer(session.Text("x"))
+		s.FollowUp(session.Text("y"))
+	}, "a viewer has no queues, so the calls do nothing")
 }

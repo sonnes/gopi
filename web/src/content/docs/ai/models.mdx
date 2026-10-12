@@ -9,7 +9,7 @@ import Nesting from "../../../components/figures/Nesting.astro";
 A model is one named model that a provider serves. It holds an ID, a name, its limits, the kinds of input that it reads, its thinking levels, and its prices. It holds no credentials. A provider is one backend that answers a call. It holds the credentials and speaks the wire format. A binding pairs the two, and your code calls the binding.
 
 <BindingEquation
-  alt="An ai.Model holds an ID, a name, its limits, its capabilities, and its prices, and no credentials. An ai.TextProvider holds the credentials and the wire format. Together they make an ai.LanguageModel. It always has StreamText. It has GenerateObject if the provider is an ObjectProvider, and CountTokens if the provider is a TokenCounter."
+  alt="An ai.Model holds an ID, a name, its limits, its capabilities, and its prices, and no credentials. An ai.TextProvider holds the credentials and the wire format. Together they make an ai.LanguageModel. It has StreamText."
   terms={[
     { type: "ai.Model", fields: ["ID", "Name", "limits", "Pricing"], lacks: "no credentials", example: "anthropic.Sonnet5" },
     {
@@ -24,8 +24,6 @@ A model is one named model that a provider serves. It holds an ID, a name, its l
     sub: "{ Model, Provider }",
     calls: [
       { name: "StreamText", when: "always", always: true },
-      { name: "GenerateObject", when: "if an ObjectProvider" },
-      { name: "CountTokens", when: "if a TokenCounter" },
     ],
     example: "your code calls this",
   }}
@@ -41,6 +39,8 @@ model := ai.LanguageModel{
 ```
 
 The same model value binds to any provider that serves it. The same provider serves any of its models.
+
+`ai.GenerateObject` and `ai.CountTokens` are package functions that take the binding as an argument. [The Optional Capabilities](index.mdx#the-optional-capabilities) says which providers implement them.
 
 ## Read the Metadata
 

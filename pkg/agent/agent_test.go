@@ -9,6 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -19,7 +20,7 @@ func TestCallOptions(t *testing.T) {
 		agent.Thinking(ai.ThinkingLow),
 	)
 
-	_, _, err := collect(t, a.Run(context.Background(), ai.UserMessage("hi")))
+	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 	require.NoError(t, err)
 	require.Len(t, p.opts, 1)
 	opts := p.opts[0]
@@ -36,34 +37,18 @@ func TestRunIsSequential(t *testing.T) {
 	a := agent.New(model(p))
 	ctx := context.Background()
 
-	first := a.Run(ctx, ai.UserMessage("one"))
+	first := a.Run(ctx, session.Text("one"))
 	for range first.Events() {
 		break
 	}
 
-	_, err := a.Run(ctx, ai.UserMessage("two")).Wait()
+	_, err := a.Run(ctx, session.Text("two")).Wait()
 	require.Error(t, err)
 
 	close(gate)
 	_, err = first.Wait()
 	require.NoError(t, err)
 	assert.Equal(t, []string{"one", "ok"}, msgTexts(history(a)), "the refused run added nothing")
-}
-
-func TestHistory(t *testing.T) {
-	p := &script{responses: []ai.Message{text("two")}}
-	saved := []ai.Message{
-		ai.UserMessage("first"),
-		text("one"),
-	}
-	a := agent.New(model(p), agent.History(saved...))
-
-	_, msgs, err := collect(t, a.Run(context.Background(), ai.UserMessage("second")))
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"first", "one", "second"}, msgTexts(p.received()[0]), "the model reads the history first")
-	assert.Equal(t, []string{"two"}, msgTexts(msgs), "the result has no history and no input")
-	assert.Equal(t, []string{"first", "one", "second", "two"}, msgTexts(history(a)))
 }
 
 func TestDuplicateToolName(t *testing.T) {

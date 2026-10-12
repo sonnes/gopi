@@ -1,6 +1,6 @@
 ---
 title: Run an Agent
-summary: Give an agent a tool and a prompt, read the events of a run, cap its turns, and save the conversation.
+summary: Give an agent a tool and a prompt, read the events of a run, cap its turns, and read its log.
 ---
 
 import { Code } from "@astrojs/starlight/components";
@@ -10,12 +10,12 @@ import code from "../../../../../examples/run-an-agent/main.go?raw";
 The program in this guide needs no key. Its model is a fake provider that sends scripted replies.
 :::
 
-`agent.New` takes a model and options. `Run` takes the input and returns a stream. `Wait` returns the messages that the run produced.
+`agent.New` takes a model and options. `Run` takes the input as entries and returns a stream. `Wait` returns the messages that the run produced.
 
 ```go
 a := agent.New(lm, agent.Toolset(weather))
 
-msgs, err := a.Run(ctx, ai.UserMessage("Is it warmer in Lisbon or in Oslo?")).Wait()
+msgs, err := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?")).Wait()
 ```
 
 The agent calls the model, runs each tool that the model calls, and calls the model again. The run stops when the model makes no tool call.
@@ -96,31 +96,26 @@ case agent.EventAgentEnd:
 | `EventMessageUpdate`      | One model event and a snapshot of the partial message      |
 | `EventToolExecutionStart` | The name and the input of one tool call                    |
 | `EventToolExecutionEnd`   | The result of one tool call                                |
-| `EventMessageEnd`         | The final message                                          |
+| `EventMessageEnd`         | The final message, after the log stores it                 |
 | `EventAgentEnd`           | The usage of the run, summed, and the error of a run that failed |
 
 ## Continue a Run
 
-If a failure stops a run, call `Run` with no messages. The run continues from the last message of the history.
+If a failure stops a run, call `Run` with no entries. The run continues from the last message of the history.
 
 ```go
 stream := a.Run(ctx)
 ```
 
-## Save and Resume
+## Keep the History
 
-The agent keeps its history in memory. Each message of the history arrives as one `message_end`. This includes the input. To save the conversation, save the message of each `message_end`.
-
-```go
-case agent.EventMessageEnd:
-	saved = append(saved, ev.Message)
-```
-
-To resume, give the saved messages to a new agent.
+The log of the agent keeps the history. It stores each message before its `message_end` event, so it has every message of the run.
 
 ```go
-resumed := agent.New(lm, agent.History(saved...), agent.Toolset(weather))
+fmt.Printf("%d entries in the log\n", len(a.Log().Entries()))
 ```
+
+The log of `agent.New` is in memory and ends with the process. To keep the history across processes, use `agent.Durable` with a store. [Keep a Session](keep-a-session.mdx) shows how.
 
 ## The Full Example
 
@@ -130,11 +125,11 @@ resumed := agent.New(lm, agent.History(saved...), agent.Toolset(weather))
 
 ## Read the Output
 
-- The two `->` lines are the calls of the first turn. They start in call order. The calls run at the same time, so the `<-` lines can come in either order.
+- The two `->` lines are the calls of the first turn. They start in call order. The calls run at the same time, so the `<-` lines can come in either order. The tool results go to the log in the same order as the `<-` lines.
 - The answer prints as it streams.
 - The token line comes from `agent_end`. It is the sum of the usage of the two model calls.
 - The role lines list the history. The first is the `system` message that `System` built. Then come the question, the assistant message with the calls, the two tool results, and the answer.
-- The last line counts the saved messages. The count is the same as the number of role lines.
+- The last line counts the entries of the log. The count is the same as the number of role lines.
 
 ## Related
 
@@ -142,3 +137,4 @@ resumed := agent.New(lm, agent.History(saved...), agent.Toolset(weather))
 - [Events](../agent/events.mdx) for each event and what it carries.
 - [Hooks](../agent/hooks.mdx) for the six points of the loop.
 - [Tools](../tool/index.mdx) for the tool interface and the two failure channels.
+- [Sessions](../session/index.mdx) for the log and its entries.

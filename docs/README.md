@@ -25,7 +25,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | ------------- | ----------------------------------------------------------- | --------------------------- |
 | provider      | One backend that answers a model call                        | vendor, service, client     |
 | model         | One named model that a provider serves                       | engine, LLM                 |
-| message       | One turn of a conversation, with a role and content          | turn, entry                 |
+| message       | What one role adds to a conversation, with its content       | turn, entry                 |
 | content block | One part of a message: text, thinking, a tool call, or a file | part, chunk, segment        |
 | tool          | One function that a model can call                           | function, action, skill     |
 | base          | The first message of a history, if it is a system message. It holds the first sections and the first tools | initial prompt, header |
@@ -40,12 +40,21 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | search tool   | The agent tool that ranks the deferred tools and loads the matches | tool finder, loader   |
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
 | run           | One call of the loop, from a prompt to a result              | invocation, request, turn   |
+| turn          | One model call of a run, with the tool calls that it makes   | step, iteration, round      |
 | state         | What an agent knows: the messages that the model reads, the progress of the run, the queues, and the loaded tools | context, memory |
-| history       | The messages of an agent, in order, in memory. The model reads them before each call | log, transcript, session |
-| snapshot      | A copy of a state, as JSON, that a viewer applies events to   | dump, checkpoint            |
+| history       | The messages that the model reads before each call: the messages of the log, and the ephemeral messages of the run | transcript, conversation |
+| session       | One conversation that a store keeps, with an ID that the application chooses | thread, chat            |
+| record        | The part of a session that says that it exists: its ID and its creation time | header, metadata  |
+| log           | The live handle on one session: its record, its entries in order, and its values | journal, history file |
+| entry         | One item of a log: a message, or a custom entry              | record, row, event          |
+| ephemeral entry | An entry that the model reads in its run, and that the store does not keep | transient message, temp entry |
+| custom entry  | An entry with a kind and data and no message. The model never reads it | marker, meta entry |
+| value         | One piece of application state in a session, named by a namespace and a key | metadata, attribute, setting |
+| store         | What keeps the sessions: the record, the entries, and the values | database, backend, repository |
+| snapshot      | A copy of a state, as JSON, that a viewer applies events to. `session.Snapshot` is a session as a store loads it | dump, checkpoint |
 | hook          | A function that the loop calls at a lifecycle point          | callback                    |
-| steer         | A message that the agent reads before its next model call    | interrupt, injection        |
-| follow-up     | A message that the agent reads when the run would stop       | next prompt, queued prompt  |
+| steer         | An entry that the agent reads before its next model call     | interrupt, injection        |
+| follow-up     | An entry that the agent reads when the run would stop        | next prompt, queued prompt  |
 | middleware    | A function that wraps a tool and returns a tool              | wrapper, decorator, hook    |
 | sandbox       | The place where the tools read files, write files, and run commands | box, environment, workspace |
 | fence         | An OS sandbox that limits the writes, reads, network, and environment of a command | jail, cage |

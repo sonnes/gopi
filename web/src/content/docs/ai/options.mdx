@@ -18,6 +18,8 @@ Add an option when a call needs a system prompt, tools, retries, or a setting ot
 | `ai.Thinking`       | `ai.ThinkingLevel`  | The default of the model                   |
 | `ai.Temperature`    | `float64`           | The default of the model                   |
 | `ai.ToolChoice`     | `ai.ToolChoiceMode` | The model decides                          |
+| `ai.ImageSize`      | `string`            | The API picks the size                     |
+| `ai.ImageCount`     | `int`               | The API picks the number                   |
 | `ai.CacheRetention` | `ai.Retention`      | `ai.CacheShort`                            |
 | `ai.MaxRetries`     | `int`               | No retry                                   |
 | `ai.MaxRetryDelay`  | `time.Duration`     | 60 seconds                                 |
@@ -32,7 +34,7 @@ ai.SystemPrompt([]ai.Content{
 })
 ```
 
-A provider retries only when you set `ai.MaxRetries`, and never after the first event of the stream. The error must be one that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. A provider does not send `ai.Temperature` to a model that rejects it.
+A provider retries only when you set `ai.MaxRetries`, and never after the first event of the stream. The error must be one that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. The Anthropic provider does not send `ai.Temperature` to a model that rejects it, or when thinking is on. The OpenAI providers send it when you set it.
 
 ## Two Rules
 

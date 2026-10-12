@@ -59,11 +59,15 @@ import StopOrCancel from "../../../components/figures/StopOrCancel.astro";
 
 ## Two Ways to Read
 
-```go
-// Only the message.
-msg, err := stream.Wait()
+To read only the message, call `Wait`:
 
-// Each event, then the message.
+```go
+msg, err := stream.Wait()
+```
+
+To read each event, range over `Events`. Then call `Wait` for the message:
+
+```go
 for ev, err := range stream.Events() {
 	if err != nil { return err }
 	// ev.Type, ev.ContentIndex, ev.Delta, ev.Content, ev.ToolCall

@@ -45,8 +45,8 @@ The first paragraph comes after the lede. Do not repeat the summary in it.
 
 ## A Guide
 
-A guide covers one job, not one call. There are five: call a model, stream a
-response, use tools, write a provider, run an agent. Add a section to one of them before
+A guide covers one job, not one call. There are six: call a model, stream a
+response, use tools, write a provider, run an agent, keep a session. Add a section to one of them before
 you add a page.
 
 1. Open with the smallest call that does the job.

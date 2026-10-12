@@ -74,21 +74,18 @@ Updated system prompt section "todos":
 
 A removal reads `Removed system prompt section "todos".` A model that takes no system message in the conversation gets this text as a `<system-reminder>` in a user message.
 
-## Save and Resume
+## Resume a Session
 
-The agent keeps the history in memory. To keep a conversation and resume it later:
-
-1. Save the message of each `message_end` event.
-2. Give the saved messages to `agent.History`.
+To keep a conversation and resume it later, open it with `agent.Durable` and a store.
 
 ```go
-a := agent.New(model,
-	agent.History(saved...),
+a, err := agent.Durable(ctx, model, "user-42",
+	agent.Store(store),
 	agent.System(prompt),
 )
 ```
 
-The first saved message stays the base. The agent reads the sections from the history, so it adds a change only if the prompt differs.
+The first message of the session stays the base. The agent reads the sections from the history, so it adds a change only if the prompt differs.
 
 ## Rules
 
