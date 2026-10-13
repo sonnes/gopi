@@ -1,4 +1,4 @@
-.PHONY: test check build tidy fmt record \
+.PHONY: test check build tidy fmt record record-cli \
 	site-install site-dev site-build site-preview site-check site-test \
 	docs-links
 
@@ -66,6 +66,22 @@ RUN ?= .
 record:
 	@set -a; if [ -f .envrc ]; then . ./.envrc; fi; set +a; \
 	cd pkg/ai/$(PKG) && go test . -httprecord='$(subst /,_,$(RUN))' -run='$(RUN)'
+
+# Re-record the stdio traces of one CLI agent package. Set AGENT to its
+# directory under pkg/agent, for example `make record-cli AGENT=codex`.
+# The CLI must be installed and logged in.
+#
+#   codex    runs `codex app-server`
+#   claude   runs `claude` in stream-json mode
+#
+# RUN selects the tests and the trace files, so a recorded test names
+# its trace after itself: TestRecorded writes testdata/TestRecorded.trace.
+# Without RUN, the target records TestRecorded only, because the other
+# traces are hand-written.
+AGENT ?= codex
+CLIRUN = $(if $(filter command line environment,$(origin RUN)),$(RUN),TestRecorded)
+record-cli:
+	go test ./pkg/agent/$(AGENT) -clirecord='$(CLIRUN)' -run='$(CLIRUN)'
 
 # The site lives in web/. Its README has the layout.
 site-install:

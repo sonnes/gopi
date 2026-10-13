@@ -39,6 +39,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | sequential tool | A tool whose call runs with no other call of its message at the same time | exclusive tool, serial tool |
 | search tool   | The agent tool that ranks the deferred tools and loads the matches | tool finder, loader   |
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
+| CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter, harness |
 | run           | One call of the loop, from a prompt to a result              | invocation, request, turn   |
 | turn          | One model call of a run, with the tool calls that it makes   | step, iteration, round      |
 | state         | What an agent knows: the messages that the model reads, the progress of the run, the queues, and the loaded tools | context, memory |

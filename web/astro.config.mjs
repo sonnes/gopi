@@ -119,6 +119,7 @@ export default defineConfig({
             { label: "Steer and Follow-Up", slug: "docs/agent/steer" },
             { label: "Sections", slug: "docs/agent/sections" },
             { label: "Tool Changes", slug: "docs/agent/tool-changes" },
+            { label: "CLI Agents", slug: "docs/agent/cli" },
           ],
         },
         {

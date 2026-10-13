@@ -1,0 +1,7 @@
+stdiorr trace v1
+# Hand-written. The thread of the session is gone.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/resume","params":{"threadId":"th0","cwd":"/work","approvalPolicy":"never"}}
+< {"error":{"code":-32600,"message":"no rollout found for thread id th0"},"id":2}

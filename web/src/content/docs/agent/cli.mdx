@@ -1,0 +1,127 @@
+---
+title: CLI Agents
+summary: A CLI agent runs the Codex CLI or the Claude Code CLI as a gopi agent. The CLI runs its own loop and tools, and gopi reports each run as events and log entries.
+---
+
+import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
+
+A CLI agent starts the CLI once and sends it the input of each run. It reads the output of the CLI and turns it into the same [events](events.mdx) and log entries as an [agent](index.mdx). So the code that shows or stores a run works with all three agents.
+
+<CheckMatrix
+  alt="Three agents and what each one can do. agent.Agent runs gopi tools on any provider, and a run with no entries continues the log. codex.Agent and claude.Agent run the tools of their CLI on the model of their CLI. All three send the same events, and all three resume a stored session with Durable."
+  corner="agent · package"
+  colWidth="72px"
+  columns={[
+    { label: "gopi tools" },
+    { label: "any provider" },
+    { label: "CLI tools" },
+    { label: "same events" },
+    { label: "Durable" },
+    { label: "empty Run" },
+  ]}
+  rows={[
+    { label: "agent.Agent", kind: "ai", sub: "pkg/agent", cells: ["yes", "yes", "no", "yes", "yes", "yes"] },
+    { label: "codex.Agent", kind: "tool", sub: "pkg/agent/codex", cells: ["no", "no", "yes", "yes", { mark: "half", label: "thread" }, "no"] },
+    { label: "claude.Agent", kind: "tool", sub: "pkg/agent/claude", cells: ["no", "no", "yes", "yes", { mark: "half", label: "session" }, "no"] },
+  ]}
+  legend={[["yes", "yes"], ["no", "no"], ["half", "resumes the thread or session of the CLI"]]}
+/>
+
+## Start One
+
+The CLI must be installed and logged in. The first run starts the CLI, and `Close` stops it.
+
+```go
+a := codex.New(
+	codex.Dir("."),
+	codex.Sandbox(codex.SandboxWorkspaceWrite),
+)
+defer a.Close()
+
+msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
+```
+
+`claude.New` takes the same shared options. Read the events of a run as you read the events of an agent. [Run an Agent](../guides/run-an-agent.mdx) shows how.
+
+## Options
+
+| Option                             | Package | Sets                                                        |
+| ---------------------------------- | ------- | ----------------------------------------------------------- |
+| `Store(s)`, `Name(s)`              | both    | The same as for `agent.Agent`                               |
+| `Binary(path)`                     | both    | The path of the CLI. The default is `codex` or `claude` on `PATH` |
+| `Dir(path)`                        | both    | The working directory of the CLI                            |
+| `Model(name)`                      | both    | The model of the CLI                                        |
+| `System(s)`                        | both    | Instructions that the CLI adds to its own prompt            |
+| `Thinking(level)`                  | both    | The reasoning effort of the CLI. For Claude Code, `ai.ThinkingOff` turns thinking off |
+| `Env(kv...)`                       | both    | More environment variables for the CLI                      |
+| `Sandbox(mode)`, `Approval(policy)` | codex   | What a command can touch, and when the CLI asks             |
+| `Approver(fn)`                     | codex   | The function that answers each approval request             |
+| `PermissionMode(mode)`             | claude  | Which tools the CLI runs without a prompt                   |
+| `AllowedTools(names...)`, `DisallowedTools(names...)` | claude | The tools that the CLI runs without a prompt, and the tools that it cannot use |
+| `CanUseTool(fn)`                   | claude  | The function that answers each permission prompt            |
+
+## Tools and Prompts
+
+The CLI runs its own tools. Each tool call of the CLI becomes a tool call in an assistant message, then a tool result. So `tool_execution_start` and `tool_execution_end` report it.
+
+| Codex item    | `ToolName`         |
+| ------------- | ------------------ |
+| command       | `bash`             |
+| file change   | `apply_patch`      |
+| MCP tool call | `<server>__<tool>` |
+| web search    | `web_search`       |
+
+Claude Code reports the names of its own tools, such as `Bash` and `Edit`.
+
+`Approver` answers each approval request of Codex, and `CanUseTool` answers each permission prompt of Claude Code. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request.
+
+```go
+a := claude.New(
+	claude.AllowedTools("Read", "Grep"),
+	claude.CanUseTool(func(ctx context.Context, req claude.ToolRequest) (claude.ToolDecision, error) {
+		if req.ToolName == "Bash" && !confirm(req.Input) {
+			return claude.ToolDecision{Message: "The user refused the command."}, nil
+		}
+		return claude.ToolDecision{Allow: true}, nil
+	}),
+)
+```
+
+A `ToolDecision` with no `Allow` denies the call, and its `Message` goes to the model. With `Always`, the CLI also allows the calls that match its suggestions until the session ends.
+
+To let a CLI act with no request, set `Approval(codex.ApprovalNever)` and a `Sandbox` mode for Codex. For Claude Code, set a `PermissionMode` or `AllowedTools`.
+
+:::caution
+Do not use `SandboxDangerFullAccess` or `PermissionBypass` outside a sandbox. With these modes, the CLI can run any command on the machine.
+:::
+
+## Sessions
+
+`Durable` keeps the thread ID of Codex, or the session ID of Claude Code, as a [value](../session/index.mdx) of the session. A second `Durable` with the same ID and store resumes the same thread of the CLI.
+
+If the CLI cannot find the stored thread or session, the run fails with `ErrNoConversation`. The agent then forgets the ID, and the next run starts a new conversation of the CLI. The log keeps its messages, but the model of the CLI no longer reads them.
+
+The CLI keeps the transcript that its model reads. The log is a copy of the run for display and replay.
+
+`State` returns the [state](events.mdx#state) of the agent, as for `agent.Agent`. A CLI agent has no queues, so `Steer` and `FollowUp` on the state do nothing.
+
+## Rules
+
+- Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream.
+- A run needs an entry with text or a file. The text and the files of the entries go to the CLI. Claude Code reads images and PDFs, and Codex reads images. Each other file becomes a note in the text, so the model knows that the file was there.
+- If the CLI is not logged in, the run fails with `ErrAuth`.
+- An ephemeral entry goes to the CLI, and the log does not keep it. The CLI keeps it in its transcript, so a later run still reads it.
+- A custom entry goes to the log, and not to the CLI.
+- Every run that starts ends with `agent_end`, which holds the error of a failed run.
+- A cancel interrupts the turn of the CLI and waits for the turn to end. If the CLI does not stop, the agent stops the process.
+- If a run fails or stops during a message, the log keeps the blocks that the CLI completed. The block that streams at that time is not kept.
+- Codex can run tools in parallel. The events show them one after the other.
+- If the CLI exits, the error of the run holds the end of its stderr.
+
+## Related
+
+- [Agents](index.mdx) for the loop of gopi.
+- [Events](events.mdx) for each event and what it carries.
+- [Sessions](../session/index.mdx) for the log and its values.
+
+The decisions are in [docs/concepts/agent/cli-agent.md](../../../../../docs/concepts/agent/cli-agent.md).

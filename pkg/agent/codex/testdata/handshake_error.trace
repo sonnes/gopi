@@ -1,0 +1,7 @@
+stdiorr trace v1
+# Hand-written. thread/start fails.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"never"}}
+< {"id":2,"error":{"code":-32600,"message":"not logged in"}}

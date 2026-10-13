@@ -148,6 +148,17 @@ func (s *State) stream(msg ai.Message) {
 	}
 }
 
+// Clip returns s with its slices capped at their length, so an
+// [State.Apply] on the result never writes into the arrays of s.
+// [Agent.State] returns a clipped copy. A CLI agent that keeps its own
+// State returns one too.
+func (s State) Clip() State {
+	s.messages = slices.Clip(s.messages)
+	s.ephemeral = slices.Clip(s.ephemeral)
+	s.pending = slices.Clip(s.pending)
+	return s
+}
+
 // Messages returns what the model reads: the messages of the log, and
 // the ephemeral messages of the active run in their places. A caller
 // must not change them.

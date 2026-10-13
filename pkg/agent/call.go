@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/sonnes/gopi/pkg/agent/internal/partial"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -40,13 +41,13 @@ func (a *Agent) call(
 		if err != nil {
 			return a.keepPartial(ctx, inflight, started, err, em)
 		}
-		accumulate(inflight, &evt)
+		partial.Accumulate(inflight, &evt)
 		if !started {
-			em.emit(EventMessageStart{Message: *snapshot(inflight)})
+			em.emit(EventMessageStart{Message: *partial.Snapshot(inflight)})
 			started = true
 		}
 		em.emit(EventMessageUpdate{
-			Message:        *snapshot(inflight),
+			Message:        *partial.Snapshot(inflight),
 			AssistantEvent: evt,
 		})
 	}
@@ -124,7 +125,7 @@ func (a *Agent) keepPartial(
 	if !started {
 		return nil, cause
 	}
-	msg := snapshot(inflight)
+	msg := partial.Snapshot(inflight)
 	msg.Content = slices.DeleteFunc(msg.Content, unfinishedCall)
 	msg.StopReason = ai.StopReasonError
 	msg.StopDetail = cause.Error()
@@ -147,63 +148,4 @@ func (a *Agent) keepPartial(
 func unfinishedCall(c ai.Content) bool {
 	call, ok := c.(ai.ToolCall)
 	return ok && call.ID == ""
-}
-
-// accumulate applies one model event to the partial message. It grows
-// the content blocks as the events arrive.
-func accumulate(m *ai.Message, evt *ai.Event) {
-	i := evt.ContentIndex
-	switch evt.Type {
-	case ai.EventTextStart:
-		grow(m, i, ai.Text{})
-	case ai.EventTextDelta:
-		grow(m, i, ai.Text{})
-		if t, ok := m.Content[i].(ai.Text); ok {
-			t.Text += evt.Delta
-			m.Content[i] = t
-		}
-	case ai.EventTextEnd:
-		grow(m, i, ai.Text{})
-		if t, ok := m.Content[i].(ai.Text); ok {
-			t.Text = evt.Content
-			m.Content[i] = t
-		}
-	case ai.EventThinkStart:
-		grow(m, i, ai.ThinkingBlock{})
-	case ai.EventThinkDelta:
-		grow(m, i, ai.ThinkingBlock{})
-		if t, ok := m.Content[i].(ai.ThinkingBlock); ok {
-			t.Thinking += evt.Delta
-			m.Content[i] = t
-		}
-	case ai.EventThinkEnd:
-		grow(m, i, ai.ThinkingBlock{})
-		if t, ok := m.Content[i].(ai.ThinkingBlock); ok {
-			t.Thinking = evt.Content
-			m.Content[i] = t
-		}
-	case ai.EventToolStart:
-		grow(m, i, ai.ToolCall{})
-	case ai.EventToolEnd:
-		if evt.ToolCall != nil {
-			grow(m, i, ai.ToolCall{})
-			m.Content[i] = *evt.ToolCall
-		}
-	}
-}
-
-// grow extends the content of m until index i exists.
-func grow(m *ai.Message, i int, zero ai.Content) {
-	for len(m.Content) <= i {
-		m.Content = append(m.Content, zero)
-	}
-}
-
-// snapshot returns a copy of m with its own content slice, so later
-// deltas do not change an event that was already sent.
-func snapshot(m *ai.Message) *ai.Message {
-	cp := *m
-	cp.Content = make([]ai.Content, len(m.Content))
-	copy(cp.Content, m.Content)
-	return &cp
 }

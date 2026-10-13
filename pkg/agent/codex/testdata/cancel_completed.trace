@@ -1,0 +1,17 @@
+stdiorr trace v1
+# Hand-written. The client cancels after the first delta, and the message completes before the turn stops.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"never"}}
+< {"id":2,"result":{"thread":{"id":"th1","turns":[]},"model":"gpt-5-codex","cwd":"/work","approvalPolicy":"never"}}
+< {"method":"thread/started","params":{"thread":{"id":"th1"}}}
+> {"id":3,"method":"turn/start","params":{"threadId":"th1","input":[{"type":"text","text":"Count to 100."}]}}
+< {"id":3,"result":{"turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"turn/started","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":""}}}
+< {"method":"item/agentMessage/delta","params":{"threadId":"th1","turnId":"tu1","itemId":"m1","delta":"1, 2,"}}
+> {"id":4,"method":"turn/interrupt","params":{"threadId":"th1","turnId":"tu1"}}
+< {"id":4,"result":{}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":"1, 2, 3"}}}
+< {"method":"turn/completed","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"interrupted","error":null}}}

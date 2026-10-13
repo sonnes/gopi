@@ -201,3 +201,17 @@ func TestStateCopyKeepsItsLength(t *testing.T) {
 	assert.Equal(t, []string{"first", "one"}, msgTexts(before.Messages()), "a later run does not change a copy")
 	assert.Len(t, a.State().Messages(), 4)
 }
+
+func TestStateClipKeepsTheOriginal(t *testing.T) {
+	var st agent.State
+	for _, s := range []string{"one", "two", "three"} {
+		st.Apply(agent.EventMessageEnd{Message: ai.UserMessage(s)})
+	}
+
+	c := st.Clip()
+	c.Apply(agent.EventMessageEnd{Message: ai.UserMessage("copy")})
+	st.Apply(agent.EventMessageEnd{Message: ai.UserMessage("original")})
+
+	assert.Equal(t, []string{"one", "two", "three", "copy"}, msgTexts(c.Messages()))
+	assert.Equal(t, []string{"one", "two", "three", "original"}, msgTexts(st.Messages()))
+}

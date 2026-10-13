@@ -1,0 +1,8 @@
+stdiorr trace v1
+# The process greets first, then answers each request.
+< {"hello":true}
+> {"id":1,"dir":"/home/me/work"}
+< {"id":1,"ok":true}
+< {"note":"after 1"}
+> {"id":2}
+< {"id":2,"ok":true}

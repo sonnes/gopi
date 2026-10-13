@@ -25,6 +25,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make tidy`  | Run `go mod tidy`                                               |
 | `make fmt`   | Run `gofmt -w` on every Go file                                 |
 | `make record` | Re-record the fixtures of one provider. Set `PKG` and `RUN`. |
+| `make record-cli` | Re-record the trace of one CLI agent. Set `AGENT`. |
 | `make site-dev` | Serve the site with hot reload. Run `make site-install` first. |
 | `make site-check` | Type-check the site                                       |
 | `make site-test` | Run the tests of the site                                  |

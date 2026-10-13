@@ -3,6 +3,7 @@
 package emittest
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,4 +84,25 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 	assert.False(t, inTurn, "the run left a turn open")
 	assert.False(t, inMsg, "the run left a message open")
 	assert.Empty(t, tools, "the run left tool calls open")
+}
+
+// Types returns the JSON type name of each event, such as
+// "message_start", so that a test compares the order of a run in one
+// assert.
+func Types(events []agent.Event) []string {
+	out := make([]string, 0, len(events))
+	for _, ev := range events {
+		data, err := json.Marshal(ev)
+		if err != nil {
+			panic(err)
+		}
+		var v struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(data, &v); err != nil {
+			panic(err)
+		}
+		out = append(out, v.Type)
+	}
+	return out
 }

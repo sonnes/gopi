@@ -233,11 +233,9 @@ func (a *Agent) Log() *session.Log { return a.log }
 func (a *Agent) State() State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	// The clip caps the messages at their length, so an append of the
+	// The clip caps the slices at their length, so an append of the
 	// agent never shows in the copy.
-	s := a.state
-	s.messages = slices.Clip(s.messages)
-	return s
+	return a.state.Clip()
 }
 
 // Run starts a run with entries as its input, and returns the stream

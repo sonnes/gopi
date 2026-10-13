@@ -1,0 +1,394 @@
+package claude
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
+	"sync"
+
+	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/resume"
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/stream"
+)
+
+// defaultBinary is the name of the CLI, looked up on PATH.
+const defaultBinary = "claude"
+
+// conversation is the session ID of the CLI, so that a [Durable] agent
+// resumes the same CLI session.
+var conversation = resume.New("claude")
+
+// ErrNoConversation is the error of a run whose CLI cannot find the
+// stored session, such as after the session file was deleted. The agent
+// clears the stored session ID, so the next run starts a new session of
+// the CLI. The log keeps its messages, and the CLI no longer reads them.
+var ErrNoConversation = errors.New("claude: the CLI has no conversation to resume")
+
+// ErrAuth is the error of a run whose CLI is not logged in. Run `claude
+// /login`, or set an API key in the environment of the CLI.
+var ErrAuth = errors.New("claude: the CLI is not logged in")
+
+// Permission is a permission mode of the CLI. It decides which tool
+// calls the CLI runs without a prompt. The agent denies every prompt,
+// so a mode that prompts less lets the CLI do more.
+type Permission string
+
+const (
+	// PermissionDefault prompts for each tool call that the settings do
+	// not allow.
+	PermissionDefault Permission = "default"
+	// PermissionAcceptEdits allows file edits without a prompt.
+	PermissionAcceptEdits Permission = "acceptEdits"
+	// PermissionPlan lets the model read and plan, and run no tool that
+	// changes a file.
+	PermissionPlan Permission = "plan"
+	// PermissionAuto lets a classifier of the CLI allow or deny each
+	// prompt.
+	PermissionAuto Permission = "auto"
+	// PermissionDontAsk denies each tool call that the settings do not
+	// allow, without a prompt.
+	PermissionDontAsk Permission = "dontAsk"
+	// PermissionBypass allows every tool call without a prompt.
+	PermissionBypass Permission = "bypassPermissions"
+)
+
+// Agent runs the Claude Code CLI as a gopi agent. The CLI runs its own
+// loop and its own tools. The agent sends the input of each run to the
+// CLI, turns the output into [agent.Event] values, and writes every
+// message to its [session.Log].
+type Agent struct {
+	log   *session.Log
+	name  string
+	cfg   config
+	state *emit.State
+
+	mu sync.Mutex
+	// proc is the running CLI, or nil before the first run and after a
+	// failure that stopped it.
+	proc *process
+}
+
+// config collects the options before [New] or [Durable] builds the agent.
+type config struct {
+	store      session.Storer
+	name       string
+	binary     string
+	dir        string
+	model      string
+	system     string
+	thinking   ai.ThinkingLevel
+	env        []string
+	permission Permission
+	allowed    []string
+	disallowed []string
+	canUseTool CanUseToolFunc
+}
+
+// Option configures an [Agent]. [New] and [Durable] take the same options.
+type Option func(*config)
+
+// Store sets the store of a [Durable] agent. Without it, Durable keeps
+// the session in a [session.MemoryStore]. [New] ignores it.
+func Store(s session.Storer) Option {
+	return func(c *config) { c.store = s }
+}
+
+// Name sets the Author of every entry that the agent writes.
+func Name(s string) Option {
+	return func(c *config) { c.name = s }
+}
+
+// Binary sets the path of the CLI. Without it, the agent runs "claude"
+// from PATH.
+func Binary(path string) Option {
+	return func(c *config) { c.binary = path }
+}
+
+// Dir sets the working directory of the CLI. Without it, the CLI runs
+// in the working directory of this process.
+func Dir(path string) Option {
+	return func(c *config) { c.dir = path }
+}
+
+// Model sets the model of the CLI, as an alias such as "sonnet" or a
+// full model name.
+func Model(s string) Option {
+	return func(c *config) { c.model = s }
+}
+
+// System appends s to the system prompt of the CLI. The CLI keeps its
+// own prompt, because its tools depend on it.
+func System(s string) Option {
+	return func(c *config) { c.system = s }
+}
+
+// Thinking sets the effort level of the CLI. [ai.ThinkingOff] turns
+// thinking off. Without it, the CLI uses its default.
+func Thinking(level ai.ThinkingLevel) Option {
+	return func(c *config) { c.thinking = level }
+}
+
+// Env adds KEY=VALUE pairs to the environment of the CLI. The CLI gets
+// the environment of this process, then these pairs.
+func Env(kv ...string) Option {
+	return func(c *config) { c.env = append(c.env, kv...) }
+}
+
+// AllowedTools lets the CLI run the named tools without a prompt. A
+// name can hold a rule, such as "Bash(git:*)". Without it, the settings
+// of the CLI decide.
+func AllowedTools(names ...string) Option {
+	return func(c *config) { c.allowed = append(c.allowed, names...) }
+}
+
+// DisallowedTools removes the named tools from the CLI. A name can hold
+// a rule, as in [AllowedTools].
+func DisallowedTools(names ...string) Option {
+	return func(c *config) { c.disallowed = append(c.disallowed, names...) }
+}
+
+// ToolRequest is a permission prompt of the CLI for one tool call.
+type ToolRequest struct {
+	ToolUseID string
+	ToolName  string
+	Input     json.RawMessage
+	// Suggestions are the permission updates that the CLI offers, as
+	// JSON. [ToolDecision.Always] sends them back. They are nil if the
+	// CLI offers none.
+	Suggestions json.RawMessage
+}
+
+// ToolDecision answers a [ToolRequest]. The zero value denies the call.
+type ToolDecision struct {
+	// Allow lets the CLI run the call.
+	Allow bool
+	// Always sends the [ToolRequest.Suggestions] with an allowed call,
+	// so that the CLI does not ask again for the calls that match them
+	// in this session. The CLI decides what matches.
+	Always bool
+	// Input replaces the input of an allowed call. Nil keeps the input.
+	Input json.RawMessage
+	// Message tells the model why the call is denied. If it is empty,
+	// the agent sends a default reason.
+	Message string
+}
+
+// CanUseToolFunc answers a permission prompt of the CLI. It runs while
+// the CLI waits, so it must return when ctx ends.
+type CanUseToolFunc func(ctx context.Context, req ToolRequest) (ToolDecision, error)
+
+// CanUseTool sets the function that answers each permission prompt of
+// the CLI. Without it, the agent denies every prompt. If fn returns an
+// error, the agent sends the error to the CLI, which denies the call.
+func CanUseTool(fn CanUseToolFunc) Option {
+	return func(c *config) { c.canUseTool = fn }
+}
+
+// PermissionMode sets the permission mode of the CLI. Without it, the
+// settings of the CLI decide.
+func PermissionMode(mode Permission) Option {
+	return func(c *config) { c.permission = mode }
+}
+
+// New returns an agent over an unsaved session. The history lives in
+// process memory and ends with the process. New does no I/O. The CLI
+// starts on the first run.
+func New(opts ...Option) *Agent {
+	a := newAgent(opts)
+	a.log = session.New()
+	a.state = emit.NewState(nil)
+	return a
+}
+
+// Durable returns an agent over the session id. If id is unknown,
+// Durable creates it. If id exists, Durable resumes it, and the CLI
+// resumes its own session. The [Store] option sets where the session
+// lives.
+func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
+	a := newAgent(opts)
+	store := a.cfg.store
+	if store == nil {
+		store = session.NewMemoryStore()
+	}
+	log, err := session.Open(ctx, store, id)
+	if err != nil {
+		return nil, err
+	}
+	a.log = log
+	a.state = emit.NewState(log.Messages())
+	return a, nil
+}
+
+// newAgent applies opts and returns an agent with no log.
+func newAgent(opts []Option) *Agent {
+	c := config{binary: defaultBinary}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return &Agent{
+		name: c.name,
+		cfg:  c,
+	}
+}
+
+// Log returns the log that the agent writes to.
+func (a *Agent) Log() *session.Log { return a.log }
+
+// State returns a copy of the state of the agent, as
+// [agent.Agent.State] does. Each event of a run changes the state
+// before the stream gets it. The agent has no queues and no hooks, so
+// [agent.State.Steer] and [agent.State.FollowUp] do nothing, and
+// [agent.State.Log] returns nil. Use [Agent.Log] for the log.
+func (a *Agent) State() agent.State { return a.state.Get() }
+
+// Run sends entries to the CLI as one user message and streams the run
+// until the CLI reports its result. The text of the entries is the
+// input. Images and PDFs go to the CLI as image and document blocks. A
+// file of another type becomes a text note, so that the model knows that
+// the file was there. A run needs an entry with text or a file, or it
+// fails with no event.
+//
+// An ephemeral entry goes to the CLI, and the log does not keep it.
+// The CLI keeps it in its own transcript, so a later run of the CLI
+// still reads it. A custom entry goes to the log, and not to the CLI.
+//
+// The first run starts the CLI, and later runs reuse it. Runs on one
+// Agent are sequential. If a run is active, the returned stream fails
+// with no event.
+//
+// If ctx ends, the agent interrupts the CLI and waits for its result.
+// The stream then fails with the error of ctx.
+func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream {
+	return stream.New(func(push func(agent.Event)) ([]ai.Message, error) {
+		if len(emit.Input(entries)) == 0 {
+			return nil, errors.New("claude: a run needs an entry with text or a file")
+		}
+		em := emit.New(a.log, a.name, a.state, push)
+		if err := em.Start(); err != nil {
+			return nil, fmt.Errorf("claude: %w", err)
+		}
+		// Start the CLI before the input, so that a failed start stores
+		// no input that the CLI never got.
+		proc, err := a.ensure(ctx)
+		if err != nil {
+			return em.Finish(ctx, ai.Usage{}, err)
+		}
+		r := &runner{
+			a:    a,
+			proc: proc,
+			em:   em,
+		}
+		return r.run(ctx, entries)
+	})
+}
+
+// Close stops the CLI. It ends the input of the CLI and waits for it to
+// exit. After a timeout, it kills the CLI. Close must not overlap a
+// run. A later run starts the CLI again.
+func (a *Agent) Close() error {
+	a.mu.Lock()
+	proc := a.proc
+	a.proc = nil
+	a.mu.Unlock()
+	if proc == nil {
+		return nil
+	}
+	return proc.stop()
+}
+
+// ensure returns the running CLI. It starts the CLI and initializes it
+// if none runs.
+func (a *Agent) ensure(ctx context.Context) (*process, error) {
+	a.mu.Lock()
+	proc := a.proc
+	a.mu.Unlock()
+	if proc != nil {
+		return proc, nil
+	}
+
+	cmd, err := a.command()
+	if err != nil {
+		return nil, err
+	}
+	proc, err = launch(cmd, a.cfg.canUseTool)
+	if err != nil {
+		return nil, err
+	}
+	if err := proc.initialize(ctx); err != nil {
+		proc.terminate()
+		if errors.Is(err, ErrNoConversation) {
+			err = errors.Join(err, conversation.Clear(ctx, a.log))
+		}
+		return nil, err
+	}
+
+	a.mu.Lock()
+	a.proc = proc
+	a.mu.Unlock()
+	return proc, nil
+}
+
+// drop stops proc after a failure, so that the next run starts a new
+// CLI that resumes the session.
+func (a *Agent) drop(proc *process) {
+	proc.terminate()
+	a.mu.Lock()
+	if a.proc == proc {
+		a.proc = nil
+	}
+	a.mu.Unlock()
+}
+
+// command returns the command that starts the CLI. The input never goes
+// on the command line. It goes to stdin.
+func (a *Agent) command() (*exec.Cmd, error) {
+	c := a.cfg
+	args := []string{
+		"--print",
+		"--output-format", "stream-json",
+		"--verbose",
+		"--input-format", "stream-json",
+		"--include-partial-messages",
+		"--permission-prompt-tool", "stdio",
+	}
+	if c.model != "" {
+		args = append(args, "--model", c.model)
+	}
+	if c.system != "" {
+		args = append(args, "--append-system-prompt", c.system)
+	}
+	switch c.thinking {
+	case "":
+	case ai.ThinkingOff:
+		args = append(args, "--thinking", "disabled")
+	default:
+		args = append(args, "--effort", string(c.thinking))
+	}
+	if c.permission != "" {
+		args = append(args, "--permission-mode", string(c.permission))
+	}
+	if len(c.allowed) > 0 {
+		args = append(args, "--allowedTools", strings.Join(c.allowed, ","))
+	}
+	if len(c.disallowed) > 0 {
+		args = append(args, "--disallowedTools", strings.Join(c.disallowed, ","))
+	}
+	id, err := conversation.Get(a.log)
+	if err != nil {
+		return nil, err
+	}
+	if id != "" {
+		args = append(args, "--resume="+id)
+	}
+
+	cmd := exec.Command(c.binary, args...)
+	cmd.Dir = c.dir
+	cmd.Env = environ(c.env)
+	return cmd, nil
+}

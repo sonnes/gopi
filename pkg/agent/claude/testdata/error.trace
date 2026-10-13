@@ -1,0 +1,7 @@
+stdiorr trace v1
+# A run that ends with an error result.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Say hello"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","cwd":"/work","session_id":"sess-1","model":"claude-haiku-4-5","tools":["Bash"]}
+< {"type":"result","subtype":"error_during_execution","is_error":true,"session_id":"sess-1","errors":["API Error: 500 overloaded"],"usage":{"input_tokens":0,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":0}}

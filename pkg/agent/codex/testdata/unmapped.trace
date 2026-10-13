@@ -1,0 +1,16 @@
+stdiorr trace v1
+# Hand-written. An item of an unmapped type starts and never completes. The turn fails, so the queue does not replay.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"never"}}
+< {"id":2,"result":{"thread":{"id":"th1","turns":[]},"model":"gpt-5-codex","cwd":"/work","approvalPolicy":"never"}}
+< {"method":"thread/started","params":{"thread":{"id":"th1"}}}
+> {"id":3,"method":"turn/start","params":{"threadId":"th1","input":[{"type":"text","text":"Plan, then answer."}]}}
+< {"id":3,"result":{"turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"turn/started","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"plan","id":"p1","text":""}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":""}}}
+< {"method":"item/agentMessage/delta","params":{"threadId":"th1","turnId":"tu1","itemId":"m1","delta":"Hello"}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":"Hello"}}}
+< {"method":"turn/completed","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"failed","error":{"message":"stopped"}}}}

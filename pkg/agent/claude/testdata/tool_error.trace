@@ -1,0 +1,31 @@
+stdiorr trace v1
+# A tool call that fails. The result content is a list of blocks.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Run echo hi"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","cwd":"/work","session_id":"sess-1","model":"claude-haiku-4-5","tools":["Bash"]}
+< {"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Running it."}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"Running it."}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_stop","index":0},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"Bash","input":{}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":""}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"command\": "}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"echo hi\"}"}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"echo hi"}}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_stop","index":1},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null,"session_id":"sess-1"}
+# A subagent line and a result for an unknown call do not reach the log.
+< {"type":"assistant","message":{"id":"msg_sub","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"subagent text"}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":"toolu_1","session_id":"sess-1"}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_unknown","content":"stray","is_error":false}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":[{"type":"text","text":"command not found"}],"is_error":true}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_2","model":"claude-haiku-4-5","role":"assistant","content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"It failed."}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_2","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"It failed."}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_stop","index":0},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"It failed.","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}}
