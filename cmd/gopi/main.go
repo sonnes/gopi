@@ -16,6 +16,12 @@
 // folder, and it has no network. The file tools obey the same rules.
 // ask_user_question asks on the terminal.
 //
+// gopi builds the agent with package harness. It reads the instruction
+// files, the skills, and the subagents of the home folder and of the
+// root folder, in the layouts of Claude Code, Codex, and gopi. Each
+// tool call obeys --permission-mode and the --allow and --deny rules. A
+// call that needs an approval asks on the terminal.
+//
 // With --session-id, gopi keeps the conversation in a JSONL file of
 // that name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The first run
 // creates the session, and each later run with the same ID resumes it.
@@ -41,6 +47,9 @@ import (
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
+	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/harness"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/bash"
 	"github.com/sonnes/gopi/pkg/sandbox/edit"
@@ -87,6 +96,11 @@ type options struct {
 	// sessionID is the ID of the session that keeps the conversation.
 	// Empty means no session: the conversation ends with gopi.
 	sessionID string
+	// mode is the permission mode of the tool calls.
+	mode string
+	// allow and deny are the permission rules of the tool calls.
+	allow []string
+	deny  []string
 }
 
 func main() {
@@ -136,6 +150,19 @@ func main() {
 				Usage:   "keep the conversation in the session with this ID. The first run creates it, and a later run resumes it",
 			},
 			&cli.StringFlag{
+				Name:  "permission-mode",
+				Value: string(permission.Default),
+				Usage: "the permission mode of the tool calls: default, acceptEdits, plan, or bypassPermissions. A call that needs an approval asks on the terminal",
+			},
+			&cli.StringSliceFlag{
+				Name:  "allow",
+				Usage: "a rule for the tool calls that run without a question, such as 'bash(go test *)'. Give the flag again to add a rule",
+			},
+			&cli.StringSliceFlag{
+				Name:  "deny",
+				Usage: "a rule for the tool calls that never run, such as 'bash(git push *)'. Give the flag again to add a rule",
+			},
+			&cli.StringFlag{
 				Name:  "mcp",
 				Usage: "the path of an mcp.json file. gopi starts its servers and gives their tools to the agent. The fence does not confine the servers",
 			},
@@ -152,6 +179,9 @@ func main() {
 				json:      c.Bool("json"),
 				mcp:       c.String("mcp"),
 				sessionID: c.String("session-id"),
+				mode:      c.String("permission-mode"),
+				allow:     c.StringSlice("allow"),
+				deny:      c.StringSlice("deny"),
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
@@ -194,28 +224,43 @@ func run(ctx context.Context, o options, args []string) error {
 		tools = append(tools, mcpTools...)
 	}
 
-	opts := []agent.Option{agent.Toolset(tools...)}
+	mode, err := permission.ParseMode(o.mode)
+	if err != nil {
+		return err
+	}
+	cat, spec := newCatalog(lm, name)
+	opts := []harness.Option{
+		harness.Catalog(cat),
+		harness.Model(spec),
+		harness.Dir(o.root),
+		harness.Builtin(harness.NoBuiltins),
+		harness.Toolset(harness.Tools(tools...)),
+		harness.Mode(mode),
+		harness.Allow(o.allow...),
+		harness.Deny(o.deny...),
+		harness.Approve(answers.Approve),
+	}
 	if o.turns > 0 {
-		opts = append(opts, maxTurns(o.turns))
+		opts = append(opts, harness.AgentDefaults(maxTurns(o.turns)))
 	}
 	if o.thinking != "" {
 		level, err := parseThinking(o.thinking)
 		if err != nil {
 			return err
 		}
-		opts = append(opts, agent.Thinking(level))
+		opts = append(opts, harness.AgentDefaults(agent.Thinking(level)))
 	}
 	dir, err := sessionsDir(os.Getenv)
 	if err != nil {
 		return err
 	}
-	a, err := newAgent(ctx, lm, opts, o.sessionID, dir)
+	a, err := newAgent(ctx, opts, o.sessionID, dir)
 	if err != nil {
 		return err
 	}
 	var t printer = jsonLines{w: os.Stdout}
 	if !o.json {
-		tr := newTree(os.Stdout, name+"/"+lm.Model.ID, isTerminal(os.Stdout))
+		tr := newTree(os.Stdout, spec, isTerminal(os.Stdout))
 		tr.shown = shown
 		t = tr
 	}
@@ -247,26 +292,34 @@ func run(ctx context.Context, o options, args []string) error {
 // newAgent returns the agent of gopi. With a session ID, the agent
 // keeps the conversation in the JSONL store in dir. Without one, the
 // conversation ends with gopi.
+// newAgent assembles the agent of gopi with the harness. With a
+// session ID, the agent keeps the conversation in a JSONL file in dir,
+// and a later run with the same ID resumes it.
 func newAgent(
 	ctx context.Context,
-	lm ai.LanguageModel,
-	opts []agent.Option,
+	opts []harness.Option,
 	sessionID string,
 	dir string,
 ) (*agent.Agent, error) {
 	if sessionID == "" {
-		return agent.New(lm, opts...), nil
+		return harness.New(opts...).New(ctx)
 	}
 	store, err := jsonl.New(dir)
 	if err != nil {
 		return nil, err
 	}
-	opts = append(slices.Clip(opts), agent.Store(store))
-	return agent.Durable(ctx, lm, sessionID, opts...)
+	opts = append(slices.Clip(opts), harness.Store(store))
+	return harness.New(opts...).Durable(ctx, sessionID)
 }
 
-// sessionsDir returns the folder of the session files:
-// $GOPI_HOME/sessions, or ~/.gopi/sessions.
+// newCatalog returns a catalog that serves lm under the provider name,
+// and the spec of lm in it.
+func newCatalog(lm ai.LanguageModel, name string) (*catalog.Catalog, string) {
+	cat := catalog.New()
+	cat.RegisterTextProvider(name, lm.Provider, lm.Model)
+	return cat, name + "/" + lm.Model.ID
+}
+
 func sessionsDir(getenv func(string) string) (string, error) {
 	if home := getenv("GOPI_HOME"); home != "" {
 		return filepath.Join(home, "sessions"), nil

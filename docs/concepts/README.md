@@ -16,6 +16,12 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Provider](ai/provider.md)   | How a provider serves a model call, and how the Anthropic provider builds its requests. |
 | [OpenAI Providers](ai/openai.md) | How the two OpenAI providers build their requests, keep reasoning between calls, and serve compatible servers. |
 
+## catalog
+
+| Concept                          | Description                                                                                              |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [Catalog](catalog/catalog.md)    | How a spec resolves to a model bound to its provider, and how detectors fill a catalog from the credentials of a process. |
+
 ## tool
 
 | Concept                   | Description                                                                  |
@@ -34,6 +40,15 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Section](agent/section.md)         | How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it. |
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
 | [CLI Agent](agent/cli-agent.md)     | How an agent CLI such as Codex or Claude Code runs as a gopi agent, with the same events, state, and log as the loop. |
+
+## harness
+
+| Concept                              | Description                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the files of a project and a home folder, and a catalog, on each call.     |
+| [Skill](harness/skill.md)            | How a skill reaches the model on demand through the skill tool, how the system prompt lists the skills, and how two skills with one name both stay. |
+| [Subagent](harness/subagent.md)      | How the task tool runs a subagent in a child session, what the parent model gets back, and how a child resumes.                  |
+| [Permission](harness/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied.                 |
 
 ## session
 

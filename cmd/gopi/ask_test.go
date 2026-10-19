@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
@@ -204,4 +207,35 @@ func TestTerminal_Ask_OnATerminal(t *testing.T) {
 	line, ok := in.next()
 	require.True(t, ok)
 	assert.Equal(t, "next prompt", line)
+}
+
+func TestTerminal_Approve(t *testing.T) {
+	tests := []struct {
+		line string
+		want permission.Decision
+	}{
+		{"y", permission.Allow},
+		{" YES ", permission.Allow},
+		{"a", permission.AllowAlways},
+		{"always", permission.AllowAlways},
+		{"n", permission.Deny},
+		{"", permission.Deny},
+		{"maybe", permission.Deny},
+	}
+	for _, tt := range tests {
+		t.Run(tt.line, func(t *testing.T) {
+			var out strings.Builder
+			r := terminal{
+				w:  &out,
+				in: readInput(strings.NewReader(tt.line+"\n"), false),
+			}
+			call := ai.ToolCall{ID: "call_1", Name: "bash", Input: json.RawMessage(`{"command":"rm -rf .bin"}`)}
+
+			got, err := r.Approve(t.Context(), call)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+			assert.Equal(t, `? allow bash {"command":"rm -rf .bin"}? [y]es, [a]lways, [n]o: `, out.String())
+		})
+	}
 }

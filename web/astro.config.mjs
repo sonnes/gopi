@@ -123,6 +123,10 @@ export default defineConfig({
           ],
         },
         {
+          label: "pkg/harness",
+          items: [{ label: "Harness", slug: "docs/harness" }],
+        },
+        {
           label: "pkg/session",
           items: [{ label: "Sessions", slug: "docs/session" }],
         },

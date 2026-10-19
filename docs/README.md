@@ -39,7 +39,20 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | sequential tool | A tool whose call runs with no other call of its message at the same time | exclusive tool, serial tool |
 | search tool   | The agent tool that ranks the deferred tools and loads the matches | tool finder, loader   |
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
-| CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter, harness |
+| CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter |
+| catalog       | What maps a spec to a model bound to its provider            | registry, model list        |
+| spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
+| detector      | What reads one credential source and gives a catalog a provider | probe, loader            |
+| harness       | What assembles a coding agent from options, the files of a project, and a catalog, on each call | builder, factory, runtime |
+| assembly      | What one call of a harness resolved: the model, the instruction files, the skills, the subagents, and the tools | build, config |
+| source        | A place that a harness reads instruction files, skills, and subagents from: the project or the home folder | layout, origin |
+| instruction file | A file of rules for the agent, such as AGENTS.md or CLAUDE.md | memory file, rules file  |
+| skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
+| qualified name | The qualifier of a skill, ":", and its name, such as `apps/web:deploy` | full name, path name |
+| subagent      | A named agent that the model gives a task to with the task tool | worker, delegate, sub-task |
+| child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
+| permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
+| permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
 | run           | One call of the loop, from a prompt to a result              | invocation, request, turn   |
 | turn          | One model call of a run, with the tool calls that it makes   | step, iteration, round      |
 | state         | What an agent knows: the messages that the model reads, the progress of the run, the queues, and the loaded tools | context, memory |

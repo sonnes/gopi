@@ -14,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
+	"github.com/sonnes/gopi/pkg/harness"
 )
 
 func TestNewModel(t *testing.T) {
@@ -219,14 +220,31 @@ func TestSessionsDir(t *testing.T) {
 
 func TestNewAgentKeepsASession(t *testing.T) {
 	dir := t.TempDir()
-	lm := ai.LanguageModel{Model: ai.Model{ID: "test"}}
+	cat, spec := newCatalog(ai.LanguageModel{Model: ai.Model{ID: "test"}}, "fake")
+	opts := []harness.Option{
+		harness.Catalog(cat),
+		harness.Model(spec),
+		harness.Builtin(harness.NoBuiltins),
+		harness.Sources(),
+	}
 
-	a, err := newAgent(t.Context(), lm, nil, "ada", dir)
+	a, err := newAgent(t.Context(), opts, "ada", dir)
 	require.NoError(t, err)
 	assert.Equal(t, "ada", a.Log().Session().ID)
 	assert.FileExists(t, filepath.Join(dir, "ada.jsonl"))
 
-	b, err := newAgent(t.Context(), lm, nil, "", dir)
+	b, err := newAgent(t.Context(), opts, "", dir)
 	require.NoError(t, err)
 	assert.Empty(t, b.Log().Session().ID, "with no session ID, the agent keeps no session")
+}
+
+func TestNewCatalog(t *testing.T) {
+	lm := ai.LanguageModel{Model: anthropic.Opus5_5, Provider: &anthropic.Provider{}}
+
+	cat, spec := newCatalog(lm, "anthropic")
+
+	assert.Equal(t, "anthropic/"+anthropic.Opus5_5.ID, spec)
+	got, err := cat.LanguageModel(spec)
+	require.NoError(t, err)
+	assert.Equal(t, lm.Model, got.Model)
 }

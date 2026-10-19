@@ -7,5 +7,6 @@ use (
 	./pkg/ai/anthropic
 	./pkg/ai/openai
 	./pkg/ai/openaichat
+	./pkg/catalog/env
 	./pkg/mcp
 )
