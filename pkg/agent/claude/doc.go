@@ -19,9 +19,9 @@
 //     stream.
 //   - The first run starts the CLI, and it runs until [Agent.Close].
 //     Call Close when the agent is no longer needed.
-//   - Without [CanUseTool], the agent denies every permission prompt of
-//     the CLI. Set [CanUseTool], a [PermissionMode], or [AllowedTools]
-//     to let the CLI run the tools.
+//   - Without [Approve], the agent denies every permission prompt of
+//     the CLI. Set [Approve], a [PermissionMode], or [AllowedTools] to
+//     let the CLI run the tools.
 //   - The text, the images, and the PDFs of the input entries go to the
 //     CLI. Each other file becomes a text note.
 //   - The log holds the messages of the main agent. The messages of a

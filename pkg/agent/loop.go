@@ -88,7 +88,11 @@ func (a *Agent) run(
 func (a *Agent) afterTurn(ctx context.Context, em *emitter) ([]ai.Message, error) {
 	var added []ai.Message
 	for _, h := range a.cfg.hooks {
-		entries, err := h.AfterTurn(ctx, a.State())
+		at, ok := h.(AfterTurnHook)
+		if !ok {
+			continue
+		}
+		entries, err := at.AfterTurn(ctx, a.State())
 		if err != nil {
 			return added, err
 		}
@@ -123,7 +127,11 @@ func (a *Agent) next(ctx context.Context, calledTools bool) ([]session.Entry, er
 // returns the entries of that hook, or nil if the run stops.
 func (a *Agent) beforeStop(ctx context.Context) ([]session.Entry, error) {
 	for _, h := range a.cfg.hooks {
-		entries, err := h.BeforeStop(ctx, a.State())
+		bs, ok := h.(BeforeStopHook)
+		if !ok {
+			continue
+		}
+		entries, err := bs.BeforeStop(ctx, a.State())
 		if err != nil {
 			return nil, err
 		}

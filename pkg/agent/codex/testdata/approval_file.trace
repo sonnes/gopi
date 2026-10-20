@@ -9,10 +9,10 @@ stdiorr trace v1
 > {"id":3,"method":"turn/start","params":{"threadId":"th1","input":[{"type":"text","text":"Remove /tmp/x."}]}}
 < {"id":3,"result":{"turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
 < {"method":"turn/started","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
-< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"fileChange","id":"c1","changes":[],"status":"inProgress"}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"fileChange","id":"c1","changes":[{"path":"/tmp/x","kind":{"type":"delete"}}],"status":"inProgress"}}}
 < {"method":"item/fileChange/requestApproval","id":0,"params":{"threadId":"th1","turnId":"tu1","itemId":"c1","reason":"write outside the workspace","startedAtMs":1}}
 > {"id":0,"result":{"decision":"decline"}}
-< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"fileChange","id":"c1","changes":[],"status":"declined"}}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"fileChange","id":"c1","changes":[{"path":"/tmp/x","kind":{"type":"delete"}}],"status":"declined"}}}
 < {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":""}}}
 < {"method":"item/agentMessage/delta","params":{"threadId":"th1","turnId":"tu1","itemId":"m1","delta":"The change was declined."}}
 < {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":"The change was declined."}}}

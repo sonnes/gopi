@@ -35,7 +35,8 @@ A permission policy decides, for each tool call, if the call runs, asks a person
 - A Deny rule and an Ask rule apply in every mode, also in bypass. A person can then let an agent run freely and still block one command.
 - A tool has a kind, and the mode decides by the kind. A tool that the policy does not know is `Other`, and it asks in every mode but bypass. A new tool then needs an approval or a rule before it runs.
 - Without `Approve`, each call that needs an approval is denied, with a reason that says that no one can approve. An agent with no person present then fails closed.
-- `AllowAlways` keeps an allow rule for the exact command, or for the tool name, in the hook. A new hook starts with no kept rules, so an approval lasts as long as one agent and does not reach the next session.
+- An `Always` decision keeps an allow rule for the exact command, or for the tool name, in the hook. A new hook starts with no kept rules, so an approval lasts as long as one agent and does not reach the next session.
+- If a decision edits the input, the edited input runs. The Deny rules check it, and an `Always` rule is for it, because the person approved the edited call and not the call of the model.
 - The policy is a plain value, and the state of a run lives in its hook. The harness then copies the policy for each call and each child with no shared lock.
 - A command rule matches the text of the command, not a parsed shell program. So a command rule is not a security boundary, and the fence of the sandbox limits what a command that runs can touch.
 - An invalid rule fails the assembly. A typo in a Deny rule then cannot let every call through.

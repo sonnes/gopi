@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
@@ -212,15 +212,15 @@ func TestTerminal_Ask_OnATerminal(t *testing.T) {
 func TestTerminal_Approve(t *testing.T) {
 	tests := []struct {
 		line string
-		want permission.Decision
+		want agent.Decision
 	}{
-		{"y", permission.Allow},
-		{" YES ", permission.Allow},
-		{"a", permission.AllowAlways},
-		{"always", permission.AllowAlways},
-		{"n", permission.Deny},
-		{"", permission.Deny},
-		{"maybe", permission.Deny},
+		{"y", agent.Decision{Allow: true}},
+		{" YES ", agent.Decision{Allow: true}},
+		{"a", agent.Decision{Allow: true, Always: true}},
+		{"always", agent.Decision{Allow: true, Always: true}},
+		{"n", agent.Decision{}},
+		{"", agent.Decision{}},
+		{"maybe", agent.Decision{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.line, func(t *testing.T) {

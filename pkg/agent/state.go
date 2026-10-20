@@ -197,6 +197,14 @@ func (s State) FollowUp(entries ...session.Entry) {
 // a state that a viewer decoded returns nil.
 func (s State) Log() session.Writer { return s.log }
 
+// WithLog returns a copy of s with w as its log. A CLI agent keeps its
+// state outside the loop of [Agent], so it gives its log to each copy
+// with WithLog. Then a hook reads the session as it does on [Agent].
+func (s State) WithLog(w session.Writer) State {
+	s.log = w
+	return s
+}
+
 // Tools returns the tools that the model can call after
 // [State.Messages]: the tools of the base, then the changes of the
 // later system messages.

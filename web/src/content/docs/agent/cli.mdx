@@ -54,11 +54,12 @@ msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 | `System(s)`                        | both    | Instructions that the CLI adds to its own prompt            |
 | `Thinking(level)`                  | both    | The reasoning effort of the CLI. For Claude Code, `ai.ThinkingOff` turns thinking off |
 | `Env(kv...)`                       | both    | More environment variables for the CLI                      |
-| `Sandbox(mode)`, `Approval(policy)` | codex   | What a command can touch, and when the CLI asks             |
-| `Approver(fn)`                     | codex   | The function that answers each approval request             |
+| `Approve(fn)`                      | both    | The function that answers each approval request             |
+| `Hooks(hs...)`                     | both    | [Hooks](hooks.mdx#hooks-on-a-cli-agent) that the CLI calls  |
+| `HookCommand(path)`                | codex   | The `gopi` binary that relays a hook. The default is `gopi` on `PATH`. A run with hooks fails if the binary is missing |
+| `Sandbox(mode)`, `Policy(policy)`  | codex   | What a command can touch, and when the CLI asks             |
 | `PermissionMode(mode)`             | claude  | Which tools the CLI runs without a prompt                   |
 | `AllowedTools(names...)`, `DisallowedTools(names...)` | claude | The tools that the CLI runs without a prompt, and the tools that it cannot use |
-| `CanUseTool(fn)`                   | claude  | The function that answers each permission prompt            |
 
 ## Tools and Prompts
 
@@ -73,23 +74,23 @@ The CLI runs its own tools. Each tool call of the CLI becomes a tool call in an 
 
 Claude Code reports the names of its own tools, such as `Bash` and `Edit`.
 
-`Approver` answers each approval request of Codex, and `CanUseTool` answers each permission prompt of Claude Code. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request.
+`Approve` answers each approval request of Codex and each permission prompt of Claude Code. It takes an `agent.ApproveFunc`, the same function that the harness takes. The function gets the tool call with the name in the table above. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request. Codex declines a file change request that comes before its item, and the function does not see it.
 
 ```go
 a := claude.New(
 	claude.AllowedTools("Read", "Grep"),
-	claude.CanUseTool(func(ctx context.Context, req claude.ToolRequest) (claude.ToolDecision, error) {
-		if req.ToolName == "Bash" && !confirm(req.Input) {
-			return claude.ToolDecision{Message: "The user refused the command."}, nil
+	claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+		if call.Name == "Bash" && !confirm(call.Input) {
+			return agent.Decision{Message: "The user refused the command."}, nil
 		}
-		return claude.ToolDecision{Allow: true}, nil
+		return agent.Decision{Allow: true}, nil
 	}),
 )
 ```
 
-A `ToolDecision` with no `Allow` denies the call, and its `Message` goes to the model. With `Always`, the CLI also allows the calls that match its suggestions until the session ends.
+A `Decision` with no `Allow` denies the call. Claude Code sends its `Message` to the model, and Codex has no field for it. With `Always`, the CLI also allows the calls that it matches to this call, until the session ends. Claude Code keeps the rule for the session only and writes no settings file. On Claude Code, `Always` with a new `Input` allows only this call. Codex cannot change the input of an action, so a decision with an `Input` declines the action.
 
-To let a CLI act with no request, set `Approval(codex.ApprovalNever)` and a `Sandbox` mode for Codex. For Claude Code, set a `PermissionMode` or `AllowedTools`.
+To let a CLI act with no request, set `Policy(codex.ApprovalNever)` and a `Sandbox` mode for Codex. For Claude Code, set a `PermissionMode` or `AllowedTools`.
 
 :::caution
 Do not use `SandboxDangerFullAccess` or `PermissionBypass` outside a sandbox. With these modes, the CLI can run any command on the machine.

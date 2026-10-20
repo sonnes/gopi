@@ -2,6 +2,7 @@ package permission_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -250,8 +251,8 @@ func TestToolNames(t *testing.T) {
 	}
 }
 
-func TestAllowAlways(t *testing.T) {
-	a := &approver{decision: permission.AllowAlways}
+func TestAlways(t *testing.T) {
+	a := &approver{decision: allowAlways}
 	p := permission.Policy{Approve: a.approve}
 	h := p.Hook()
 
@@ -280,8 +281,8 @@ func TestPolicyIsAValue(t *testing.T) {
 	assert.Equal(t, denied, runOn(t, child.Hook(), bashCall(t, "ls")))
 }
 
-func TestAllowAlwaysDoesNotBeatDeny(t *testing.T) {
-	a := &approver{decision: permission.AllowAlways}
+func TestAlwaysDoesNotBeatDeny(t *testing.T) {
+	a := &approver{decision: allowAlways}
 	p := permission.Policy{
 		Approve: a.approve,
 		Deny:    []string{"Bash(rm:*)"},
@@ -292,7 +293,7 @@ func TestAllowAlwaysDoesNotBeatDeny(t *testing.T) {
 }
 
 func TestAllow(t *testing.T) {
-	a := &approver{decision: permission.Allow}
+	a := &approver{decision: allow}
 	p := &permission.Policy{Approve: a.approve}
 
 	assert.Equal(t, ran, runHook(t, p, bashCall(t, "make test")))
@@ -300,23 +301,99 @@ func TestAllow(t *testing.T) {
 	assert.Len(t, a.calls, 2, "Allow keeps no rule")
 }
 
-func TestApproverDenies(t *testing.T) {
-	a := &approver{decision: permission.Deny}
-	p := &permission.Policy{Approve: a.approve}
-
-	reason := denyReason(t, p, bashCall(t, "make test"))
-	assert.Contains(t, reason, "bash")
-	assert.Len(t, a.calls, 1)
-}
-
-func TestApproverError(t *testing.T) {
-	boom := errors.New("boom")
-	p := &permission.Policy{
-		Approve: func(context.Context, ai.ToolCall) (permission.Decision, error) {
-			return permission.Allow, boom
+func TestApproveDenies(t *testing.T) {
+	tests := []struct {
+		name     string
+		decision agent.Decision
+		want     string
+	}{
+		{
+			name:     "the zero decision denies with the name of the tool",
+			decision: agent.Decision{},
+			want:     `the approver denied the tool call "bash"`,
+		},
+		{
+			name:     "a message is the reason",
+			decision: agent.Decision{Message: "Run make check first."},
+			want:     "Run make check first.",
 		},
 	}
-	_, err := p.Hook().BeforeTool(context.Background(), agent.State{}, bashCall(t, "ls"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &approver{decision: tt.decision}
+			p := &permission.Policy{Approve: a.approve}
+
+			reason := denyReason(t, p, bashCall(t, "make test"))
+			assert.Equal(t, tt.want, reason)
+			assert.Len(t, a.calls, 1)
+		})
+	}
+}
+
+func TestApproveChangesInput(t *testing.T) {
+	a := &approver{decision: agent.Decision{
+		Allow: true,
+		Input: json.RawMessage(`{"command":"make test -v"}`),
+	}}
+	p := &permission.Policy{Approve: a.approve}
+
+	c := bashCall(t, "make test")
+	got, err := beforeTool(t, p.Hook()).BeforeTool(context.Background(), agent.State{}, c)
+	require.NoError(t, err)
+	assert.Equal(t, c.ID, got.ID)
+	assert.Equal(t, c.Name, got.Name)
+	assert.JSONEq(t, `{"command":"make test -v"}`, string(got.Input))
+}
+
+func TestAlwaysKeepsTheEditedInput(t *testing.T) {
+	a := &approver{decision: agent.Decision{
+		Allow:  true,
+		Always: true,
+		Input:  json.RawMessage(`{"command":"rm -rf build/tmp"}`),
+	}}
+	p := permission.Policy{Approve: a.approve}
+	h := p.Hook()
+
+	got, out := runEdited(t, h, bashCall(t, "rm -rf build"))
+	assert.Equal(t, ran, out)
+	assert.JSONEq(t, `{"command":"rm -rf build/tmp"}`, string(got.Input))
+
+	a.decision = allow
+	assert.Equal(t, ran, runOn(t, h, bashCall(t, "rm -rf build/tmp")))
+	assert.Len(t, a.calls, 1, "the kept rule is the edited command")
+
+	assert.Equal(t, ran, runOn(t, h, bashCall(t, "rm -rf build")))
+	assert.Len(t, a.calls, 2, "the command before the edit asks again")
+}
+
+func TestDenyChecksTheEditedInput(t *testing.T) {
+	a := &approver{decision: agent.Decision{
+		Allow:  true,
+		Always: true,
+		Input:  json.RawMessage(`{"command":"rm -rf /"}`),
+	}}
+	p := permission.Policy{
+		Approve: a.approve,
+		Deny:    []string{"Bash(rm:*)"},
+	}
+	h := p.Hook()
+
+	_, out := runEdited(t, h, bashCall(t, "ls"))
+	assert.Equal(t, denied, out)
+
+	a.decision = allow
+	assert.Equal(t, ran, runOn(t, h, bashCall(t, "ls")))
+	assert.Len(t, a.calls, 2, "a denied edit keeps no rule")
+}
+
+func TestApproveError(t *testing.T) {
+	boom := errors.New("boom")
+	p := &permission.Policy{
+		Approve: func(context.Context, ai.ToolCall) (agent.Decision, error) {
+			return allow, boom
+		},
+	}
+	_, err := beforeTool(t, p.Hook()).BeforeTool(context.Background(), agent.State{}, bashCall(t, "ls"))
 	assert.ErrorIs(t, err, boom)
 }
 

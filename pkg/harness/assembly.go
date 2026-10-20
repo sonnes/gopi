@@ -60,6 +60,36 @@ func (a *Assembly) SkillName(i int) string {
 	return a.names[i]
 }
 
+// skill returns the skill that has the name or the qualified name, and
+// reports whether it exists.
+func (a *Assembly) skill(name string) (skill.Skill, bool) {
+	for i, s := range a.Skills {
+		if name == a.SkillName(i) || name == s.QualifiedName() {
+			return s, true
+		}
+	}
+	return skill.Skill{}, false
+}
+
+// withSkills returns text with the body of each named skill after it.
+// If no skill has a name, it returns an error.
+func (a *Assembly) withSkills(text string, names []string) (string, error) {
+	parts := []string{text}
+	for _, name := range names {
+		s, ok := a.skill(name)
+		if !ok {
+			return "", fmt.Errorf("harness: preload the skill %q: no skill has this name", name)
+		}
+		parts = append(parts, skillText(name, s))
+	}
+	return joinText(parts...), nil
+}
+
+// skillText is the text of a preloaded skill in the prompt.
+func skillText(name string, s skill.Skill) string {
+	return "## Skill: " + name + "\n\n" + s.Body
+}
+
 // taskTool reports if the assembly gives the model the task tool.
 func (a *Assembly) taskTool() bool {
 	return len(a.Agents) > 0 && a.h.child == nil
@@ -96,6 +126,12 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 	}
 	asm.names = skillNames(asm.Skills)
 	if h.child == nil {
+		// A subagent preloads the skills of its file, in childSystem,
+		// and not the skills of its parent.
+		asm.System, err = asm.withSkills(asm.System, h.preload)
+		if err != nil {
+			return nil, err
+		}
 		asm.Agents, err = readAgents(ctx, append(src.agents, h.agents...))
 		if err != nil {
 			return nil, err

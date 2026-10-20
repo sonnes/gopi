@@ -43,7 +43,7 @@ An agent is the loop that runs a model with tools until the work is done. It sto
 - The tool calls of one message run at the same time, so the slowest call sets the time of the turn. If a message calls a sequential tool, every call of the message runs in order.
 - A Go error from a tool or a tool hook, or an unknown tool, becomes an error result, so the model can correct the call. A canceled or expired context stops the run, because the caller asked for it.
 - A finished tool call runs whatever the stop reason, except a refusal. A provider can stop at the output cap after a complete call, and a call that does not run gives the model no result.
-- `Hook` is one interface with a method for each point, so a policy at two points, such as a token budget, is one value. An unexported method forces the embed of `BaseHook`. The cost: a misspelled method compiles and falls back to `BaseHook`.
+- Each point of a hook is its own interface, such as `BeforeToolHook`, so a policy at two points is one value, and a driver sees the points that a hook uses. The unexported method of `Hook` forces the embed of `BaseHook`. The cost: a misspelled method compiles and never runs.
 - A hook adds entries only through the return value of `AfterTurn` or `BeforeStop`, or through `State.Steer` and `State.FollowUp`, so every message of a run has its events. `State.Log` has no `Append`.
 - The `BeforeTool` hooks run one call at a time, before the calls that run together start. A hook that asks a person to approve a call then asks one question at a time.
 - `BeforeStop` is the one hook that continues a run, so one place decides the stop. The agent has no turn cap, so a run stops early in one way: a `BeforeCall` hook that reads `State.Turn` returns an error.

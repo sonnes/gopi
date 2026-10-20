@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
@@ -29,8 +30,8 @@ func callEcho(t *testing.T, opts ...harness.Option) ai.Message {
 }
 
 func TestPermissions(t *testing.T) {
-	approve := func(context.Context, ai.ToolCall) (permission.Decision, error) {
-		return permission.Allow, nil
+	approve := func(context.Context, ai.ToolCall) (agent.Decision, error) {
+		return agent.Decision{Allow: true}, nil
 	}
 	tests := []struct {
 		name   string

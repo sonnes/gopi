@@ -1,5 +1,5 @@
 stdiorr trace v1
-# Hand-written. The Approver accepts an approval request.
+# Hand-written. The approver accepts an approval request.
 > {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
 < {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
 > {"method":"initialized"}

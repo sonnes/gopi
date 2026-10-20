@@ -107,10 +107,14 @@ type wireUsage struct {
 // controlRequest is the request of a control_request line. The agent
 // reads the subtype and the tool call of a permission prompt.
 type controlRequest struct {
-	Subtype   string          `json:"subtype"`
-	ToolUseID string          `json:"tool_use_id"`
-	ToolName  string          `json:"tool_name"`
-	Input     json.RawMessage `json:"input"`
+	Subtype   string `json:"subtype"`
+	ToolUseID string `json:"tool_use_id"`
+	ToolName  string `json:"tool_name"`
+	// Input is the input of the tool call of a permission prompt, or
+	// the input of a hook callback.
+	Input json.RawMessage `json:"input"`
+	// CallbackID names the callback of a hook_callback request.
+	CallbackID string `json:"callback_id"`
 	// PermissionSuggestions are the permission updates that the CLI
 	// offers for "allow always".
 	PermissionSuggestions json.RawMessage `json:"permission_suggestions"`
@@ -132,6 +136,8 @@ type outRequest struct {
 
 type outRequestBody struct {
 	Subtype string `json:"subtype"`
+	// Hooks registers the hook callbacks, in the initialize request.
+	Hooks map[string][]hookMatcher `json:"hooks,omitempty"`
 }
 
 // outResponse is a control_response that the agent sends.

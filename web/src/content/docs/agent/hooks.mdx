@@ -30,7 +30,7 @@ Add a hook when a run needs a rule that the loop does not have, such as a token 
 
 ## Add a Hook
 
-`agent.Hook` has a method for each point. A hook embeds `agent.BaseHook` and overrides the methods that it needs. Each method gets a copy of `agent.State`. `agent.Hooks` adds hook values to the agent, and one value can act at more than one point.
+Each point is its own interface, such as `agent.BeforeToolHook`. A hook embeds `agent.BaseHook` and implements the points that it needs. Each point gets a copy of `agent.State`. `agent.Hooks` adds hook values to the agent, and one value can act at more than one point.
 
 ```go
 type Budget struct {
@@ -52,7 +52,7 @@ For one point, use the option of that point, such as `agent.BeforeTool`. The hoo
 
 A hook reads the [session](../session/index.mdx#in-a-hook) from `State.Log()`: the entries, the messages, and the values. It can set values through it, and it cannot append an entry.
 
-A hook that embeds `agent.BaseHook` keeps compiling when gopi adds a hook point, but a misspelled method also compiles and never runs.
+A hook keeps compiling when gopi adds a hook point. A misspelled method also compiles, and it never runs.
 
 ## Change One Model Call
 
@@ -137,6 +137,25 @@ A state that a viewer decoded from JSON has no queues, so the two calls do nothi
 | `AfterTurn`, `BeforeStop` | The run fails.                                            |
 
 The hooks after the failed hook do not run.
+
+## Hooks on a CLI Agent
+
+The same hooks run on Claude Code and Codex, through `claude.Hooks` and `codex.Hooks`, or through an [agent.Driver](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Driver). The CLI calls each point at one of its own hook events:
+
+| Point        | Claude Code                         | Codex         |
+| ------------ | ----------------------------------- | ------------- |
+| `BeforeCall` | none                                | none          |
+| `AfterCall`  | none                                | none          |
+| `BeforeTool` | `PreToolUse`                        | `PreToolUse`  |
+| `AfterTool`  | `PostToolUse`, `PostToolUseFailure` | `PostToolUse` |
+| `AfterTurn`  | `PostToolBatch`                     | none          |
+| `BeforeStop` | `Stop`                              | `Stop`        |
+
+After a failed call, Claude Code calls `AfterTool` with an error result. The model reads the error, and the new text of the hook comes after it as context. If a hook changes the result of a built-in tool such as `Bash`, it must return JSON in the shape of the tool response.
+
+A hook at a point that the CLI does not have fails the run, or the start of the session. A hook entry must be text. A CLI cannot rename a tool call, so a new name denies the call.
+
+Codex runs each hook as the command `gopi hook`, so the `gopi` binary must be on the `PATH`, or in `codex.HookCommand`. If the agent cannot find the command, the run fails. If the command fails or times out, Codex runs the tool. If the command cannot reach the agent, it denies the tool call, replaces a tool output with the error, or ends the turn at a stop. For `Bash` and `apply_patch`, a new input must have a string `command`, or the agent denies the call. Codex does not call a hook for a hosted tool, such as web search.
 
 ## Related
 

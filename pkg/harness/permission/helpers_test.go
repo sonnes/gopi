@@ -22,13 +22,19 @@ const (
 	denied outcome = "deny"
 )
 
+// The decisions that the tests use most.
+var (
+	allow       = agent.Decision{Allow: true}
+	allowAlways = agent.Decision{Allow: true, Always: true}
+)
+
 // approver records the calls that it gets, and returns one decision.
 type approver struct {
-	decision permission.Decision
+	decision agent.Decision
 	calls    []ai.ToolCall
 }
 
-func (a *approver) approve(_ context.Context, c ai.ToolCall) (permission.Decision, error) {
+func (a *approver) approve(_ context.Context, c ai.ToolCall) (agent.Decision, error) {
 	a.calls = append(a.calls, c)
 	return a.decision, nil
 }
@@ -59,7 +65,7 @@ func pathCall(t *testing.T, name, path string) ai.ToolCall {
 // tells an ask from a run. The approver of p, if set, is replaced.
 func decide(t *testing.T, p *permission.Policy, c ai.ToolCall) outcome {
 	t.Helper()
-	a := &approver{decision: permission.Allow}
+	a := &approver{decision: allow}
 	p.Approve = a.approve
 	out := runHook(t, p, c)
 	if len(a.calls) > 0 {
@@ -75,24 +81,41 @@ func runHook(t *testing.T, p *permission.Policy, c ai.ToolCall) outcome {
 	return runOn(t, p.Hook(), c)
 }
 
-// runOn runs the hook h on c.
+// beforeTool returns the BeforeTool point of h.
+func beforeTool(t *testing.T, h agent.Hook) agent.BeforeToolHook {
+	t.Helper()
+	bt, ok := h.(agent.BeforeToolHook)
+	require.True(t, ok, "the hook of a policy implements BeforeTool")
+	return bt
+}
+
+// runOn runs the hook h on c. The hook must not change c.
 func runOn(t *testing.T, h agent.Hook, c ai.ToolCall) outcome {
 	t.Helper()
-	got, err := h.BeforeTool(context.Background(), agent.State{}, c)
-	if err == nil {
+	got, out := runEdited(t, h, c)
+	if out == ran {
 		require.Equal(t, c, got)
-		return ran
+	}
+	return out
+}
+
+// runEdited runs the hook h on c, and returns the call that runs.
+func runEdited(t *testing.T, h agent.Hook, c ai.ToolCall) (ai.ToolCall, outcome) {
+	t.Helper()
+	got, err := beforeTool(t, h).BeforeTool(context.Background(), agent.State{}, c)
+	if err == nil {
+		return got, ran
 	}
 	var deny *agent.DenyError
 	require.True(t, errors.As(err, &deny), "error %v is not a DenyError", err)
-	return denied
+	return got, denied
 }
 
 // denyReason runs the hook of p on c, and returns the reason of the
 // deny.
 func denyReason(t *testing.T, p *permission.Policy, c ai.ToolCall) string {
 	t.Helper()
-	_, err := p.Hook().BeforeTool(context.Background(), agent.State{}, c)
+	_, err := beforeTool(t, p.Hook()).BeforeTool(context.Background(), agent.State{}, c)
 	var deny *agent.DenyError
 	require.True(t, errors.As(err, &deny), "error %v is not a DenyError", err)
 	return deny.Reason

@@ -167,6 +167,9 @@ func main() {
 				Usage: "the path of an mcp.json file. gopi starts its servers and gives their tools to the agent. The fence does not confine the servers",
 			},
 		},
+		Commands: []*cli.Command{
+			hookCommand(),
+		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := options{
 				provider:  c.String("provider"),

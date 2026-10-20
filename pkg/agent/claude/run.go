@@ -96,7 +96,7 @@ func (r *runner) run(
 		case <-done:
 			done = nil
 			r.interrupted = true
-			if _, err := r.proc.request("interrupt"); err != nil {
+			if _, err := r.proc.request(outRequestBody{Subtype: "interrupt"}); err != nil {
 				return r.fail(ctx, ctx.Err())
 			}
 			timer := time.NewTimer(interruptTimeout)
@@ -483,13 +483,45 @@ func (r *runner) finish(ctx context.Context) error {
 	return nil
 }
 
-// user applies the tool results of a user line. The emitter drops a
-// result for a call that it did not start.
+// user applies a user line: its tool results, then its text. The
+// emitter drops a result for a call that it did not start.
 func (r *runner) user(ctx context.Context, m *wireMessage) error {
 	if err := r.finish(ctx); err != nil {
 		return err
 	}
-	return r.toolResults(ctx, m)
+	if err := r.toolResults(ctx, m); err != nil {
+		return err
+	}
+	return r.userText(ctx, m)
+}
+
+// stopFeedbackPrefix starts the text of the user line that the CLI
+// writes when a Stop hook continues the run.
+const stopFeedbackPrefix = "Stop hook feedback:"
+
+// userText stores the feedback of a Stop hook in a user line as a user
+// message. The CLI also writes other text in user lines, such as the
+// body of a skill or the summary of a compaction. The log does not keep
+// that text. After an interrupt, userText stores nothing.
+func (r *runner) userText(ctx context.Context, m *wireMessage) error {
+	if r.interrupted {
+		return nil
+	}
+	var texts []ai.Content
+	for _, b := range m.blocks() {
+		feedback := b.Type == "text" && strings.HasPrefix(b.Text, stopFeedbackPrefix)
+		if feedback {
+			texts = append(texts, ai.Text{Text: b.Text})
+		}
+	}
+	if len(texts) == 0 {
+		return nil
+	}
+	msg := ai.Message{
+		Role:    ai.RoleUser,
+		Content: texts,
+	}
+	return r.em.Input(ctx, []session.Entry{session.NewEntry(msg)})
 }
 
 // toolResults stores the tool_result blocks of a user line. The emitter
@@ -544,6 +576,9 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	}
 	if r.interrupted {
 		return r.abort(ctx, u, ctx.Err())
+	}
+	if err := r.proc.takeHookErr(); err != nil {
+		return r.abort(ctx, u, err)
 	}
 
 	failed := l.IsError || l.Subtype != "success"

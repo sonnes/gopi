@@ -280,3 +280,13 @@ func TestDecodedStateCannotQueue(t *testing.T) {
 		s.FollowUp(session.Text("y"))
 	}, "a viewer has no queues, so the calls do nothing")
 }
+
+func TestTakeSteer(t *testing.T) {
+	a := agent.New(model(&script{}))
+	a.Steer(session.Text("one"), session.Text("two"))
+
+	taken := a.TakeSteer()
+	require.Len(t, taken, 2)
+	assert.Equal(t, "one", taken[0].Message.Text())
+	assert.Empty(t, a.TakeSteer(), "TakeSteer empties the queue")
+}

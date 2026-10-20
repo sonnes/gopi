@@ -72,6 +72,8 @@ type threadParams struct {
 	ApprovalPolicy        ApprovalPolicy `json:"approvalPolicy,omitempty"`
 	Sandbox               SandboxMode    `json:"sandbox,omitempty"`
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
+	// Config overrides the config of the CLI for the thread.
+	Config map[string]any `json:"config,omitempty"`
 }
 
 // threadResult is the result of thread/start and thread/resume.

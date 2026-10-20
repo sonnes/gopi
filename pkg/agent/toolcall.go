@@ -138,7 +138,11 @@ func (a *Agent) prepare(ctx context.Context, declared []ai.ToolInfo, tc ai.ToolC
 
 	call := tc
 	for _, h := range a.cfg.hooks {
-		next, err := h.BeforeTool(ctx, a.State(), call)
+		bt, ok := h.(BeforeToolHook)
+		if !ok {
+			continue
+		}
+		next, err := bt.BeforeTool(ctx, a.State(), call)
 		if err != nil {
 			result, err := failure(ctx, err)
 			return pending{call: call, result: result, err: err}
@@ -169,7 +173,11 @@ func (a *Agent) execute(ctx context.Context, p pending) (ai.ToolResult, error) {
 		return failure(ctx, err)
 	}
 	for _, h := range a.cfg.hooks {
-		result, err = h.AfterTool(ctx, a.State(), p.call, result)
+		at, ok := h.(AfterToolHook)
+		if !ok {
+			continue
+		}
+		result, err = at.AfterTool(ctx, a.State(), p.call, result)
 		if err != nil {
 			return failure(ctx, err)
 		}

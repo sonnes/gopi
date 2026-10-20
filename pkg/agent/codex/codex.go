@@ -17,8 +17,8 @@
 // a stored session resumes the same thread.
 //
 // The agent declines every approval request from the CLI, unless an
-// [Approver] answers it. To let the CLI act without a request, set
-// [Approval] to [ApprovalNever] and pick a [Sandbox] mode.
+// [Approve] function answers it. To let the CLI act without a request,
+// set [Policy] to [ApprovalNever] and pick a [Sandbox] mode.
 //
 // The reasons are in docs/concepts/agent/cli-agent.md.
 package codex
@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -72,8 +73,8 @@ const (
 )
 
 // ApprovalPolicy says when the CLI asks for approval before it acts.
-// An [Approver] answers each request. Without it, the agent declines
-// every request.
+// An [Approve] function answers each request. Without it, the agent
+// declines every request.
 type ApprovalPolicy string
 
 const (
@@ -114,7 +115,10 @@ type config struct {
 	env      []string
 	sandbox  SandboxMode
 	approval ApprovalPolicy
-	approver ApproverFunc
+	approve  agent.ApproveFunc
+	hooks    []agent.Hook
+	// hookCommand is the gopi binary that relays a hook.
+	hookCommand string
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same
@@ -176,70 +180,38 @@ func Sandbox(mode SandboxMode) Option {
 	return func(c *config) { c.sandbox = mode }
 }
 
-// Approval sets the approval policy of the thread. The default is
+// Policy sets the approval policy of the thread. The default is
 // [ApprovalNever].
-func Approval(policy ApprovalPolicy) Option {
+func Policy(policy ApprovalPolicy) Option {
 	return func(c *config) { c.approval = policy }
 }
 
-// ApprovalKind is the kind of action that an [ApprovalRequest] asks
-// for.
-type ApprovalKind string
-
-const (
-	// ApprovalCommand asks to run a command.
-	ApprovalCommand ApprovalKind = "command"
-	// ApprovalFileChange asks to change files.
-	ApprovalFileChange ApprovalKind = "fileChange"
-)
-
-// ApprovalRequest is a request of the CLI to run a command or to change
-// files.
-type ApprovalRequest struct {
-	Kind ApprovalKind
-	// ItemID is the ID of the tool call in the log.
-	ItemID string
-	// Command and Cwd are set for [ApprovalCommand].
-	Command string
-	Cwd     string
-	// Reason says why the CLI asks, or is empty.
-	Reason string
-}
-
-// Decision answers an [ApprovalRequest]. The zero value declines.
-type Decision string
-
-const (
-	// Decline refuses the action. The turn goes on.
-	Decline Decision = ""
-	// Accept allows the action one time.
-	Accept Decision = "accept"
-	// AcceptForSession allows the action, and the actions that the CLI
-	// matches to it, until the process stops.
-	AcceptForSession Decision = "acceptForSession"
-	// Cancel refuses the action and interrupts the turn.
-	Cancel Decision = "cancel"
-)
-
-// ApproverFunc answers an approval request of the CLI. It runs while
-// the CLI waits, so it must return when ctx ends. The ctx ends when the
-// process stops.
-type ApproverFunc func(ctx context.Context, req ApprovalRequest) (Decision, error)
-
-// Approver sets the function that answers each approval request of the
+// Approve sets the function that answers each approval request of the
 // CLI. Without it, the agent declines every request. If fn returns an
 // error, the agent declines the request.
-func Approver(fn ApproverFunc) Option {
-	return func(c *config) { c.approver = fn }
+//
+// The call is the tool call of the item that the request names, as the
+// log has it: a bash call for a command, and an apply_patch call with
+// the changes for a file change. A file change request has no changes.
+// So if it comes before its item, the agent declines it and does not
+// call fn.
+//
+// An Always decision accepts the action, and the actions that the CLI
+// matches to it, until the process stops. Codex cannot change the input
+// of an action, so a decision with an Input declines it. Codex has no
+// field for the Message of a decision, so the model does not read it.
+func Approve(fn agent.ApproveFunc) Option {
+	return func(c *config) { c.approve = fn }
 }
 
 // New returns an agent over an unsaved log. New does no I/O. The
 // process starts on the first Run.
 func New(opts ...Option) *Agent {
+	log := session.New()
 	return &Agent{
 		cfg:   newConfig(opts),
-		log:   session.New(),
-		state: emit.NewState(nil),
+		log:   log,
+		state: emit.NewState(log),
 	}
 }
 
@@ -259,15 +231,16 @@ func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
 	return &Agent{
 		cfg:   cfg,
 		log:   log,
-		state: emit.NewState(log.Messages()),
+		state: emit.NewState(log),
 	}, nil
 }
 
 // newConfig applies opts over the defaults.
 func newConfig(opts []Option) config {
 	c := config{
-		binary:   defaultBinary,
-		approval: ApprovalNever,
+		binary:      defaultBinary,
+		approval:    ApprovalNever,
+		hookCommand: defaultHookCommand,
 	}
 	for _, opt := range opts {
 		opt(&c)
@@ -280,9 +253,10 @@ func (a *Agent) Log() *session.Log { return a.log }
 
 // State returns a copy of the state of the agent, as
 // [agent.Agent.State] does. Each event of a run changes the state
-// before the stream gets it. The agent has no queues and no hooks, so
-// [agent.State.Steer] and [agent.State.FollowUp] do nothing, and
-// [agent.State.Log] returns nil. Use [Agent.Log] for the log.
+// before the stream gets it. [agent.State.Log] is the log of the
+// agent, also in the state that a hook of [Hooks] gets. The agent has
+// no queues, so [agent.State.Steer] and [agent.State.FollowUp] do
+// nothing.
 func (a *Agent) State() agent.State { return a.state.Get() }
 
 // Run appends entries to the log and runs one Codex turn with their
@@ -305,7 +279,9 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 	})
 }
 
-// Close stops the process. The next Run starts a new process.
+// Close stops the process. The next Run starts a new process. The
+// context of a hook in flight ends, and Close waits for the hook to
+// return.
 func (a *Agent) Close() error {
 	a.mu.Lock()
 	c := a.conn
@@ -343,7 +319,14 @@ func (a *Agent) run(
 		model:    a.model,
 		effort:   effort(a.cfg.thinking),
 	}
+	// The error of a hook belongs to the run that called it.
+	_ = c.hookErr()
+	c.bindHooks(ctx)
 	usage, err := t.run(ctx, userInputs(emit.Input(entries)))
+	c.bindHooks(nil)
+	if err == nil {
+		err = c.hookErr()
+	}
 	if t.dead {
 		a.drop(c)
 	}
@@ -367,13 +350,35 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		a.drop(c)
 	}
 
+	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
+		return nil, "", fmt.Errorf("codex: %w", err)
+	}
+	var (
+		hooks       *hookServer
+		hookCommand string
+	)
+	if len(a.cfg.hooks) > 0 {
+		hookCommand, err = a.findHookCommand()
+		if err != nil {
+			return nil, "", err
+		}
+		hooks, err = startHookServer(a.cfg.hooks, a.State)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
 	cmd := a.command()
 	p, err := start(cmd)
 	if err != nil {
+		if hooks != nil {
+			hooks.close()
+		}
 		return nil, "", fmt.Errorf("codex: start %s: %w", cmd.Path, err)
 	}
-	c = dial(p, a.cfg.approver)
-	res, err := c.handshake(ctx, a.threadParams(thread))
+	c = dial(p, a.cfg.approve)
+	c.hooks = hooks
+	res, err := c.handshake(ctx, a.threadParams(thread, hooks, hookCommand))
 	if err != nil {
 		c.kill()
 		if thread != "" && lostThread(err) {
@@ -461,9 +466,11 @@ func (a *Agent) command() *exec.Cmd {
 }
 
 // threadParams returns the parameters of thread/start, or of
-// thread/resume if thread is set.
-func (a *Agent) threadParams(thread string) threadParams {
-	return threadParams{
+// thread/resume if thread is set. With a hook server, the config adds
+// the hooks of the agent to the thread, and each hook runs the program
+// hookCommand.
+func (a *Agent) threadParams(thread string, hooks *hookServer, hookCommand string) threadParams {
+	p := threadParams{
 		ThreadID:              thread,
 		Model:                 a.cfg.model,
 		Cwd:                   a.cfg.dir,
@@ -471,6 +478,24 @@ func (a *Agent) threadParams(thread string) threadParams {
 		Sandbox:               a.cfg.sandbox,
 		DeveloperInstructions: a.cfg.system,
 	}
+	if hooks != nil {
+		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
+	}
+	return p
+}
+
+// findHookCommand returns the absolute path of the hook command. The
+// reasons are in the doc comment of [HookCommand].
+func (a *Agent) findHookCommand() (string, error) {
+	path, err := exec.LookPath(a.cfg.hookCommand)
+	if err != nil {
+		return "", fmt.Errorf("codex: find the hook command: %w", err)
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("codex: find the hook command: %w", err)
+	}
+	return abs, nil
 }
 
 // effort returns the reasoning effort of the CLI for level, or "" for

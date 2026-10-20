@@ -7,13 +7,19 @@ import (
 	"github.com/sonnes/gopi/pkg/session"
 )
 
-// Hook changes the loop at six points. Each method gets a copy of the
-// [State] and returns the value that the loop uses. A hook embeds
-// [BaseHook] and overrides the methods that it needs. The other methods
-// pass their values through.
+// Hook changes the loop at the points that it implements. Each point
+// is its own interface: [BeforeCallHook], [AfterCallHook],
+// [BeforeToolHook], [AfterToolHook], [AfterTurnHook], and
+// [BeforeStopHook]. A hook embeds [BaseHook] and implements the points
+// that it needs. Each point gets a copy of the [State] and returns the
+// value that the loop uses.
 //
-// The loop calls each method of each hook, in the order of
-// registration. A method gets the value that the hook before it
+// A point is an interface, so the code that runs a hook can see the
+// points that the hook uses. A driver of an agent that cannot call a
+// point rejects a hook that implements it.
+//
+// The loop calls each point of each hook, in the order of
+// registration. A point gets the value that the hook before it
 // returned.
 //
 // A hook reads the session from [State.Log], and sets values through
@@ -21,68 +27,48 @@ import (
 // queues them with [State.Steer] and [State.FollowUp], so the agent
 // stores each entry and sends its events in one order.
 type Hook interface {
-	// BeforeCall changes one model call. See [BeforeCall].
-	BeforeCall(ctx context.Context, s State, r Request) (Request, error)
-	// AfterCall changes the message of one model call. See [AfterCall].
-	AfterCall(ctx context.Context, s State, r Request, m ai.Message) (ai.Message, error)
-	// BeforeTool changes or blocks one tool call. See [BeforeTool].
-	BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.ToolCall, error)
-	// AfterTool changes the result of one tool call. See [AfterTool].
-	AfterTool(ctx context.Context, s State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error)
-	// AfterTurn adds entries after a turn. See [AfterTurn].
-	AfterTurn(ctx context.Context, s State) ([]session.Entry, error)
-	// BeforeStop continues a run that would stop. See [BeforeStop].
-	BeforeStop(ctx context.Context, s State) ([]session.Entry, error)
-
-	// nop makes every Hook embed BaseHook. A new point of the loop then
-	// does not break a hook.
+	// nop makes every Hook embed BaseHook, so a value that is not a
+	// hook cannot go in a list of hooks.
 	nop()
 }
 
-// BaseHook is a [Hook] that changes nothing. Each method returns the
-// value that it gets, and adds no entries.
+// BeforeCallHook changes one model call. See [BeforeCall].
+type BeforeCallHook interface {
+	BeforeCall(ctx context.Context, s State, r Request) (Request, error)
+}
+
+// AfterCallHook changes the message of one model call. See [AfterCall].
+type AfterCallHook interface {
+	AfterCall(ctx context.Context, s State, r Request, m ai.Message) (ai.Message, error)
+}
+
+// BeforeToolHook changes or blocks one tool call. See [BeforeTool].
+type BeforeToolHook interface {
+	BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.ToolCall, error)
+}
+
+// AfterToolHook changes the result of one tool call. See [AfterTool].
+type AfterToolHook interface {
+	AfterTool(ctx context.Context, s State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error)
+}
+
+// AfterTurnHook adds entries after a turn. See [AfterTurn].
+type AfterTurnHook interface {
+	AfterTurn(ctx context.Context, s State) ([]session.Entry, error)
+}
+
+// BeforeStopHook continues a run that would stop. See [BeforeStop].
+type BeforeStopHook interface {
+	BeforeStop(ctx context.Context, s State) ([]session.Entry, error)
+}
+
+// BaseHook is a [Hook] that implements no point. A hook embeds it.
 type BaseHook struct{}
-
-// BeforeCall returns r.
-func (BaseHook) BeforeCall(_ context.Context, _ State, r Request) (Request, error) {
-	return r, nil
-}
-
-// AfterCall returns m.
-func (BaseHook) AfterCall(
-	_ context.Context,
-	_ State,
-	_ Request,
-	m ai.Message,
-) (ai.Message, error) {
-	return m, nil
-}
-
-// BeforeTool returns c.
-func (BaseHook) BeforeTool(_ context.Context, _ State, c ai.ToolCall) (ai.ToolCall, error) {
-	return c, nil
-}
-
-// AfterTool returns r.
-func (BaseHook) AfterTool(
-	_ context.Context,
-	_ State,
-	_ ai.ToolCall,
-	r ai.ToolResult,
-) (ai.ToolResult, error) {
-	return r, nil
-}
-
-// AfterTurn returns no entries.
-func (BaseHook) AfterTurn(context.Context, State) ([]session.Entry, error) { return nil, nil }
-
-// BeforeStop returns no entries.
-func (BaseHook) BeforeStop(context.Context, State) ([]session.Entry, error) { return nil, nil }
 
 func (BaseHook) nop() {}
 
 // Hooks adds hs to the hooks of the agent. Each hook takes its place
-// in each point of the loop, in the order of registration.
+// in each point that it implements, in the order of registration.
 func Hooks(hs ...Hook) Option {
 	return func(a *Agent) { a.cfg.hooks = append(a.cfg.hooks, hs...) }
 }

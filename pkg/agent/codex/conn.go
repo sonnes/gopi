@@ -9,7 +9,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
+	"github.com/sonnes/gopi/pkg/ai"
 )
 
 // inboxSize is the number of messages that the reader holds for the
@@ -55,24 +57,52 @@ type conn struct {
 	done     chan struct{}
 	doneOnce sync.Once
 
-	// approver answers the approval requests, or is nil.
-	approver ApproverFunc
-	// ctx ends when the reader stops. An approver gets it.
+	// approve answers the approval requests, or is nil.
+	approve agent.ApproveFunc
+	// ctx ends when the reader stops. The approve function gets it.
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// itemsMu guards items.
+	itemsMu sync.Mutex
+	// items holds the tool call of each tool item that started and did
+	// not complete, by item ID. An approval request names its item, so
+	// the approve function gets the same call as the log.
+	items map[string]ai.ToolCall
+
+	// hooks serves the hooks of the agent for the process, or is nil.
+	hooks *hookServer
+}
+
+// bindHooks gives the hooks of the process the context of a run, or
+// nil after the run.
+func (c *conn) bindHooks(ctx context.Context) {
+	if c.hooks != nil {
+		c.hooks.bind(ctx)
+	}
+}
+
+// hookErr returns the error of a hook that stopped the turn, and
+// clears it.
+func (c *conn) hookErr() error {
+	if c.hooks == nil {
+		return nil
+	}
+	return c.hooks.takeErr()
 }
 
 // dial starts the reader of p.
-func dial(p cliproc.Pipes, approver ApproverFunc) *conn {
+func dial(p cliproc.Pipes, approve agent.ApproveFunc) *conn {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &conn{
-		p:        cliproc.Open(p),
-		approver: approver,
-		ctx:      ctx,
-		cancel:   cancel,
-		inbox:    make(chan message, inboxSize),
-		exited:   make(chan struct{}),
-		done:     make(chan struct{}),
+		p:       cliproc.Open(p),
+		approve: approve,
+		ctx:     ctx,
+		cancel:  cancel,
+		inbox:   make(chan message, inboxSize),
+		exited:  make(chan struct{}),
+		done:    make(chan struct{}),
+		items:   make(map[string]ai.ToolCall),
 	}
 	go c.read()
 	return c
@@ -92,11 +122,41 @@ func (c *conn) read() {
 			c.answer(m)
 			continue
 		}
+		c.track(m)
 		select {
 		case c.inbox <- m:
 		case <-c.done:
 			return
 		}
+	}
+}
+
+// track keeps the tool call of a tool item from item/started until
+// item/completed. If item/started comes before the approval request of
+// the item, the call is there when approve needs it.
+func (c *conn) track(m message) {
+	started := m.Method == methodItemStarted
+	completed := m.Method == methodItemCompleted
+	if !started && !completed {
+		return
+	}
+	var p params
+	if err := json.Unmarshal(m.Params, &p); err != nil {
+		return
+	}
+	var it item
+	if err := json.Unmarshal(p.Item, &it); err != nil {
+		return
+	}
+	c.itemsMu.Lock()
+	defer c.itemsMu.Unlock()
+	if completed {
+		delete(c.items, it.ID)
+		return
+	}
+	call, ok := toolCall(it)
+	if ok {
+		c.items[it.ID] = call
 	}
 }
 
@@ -106,19 +166,21 @@ const (
 	methodFileChangeApproval = "item/fileChange/requestApproval"
 )
 
-// answer responds to a request from the server. The approver answers an
-// approval request in its own goroutine, so that the reader goes on.
-// Without an approver, the agent declines. It grants no extra
-// permissions. Every other request gets a method-not-found error.
+// answer responds to a request from the server. The approve function
+// answers an approval request in its own goroutine, so that the reader
+// goes on. Without it, or without the call of the request, the agent
+// declines. It grants no extra permissions. Every other request gets a
+// method-not-found error.
 func (c *conn) answer(m message) {
 	res := response{ID: m.ID}
 	switch m.Method {
 	case methodCommandApproval, methodFileChangeApproval:
-		if c.approver != nil {
-			go c.approve(m)
+		call, known := c.approvalCall(m)
+		if c.approve != nil && known {
+			go c.decide(m.ID, call)
 			return
 		}
-		res.Result = decisionResult(Decline)
+		res.Result = decisionResult(decisionDecline)
 	case "item/permissions/requestApproval":
 		res.Result = map[string]any{
 			"permissions": map[string]any{},
@@ -135,37 +197,60 @@ func (c *conn) answer(m message) {
 	_ = c.write(res)
 }
 
-// approve sends the decision of the approver for the approval request
-// m. If the approver fails, the agent declines.
-func (c *conn) approve(m message) {
+// approvalCall returns the tool call that the approval request m asks
+// about: the call of its item, or for a command, a call from the
+// parameters of m if the item is not known. A file change request has
+// no changes, so approvalCall reports false for a file change with an
+// unknown item.
+func (c *conn) approvalCall(m message) (ai.ToolCall, bool) {
 	var p approvalParams
 	_ = json.Unmarshal(m.Params, &p)
-	req := ApprovalRequest{
-		Kind:    ApprovalCommand,
-		ItemID:  p.ItemID,
-		Command: p.Command,
-		Cwd:     p.Cwd,
-		Reason:  p.Reason,
+
+	c.itemsMu.Lock()
+	call, ok := c.items[p.ItemID]
+	c.itemsMu.Unlock()
+	if ok {
+		return call, true
 	}
 	if m.Method == methodFileChangeApproval {
-		req.Kind = ApprovalFileChange
+		return ai.ToolCall{}, false
 	}
-	d, err := c.approver(c.ctx, req)
-	if err != nil {
-		d = Decline
-	}
-	_ = c.write(response{
-		ID:     m.ID,
-		Result: decisionResult(d),
+	return toolCall(item{
+		Type:    itemCommandExecution,
+		ID:      p.ItemID,
+		Command: p.Command,
 	})
 }
 
-// decisionResult returns the result of an approval response.
-func decisionResult(d Decision) map[string]string {
-	if d == Decline {
-		return map[string]string{"decision": "decline"}
+// decide sends the decision of the approve function on call, as the
+// response to the request id. If the function fails, or the decision
+// changes the input, the agent declines.
+func (c *conn) decide(id json.RawMessage, call ai.ToolCall) {
+	d, err := c.approve(c.ctx, call)
+	declined := err != nil || !d.Allow || d.Input != nil
+	decision := decisionAccept
+	switch {
+	case declined:
+		decision = decisionDecline
+	case d.Always:
+		decision = decisionAcceptForSession
 	}
-	return map[string]string{"decision": string(d)}
+	_ = c.write(response{
+		ID:     id,
+		Result: decisionResult(decision),
+	})
+}
+
+// The decisions of an approval response.
+const (
+	decisionDecline          = "decline"
+	decisionAccept           = "accept"
+	decisionAcceptForSession = "acceptForSession"
+)
+
+// decisionResult returns the result of an approval response.
+func decisionResult(decision string) map[string]string {
+	return map[string]string{"decision": decision}
 }
 
 // write sends one line to the process.
@@ -270,21 +355,37 @@ func (c *conn) alive() bool {
 // block on a full pipe.
 func (c *conn) close() error {
 	c.stop()
-	return c.p.Stop()
+	err := c.p.Stop()
+	c.closeHooks()
+	return err
 }
 
 // kill stops the process at once.
 func (c *conn) kill() {
 	c.stop()
 	c.p.Kill()
+	c.closeHooks()
 }
 
-// stop ends the reader and the ctx of the approver.
+// stop ends the reader, the ctx of the approve function, and the ctx of
+// the hooks in flight.
 func (c *conn) stop() {
 	c.doneOnce.Do(func() {
 		close(c.done)
 		c.cancel()
+		if c.hooks != nil {
+			c.hooks.cancel()
+		}
 	})
+}
+
+// closeHooks waits for the hooks in flight and removes the socket.
+// Call it after the process stops, so that the wait does not delay the
+// stop of the process.
+func (c *conn) closeHooks() {
+	if c.hooks != nil {
+		c.hooks.close()
+	}
 }
 
 // isResponse reports whether m is the response to the request id.

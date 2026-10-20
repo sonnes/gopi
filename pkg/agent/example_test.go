@@ -71,8 +71,9 @@ func ExampleBeforeStop() {
 }
 
 // Budget is a policy at two points of the loop. It embeds
-// [agent.BaseHook], so the other points pass their values through. It
-// keeps no count, because the state has the usage of the run.
+// [agent.BaseHook] and implements two points, so the loop skips it at
+// the other points. It keeps no count, because the state has the usage
+// of the run.
 type Budget struct {
 	agent.BaseHook
 	// Low is the number of output tokens after which the model thinks
@@ -98,7 +99,7 @@ func (b Budget) BeforeTool(ctx context.Context, s agent.State, c ai.ToolCall) (a
 	return c, nil
 }
 
-// A struct hook overrides the points that it needs.
+// A struct hook implements the points that it needs.
 func ExampleHooks() {
 	var lm ai.LanguageModel // a model from a catalog
 

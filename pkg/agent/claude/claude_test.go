@@ -2,6 +2,7 @@ package claude_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -108,6 +109,30 @@ func TestRunText(t *testing.T) {
 	id, err := claude.SessionID(a)
 	require.NoError(t, err)
 	assert.Equal(t, "sess-1", id)
+}
+
+func TestRunDropsOtherUserText(t *testing.T) {
+	claude.Replay(t, nil, "testdata/user_text.trace")
+	a := claude.New()
+	defer closeAgent(t, a)
+
+	events, _, err := run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	var log []string
+	for _, e := range a.Log().Entries() {
+		log = append(log, string(e.Message.Role)+": "+e.Message.Text())
+	}
+	assert.Equal(t,
+		[]string{
+			"user: Say hello",
+			"assistant: Hello there",
+		},
+		log,
+		"the log keeps only the Stop hook feedback of the user lines of the CLI",
+	)
+	checkLog(t, a)
 }
 
 func TestRunThinking(t *testing.T) {
@@ -445,7 +470,7 @@ func TestControlRequests(t *testing.T) {
 		want  int
 	}{
 		{
-			name:  "can_use_tool is denied without CanUseTool",
+			name:  "can_use_tool is denied without an approver",
 			file:  "testdata/can_use_tool.trace",
 			input: "Delete a.txt",
 			want:  3,
@@ -574,6 +599,7 @@ func TestOptions(t *testing.T) {
 		claude.PermissionMode(claude.PermissionAcceptEdits),
 		claude.AllowedTools("Read", "Bash(git:*)"),
 		claude.DisallowedTools("WebFetch"),
+		claude.AskTools("Bash(gh pr comment:*)"),
 		claude.Env("FOO=bar"),
 	)
 	defer closeAgent(t, a)
@@ -598,6 +624,7 @@ func TestOptions(t *testing.T) {
 		"--permission-mode", "acceptEdits",
 		"--allowedTools", "Read,Bash(git:*)",
 		"--disallowedTools", "WebFetch",
+		"--settings", `{"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
 	}, cmd.Args)
 	assert.Equal(t, "/work", cmd.Dir)
 	assert.Contains(t, cmd.Env, "FOO=bar")
@@ -622,11 +649,11 @@ func TestThinkingOffDisablesThinking(t *testing.T) {
 	assert.NotContains(t, args, "--effort")
 }
 
-func TestCanUseTool(t *testing.T) {
+func TestApprove(t *testing.T) {
 	tests := []struct {
 		name     string
 		file     string
-		decision claude.ToolDecision
+		decision agent.Decision
 		err      error
 		result   string
 		isError  bool
@@ -634,12 +661,20 @@ func TestCanUseTool(t *testing.T) {
 		{
 			name:     "allow",
 			file:     "testdata/can_use_tool_allow.trace",
-			decision: claude.ToolDecision{Allow: true},
+			decision: agent.Decision{Allow: true},
+		},
+		{
+			name: "allow with a changed input",
+			file: "testdata/can_use_tool_input.trace",
+			decision: agent.Decision{
+				Allow: true,
+				Input: json.RawMessage(`{"command":"rm -i a.txt"}`),
+			},
 		},
 		{
 			name:     "deny",
 			file:     "testdata/can_use_tool.trace",
-			decision: claude.ToolDecision{Message: "gopi does not answer permission prompts. Set a permission mode that allows the tool."},
+			decision: agent.Decision{Message: "gopi does not answer permission prompts. Set a permission mode that allows the tool."},
 			result:   "gopi does not answer permission prompts. Set a permission mode that allows the tool.",
 			isError:  true,
 		},
@@ -654,9 +689,9 @@ func TestCanUseTool(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
-			var got []claude.ToolRequest
-			a := claude.New(claude.CanUseTool(func(ctx context.Context, req claude.ToolRequest) (claude.ToolDecision, error) {
-				got = append(got, req)
+			var got []ai.ToolCall
+			a := claude.New(claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+				got = append(got, call)
 				return tt.decision, tt.err
 			}))
 			defer closeAgent(t, a)
@@ -666,8 +701,8 @@ func TestCanUseTool(t *testing.T) {
 			emittest.CheckEvents(t, events)
 
 			require.Len(t, got, 1)
-			assert.Equal(t, "toolu_1", got[0].ToolUseID)
-			assert.Equal(t, "Bash", got[0].ToolName)
+			assert.Equal(t, "toolu_1", got[0].ID)
+			assert.Equal(t, "Bash", got[0].Name)
 			assert.JSONEq(t, `{"command":"rm a.txt"}`, string(got[0].Input))
 
 			require.Len(t, msgs, 3)
@@ -791,24 +826,47 @@ func TestRunFileOnly(t *testing.T) {
 	require.NoError(t, err, "a file without text is input")
 }
 
-func TestCanUseToolAlways(t *testing.T) {
-	claude.Replay(t, nil, "testdata/can_use_tool_always.trace")
-	var got claude.ToolRequest
-	a := claude.New(claude.CanUseTool(func(ctx context.Context, req claude.ToolRequest) (claude.ToolDecision, error) {
-		got = req
-		return claude.ToolDecision{
-			Allow:  true,
-			Always: true,
-		}, nil
-	}))
-	defer closeAgent(t, a)
+func TestApproveAlways(t *testing.T) {
+	tests := []struct {
+		name  string
+		file  string
+		input json.RawMessage
+	}{
+		{
+			name: "the suggestions of the CLI go back for the session",
+			file: "testdata/can_use_tool_always.trace",
+		},
+		{
+			name: "no suggestions send no permission updates",
+			file: "testdata/can_use_tool_always_none.trace",
+		},
+		{
+			name:  "the same input in another form keeps the suggestions",
+			file:  "testdata/can_use_tool_always.trace",
+			input: json.RawMessage(`{ "command": "rm a.txt" }`),
+		},
+		{
+			name:  "a new input sends no permission updates",
+			file:  "testdata/can_use_tool_always_input.trace",
+			input: json.RawMessage(`{"command":"rm -i a.txt"}`),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claude.Replay(t, nil, tt.file)
+			a := claude.New(claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+				return agent.Decision{
+					Allow:  true,
+					Always: true,
+					Input:  tt.input,
+				}, nil
+			}))
+			defer closeAgent(t, a)
 
-	_, _, err := run(context.Background(), a, "Delete a.txt")
-	require.NoError(t, err, "the response sends the suggestions back")
-	assert.JSONEq(t,
-		`[{"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"rm:*"}],"behavior":"allow","destination":"session"}]`,
-		string(got.Suggestions),
-	)
+			_, _, err := run(context.Background(), a, "Delete a.txt")
+			require.NoError(t, err, "the trace matches the answer to the prompt")
+		})
+	}
 }
 
 func TestRunNotLoggedIn(t *testing.T) {

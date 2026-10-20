@@ -376,7 +376,7 @@ func TestServerRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
-			a := newAgent(t, Approval(tt.approval))
+			a := newAgent(t, Policy(tt.approval))
 
 			events, msgs, err := collect(a.Run(context.Background(), session.Text(tt.input)))
 			require.NoError(t, err)
@@ -391,7 +391,7 @@ func TestServerRequests(t *testing.T) {
 
 func TestDeclinedCommandIsError(t *testing.T) {
 	useTraces(t, []string{"approval.trace"})
-	a := newAgent(t, Approval(ApprovalUntrusted))
+	a := newAgent(t, Policy(ApprovalUntrusted))
 
 	_, msgs, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
 	require.NoError(t, err)
@@ -610,7 +610,7 @@ func TestRecorded(t *testing.T) {
 	a := New(
 		Dir(dir),
 		Sandbox(SandboxReadOnly),
-		Approval(ApprovalNever),
+		Policy(ApprovalNever),
 		Thinking(ai.ThinkingLow),
 	)
 	t.Cleanup(func() { a.Close() })
@@ -937,55 +937,68 @@ func TestRunSendsFiles(t *testing.T) {
 	assert.Equal(t, "A logo.", msgs[0].Text())
 }
 
-func TestApprover(t *testing.T) {
+func TestApprove(t *testing.T) {
+	command := ai.ToolCall{
+		ID:    "c1",
+		Name:  "bash",
+		Input: json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+	}
 	tests := []struct {
 		name     string
 		file     string
-		decision Decision
+		decision agent.Decision
 		err      error
-		want     ApprovalRequest
+		want     ai.ToolCall
 	}{
 		{
-			name:     "accept a command",
+			name:     "allow a command",
 			file:     "approval_accept.trace",
-			decision: Accept,
-			want: ApprovalRequest{
-				Kind:    ApprovalCommand,
-				ItemID:  "c1",
-				Command: "rm -rf /tmp/x",
-				Cwd:     "/work",
+			decision: agent.Decision{Allow: true},
+			want:     command,
+		},
+		{
+			name: "allow a command for the session",
+			file: "approval_always.trace",
+			decision: agent.Decision{
+				Allow:  true,
+				Always: true,
 			},
+			want: command,
+		},
+		{
+			name: "a changed input declines",
+			file: "approval.trace",
+			decision: agent.Decision{
+				Allow: true,
+				Input: json.RawMessage(`{"command":"rm -ri /tmp/x"}`),
+			},
+			want: command,
 		},
 		{
 			name: "an error declines",
 			file: "approval.trace",
 			err:  errors.New("no user"),
-			want: ApprovalRequest{
-				Kind:    ApprovalCommand,
-				ItemID:  "c1",
-				Command: "rm -rf /tmp/x",
-				Cwd:     "/work",
-			},
+			want: command,
 		},
 		{
-			name:     "decline a file change",
+			name:     "deny a file change",
 			file:     "approval_file.trace",
-			decision: Decline,
-			want: ApprovalRequest{
-				Kind:   ApprovalFileChange,
-				ItemID: "c1",
-				Reason: "write outside the workspace",
+			decision: agent.Decision{},
+			want: ai.ToolCall{
+				ID:    "c1",
+				Name:  "apply_patch",
+				Input: json.RawMessage(`{"changes":[{"path":"/tmp/x","kind":{"type":"delete"}}]}`),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
-			var got []ApprovalRequest
+			var got []ai.ToolCall
 			a := newAgent(t,
-				Approval(ApprovalUntrusted),
-				Approver(func(ctx context.Context, req ApprovalRequest) (Decision, error) {
-					got = append(got, req)
+				Policy(ApprovalUntrusted),
+				Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+					got = append(got, call)
 					return tt.decision, tt.err
 				}),
 			)
@@ -994,7 +1007,10 @@ func TestApprover(t *testing.T) {
 			require.NoError(t, err, "the trace matches the decision")
 			emittest.CheckEvents(t, events)
 			checkLog(t, a)
-			assert.Equal(t, []ApprovalRequest{tt.want}, got)
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.want.ID, got[0].ID)
+			assert.Equal(t, tt.want.Name, got[0].Name)
+			assert.JSONEq(t, string(tt.want.Input), string(got[0].Input))
 		})
 	}
 }
@@ -1007,4 +1023,87 @@ func TestRunNotLoggedIn(t *testing.T) {
 	require.ErrorIs(t, err, ErrAuth)
 	assert.ErrorContains(t, err, "401 Unauthorized")
 	emittest.CheckEvents(t, events)
+}
+
+func TestApproveBeforeItem(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		want []ai.ToolCall
+	}{
+		{
+			name: "a command comes from the request",
+			file: "approval_before_item.trace",
+			want: []ai.ToolCall{{
+				ID:    "c1",
+				Name:  "bash",
+				Input: json.RawMessage(`{"command":"rm -rf /tmp/x"}`),
+			}},
+		},
+		{
+			name: "a file change with no item is declined without a question",
+			file: "approval_file_before_item.trace",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useTraces(t, []string{tt.file})
+			var got []ai.ToolCall
+			a := newAgent(t,
+				Policy(ApprovalUntrusted),
+				Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+					got = append(got, call)
+					return agent.Decision{Allow: true}, nil
+				}),
+			)
+
+			events, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
+			require.NoError(t, err, "the trace matches the decision")
+			emittest.CheckEvents(t, events)
+			checkLog(t, a)
+			require.Len(t, got, len(tt.want))
+			for i, want := range tt.want {
+				assert.Equal(t, want.ID, got[i].ID)
+				assert.Equal(t, want.Name, got[i].Name)
+				assert.JSONEq(t, string(want.Input), string(got[i].Input))
+			}
+		})
+	}
+}
+
+// TestRecordedApproval runs the real CLI with the approval policy that
+// the driver sets for an Approve function. To record it again:
+//
+//	make record-cli AGENT=codex RUN=TestRecordedApproval
+func TestRecordedApproval(t *testing.T) {
+	dir := t.TempDir()
+	real, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	useTraces(t, []string{"TestRecordedApproval.trace"},
+		replaceScrub(jsonString(real), workDir),
+		replaceScrub(jsonString(dir), workDir),
+		replaceScrub(jsonString(home), "/home/me"),
+		machineScrub,
+		userHookScrub,
+	)
+	var asked []string
+	a := New(
+		Dir(dir),
+		Policy(ApprovalUntrusted),
+		Thinking(ai.ThinkingLow),
+		Approve(func(_ context.Context, call ai.ToolCall) (agent.Decision, error) {
+			asked = append(asked, call.Name)
+			return agent.Decision{Allow: true}, nil
+		}),
+	)
+	t.Cleanup(func() { a.Close() })
+
+	prompt := "Run the shell command `touch a.txt`. Then reply with the word done."
+	events, _, err := collect(a.Run(context.Background(), session.Text(prompt)))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	checkLog(t, a)
+	assert.Contains(t, asked, "bash", "the policy asks before the command")
 }

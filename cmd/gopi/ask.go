@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
@@ -93,24 +93,24 @@ func pick(q askquestion.Question, line string) string {
 // Approve asks on the terminal if a tool call can run. "y" allows the
 // call. "a" allows it and each later call that the same rule matches.
 // Any other line denies it.
-func (r terminal) Approve(ctx context.Context, call ai.ToolCall) (permission.Decision, error) {
+func (r terminal) Approve(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
 	if err := r.shown.wait(ctx, call.ID); err != nil {
-		return permission.Deny, err
+		return agent.Decision{}, err
 	}
 
 	shown := time.Now()
 	fmt.Fprintf(r.w, "? allow %s %s? [y]es, [a]lways, [n]o: ", call.Name, compact(call.Input))
 	line, err := r.in.after(ctx, shown)
 	if err != nil {
-		return permission.Deny, err
+		return agent.Decision{}, err
 	}
 
 	switch strings.ToLower(strings.TrimSpace(line)) {
 	case "y", "yes":
-		return permission.Allow, nil
+		return agent.Decision{Allow: true}, nil
 	case "a", "always":
-		return permission.AllowAlways, nil
+		return agent.Decision{Allow: true, Always: true}, nil
 	default:
-		return permission.Deny, nil
+		return agent.Decision{}, nil
 	}
 }

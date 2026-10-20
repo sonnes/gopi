@@ -1,5 +1,5 @@
 stdiorr trace v1
-# The CLI asks to use a tool. The CanUseTool function allows it.
+# The CLI asks to use a tool. The approver allows it.
 > {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
 < {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
 > {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Delete a.txt"}]},"parent_tool_use_id":null,"session_id":""}

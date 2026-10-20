@@ -27,8 +27,12 @@ func (a *Agent) call(
 	// messages of the state do not change.
 	r := Request{Messages: slices.Clip(rest), Options: opts}
 	for _, h := range a.cfg.hooks {
+		bc, ok := h.(BeforeCallHook)
+		if !ok {
+			continue
+		}
 		var err error
-		r, err = h.BeforeCall(ctx, a.State(), r)
+		r, err = bc.BeforeCall(ctx, a.State(), r)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +72,11 @@ func (a *Agent) call(
 		em.emit(EventMessageStart{Message: *final})
 	}
 	for _, h := range a.cfg.hooks {
-		msg, err := h.AfterCall(ctx, a.State(), r, *final)
+		ac, ok := h.(AfterCallHook)
+		if !ok {
+			continue
+		}
+		msg, err := ac.AfterCall(ctx, a.State(), r, *final)
 		if err != nil {
 			em.emit(emptyEnd(final.Usage))
 			return nil, err

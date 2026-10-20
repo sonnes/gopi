@@ -40,7 +40,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | search tool   | The agent tool that ranks the deferred tools and loads the matches | tool finder, loader   |
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
 | CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter |
-| catalog       | What maps a spec to a model bound to its provider            | registry, model list        |
+| catalog       | What maps a spec to a model bound to its provider, or to the driver of its agent | registry, model list |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
 | detector      | What reads one credential source and gives a catalog a provider | probe, loader            |
 | harness       | What assembles a coding agent from options, the files of a project, and a catalog, on each call | builder, factory, runtime |
@@ -67,6 +67,10 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | store         | What keeps the sessions: the record, the entries, and the values | database, backend, repository |
 | snapshot      | A copy of a state, as JSON, that a viewer applies events to. `session.Snapshot` is a session as a store loads it | dump, checkpoint |
 | hook          | A function that the loop calls at a lifecycle point          | callback                    |
+| hook point    | One point of the loop at which a hook runs, such as BeforeTool. Each point is its own interface | hook type, lifecycle event |
+| approve function | The function that decides a tool call that needs a person, the same type for each agent | permission callback, can-use-tool function |
+| driver        | What starts an agent of one kind for one session: the harness, the Claude Code agent, or the Codex agent | adapter, backend |
+| runner        | The part of an agent that a caller of a driver uses: Run, Log, and State | instance, handle, connection |
 | steer         | An entry that the agent reads before its next model call     | interrupt, injection        |
 | follow-up     | An entry that the agent reads when the run would stop        | next prompt, queued prompt  |
 | middleware    | A function that wraps a tool and returns a tool              | wrapper, decorator, hook    |

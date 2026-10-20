@@ -87,7 +87,9 @@ type config struct {
 	permission Permission
 	allowed    []string
 	disallowed []string
-	canUseTool CanUseToolFunc
+	ask        []string
+	approve    agent.ApproveFunc
+	hooks      []agent.Hook
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -153,41 +155,30 @@ func DisallowedTools(names ...string) Option {
 	return func(c *config) { c.disallowed = append(c.disallowed, names...) }
 }
 
-// ToolRequest is a permission prompt of the CLI for one tool call.
-type ToolRequest struct {
-	ToolUseID string
-	ToolName  string
-	Input     json.RawMessage
-	// Suggestions are the permission updates that the CLI offers, as
-	// JSON. [ToolDecision.Always] sends them back. They are nil if the
-	// CLI offers none.
-	Suggestions json.RawMessage
+// AskTools makes the CLI ask before it runs the named tools, also when
+// [AllowedTools] allows them. A name can hold a rule, as in
+// AllowedTools. The agent gives the rules to the CLI as settings, and
+// the CLI adds them to the ask rules of its own settings.
+func AskTools(names ...string) Option {
+	return func(c *config) { c.ask = append(c.ask, names...) }
 }
 
-// ToolDecision answers a [ToolRequest]. The zero value denies the call.
-type ToolDecision struct {
-	// Allow lets the CLI run the call.
-	Allow bool
-	// Always sends the [ToolRequest.Suggestions] with an allowed call,
-	// so that the CLI does not ask again for the calls that match them
-	// in this session. The CLI decides what matches.
-	Always bool
-	// Input replaces the input of an allowed call. Nil keeps the input.
-	Input json.RawMessage
-	// Message tells the model why the call is denied. If it is empty,
-	// the agent sends a default reason.
-	Message string
-}
-
-// CanUseToolFunc answers a permission prompt of the CLI. It runs while
-// the CLI waits, so it must return when ctx ends.
-type CanUseToolFunc func(ctx context.Context, req ToolRequest) (ToolDecision, error)
-
-// CanUseTool sets the function that answers each permission prompt of
-// the CLI. Without it, the agent denies every prompt. If fn returns an
-// error, the agent sends the error to the CLI, which denies the call.
-func CanUseTool(fn CanUseToolFunc) Option {
-	return func(c *config) { c.canUseTool = fn }
+// Approve sets the function that answers each permission prompt of the
+// CLI. The call has the tool_use_id, the tool name, and the input of
+// the prompt. Without Approve, the agent denies every prompt. If fn
+// returns an error, the agent sends the error to the CLI, which denies
+// the call.
+//
+// An Always decision sends the permission suggestions of the CLI back,
+// so that the CLI does not ask again for the calls that match them. The
+// CLI decides what matches. The agent sets the destination of each
+// suggestion to the session, so the CLI writes no rule to a settings
+// file. If the CLI offers no suggestions, Always does nothing. The
+// suggestions describe the original input, so an Always decision with
+// a new Input allows only this call. An Input that holds the same JSON
+// value as the input of the prompt is not a new Input.
+func Approve(fn agent.ApproveFunc) Option {
+	return func(c *config) { c.approve = fn }
 }
 
 // PermissionMode sets the permission mode of the CLI. Without it, the
@@ -202,7 +193,7 @@ func PermissionMode(mode Permission) Option {
 func New(opts ...Option) *Agent {
 	a := newAgent(opts)
 	a.log = session.New()
-	a.state = emit.NewState(nil)
+	a.state = emit.NewState(a.log)
 	return a
 }
 
@@ -221,7 +212,7 @@ func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
 		return nil, err
 	}
 	a.log = log
-	a.state = emit.NewState(log.Messages())
+	a.state = emit.NewState(log)
 	return a, nil
 }
 
@@ -242,9 +233,10 @@ func (a *Agent) Log() *session.Log { return a.log }
 
 // State returns a copy of the state of the agent, as
 // [agent.Agent.State] does. Each event of a run changes the state
-// before the stream gets it. The agent has no queues and no hooks, so
-// [agent.State.Steer] and [agent.State.FollowUp] do nothing, and
-// [agent.State.Log] returns nil. Use [Agent.Log] for the log.
+// before the stream gets it. [agent.State.Log] is the log of the
+// agent, also in the state that a hook of [Hooks] gets. The agent has
+// no queues, so [agent.State.Steer] and [agent.State.FollowUp] do
+// nothing.
 func (a *Agent) State() agent.State { return a.state.Get() }
 
 // Run sends entries to the CLI as one user message and streams the run
@@ -279,6 +271,8 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 		if err != nil {
 			return em.Finish(ctx, ai.Usage{}, err)
 		}
+		// The error of a hook belongs to the run that called it.
+		proc.hookErr = nil
 		r := &runner{
 			a:    a,
 			proc: proc,
@@ -316,7 +310,10 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
-	proc, err = launch(cmd, a.cfg.canUseTool)
+	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
+		return nil, fmt.Errorf("claude: %w", err)
+	}
+	proc, err = launch(cmd, a.cfg.approve, a.cfg.hooks, a.State)
 	if err != nil {
 		return nil, err
 	}
@@ -343,6 +340,22 @@ func (a *Agent) drop(proc *process) {
 		a.proc = nil
 	}
 	a.mu.Unlock()
+}
+
+// askSettings returns the settings of the CLI, as JSON, that hold the
+// ask rules.
+func askSettings(rules []string) (string, error) {
+	var s struct {
+		Permissions struct {
+			Ask []string `json:"ask"`
+		} `json:"permissions"`
+	}
+	s.Permissions.Ask = rules
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", fmt.Errorf("claude: encode the ask rules: %w", err)
+	}
+	return string(data), nil
 }
 
 // command returns the command that starts the CLI. The input never goes
@@ -378,6 +391,13 @@ func (a *Agent) command() (*exec.Cmd, error) {
 	}
 	if len(c.disallowed) > 0 {
 		args = append(args, "--disallowedTools", strings.Join(c.disallowed, ","))
+	}
+	if len(c.ask) > 0 {
+		settings, err := askSettings(c.ask)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "--settings", settings)
 	}
 	id, err := conversation.Get(a.log)
 	if err != nil {

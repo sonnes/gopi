@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/internal/stdiorr"
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -100,4 +102,159 @@ func TestRecorded(t *testing.T) {
 	id, err := claude.SessionID(a)
 	require.NoError(t, err)
 	assert.NotEmpty(t, id)
+}
+
+// TestRecordedHooks runs the real CLI with a BeforeTool hook and a
+// BeforeStop hook. Record it with
+// `make record-cli AGENT=claude RUN=TestRecordedHooks`.
+func TestRecordedHooks(t *testing.T) {
+	dir := t.TempDir()
+	home, _ := os.UserHomeDir()
+	claude.Replay(t, []stdiorr.Scrub{
+		scrubLine,
+		scrubDir("/private"+dir, "/work"),
+		scrubDir(dir, "/work"),
+		scrubDir(home, "/home/me"),
+		// The transcript path of a hook input names the folder of the
+		// session after dir, with each slash as a dash.
+		scrubDir(strings.ReplaceAll("/private"+dir, "/", "-"), "-work"),
+	}, "testdata/TestRecordedHooks.trace")
+
+	var seen []ai.ToolCall
+	guard := toolGuard{
+		seen: &seen,
+		fn: func(c ai.ToolCall) (ai.ToolCall, error) {
+			return c, agent.Deny("Do not delete files.")
+		},
+	}
+	stops := 0
+	a := claude.New(
+		claude.Dir(dir),
+		claude.Model("haiku"),
+		claude.PermissionMode(claude.PermissionDontAsk),
+		claude.Hooks(guard, goodbye{calls: &stops}),
+	)
+	defer closeAgent(t, a)
+
+	prompt := "Run the shell command `rm a.txt` with the Bash tool. Then reply with the word done."
+	events, msgs, err := run(context.Background(), a, prompt)
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	require.NotEmpty(t, seen, "the CLI calls the PreToolUse hook")
+	assert.Equal(t, "Bash", seen[0].Name)
+	var results []string
+	for _, m := range msgs {
+		if m.Role == ai.RoleToolResult {
+			results = append(results, m.Text())
+		}
+	}
+	require.NotEmpty(t, results)
+	assert.Contains(t, results[0], "Do not delete files.")
+	assert.Equal(t, 2, stops, "the first Stop continues the run")
+	feedback := slices.ContainsFunc(a.Log().Messages(), func(m ai.Message) bool {
+		return m.Role == ai.RoleUser && strings.Contains(m.Text(), "Also say goodbye.")
+	})
+	assert.True(t, feedback, "the log keeps the feedback of the Stop hook")
+	checkLog(t, a)
+}
+
+// outputEditor is a hook at AfterTool. It records each result. It
+// replaces "two" with "three" in the stdout of a Bash result, and the
+// result of a failed call with a note.
+type outputEditor struct {
+	agent.BaseHook
+	results *[]ai.ToolResult
+}
+
+func (h outputEditor) AfterTool(
+	_ context.Context,
+	_ agent.State,
+	_ ai.ToolCall,
+	r ai.ToolResult,
+) (ai.ToolResult, error) {
+	*h.results = append(*h.results, r)
+	if r.IsError {
+		return ai.ToolResult{
+			Content: []ai.Content{ai.Text{Text: "The folder nope does not exist."}},
+			IsError: true,
+		}, nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(toolText(r)), &out); err != nil {
+		return r, nil
+	}
+	stdout, _ := out["stdout"].(string)
+	out["stdout"] = strings.ReplaceAll(stdout, "two", "three")
+	data, err := json.Marshal(out)
+	if err != nil {
+		return r, err
+	}
+	return ai.ToolResult{Content: []ai.Content{ai.Text{Text: string(data)}}}, nil
+}
+
+// TestRecordedToolEdits runs the real CLI with a BeforeTool hook that
+// changes the input of a Bash call, and an AfterTool hook that changes
+// the output. Record it with
+// `make record-cli AGENT=claude RUN=TestRecordedToolEdits`.
+func TestRecordedToolEdits(t *testing.T) {
+	dir := t.TempDir()
+	home, _ := os.UserHomeDir()
+	claude.Replay(t, []stdiorr.Scrub{
+		scrubLine,
+		scrubDir("/private"+dir, "/work"),
+		scrubDir(dir, "/work"),
+		scrubDir(home, "/home/me"),
+		scrubDir(strings.ReplaceAll("/private"+dir, "/", "-"), "-work"),
+	}, "testdata/TestRecordedToolEdits.trace")
+
+	var seen []ai.ToolCall
+	guard := toolGuard{
+		seen: &seen,
+		fn: func(c ai.ToolCall) (ai.ToolCall, error) {
+			var in map[string]any
+			if err := json.Unmarshal(c.Input, &in); err != nil {
+				return c, err
+			}
+			if in["command"] != "echo one" {
+				return c, nil
+			}
+			in["command"] = "echo two"
+			data, err := json.Marshal(in)
+			c.Input = data
+			return c, err
+		},
+	}
+	var results []ai.ToolResult
+	a := claude.New(
+		claude.Dir(dir),
+		claude.Model("haiku"),
+		claude.PermissionMode(claude.PermissionDontAsk),
+		claude.AllowedTools("Bash"),
+		claude.Hooks(guard, outputEditor{results: &results}),
+	)
+	defer closeAgent(t, a)
+
+	prompt := "Make two separate Bash tool calls, one after the other. " +
+		"First run `echo one`. Then run `ls nope`. " +
+		"Then reply with the exact stdout of the first command and nothing else."
+	events, msgs, err := run(context.Background(), a, prompt)
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	checkLog(t, a)
+
+	require.NotEmpty(t, seen, "the CLI calls the PreToolUse hook")
+	require.NotEmpty(t, results, "the CLI calls the PostToolUse hook")
+	assert.Contains(t, toolText(results[0]), `"stdout":"two`,
+		"the CLI runs the input of the BeforeTool hook")
+	var outputs []string
+	for _, m := range msgs {
+		if m.Role == ai.RoleToolResult {
+			outputs = append(outputs, m.Text())
+		}
+	}
+	require.NotEmpty(t, outputs)
+	assert.Contains(t, outputs[0], "three", "the model reads the output of the AfterTool hook")
+	require.Len(t, results, 2)
+	assert.True(t, results[1].IsError, "the CLI calls PostToolUseFailure for a failed call")
 }

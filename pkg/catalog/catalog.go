@@ -10,28 +10,41 @@
 //     model with that ID and no metadata, such as MaxTokens.
 //   - The catalog resolves only. A caller makes the call on the bound
 //     model, or passes it to agent.New.
+//   - A driver starts an agent for a spec. A provider with a driver
+//     uses it. A text provider with no driver uses the default driver.
+//   - A bare model ID does not count a provider that has only a driver,
+//     unless no other provider registered the ID.
 //
 // The reasons are in docs/concepts/catalog/catalog.md.
 package catalog
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
+// ErrUnknownModel is the error of a spec that no provider serves. A
+// caller tests for it with [errors.Is].
+var ErrUnknownModel = errors.New("catalog: unknown model")
+
 // Catalog is a registry of providers and their models. Each capability
 // has its own map of providers, and all of them share one model index.
-// Create one with [New]. A Catalog is safe for concurrent use.
+// The drivers of agents are a capability too. Create one with [New]. A
+// Catalog is safe for concurrent use.
 type Catalog struct {
 	mu              sync.RWMutex
 	textProviders   map[string]ai.TextProvider
 	imageProviders  map[string]ai.ImageProvider
 	speechProviders map[string]ai.SpeechProvider
+	drivers         map[string]agent.Driver
+	defaultDriver   agent.Driver
 
 	// models holds each registered model by its full spec.
 	models map[string]ai.Model
@@ -43,6 +56,7 @@ func New() *Catalog {
 		textProviders:   make(map[string]ai.TextProvider),
 		imageProviders:  make(map[string]ai.ImageProvider),
 		speechProviders: make(map[string]ai.SpeechProvider),
+		drivers:         make(map[string]agent.Driver),
 		models:          make(map[string]ai.Model),
 	}
 }
@@ -86,6 +100,31 @@ func (c *Catalog) RegisterSpeechProvider(
 	c.addModelsLocked(id, models)
 }
 
+// RegisterDriver registers d as the driver of agents under id, and adds
+// models to the model index. A spec of the provider id then starts an
+// agent with d, such as "claude-code/claude-opus-5-5". If id has only a
+// driver, a bare model ID skips its models when another provider
+// registered the same ID. [Catalog.Driver] says why.
+func (c *Catalog) RegisterDriver(
+	id string,
+	d agent.Driver,
+	models ...ai.Model,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.drivers[id] = d
+	c.addModelsLocked(id, models)
+}
+
+// DefaultDriver sets the driver of the text providers that have no
+// driver of their own, such as a harness. A spec of such a provider then
+// starts an agent of the default driver over the model of the spec.
+func (c *Catalog) DefaultDriver(d agent.Driver) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.defaultDriver = d
+}
+
 // RegisterModel adds m to the model index under the provider id.
 func (c *Catalog) RegisterModel(id string, m ai.Model) {
 	c.mu.Lock()
@@ -107,15 +146,18 @@ func (c *Catalog) Specs() []string {
 	return slices.Sorted(maps.Keys(c.models))
 }
 
-// Model returns the model of spec, without a provider.
+// Model returns the model of spec, without a provider. A bare model ID
+// does not count a provider that has only a driver.
 func (c *Catalog) Model(spec string) (ai.Model, error) {
-	m, _, err := c.resolve(spec)
+	m, _, err := c.resolve(spec, false)
 	return m, err
 }
 
-// LanguageModel resolves spec to a model bound to its text provider.
+// LanguageModel resolves spec to a model bound to its text provider. A
+// bare model ID does not count a provider that has only a driver,
+// because a driver cannot serve a call to a model.
 func (c *Catalog) LanguageModel(spec string) (ai.LanguageModel, error) {
-	m, id, err := c.resolve(spec)
+	m, id, err := c.resolve(spec, false)
 	if err != nil {
 		return ai.LanguageModel{}, err
 	}
@@ -130,7 +172,7 @@ func (c *Catalog) LanguageModel(spec string) (ai.LanguageModel, error) {
 
 // ImageModel resolves spec to a model bound to its image provider.
 func (c *Catalog) ImageModel(spec string) (ai.ImageModel, error) {
-	m, id, err := c.resolve(spec)
+	m, id, err := c.resolve(spec, false)
 	if err != nil {
 		return ai.ImageModel{}, err
 	}
@@ -145,7 +187,7 @@ func (c *Catalog) ImageModel(spec string) (ai.ImageModel, error) {
 
 // SpeechModel resolves spec to a model bound to its speech provider.
 func (c *Catalog) SpeechModel(spec string) (ai.SpeechModel, error) {
-	m, id, err := c.resolve(spec)
+	m, id, err := c.resolve(spec, false)
 	if err != nil {
 		return ai.SpeechModel{}, err
 	}
@@ -158,6 +200,41 @@ func (c *Catalog) SpeechModel(spec string) (ai.SpeechModel, error) {
 	return ai.SpeechModel{Model: m, Provider: p}, nil
 }
 
+// Driver resolves spec to the driver that starts its agent, and to its
+// model. A provider with a driver uses it. A text provider with no
+// driver uses the [Catalog.DefaultDriver].
+//
+// A bare model ID resolves as in [Catalog.LanguageModel] first. So if a
+// text provider and a provider with only a driver both serve the ID, the
+// text provider wins, and the ID names the same model in both methods.
+// A provider with only a driver serves a bare ID when no other provider
+// registered it. To start the agent of a driver, give its full spec,
+// such as "claude-code/claude-opus-5-5".
+func (c *Catalog) Driver(spec string) (agent.Driver, ai.Model, error) {
+	m, id, err := c.resolve(spec, true)
+	if err != nil {
+		return nil, ai.Model{}, err
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if d, ok := c.drivers[id]; ok {
+		return d, m, nil
+	}
+	if _, ok := c.textProviders[id]; !ok {
+		return nil, ai.Model{}, fmt.Errorf(
+			"catalog: provider %q has no driver and no text generation",
+			id,
+		)
+	}
+	if c.defaultDriver == nil {
+		return nil, ai.Model{}, fmt.Errorf(
+			"catalog: provider %q needs the default driver: set one with DefaultDriver",
+			id,
+		)
+	}
+	return c.defaultDriver, m, nil
+}
+
 func unsupported(id, capability string) error {
 	return fmt.Errorf(
 		"catalog: provider %q does not support %s generation",
@@ -168,11 +245,13 @@ func unsupported(id, capability string) error {
 
 // resolve returns the model of spec and the ID of its provider. It tries
 // three forms in order: a registered spec, an unregistered ID on a
-// registered provider, and a bare model ID.
+// registered provider, and a bare model ID. If drivers is true, a bare
+// model ID that no other provider registered can resolve to a provider
+// that has only a driver.
 //
 // The second form passes the ID through, because a provider serves new
 // models before the SDK lists them.
-func (c *Catalog) resolve(spec string) (ai.Model, string, error) {
+func (c *Catalog) resolve(spec string, drivers bool) (ai.Model, string, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -186,32 +265,57 @@ func (c *Catalog) resolve(spec string) (ai.Model, string, error) {
 		return ai.Model{ID: modelID, Name: modelID}, id, nil
 	}
 
-	return c.resolveBareLocked(spec)
+	return c.resolveBareLocked(spec, drivers)
 }
 
 // hasProviderLocked reports whether id has a provider for any
 // capability.
 func (c *Catalog) hasProviderLocked(id string) bool {
+	_, driver := c.drivers[id]
+	return driver || c.hasModelProviderLocked(id)
+}
+
+// hasModelProviderLocked reports whether id has a text, image, or speech
+// provider.
+func (c *Catalog) hasModelProviderLocked(id string) bool {
 	_, text := c.textProviders[id]
 	_, image := c.imageProviders[id]
 	_, speech := c.speechProviders[id]
 	return text || image || speech
 }
 
+// driverOnlyLocked reports whether id has a driver and no text, image,
+// or speech provider.
+func (c *Catalog) driverOnlyLocked(id string) bool {
+	_, driver := c.drivers[id]
+	return driver && !c.hasModelProviderLocked(id)
+}
+
 // resolveBareLocked resolves a model ID with no provider. It succeeds
-// when exactly one provider registered the ID.
-func (c *Catalog) resolveBareLocked(modelID string) (ai.Model, string, error) {
-	var matches []string
+// when exactly one provider registered the ID. It does not count a
+// provider that has only a driver. If drivers is true and no other
+// provider registered the ID, it counts the providers with only a
+// driver.
+func (c *Catalog) resolveBareLocked(modelID string, drivers bool) (ai.Model, string, error) {
+	var matches, driverMatches []string
 	for spec := range c.models {
-		_, id, _ := strings.Cut(spec, "/")
-		if id == modelID {
+		provider, id, _ := strings.Cut(spec, "/")
+		if id != modelID {
+			continue
+		}
+		if c.driverOnlyLocked(provider) {
+			driverMatches = append(driverMatches, spec)
+		} else {
 			matches = append(matches, spec)
 		}
+	}
+	if len(matches) == 0 && drivers {
+		matches = driverMatches
 	}
 
 	switch len(matches) {
 	case 0:
-		return ai.Model{}, "", fmt.Errorf("catalog: unknown model %q", modelID)
+		return ai.Model{}, "", fmt.Errorf("%w %q", ErrUnknownModel, modelID)
 	case 1:
 		id, _, _ := strings.Cut(matches[0], "/")
 		return c.models[matches[0]], id, nil

@@ -208,6 +208,56 @@ func TestTaskRunsTheChildOnItsModel(t *testing.T) {
 	}
 }
 
+// TestTaskChildModelWithADriver checks that a driver of the same model
+// ID does not change the model of a child.
+func TestTaskChildModelWithADriver(t *testing.T) {
+	sub := reviewer
+	sub.Model = "two"
+	p := &script{responses: []ai.Message{
+		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		reply("done"),
+		reply("ok"),
+	}}
+	cat := newCatalog(p)
+	cat.RegisterDriver("cli", harness.New(), ai.Model{ID: "two"})
+	h := harness.New(with(base(t, p),
+		harness.Catalog(cat),
+		harness.Agents(sub),
+	)...)
+
+	a, err := h.New(context.Background())
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	assert.Equal(t, []string{"one", "two", "one"}, p.called())
+}
+
+// TestTaskFailsOnAnAmbiguousModel checks that a child with a model that
+// two providers serve does not run on the model of its parent.
+func TestTaskFailsOnAnAmbiguousModel(t *testing.T) {
+	sub := reviewer
+	sub.Model = "two"
+	p := &script{responses: []ai.Message{
+		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		reply("ok"),
+	}}
+	cat := newCatalog(p)
+	cat.RegisterTextProvider("other", p, ai.Model{ID: "two"})
+	h := harness.New(with(base(t, p),
+		harness.Catalog(cat),
+		harness.Agents(sub),
+	)...)
+
+	a, err := h.New(context.Background())
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	result := toolResult(t, a)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Text(), `ambiguous model "two"`)
+	assert.Equal(t, []string{"one", "one"}, p.called(), "no child runs")
+}
+
 func TestTaskSendsTheChildEvents(t *testing.T) {
 	var (
 		mu    sync.Mutex

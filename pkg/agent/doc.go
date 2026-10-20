@@ -13,6 +13,31 @@
 // of the run. So a viewer that applies the same events to a snapshot of
 // the state gets the same state. The hooks read the same state.
 //
+// A [Driver] starts an agent of one kind: the loop of the harness, or
+// an agent CLI. Each driver calls the hook points that its agent has,
+// and rejects a hook at another point:
+//
+//	             harness   claude-code          codex
+//	BeforeCall   yes       no                   no
+//	AfterCall    yes       no                   no
+//	BeforeTool   yes       PreToolUse           PreToolUse (1)
+//	AfterTool    yes       PostToolUse (2)(3)   PostToolUse (1)(2)
+//	AfterTurn    yes       PostToolBatch        no
+//	BeforeStop   yes       Stop                 Stop
+//
+// A CLI has no hook at a model call. Claude Code calls AfterTurn only
+// after a turn with tool calls. Codex runs a hook through the gopi
+// binary, and runs the tool if the hook fails. If the binary is
+// missing, the run fails. A hook of a CLI agent
+// gives text entries only, and cannot rename a tool call.
+//
+//  1. Codex calls no hook for a hosted tool, such as web search.
+//  2. On a CLI agent, the model reads only the text of the result that
+//     AfterTool returns.
+//  3. Claude Code also calls AfterTool after a failed call, at
+//     PostToolUseFailure. The model reads the original error, and the
+//     text of the hook comes after it as context.
+//
 // A caller must obey these rules:
 //
 //   - Runs on one agent are sequential. A second Run fails on its
@@ -38,14 +63,15 @@
 //     log.
 //   - [Agent.Steer] and [Agent.FollowUp] queue entries for an active
 //     run, and they do not start one.
-//   - A [Hook] runs at six points of the loop, in the order of
-//     registration. A hook must embed [BaseHook]. [BeforeCall],
-//     [AfterCall], [BeforeTool], [AfterTool], [AfterTurn], and
-//     [BeforeStop] add a hook at one point. An AfterTool method must be
-//     safe for concurrent use. A hook reads the session and sets values
-//     through [State.Log]. It adds entries from AfterTurn and
-//     BeforeStop, or queues them with [State.Steer] and
-//     [State.FollowUp]. On a state that a viewer decoded, Steer and
+//   - A [Hook] runs at the points of the loop that it implements, in
+//     the order of registration. Each point is its own interface,
+//     such as [BeforeToolHook]. A hook must embed [BaseHook].
+//     [BeforeCall], [AfterCall], [BeforeTool], [AfterTool],
+//     [AfterTurn], and [BeforeStop] add a hook at one point. An
+//     AfterTool method must be safe for concurrent use. A hook reads
+//     the session and sets values through [State.Log]. It adds entries
+//     from AfterTurn and BeforeStop, or queues them with [State.Steer]
+//     and [State.FollowUp]. On a state that a viewer decoded, Steer and
 //     FollowUp do nothing.
 //   - A caller must not change a message of a [State].
 //

@@ -42,6 +42,7 @@ type Harness struct {
 	builtin    Builtins
 	box        sandbox.Sandbox
 	system     string
+	preload    []string
 	prompt     PromptBuilder
 	seeds      []Seeder
 	agentOpts  []agent.Option
@@ -71,6 +72,7 @@ func (h *Harness) with(opts []Option) *Harness {
 	c := *h
 	c.sources = slices.Clip(c.sources)
 	c.skills = slices.Clip(c.skills)
+	c.preload = slices.Clip(c.preload)
 	c.agents = slices.Clip(c.agents)
 	c.tools = slices.Clip(c.tools)
 	c.seeds = slices.Clip(c.seeds)

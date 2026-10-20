@@ -20,7 +20,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept                          | Description                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| [Catalog](catalog/catalog.md)    | How a spec resolves to a model bound to its provider, and how detectors fill a catalog from the credentials of a process. |
+| [Catalog](catalog/catalog.md)    | How a spec resolves to a model bound to its provider or to the driver of its agent, and how detectors fill a catalog from the credentials of a process. |
 
 ## tool
 
@@ -40,6 +40,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Section](agent/section.md)         | How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it. |
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
 | [CLI Agent](agent/cli-agent.md)     | How an agent CLI such as Codex or Claude Code runs as a gopi agent, with the same events, state, and log as the loop. |
+| [Driver](agent/driver.md)           | How one interface starts the harness, Claude Code, or Codex for a session, and what a driver does with a field or a hook point that its agent cannot honor. |
 
 ## harness
 

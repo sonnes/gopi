@@ -15,35 +15,13 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox/bash"
 )
 
-// Decision is the answer of an [ApproveFunc] to one tool call.
-type Decision int
-
-const (
-	// Deny blocks the call. Deny is the zero value, so an approver that
-	// returns no decision blocks the call.
-	Deny Decision = iota
-	// Allow runs this call only.
-	Allow
-	// AllowAlways runs this call, and each later call that the same rule
-	// matches. For the bash tool, the hook keeps an Allow rule for the
-	// exact command. For another tool, it keeps an Allow rule for the
-	// tool name. The hook keeps the rule in memory for its life. An Ask
-	// rule and a Deny rule still apply to the later calls.
-	AllowAlways
-)
-
-// ApproveFunc asks for a decision on a tool call that needs approval,
-// for example from the user. If it returns an error, the call does not
-// run, and the text of the error is the error result.
-type ApproveFunc func(ctx context.Context, call ai.ToolCall) (Decision, error)
-
 // Policy holds the permission mode and the rules of a harness. Each
 // rule has the format "Tool" or "Tool(content)". The package doc has
 // the format and the order of the checks.
 //
 // A Policy is a value with no state, so a caller can copy it, for
-// example to give a child agent a stricter Mode. The rules of
-// [AllowAlways] are in the hook that [Policy.Hook] returns.
+// example to give a child agent a stricter Mode. The rules of the
+// Always decisions are in the hook that [Policy.Hook] returns.
 type Policy struct {
 	// Mode decides the calls that no rule matches. The default is
 	// [Default].
@@ -57,7 +35,17 @@ type Policy struct {
 	// Approve decides each call that needs approval. If Approve is nil,
 	// each call that needs approval is blocked, with a reason that says
 	// that the policy has no approver.
-	Approve ApproveFunc
+	//
+	// If the decision allows the call with Always, the hook keeps an
+	// Allow rule. For the bash tool, the rule is for the exact command.
+	// For another tool, the rule is for the tool name. The hook keeps
+	// the rule in memory for its life. An Ask rule and a Deny rule
+	// still apply to the later calls. An Input replaces the input of the
+	// call. The Deny rules check the new input, and a match denies the
+	// call. An Always rule is for the new input. A Message is the reason
+	// of a deny. If Approve returns an error, the call does not run, and
+	// the text of the error is the error result.
+	Approve agent.ApproveFunc
 	// Kinds gives the kind of a tool, for a custom tool or to change the
 	// kind of a built-in tool. A tool that is not in Kinds and is not a
 	// built-in tool is [Other].
@@ -115,8 +103,8 @@ func (p Policy) compile() (compiled, error) {
 // Hook returns an [agent.Hook] that checks each tool call with the
 // policy in its BeforeTool method. The hook reads the fields of the
 // policy once, in this call. A later change to a field does not change
-// the hook. Each hook starts with no rules of [AllowAlways], and keeps
-// them for its life.
+// the hook. Each hook starts with no rules of the Always decisions, and
+// keeps them for its life.
 //
 // If the policy is not valid, or Dir is empty and the working
 // directory is unknown, the hook blocks each call with the error.
@@ -164,13 +152,13 @@ type hook struct {
 	compiled
 	// err blocks each call if it is set.
 	err     error
-	approve ApproveFunc
+	approve agent.ApproveFunc
 	kinds   map[string]Kind
 	dir     string
 	home    string
 
 	mu sync.Mutex
-	// kept are the Allow rules of [AllowAlways].
+	// kept are the Allow rules of the Always decisions.
 	kept []rule
 }
 
@@ -189,8 +177,9 @@ func decodeInput(raw json.RawMessage) toolInput {
 	return in
 }
 
-// BeforeTool runs the checks of the policy on c. It returns c without
-// change, or an [agent.DenyError] that blocks the call.
+// BeforeTool runs the checks of the policy on c. It returns c, c with
+// the input that the approver gave, or an [agent.DenyError] that blocks
+// the call.
 func (h *hook) BeforeTool(
 	ctx context.Context,
 	_ agent.State,
@@ -230,7 +219,10 @@ func (h *hook) BeforeTool(
 	return h.requestApproval(ctx, c, in)
 }
 
-// requestApproval gets a decision on c from the approver.
+// requestApproval gets a decision on c from the approver. If the
+// decision edits the input, the Deny rules check the edited input, and
+// an Always decision keeps a rule for the edited input. The edited input
+// is the input that runs.
 func (h *hook) requestApproval(
 	ctx context.Context,
 	c ai.ToolCall,
@@ -247,18 +239,29 @@ func (h *hook) requestApproval(
 	if err != nil {
 		return c, fmt.Errorf("permission: approve the tool call %q: %w", c.Name, err)
 	}
-	switch d {
-	case Allow:
-		return c, nil
-	case AllowAlways:
-		h.keep(c.Name, in)
-		return c, nil
+	if !d.Allow {
+		reason := d.Message
+		if reason == "" {
+			reason = fmt.Sprintf("the approver denied the tool call %q", c.Name)
+		}
+		return c, agent.Deny(reason)
 	}
-	reason := fmt.Sprintf("the approver denied the tool call %q", c.Name)
-	return c, agent.Deny(reason)
+	if d.Input != nil {
+		c.Input = d.Input
+		in = decodeInput(d.Input)
+		denyRule := h.firstMatch(h.deny, c.Name, in)
+		if denyRule != nil {
+			reason := fmt.Sprintf("the rule %q denies the edited tool call %q", denyRule.text, c.Name)
+			return c, agent.Deny(reason)
+		}
+	}
+	if d.Always {
+		h.keep(c.Name, in)
+	}
+	return c, nil
 }
 
-// keep adds the Allow rule of [AllowAlways] to the hook. For a bash
+// keep adds the Allow rule of an Always decision to the hook. For a bash
 // call with an input that does not decode, it keeps no rule, because a
 // rule for the tool name would allow each command.
 func (h *hook) keep(name string, in toolInput) {

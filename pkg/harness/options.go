@@ -116,6 +116,14 @@ func System(s string) Option {
 	return func(h *Harness) { h.system = s }
 }
 
+// Preload adds the body of each named skill to the base text of the
+// prompt, after the text of [System], as a subagent does with the skills
+// of its file. A name is the name of a skill in the skill list, or its
+// qualified name. If no skill has a name, the assembly fails.
+func Preload(names ...string) Option {
+	return func(h *Harness) { h.preload = append(h.preload, names...) }
+}
+
 // Prompt sets the builder of the system prompt. Without it, or with
 // nil, the harness uses [DefaultPrompt].
 func Prompt(b PromptBuilder) Option {
@@ -156,7 +164,7 @@ func Deny(rules ...string) Option {
 // Approve sets the function that asks a person to approve a tool call.
 // Without Approve, each call that needs an approval is denied, and the
 // model gets the reason.
-func Approve(fn permission.ApproveFunc) Option {
+func Approve(fn agent.ApproveFunc) Option {
 	return func(h *Harness) { h.policy.Approve = fn }
 }
 

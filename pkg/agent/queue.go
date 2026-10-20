@@ -22,6 +22,14 @@ func (a *Agent) Steer(entries ...session.Entry) {
 	a.queues.add(&a.queues.steer, entries)
 }
 
+// TakeSteer removes the entries of the steer queue that no run read,
+// and returns them. A caller that steers a run calls it after the run
+// ends: a steer that came after the last read of the run waits in the
+// queue, and the caller decides where it goes.
+func (a *Agent) TakeSteer() []session.Entry {
+	return a.queues.drain(&a.queues.steer)
+}
+
 // FollowUp queues entries that the agent reads when the run would
 // stop: the turn made no tool calls, and the steer queue is empty. The
 // agent drains the queue before the [BeforeStop] hooks run, and the run

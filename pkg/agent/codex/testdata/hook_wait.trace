@@ -1,0 +1,14 @@
+stdiorr trace v1
+# Hand-written. A shell command starts, and its PreToolUse hook does not answer before the agent closes.
+# The last line keeps the process open: the client does not write it.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"never","config":{"bypass_hook_trust":true,"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"'/bin/gopi' hook '/tmp/gopi-hook/hook.sock'"}]}]}}}}
+< {"id":2,"result":{"thread":{"id":"th1","turns":[]},"model":"gpt-5-codex","cwd":"/work","approvalPolicy":"never"}}
+< {"method":"thread/started","params":{"thread":{"id":"th1"}}}
+> {"id":3,"method":"turn/start","params":{"threadId":"th1","input":[{"type":"text","text":"Run ls."}]}}
+< {"id":3,"result":{"turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"turn/started","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"commandExecution","id":"c1","command":"ls","cwd":"/work","status":"inProgress","commandActions":[],"aggregatedOutput":null,"exitCode":null}}}
+> {"id":4,"method":"turn/interrupt","params":{"threadId":"th1","turnId":"tu1"}}

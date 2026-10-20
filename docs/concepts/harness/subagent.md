@@ -36,7 +36,7 @@ A subagent is a named agent that the model gives a task to. The `agents` section
 - A child gets no task tool, so the depth is one, as in Claude Code and Codex by default. A task tree then cannot grow without a bound.
 - The events of a child go to `SubagentEvents` and not to the stream of the parent. The run stream keeps its order rules, and the parent stream shows the task as one tool call.
 - A child runs in the stricter mode of the parent and its file, with the rules of the parent. A subagent file then cannot widen what a person approved.
-- A model of `inherit`, no model, or a model that the catalog cannot resolve, such as the alias `opus`, gives the spec of the parent. A file from Claude Code then runs, and a typo does not stop the task.
+- A model of `inherit`, no model, or a model that the catalog does not know, such as the alias `opus`, gives the spec of the parent. A file from Claude Code then runs, and a typo does not stop the task. A model that two providers serve fails the task, so the child does not run on a model that its file did not name.
 - The `tools` key takes the tool names of Claude Code as aliases. A missing key gives the child every tool of the parent, and an empty key gives it none.
 
 ## Map

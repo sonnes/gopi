@@ -31,7 +31,7 @@ func (r *recorder) types() []string { return emittest.Types(r.events) }
 // newEmitter returns an Emitter over log and a new state, with the
 // events going to r.
 func newEmitter(log *session.Log, r *recorder) (*emit.Emitter, *emit.State) {
-	st := emit.NewState(log.Messages())
+	st := emit.NewState(log)
 	return emit.New(log, "codex", st, r.push), st
 }
 
@@ -117,7 +117,7 @@ func TestEmitterToolTurns(t *testing.T) {
 func TestEmitterStartFailsWhileRunning(t *testing.T) {
 	log := session.New()
 	var first, second recorder
-	st := emit.NewState(nil)
+	st := emit.NewState(session.New())
 	a := emit.New(log, "", st, first.push)
 	b := emit.New(log, "", st, second.push)
 
@@ -269,13 +269,34 @@ func TestEmitterDrop(t *testing.T) {
 }
 
 func TestNewStateHasTheMessages(t *testing.T) {
+	log := session.New()
 	msgs := []ai.Message{
 		ai.UserMessage("one"),
 		ai.UserMessage("two"),
 	}
-	st := emit.NewState(msgs)
+	for _, m := range msgs {
+		_, err := log.Append(t.Context(), session.NewEntry(m))
+		require.NoError(t, err)
+	}
+	st := emit.NewState(log)
 	assert.Equal(t, msgs, st.Get().Messages())
 	assert.False(t, st.Get().Running())
+}
+
+// A hook of a CLI agent reads the session through the log of its state,
+// as a hook of the harness does.
+func TestNewStateHasTheLog(t *testing.T) {
+	log := session.New()
+	st := emit.NewState(log)
+	got := st.Get().Log()
+	require.NotNil(t, got)
+
+	note := session.Value[string]{Namespace: "test.note"}
+	require.NoError(t, note.Set(t.Context(), got, "kept"))
+	v, ok, err := note.Get(log)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "kept", v)
 }
 
 func TestInput(t *testing.T) {

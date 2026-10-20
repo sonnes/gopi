@@ -45,25 +45,25 @@ import (
 type State struct {
 	mu    sync.Mutex
 	state agent.State
+	log   session.Writer
 }
 
-// NewState returns a state with msgs as its messages, such as the
-// messages of a resumed log.
-func NewState(msgs []ai.Message) *State {
-	s := &State{}
-	for _, m := range msgs {
+// NewState returns the state of an agent over log. Its messages are
+// the messages of log, such as the messages of a resumed session.
+func NewState(log *session.Log) *State {
+	s := &State{log: log.Writer()}
+	for _, m := range log.Messages() {
 		s.state.Apply(agent.EventMessageEnd{Message: m})
 	}
 	return s
 }
 
-// Get returns a copy of the state. The copy has no log and no queues,
-// so [agent.State.Log] returns nil, and [agent.State.Steer] does
-// nothing.
+// Get returns a copy of the state, with the log of the agent. The copy
+// has no queues, so [agent.State.Steer] does nothing.
 func (s *State) Get() agent.State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state.Clip()
+	return s.state.Clip().WithLog(s.log)
 }
 
 // apply changes the state by e.

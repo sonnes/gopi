@@ -1,0 +1,24 @@
+stdiorr trace v1
+# The CLI calls the PostToolUseFailure hook for a failed call. The AfterTool hook gets the error, and its new text goes to the model as context.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":{"PostToolUse":[{"hookCallbackIds":["PostToolUse"]}],"PostToolUseFailure":[{"hookCallbackIds":["PostToolUseFailure"]}]}}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"List the files"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","cwd":"/work","session_id":"sess-1","model":"claude-haiku-4-5","tools":["Bash"]}
+< {"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"Bash","input":{}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"ls nope\"}"}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"ls nope"}}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_stop","index":0},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"control_request","request_id":"cli-7","request":{"subtype":"hook_callback","callback_id":"PostToolUseFailure","input":{"session_id":"sess-1","cwd":"/work","hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_input":{"command":"ls nope"},"tool_use_id":"toolu_1","error":"Exit code 1\nls: nope: No such file or directory","is_interrupt":false},"tool_use_id":"toolu_1"}}
+> {"type":"control_response","response":{"subtype":"success","request_id":"cli-7","response":{"hookSpecificOutput":{"hookEventName":"PostToolUseFailure","additionalContext":"The folder nope does not exist."}}}}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"Exit code 1\nls: nope: No such file or directory","is_error":true}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_start","message":{"id":"msg_2","model":"claude-haiku-4-5","role":"assistant","content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The folder nope does not exist."}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_2","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"The folder nope does not exist."}],"stop_reason":null,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":1}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"content_block_stop","index":0},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"stream_event","event":{"type":"message_stop"},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"The folder nope does not exist.","session_id":"sess-1","num_turns":2,"usage":{"input_tokens":10,"cache_read_input_tokens":20,"cache_creation_input_tokens":30,"output_tokens":5}}

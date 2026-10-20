@@ -194,6 +194,10 @@ func (t *taskTool) start(ctx context.Context, sub subagent.Agent, id, callID str
 	if err != nil {
 		mode = h.policy.Mode
 	}
+	spec, err := childSpec(h.cat, t.asm.Spec, sub.Model)
+	if err != nil {
+		return nil, err
+	}
 	opts := []Option{
 		func(c *Harness) {
 			c.child = &childCall{
@@ -204,7 +208,7 @@ func (t *taskTool) start(ctx context.Context, sub subagent.Agent, id, callID str
 				},
 			}
 		},
-		Model(childSpec(h.cat, t.asm.Spec, sub.Model)),
+		Model(spec),
 		System(t.childSystem(sub)),
 		Mode(permission.Stricter(h.policy.Mode, mode)),
 	}
@@ -219,12 +223,9 @@ func (t *taskTool) start(ctx context.Context, sub subagent.Agent, id, callID str
 func (t *taskTool) childSystem(sub subagent.Agent) string {
 	parts := []string{sub.Prompt}
 	for _, name := range sub.Skills {
-		for i, s := range t.asm.Skills {
-			match := name == t.asm.SkillName(i) || name == s.QualifiedName()
-			if match {
-				parts = append(parts, "## Skill: "+name+"\n\n"+s.Body)
-				break
-			}
+		s, ok := t.asm.skill(name)
+		if ok {
+			parts = append(parts, skillText(name, s))
 		}
 	}
 	return strings.Join(parts, "\n\n")
@@ -312,16 +313,22 @@ func lastText(msgs []ai.Message) string {
 }
 
 // childSpec returns the model spec of a subagent with the model key
-// file. "inherit", no model, or a spec that cat cannot resolve, such as
-// the alias "opus", gives the spec of the parent.
-func childSpec(cat *catalog.Catalog, parent, file string) string {
+// file. "inherit", no model, or a model that cat does not know, such as
+// the alias "opus", gives the spec of the parent. Any other error of cat
+// is an error, such as a bare ID that two providers serve. The child
+// then does not run on a model that its file did not name.
+func childSpec(cat *catalog.Catalog, parent, file string) (string, error) {
 	if file == "" || file == inheritModel {
-		return parent
+		return parent, nil
 	}
-	if _, err := cat.Model(file); err != nil {
-		return parent
+	_, err := cat.Model(file)
+	if errors.Is(err, catalog.ErrUnknownModel) {
+		return parent, nil
 	}
-	return file
+	if err != nil {
+		return "", err
+	}
+	return file, nil
 }
 
 // toolAliases maps the tool names of a Claude Code subagent file to the
