@@ -457,10 +457,15 @@ func (a *Agent) drop(c *conn) {
 
 // command returns the command that starts the app server.
 func (a *Agent) command() *exec.Cmd {
-	cmd := exec.Command(a.cfg.binary, "app-server")
-	cmd.Dir = a.cfg.dir
-	if len(a.cfg.env) > 0 {
-		cmd.Env = append(os.Environ(), a.cfg.env...)
+	return appServer(a.cfg)
+}
+
+// appServer returns the command that starts the app server of c.
+func appServer(c config) *exec.Cmd {
+	cmd := exec.Command(c.binary, "app-server")
+	cmd.Dir = c.dir
+	if len(c.env) > 0 {
+		cmd.Env = append(os.Environ(), c.env...)
 	}
 	return cmd
 }

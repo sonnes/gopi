@@ -3,8 +3,8 @@ package anthropic
 import "strings"
 
 // features holds what a model accepts beyond the base Messages API. The
-// zero value is the base API, so a pass-through model ID gets a request
-// that every model takes.
+// zero value is the base API, so a model that this package does not know
+// gets a request that every model takes.
 type features struct {
 	// systemMessages is true if the model takes system messages in the
 	// messages. Without it, the provider sends each system message as a

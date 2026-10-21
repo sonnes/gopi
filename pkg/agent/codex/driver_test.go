@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -144,4 +149,133 @@ func TestDriverRejectsAnOptionHook(t *testing.T) {
 	})
 	require.ErrorIs(t, err, errors.ErrUnsupported, "Start checks the hooks of the options")
 	assert.EqualError(t, err, "codex: agent: hook 1 (codex.turnHook) uses AfterTurn: unsupported operation")
+}
+
+func TestDriver_ListModels(t *testing.T) {
+	useTraces(t, []string{"list_models.trace"})
+	lister, ok := Driver().(ai.ModelLister)
+	require.True(t, ok)
+
+	got, err := lister.ListModels(context.Background())
+
+	require.NoError(t, err)
+	input := []ai.Modality{ai.ModalityText, ai.ModalityImage}
+	assert.Equal(t, []ai.Model{
+		{
+			ID:        "gpt-6.1-sol",
+			Name:      "GPT-6.1-Sol",
+			Input:     input,
+			Reasoning: true,
+			ThinkingLevels: []ai.ThinkingLevel{
+				ai.ThinkingLow,
+				ai.ThinkingMedium,
+				ai.ThinkingHigh,
+				ai.ThinkingXHigh,
+				ai.ThinkingMax,
+			},
+		},
+		{
+			ID:             "gpt-6-luna",
+			Name:           "GPT-6-Luna",
+			Input:          input,
+			Reasoning:      true,
+			ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingLow, ai.ThinkingMax},
+		},
+	}, got, "the default model comes first, and the list skips a hidden model")
+}
+
+func TestDriver_ListModelsError(t *testing.T) {
+	useTraces(t, []string{"list_models_error.trace"})
+
+	_, err := Driver().(ai.ModelLister).ListModels(context.Background())
+
+	require.EqualError(t, err, "codex: list models: codex: model/list: not logged in")
+}
+
+// TestRecordedListModels replays a trace of the real CLI. To record it
+// again:
+//
+//	make record-cli AGENT=codex RUN=TestRecordedListModels
+func TestRecordedListModels(t *testing.T) {
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	useTraces(t,
+		[]string{"TestRecordedListModels.trace"},
+		machineScrub,
+		replaceScrub(jsonString(home), "/home/me"),
+	)
+
+	got, err := Driver().(ai.ModelLister).ListModels(context.Background())
+
+	require.NoError(t, err)
+	require.NotEmpty(t, got)
+	for _, m := range got {
+		assert.NotEmpty(t, m.ID)
+		assert.NotEmpty(t, m.Name, m.ID)
+		assert.Contains(t, m.Input, ai.ModalityText, m.ID)
+	}
+}
+
+func TestModels(t *testing.T) {
+	models := Models()
+
+	require.NotEmpty(t, models)
+	models[0].ID = "changed"
+	assert.NotEqual(t, "changed", Models()[0].ID, "each call returns a new list")
+}
+
+func TestDriver_ListModelsRepeatedCursor(t *testing.T) {
+	useTraces(t, []string{"list_models_repeat.trace"})
+
+	_, err := Driver().(ai.ModelLister).ListModels(context.Background())
+
+	require.EqualError(t, err, `codex: list models: the cursor "same" repeats`)
+}
+
+func TestDriver_ListModelsCanceled(t *testing.T) {
+	useTraces(t, []string{"list_models_hang.trace"})
+	killed := countKills(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := Driver().(ai.ModelLister).ListModels(ctx)
+
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, 1, *killed, "a failed list kills the app server, and does not wait for it to exit")
+}
+
+func TestDriver_ListModelsTimeout(t *testing.T) {
+	useTraces(t, []string{"list_models_hang.trace"})
+	old := listTimeout
+	t.Cleanup(func() { listTimeout = old })
+	listTimeout = 10 * time.Millisecond
+
+	_, err := Driver().(ai.ModelLister).ListModels(context.Background())
+
+	require.ErrorIs(t, err, context.DeadlineExceeded, "an app server that never answers does not block the list")
+}
+
+// countKills counts the kills of the processes that the test starts.
+func countKills(t *testing.T) *int {
+	t.Helper()
+	var n int
+	replay := start
+	t.Cleanup(func() { start = replay })
+	start = func(cmd *exec.Cmd) (cliproc.Pipes, error) {
+		p, err := replay(cmd)
+		if err != nil {
+			return p, err
+		}
+		kill := p.Kill
+		p.Kill = func() error {
+			n++
+			return kill()
+		}
+		return p, nil
+	}
+	return &n
+}
+
+func TestModels_FromFile(t *testing.T) {
+	assert.Equal(t, models.Of("codex"), Models())
 }

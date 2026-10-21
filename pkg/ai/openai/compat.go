@@ -3,8 +3,8 @@ package openai
 import "strings"
 
 // features holds what a model accepts beyond the base Responses API.
-// The zero value is the base API, so a pass-through model ID gets a
-// request that every model takes.
+// The zero value is the base API, so a model that this package does not
+// know gets a request that every model takes.
 type features struct {
 	// systemMessages is true if the model takes a developer message in
 	// the conversation. Without it, the provider sends each system

@@ -1,0 +1,4 @@
+stdiorr trace v1
+# Hand-written. The initialize request fails.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"error","request_id":"req_1","error":"not logged in"}}

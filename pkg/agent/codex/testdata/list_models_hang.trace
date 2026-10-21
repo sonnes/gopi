@@ -1,0 +1,5 @@
+stdiorr trace v1
+# Hand-written. The app server does not answer initialize, and keeps
+# stdout open: the trace waits for a line that the client never writes.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+> {"never":"written"}

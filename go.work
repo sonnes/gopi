@@ -3,10 +3,13 @@ go 1.27.1
 use (
 	.
 	./cmd/gopi
+	./cmd/modelsync
 	./examples
 	./pkg/ai/anthropic
+	./pkg/ai/fireworks
 	./pkg/ai/openai
 	./pkg/ai/openaichat
+	./pkg/ai/openrouter
 	./pkg/catalog/env
 	./pkg/mcp
 )

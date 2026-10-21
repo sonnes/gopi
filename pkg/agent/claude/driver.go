@@ -8,20 +8,19 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
-// Models lists the models of Claude Code that a catalog registers with
-// the driver. A bare model ID names the driver only if no text provider
-// serves the same ID. Otherwise give the full spec, such as
-// "claude-code/claude-opus-5-5". A spec of the driver with another
-// model ID, such as an alias of the CLI, passes the ID to the CLI.
-var Models = []ai.Model{
-	{ID: "claude-fable-5-1", Name: "Claude Fable 5.1"},
-	{ID: "claude-opus-5-5", Name: "Claude Opus 5.5"},
-	{ID: "claude-opus-5", Name: "Claude Opus 5"},
-	{ID: "claude-sonnet-5-5", Name: "Claude Sonnet 5.5"},
-	{ID: "claude-sonnet-5", Name: "Claude Sonnet 5"},
-	{ID: "claude-haiku-4-5", Name: "Claude Haiku 4.5"},
+// Models returns the models of Claude Code that a catalog registers with
+// the driver: the aliases that --model takes, such as "opus", and the
+// full IDs, with the default model first. The list is the "claude-code"
+// entry of pkg/catalog/models/models.json. Each call returns a new list. A bare
+// model ID names the driver only if no text provider serves the same
+// ID. Otherwise give the full spec, such as
+// "claude-code/claude-opus-5-5". To list the models of the installed
+// CLI, call the ListModels method of the driver.
+func Models() []ai.Model {
+	return models.Of("claude-code")
 }
 
 // Driver returns an [agent.Driver] that starts a Claude Code agent for
@@ -40,6 +39,16 @@ func Driver(opts ...Option) agent.Driver {
 
 type driver struct {
 	opts []Option
+}
+
+// ListModels starts the CLI with the options of the driver, and returns
+// the models that the initialize response lists: each alias that
+// --model takes, such as "opus", then each full ID that an alias
+// resolves to. The CLI makes no model call, but it starts as for a run,
+// so the hooks of its settings run, such as a SessionStart hook. A
+// catalog calls it from FetchDriverModels.
+func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
+	return listModels(ctx, newAgent(d.opts).cfg)
 }
 
 // Start starts the durable agent of the session c.Session.

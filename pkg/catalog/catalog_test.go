@@ -90,14 +90,9 @@ func TestCatalog_Model(t *testing.T) {
 			want: beta,
 		},
 		{
-			name: "unknown ID on a known provider passes through",
-			spec: "one/next",
-			want: ai.Model{ID: "next", Name: "next"},
-		},
-		{
-			name: "model ID with a slash",
-			spec: "one/vendor/next",
-			want: ai.Model{ID: "vendor/next", Name: "vendor/next"},
+			name:    "unregistered ID on a known provider",
+			spec:    "one/next",
+			wantErr: `catalog: unknown model "one/next": provider "one" has no model "next"`,
 		},
 		{
 			name:    "bare ID with two providers",
@@ -112,7 +107,7 @@ func TestCatalog_Model(t *testing.T) {
 		{
 			name:    "unknown provider",
 			spec:    "nope/alpha",
-			wantErr: `catalog: unknown model "nope/alpha"`,
+			wantErr: `catalog: unknown model "nope/alpha": no provider "nope": use one of one, paint, two`,
 		},
 	}
 	for _, tt := range tests {
@@ -128,6 +123,27 @@ func TestCatalog_Model(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
+	}
+}
+
+func TestCatalog_UnknownModelIs(t *testing.T) {
+	c := newCatalog()
+
+	for _, spec := range []string{"one/next", "next", "nope/alpha"} {
+		_, err := c.Model(spec)
+		require.ErrorIs(t, err, catalog.ErrUnknownModel, spec)
+	}
+}
+
+func TestCatalog_ModelIDWithASlash(t *testing.T) {
+	c := newCatalog()
+	next := ai.Model{ID: "vendor/next", Name: "Next"}
+	c.RegisterModel("one", next)
+
+	for _, spec := range []string{"one/vendor/next", "vendor/next"} {
+		got, err := c.Model(spec)
+		require.NoError(t, err, spec)
+		assert.Equal(t, next, got, spec)
 	}
 }
 
@@ -251,6 +267,7 @@ func TestCatalog_FetchModels_KeepsPricesAndLevels(t *testing.T) {
 		Input:          []ai.Modality{ai.ModalityText, ai.ModalityImage},
 		Reasoning:      true,
 		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingHigh},
+		Pricing:        ai.Pricing{Input: 1, Output: 2},
 	}}}, registered)
 
 	c.FetchModels(t.Context())
@@ -268,6 +285,26 @@ func TestCatalog_FetchModels_KeepsPricesAndLevels(t *testing.T) {
 	}, merged, "the list adds limits and capabilities, and the registered prices and levels stay")
 }
 
+func TestCatalog_FetchModels_ListedPrices(t *testing.T) {
+	listed := ai.Model{
+		ID:             "next",
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingLow},
+		Pricing: ai.Pricing{
+			Input:  1,
+			Output: 2,
+			Tiers:  []ai.PriceTier{{InputAbove: 100, Input: 3}},
+		},
+	}
+	c := catalog.New()
+	c.RegisterTextProvider("one", &lister{models: []ai.Model{listed}})
+
+	c.FetchModels(t.Context())
+
+	got, err := c.Model("one/next")
+	require.NoError(t, err)
+	assert.Equal(t, listed, got, "a model with no registered prices and levels keeps the listed ones")
+}
+
 func TestCatalog_FetchModels_OneCallPerProvider(t *testing.T) {
 	c := catalog.New()
 	l := &lister{models: []ai.Model{{ID: "alpha"}}}
@@ -277,4 +314,125 @@ func TestCatalog_FetchModels_OneCallPerProvider(t *testing.T) {
 	c.FetchModels(t.Context())
 
 	assert.Equal(t, 1, l.calls)
+}
+
+func TestCatalog_FetchModels_Some(t *testing.T) {
+	one := &lister{models: []ai.Model{{ID: "alpha"}}}
+	two := &lister{models: []ai.Model{{ID: "beta"}}}
+	c := catalog.New()
+	c.RegisterTextProvider("one", one)
+	c.RegisterTextProvider("two", two)
+
+	results := c.FetchModels(t.Context(), "two", "nope")
+
+	require.Len(t, results, 2)
+	assert.Equal(t, "nope", results[0].Provider)
+	assert.ErrorIs(t, results[0].Err, catalog.ErrNoModelList, "an ID with no list is an error, so a typo does not pass")
+	assert.EqualError(t, results[0].Err, `catalog: "nope" has no model list`)
+	assert.Equal(t, catalog.FetchResult{Provider: "two", Models: 1}, results[1])
+	assert.Equal(t, 0, one.calls, "a provider that ids does not name is not asked")
+	assert.Equal(t, []string{"two/beta"}, c.Specs())
+}
+
+func TestCatalog_UnknownModelError(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    string
+		want    catalog.UnknownModelError
+		wantMsg string
+	}{
+		{
+			name:    "a known provider",
+			spec:    "one/next",
+			want:    catalog.UnknownModelError{Spec: "one/next", Provider: "one"},
+			wantMsg: `catalog: unknown model "one/next": provider "one" has no model "next"`,
+		},
+		{
+			name:    "a bare model ID",
+			spec:    "next",
+			want:    catalog.UnknownModelError{Spec: "next"},
+			wantMsg: `catalog: unknown model "next"`,
+		},
+		{
+			name: "an unknown provider",
+			spec: "onee/alpha",
+			want: catalog.UnknownModelError{
+				Spec:      "onee/alpha",
+				Providers: []string{"one", "paint", "two"},
+			},
+			wantMsg: `catalog: unknown model "onee/alpha": no provider "onee": use one of one, paint, two`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newCatalog().Model(tt.spec)
+
+			require.EqualError(t, err, tt.wantMsg)
+			require.ErrorIs(t, err, catalog.ErrUnknownModel)
+			var got *catalog.UnknownModelError
+			require.ErrorAs(t, err, &got)
+			assert.Equal(t, tt.want, *got)
+		})
+	}
+}
+
+func TestCatalog_AmbiguousModelError(t *testing.T) {
+	_, err := newCatalog().Model("shared")
+
+	require.ErrorIs(t, err, catalog.ErrAmbiguousModel)
+	var got *catalog.AmbiguousModelError
+	require.ErrorAs(t, err, &got)
+	assert.Equal(t, catalog.AmbiguousModelError{
+		ID:    "shared",
+		Specs: []string{"one/shared", "two/shared"},
+	}, *got)
+}
+
+func TestMergeDriverModel(t *testing.T) {
+	registered := ai.Model{
+		ID:             "opus",
+		Name:           "Opus",
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingHigh},
+	}
+	listed := ai.Model{
+		ID:             "opus",
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingLow, ai.ThinkingHigh, ai.ThinkingMax},
+	}
+
+	got := catalog.MergeDriverModel(registered, listed)
+
+	assert.Equal(t, ai.Model{
+		ID:             "opus",
+		Name:           "Opus",
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingLow, ai.ThinkingHigh, ai.ThinkingMax},
+	}, got, "the CLI knows the levels that it takes")
+}
+
+func TestMergeModel(t *testing.T) {
+	registered := ai.Model{
+		ID:             "m",
+		Name:           "Old",
+		MaxTokens:      100,
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingOff},
+		Pricing:        ai.Pricing{Input: 5},
+	}
+	listed := ai.Model{
+		ID:             "m",
+		ContextWindow:  1000,
+		Input:          []ai.Modality{ai.ModalityText},
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingHigh},
+		Pricing:        ai.Pricing{Input: 1},
+	}
+
+	got := catalog.MergeModel(registered, listed)
+
+	assert.Equal(t, ai.Model{
+		ID:             "m",
+		Name:           "Old",
+		MaxTokens:      100,
+		ContextWindow:  1000,
+		Input:          []ai.Modality{ai.ModalityText},
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingOff},
+		Pricing:        ai.Pricing{Input: 5},
+	}, got)
 }

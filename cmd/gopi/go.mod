@@ -5,8 +5,11 @@ go 1.27
 replace (
 	github.com/sonnes/gopi => ../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../pkg/ai/anthropic
+	github.com/sonnes/gopi/pkg/ai/fireworks => ../../pkg/ai/fireworks
 	github.com/sonnes/gopi/pkg/ai/openai => ../../pkg/ai/openai
 	github.com/sonnes/gopi/pkg/ai/openaichat => ../../pkg/ai/openaichat
+	github.com/sonnes/gopi/pkg/ai/openrouter => ../../pkg/ai/openrouter
+	github.com/sonnes/gopi/pkg/catalog/env => ../../pkg/catalog/env
 	github.com/sonnes/gopi/pkg/mcp => ../../pkg/mcp
 )
 
@@ -16,6 +19,7 @@ require (
 	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.0
 	github.com/sonnes/gopi/pkg/ai/openai v0.0.0
 	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0
+	github.com/sonnes/gopi/pkg/catalog/env v0.0.0
 	github.com/sonnes/gopi/pkg/mcp v0.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
@@ -33,6 +37,8 @@ require (
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
+	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.0 // indirect
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.0 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

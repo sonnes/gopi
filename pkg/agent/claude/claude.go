@@ -317,7 +317,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := proc.initialize(ctx); err != nil {
+	if _, err := proc.initialize(ctx); err != nil {
 		proc.terminate()
 		if errors.Is(err, ErrNoConversation) {
 			err = errors.Join(err, conversation.Clear(ctx, a.log))
@@ -358,10 +358,34 @@ func askSettings(rules []string) (string, error) {
 	return string(data), nil
 }
 
-// command returns the command that starts the CLI. The input never goes
-// on the command line. It goes to stdin.
+// command returns the command that starts the CLI, and resumes the
+// session of the CLI if the log has one.
 func (a *Agent) command() (*exec.Cmd, error) {
-	c := a.cfg
+	args, err := cliArgs(a.cfg)
+	if err != nil {
+		return nil, err
+	}
+	id, err := conversation.Get(a.log)
+	if err != nil {
+		return nil, err
+	}
+	if id != "" {
+		args = append(args, "--resume="+id)
+	}
+	return cliCommand(a.cfg, args), nil
+}
+
+// cliCommand returns the command that starts the CLI of c with args.
+func cliCommand(c config, args []string) *exec.Cmd {
+	cmd := exec.Command(c.binary, args...)
+	cmd.Dir = c.dir
+	cmd.Env = environ(c.env)
+	return cmd
+}
+
+// cliArgs returns the arguments of the CLI of c, without a session to
+// resume. The input never goes on the command line. It goes to stdin.
+func cliArgs(c config) ([]string, error) {
 	args := []string{
 		"--print",
 		"--output-format", "stream-json",
@@ -399,16 +423,5 @@ func (a *Agent) command() (*exec.Cmd, error) {
 		}
 		args = append(args, "--settings", settings)
 	}
-	id, err := conversation.Get(a.log)
-	if err != nil {
-		return nil, err
-	}
-	if id != "" {
-		args = append(args, "--resume="+id)
-	}
-
-	cmd := exec.Command(c.binary, args...)
-	cmd.Dir = c.dir
-	cmd.Env = environ(c.env)
-	return cmd, nil
+	return args, nil
 }

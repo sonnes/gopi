@@ -294,6 +294,11 @@ func (c *conn) call(ctx context.Context, method string, params, result any) erro
 		return err
 	}
 	for {
+		// A select picks at random when both cases are ready, so a
+		// canceled ctx wins over a message that is already there.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		var m message
 		select {
 		case msg, ok := <-c.inbox:
@@ -314,10 +319,8 @@ func (c *conn) call(ctx context.Context, method string, params, result any) erro
 	}
 }
 
-// handshake initializes the connection, then starts the thread, or
-// resumes it if params has a thread ID.
-func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult, error) {
-	var res threadResult
+// initialize initializes the connection.
+func (c *conn) initialize(ctx context.Context) error {
 	init := initializeParams{
 		ClientInfo: clientInfo{
 			Name:    clientName,
@@ -327,9 +330,16 @@ func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult
 	}
 	var initResult json.RawMessage
 	if err := c.call(ctx, "initialize", init, &initResult); err != nil {
-		return res, err
+		return err
 	}
-	if err := c.write(notification{Method: "initialized"}); err != nil {
+	return c.write(notification{Method: "initialized"})
+}
+
+// handshake initializes the connection, then starts the thread, or
+// resumes it if params has a thread ID.
+func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult, error) {
+	var res threadResult
+	if err := c.initialize(ctx); err != nil {
 		return res, err
 	}
 	method := "thread/start"

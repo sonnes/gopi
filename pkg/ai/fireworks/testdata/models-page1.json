@@ -1,0 +1,28 @@
+{
+  "models": [
+    {
+      "name": "accounts/fireworks/models/kimi-k2-thinking",
+      "displayName": "Kimi K2 Thinking",
+      "kind": "HF_BASE_MODEL",
+      "state": "READY",
+      "public": true,
+      "contextLength": 262144,
+      "supportsImageInput": false,
+      "supportsTools": true,
+      "supportsServerless": true
+    },
+    {
+      "name": "accounts/fireworks/models/qwen3-vl-235b-a22b-instruct",
+      "displayName": "Qwen3 VL 235B A22B Instruct",
+      "kind": "HF_BASE_MODEL",
+      "state": "READY",
+      "public": true,
+      "contextLength": 262144,
+      "supportsImageInput": true,
+      "supportsTools": true,
+      "supportsServerless": true
+    }
+  ],
+  "nextPageToken": "page-2",
+  "totalSize": 4
+}

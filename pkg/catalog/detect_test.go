@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 )
@@ -76,4 +77,37 @@ func TestCatalog_Detect_RegistersCapabilities(t *testing.T) {
 	require.NoError(t, textErr)
 	require.NoError(t, imageErr)
 	require.NoError(t, speechErr)
+}
+
+// driverDetector returns a driver detector that finds d if ok is true.
+func driverDetector(provider, source string, d agent.Driver, ok bool, models ...ai.Model) catalog.DriverDetector {
+	return catalog.DriverDetector{
+		Provider: provider,
+		Source:   source,
+		Models:   models,
+		Detect: func() (agent.Driver, bool) {
+			return d, ok
+		},
+	}
+}
+
+func TestCatalog_DetectDrivers(t *testing.T) {
+	c := catalog.New()
+	opus := ai.Model{ID: "opus", MaxTokens: 200}
+
+	got := c.DetectDrivers(
+		driverDetector("codex", "codex on PATH", nil, false, ai.Model{ID: "gpt"}),
+		driverDetector("claude-code", "claude on PATH", cliDriver, true, opus),
+		driverDetector("claude-code", "second", harnessDriver, true, ai.Model{ID: "haiku"}),
+	)
+
+	assert.Equal(t, []catalog.Detection{
+		{Provider: "claude-code", Source: "claude on PATH"},
+	}, got, "the first detector of an ID that finds its source wins")
+	assert.Equal(t, []string{"claude-code/opus"}, c.DriverSpecs())
+	assert.Empty(t, c.Specs(), "a driver registers no model of a provider")
+	d, m, err := c.Driver("claude-code/opus")
+	require.NoError(t, err)
+	assert.Equal(t, cliDriver, d)
+	assert.Equal(t, opus, m)
 }

@@ -1,0 +1,9 @@
+stdiorr trace v1
+# Hand-written. model/list returns the same cursor twice.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.163.0"}}
+> {"method":"initialized"}
+> {"id":2,"method":"model/list","params":{}}
+< {"id":2,"result":{"data":[{"id":"a","displayName":"A","hidden":false,"isDefault":false}],"nextCursor":"same"}}
+> {"id":3,"method":"model/list","params":{"cursor":"same"}}
+< {"id":3,"result":{"data":[{"id":"a","displayName":"A","hidden":false,"isDefault":false}],"nextCursor":"same"}}

@@ -227,25 +227,31 @@ const denyText = "gopi does not answer permission prompts. Set a permission mode
 const deniedText = "The caller denied the tool call."
 
 // initialize sends the initialize request and waits for its response.
-// It answers the control requests that arrive first.
-func (pr *process) initialize(ctx context.Context) error {
+// It answers the control requests that arrive first. It returns the
+// body of the response, which lists the models of the CLI.
+func (pr *process) initialize(ctx context.Context) (json.RawMessage, error) {
 	id, err := pr.request(outRequestBody{
 		Subtype: "initialize",
 		Hooks:   registration(pr.hooks),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for {
+		// A select picks at random when both cases are ready, so a
+		// canceled ctx wins over a line that is already there.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		var data []byte
 		var ok bool
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		case data, ok = <-pr.lines():
 		}
 		if !ok {
-			return pr.exited()
+			return nil, pr.exited()
 		}
 		var l line
 		if err := json.Unmarshal(data, &l); err != nil {
@@ -256,18 +262,18 @@ func (pr *process) initialize(ctx context.Context) error {
 			// A CLI that cannot start the session reports a result
 			// before the response, then exits.
 			if lostSession(&l) {
-				return ErrNoConversation
+				return nil, ErrNoConversation
 			}
-			return resultError(&l)
+			return nil, resultError(&l)
 		case l.Type == "control_request":
 			if err := pr.answer(ctx, &l); err != nil {
-				return err
+				return nil, err
 			}
 		case l.Type == "control_response" && l.Response != nil && l.Response.RequestID == id:
 			if l.Response.Subtype != "success" {
-				return fmt.Errorf("claude: initialize: %s", l.Response.Error)
+				return nil, fmt.Errorf("claude: initialize: %s", l.Response.Error)
 			}
-			return nil
+			return l.Response.Response, nil
 		}
 	}
 }

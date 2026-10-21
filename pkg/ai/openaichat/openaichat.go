@@ -62,15 +62,20 @@ type Option func(*config)
 
 type config struct {
 	apiKey           string
+	apiKeySet        bool
 	baseURL          string
 	httpClient       *http.Client
 	cacheBreakpoints bool
 }
 
 // APIKey sets the API key. If it is unset, the SDK reads
-// OPENAI_API_KEY.
+// OPENAI_API_KEY. An empty key replaces OPENAI_API_KEY too, so a
+// provider for another server does not send the OpenAI key to it.
 func APIKey(key string) Option {
-	return func(c *config) { c.apiKey = key }
+	return func(c *config) {
+		c.apiKey = key
+		c.apiKeySet = true
+	}
 }
 
 // BaseURL sets the base URL of the API, for another server, a proxy, or
@@ -107,7 +112,7 @@ func New(opts ...Option) *Provider {
 	clientOpts := []option.RequestOption{
 		option.WithMaxRetries(0),
 	}
-	if c.apiKey != "" {
+	if c.apiKeySet {
 		clientOpts = append(clientOpts, option.WithAPIKey(c.apiKey))
 	}
 	if c.baseURL != "" {

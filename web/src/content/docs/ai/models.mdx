@@ -44,7 +44,7 @@ The same model value binds to any provider that serves it. The same provider ser
 
 ## Read the Metadata
 
-The provider packages fill each model from the docs of their API. A zero field is unknown.
+Each typed model, such as `anthropic.Sonnet5`, comes from the file `pkg/catalog/models/models.json`, which the maintainers update from the model lists of the providers and from models.dev. A zero field is unknown.
 
 A call without `ai.MaxTokens` uses the output cap of the model. The other fields are for your code: pick a model that reads PDFs, check a request against the context window, or offer only the thinking levels that a model takes. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#Model) lists the fields.
 
@@ -55,7 +55,9 @@ msg, err := model.StreamText(ctx, messages).Wait()
 fmt.Printf("$%.4f\n", msg.Usage.Cost.Total())
 ```
 
-A model with only its `ID` works with its provider, but its cost is zero until you set `Pricing`.
+`Pricing.CacheWrite` is the price of a write to the default cache of the provider. `Pricing.CacheWriteLong` is the price of a write to the long cache that `ai.CacheLong` asks for.
+
+A model with only its `ID` works with its provider, but its cost is zero until you set `Pricing`. `models.Lookup("openrouter", "moonshotai/kimi-k3")` returns a model of the file with its limits and prices.
 
 ## Wrap
 

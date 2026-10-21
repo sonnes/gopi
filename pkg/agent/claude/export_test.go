@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sonnes/gopi/internal/stdiorr"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
@@ -21,6 +22,13 @@ func (s *Starts) Cmds() []*exec.Cmd {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return append([]*exec.Cmd(nil), s.cmds...)
+}
+
+// SetListTimeout sets the time limit of a list of models for the test.
+func SetListTimeout(t *testing.T, d time.Duration) {
+	old := listTimeout
+	t.Cleanup(func() { listTimeout = old })
+	listTimeout = d
 }
 
 // Replay makes each process start of the test replay the next trace in
@@ -51,6 +59,27 @@ func Replay(t *testing.T, scrubs []stdiorr.Scrub, files ...string) *Starts {
 			Wait:   p.Wait,
 			Kill:   p.Kill,
 		}, nil
+	}
+	return s
+}
+
+// ReplayExitError is [Replay], but the CLI of each start exits with err,
+// as a CLI does that the agent stops with a signal.
+func ReplayExitError(t *testing.T, err error, files ...string) *Starts {
+	t.Helper()
+	s := Replay(t, nil, files...)
+	replay := start
+	start = func(cmd *exec.Cmd) (cliproc.Pipes, error) {
+		p, startErr := replay(cmd)
+		if startErr != nil {
+			return p, startErr
+		}
+		wait := p.Wait
+		p.Wait = func() error {
+			_ = wait()
+			return err
+		}
+		return p, nil
 	}
 	return s
 }

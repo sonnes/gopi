@@ -7,21 +7,18 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
-// Models lists the models of the Codex CLI that a catalog registers
-// with the driver. A bare model ID names the driver only if no text
-// provider serves the same ID. Otherwise give the full spec, such as
-// "codex/gpt-6.1-sol". A spec of the driver with another model ID
-// passes the ID to the CLI.
-var Models = []ai.Model{
-	{ID: "gpt-6.1-sol", Name: "GPT-6.1-Sol"},
-	{ID: "gpt-6-astra", Name: "GPT-6-Astra"},
-	{ID: "gpt-6-sol", Name: "GPT-6-Sol"},
-	{ID: "gpt-6-luna", Name: "GPT-6-Luna"},
-	{ID: "gpt-5.6-sol", Name: "GPT-5.6-Sol"},
-	{ID: "gpt-5.6-terra", Name: "GPT-5.6-Terra"},
-	{ID: "gpt-5.6-luna", Name: "GPT-5.6-Luna"},
+// Models returns the models of the Codex CLI that a catalog registers
+// with the driver, with the default model first. The list is the
+// "codex" entry of pkg/catalog/models/models.json. Each call returns a new
+// list. A bare model ID names the driver only if no text provider
+// serves the same ID. Otherwise give the full spec, such as
+// "codex/gpt-6.1-sol". To list the models of the installed CLI, call
+// the ListModels method of the driver.
+func Models() []ai.Model {
+	return models.Of("codex")
 }
 
 // Driver returns an [agent.Driver] that starts a Codex agent for each
@@ -42,6 +39,15 @@ func Driver(opts ...Option) agent.Driver {
 
 type driver struct {
 	opts []Option
+}
+
+// ListModels starts the app server, and lists the models that the CLI
+// serves to its login with model/list. The options of the driver choose
+// the binary, the folder, and the environment. The list skips a hidden
+// model, and puts the default model first. A catalog calls it from
+// FetchDriverModels.
+func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
+	return listModels(ctx, newConfig(d.opts))
 }
 
 // Start starts the durable agent of the session c.Session.

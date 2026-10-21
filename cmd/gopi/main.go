@@ -22,9 +22,23 @@
 // tool call obeys --permission-mode and the --allow and --deny rules. A
 // call that needs an approval asks on the terminal.
 //
+// gopi finds the providers from ANTHROPIC_API_KEY, OPENAI_API_KEY,
+// OPENROUTER_API_KEY, and FIREWORKS_API_KEY, with the detectors of
+// package catalog/env.
+// --model names the model by its spec, such as
+// anthropic/claude-opus-5-5. If --model is unset, gopi uses the first
+// model of the first provider that it finds. If no provider registered
+// the model, gopi asks the provider of the spec for its models once. A
+// bare model ID asks every provider, so two providers can list the ID,
+// and gopi then asks for the full spec.
+//
 // With --session-id, gopi keeps the conversation in a JSONL file of
 // that name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The first run
 // creates the session, and each later run with the same ID resumes it.
+// A resumed session keeps its model. --model changes it.
+//
+// "gopi models [provider...]" lists the spec of each model that
+// --model takes, with the models that each provider lists from its API.
 //
 // With --mcp, gopi also starts the MCP servers of an mcp.json file, in
 // the format of Claude Code, and gives their tools to the agent. The
@@ -33,6 +47,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -43,11 +58,8 @@ import (
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/ai/anthropic"
-	"github.com/sonnes/gopi/pkg/ai/openai"
-	"github.com/sonnes/gopi/pkg/ai/openaichat"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/catalog/env"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
@@ -80,12 +92,13 @@ const defaultTools = "read_file,write_file,edit_file,bash,grep,find,todo_write,a
 
 // options holds the flags of gopi.
 type options struct {
-	provider string
-	model    string
-	turns    int
-	root     string
-	fence    bool
-	tools    string
+	// model is the model spec. Empty means the first model of the
+	// first provider that gopi finds.
+	model string
+	turns int
+	root  string
+	fence bool
+	tools string
 	// thinking is the thinking level of each model call. Empty means
 	// the default of the model.
 	thinking string
@@ -110,12 +123,9 @@ func main() {
 		ArgsUsage: "[prompt]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "provider",
-				Usage: "the provider: anthropic, openai, or openaichat. If unset, gopi picks it from ANTHROPIC_API_KEY or OPENAI_API_KEY",
-			},
-			&cli.StringFlag{
-				Name:  "model",
-				Usage: "the model ID. If unset, gopi uses the first model of the provider",
+				Name:    "model",
+				Aliases: []string{"m"},
+				Usage:   "the model spec, such as anthropic/claude-opus-5-5 or openrouter/qwen/qwen3-coder, or a model ID that one provider serves. If unset, gopi uses the model of the resumed session, or the first model of the first provider that it finds",
 			},
 			&cli.IntFlag{
 				Name:  "turns",
@@ -168,11 +178,11 @@ func main() {
 			},
 		},
 		Commands: []*cli.Command{
+			modelsCommand(),
 			hookCommand(),
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := options{
-				provider:  c.String("provider"),
 				model:     c.String("model"),
 				turns:     c.Int("turns"),
 				root:      c.String("root"),
@@ -201,7 +211,17 @@ func main() {
 }
 
 func run(ctx context.Context, o options, args []string) error {
-	lm, name, err := newModel(o.provider, o.model, os.Getenv)
+	dir, err := sessionsDir(os.Getenv)
+	if err != nil {
+		return err
+	}
+	// A resumed session keeps its model unless --model changes it, so
+	// gopi resolves the model that the harness uses.
+	stored, err := storedSpec(ctx, dir, o.sessionID)
+	if err != nil {
+		return err
+	}
+	cat, spec, err := newCatalog(ctx, cmp.Or(o.model, stored), env.Detectors())
 	if err != nil {
 		return err
 	}
@@ -231,7 +251,6 @@ func run(ctx context.Context, o options, args []string) error {
 	if err != nil {
 		return err
 	}
-	cat, spec := newCatalog(lm, name)
 	opts := []harness.Option{
 		harness.Catalog(cat),
 		harness.Model(spec),
@@ -253,11 +272,7 @@ func run(ctx context.Context, o options, args []string) error {
 		}
 		opts = append(opts, harness.AgentDefaults(agent.Thinking(level)))
 	}
-	dir, err := sessionsDir(os.Getenv)
-	if err != nil {
-		return err
-	}
-	a, err := newAgent(ctx, opts, o.sessionID, dir)
+	a, err := newAgent(ctx, opts, spec, o.sessionID, dir)
 	if err != nil {
 		return err
 	}
@@ -292,35 +307,171 @@ func run(ctx context.Context, o options, args []string) error {
 	return nil
 }
 
-// newAgent returns the agent of gopi. With a session ID, the agent
-// keeps the conversation in the JSONL store in dir. Without one, the
+// newAgent assembles the agent of gopi with the harness, on the model
+// spec. With a session ID, the agent keeps the conversation in a JSONL
+// file in dir, and a later run with the same ID resumes it. The spec
+// becomes the model of a resumed session. Without a session ID, the
 // conversation ends with gopi.
-// newAgent assembles the agent of gopi with the harness. With a
-// session ID, the agent keeps the conversation in a JSONL file in dir,
-// and a later run with the same ID resumes it.
 func newAgent(
 	ctx context.Context,
 	opts []harness.Option,
+	spec string,
 	sessionID string,
 	dir string,
 ) (*agent.Agent, error) {
 	if sessionID == "" {
-		return harness.New(opts...).New(ctx)
+		return harness.New(opts...).New(ctx, harness.Model(spec))
 	}
 	store, err := jsonl.New(dir)
 	if err != nil {
 		return nil, err
 	}
 	opts = append(slices.Clip(opts), harness.Store(store))
-	return harness.New(opts...).Durable(ctx, sessionID)
+	// A Model on the call, and not in the options of New, changes the
+	// model of a resumed session.
+	return harness.New(opts...).Durable(ctx, sessionID, harness.Model(spec))
 }
 
-// newCatalog returns a catalog that serves lm under the provider name,
-// and the spec of lm in it.
-func newCatalog(lm ai.LanguageModel, name string) (*catalog.Catalog, string) {
+// storedSpec returns the model spec that the session id in dir keeps,
+// or an empty string if id is empty or the session does not exist.
+func storedSpec(ctx context.Context, dir, id string) (string, error) {
+	if id == "" {
+		return "", nil
+	}
+	store, err := jsonl.New(dir)
+	if err != nil {
+		return "", err
+	}
+	snap, err := store.Load(ctx, id)
+	if errors.Is(err, session.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	spec, _, err := harness.SessionModel.Read(snap)
+	if err != nil {
+		return "", fmt.Errorf("session %s: %w", id, err)
+	}
+	return spec, nil
+}
+
+// newCatalog returns a catalog of the providers that ds find, and the
+// spec of the model of gopi. If spec is empty, newCatalog uses the first
+// model of the first provider that ds find with models, because the
+// first model of a detector is the default of its provider.
+//
+// If no provider registered the model of spec, newCatalog asks the
+// provider of spec for its models, because a provider such as
+// openrouter registers none. A bare model ID asks every provider.
+func newCatalog(ctx context.Context, spec string, ds []catalog.Detector) (*catalog.Catalog, string, error) {
 	cat := catalog.New()
-	cat.RegisterTextProvider(name, lm.Provider, lm.Model)
-	return cat, name + "/" + lm.Model.ID
+	found := cat.Detect(ds...)
+	if len(found) == 0 {
+		return nil, "", fmt.Errorf("no provider: set %s", sources(ds))
+	}
+	if spec == "" {
+		spec = defaultSpec(ds, found)
+	}
+	if spec == "" {
+		return nil, "", fmt.Errorf(
+			"no default model: give a spec with --model, such as %s/<model-id>",
+			found[0].Provider,
+		)
+	}
+	// The harness resolves the spec too, but gopi checks it here, before
+	// it starts the MCP servers.
+	_, err := cat.LanguageModel(spec)
+	var listErrs []error
+	if errors.Is(err, catalog.ErrUnknownModel) {
+		listErrs = fetchModels(ctx, cat, specProvider(spec, found, nil))
+		_, err = cat.LanguageModel(spec)
+	}
+	if err != nil {
+		// A spec of a provider with no credential fails as an unknown
+		// model. The credential is the fix, so the error names it. The
+		// check comes after the resolve, because a bare ID such as
+		// anthropic/claude-sonnet-5.5 can resolve to another provider.
+		if id := specProvider(spec, nil, ds); id != "" {
+			if perr := providerErr(ds, found, id); perr != nil {
+				return nil, "", fmt.Errorf("model %q: %w", spec, perr)
+			}
+		}
+		errs := append([]error{withHint(err)}, listErrs...)
+		return nil, "", fmt.Errorf("model %q: %w", spec, errors.Join(errs...))
+	}
+	return cat, spec, nil
+}
+
+// specProvider returns the provider of spec if found or ds has it, or
+// an empty string for a bare model ID.
+func specProvider(spec string, found []catalog.Detection, ds []catalog.Detector) string {
+	id, _, hasProvider := strings.Cut(spec, "/")
+	inFound := slices.ContainsFunc(found, func(d catalog.Detection) bool {
+		return d.Provider == id
+	})
+	inDetectors := slices.ContainsFunc(ds, func(d catalog.Detector) bool {
+		return d.Provider == id
+	})
+	if hasProvider && (inFound || inDetectors) {
+		return id
+	}
+	return ""
+}
+
+// fetchModels asks the provider id of cat for its models, or each
+// provider if id is empty. It returns the error of each list that
+// failed. The error of a provider names the provider.
+func fetchModels(ctx context.Context, cat *catalog.Catalog, id string) []error {
+	var ids []string
+	if id != "" {
+		ids = []string{id}
+	}
+	var errs []error
+	for _, r := range cat.FetchModels(ctx, ids...) {
+		if r.Err != nil {
+			errs = append(errs, r.Err)
+		}
+	}
+	return errs
+}
+
+// defaultSpec returns the spec of the first model of the first provider
+// in found that has models, or an empty string. The models of a
+// detection come from the first detector in ds with its provider and
+// its source.
+func defaultSpec(ds []catalog.Detector, found []catalog.Detection) string {
+	for _, f := range found {
+		i := slices.IndexFunc(ds, func(d catalog.Detector) bool {
+			return d.Provider == f.Provider && d.Source == f.Source
+		})
+		if i >= 0 && len(ds[i].Models) > 0 {
+			return f.Provider + "/" + ds[i].Models[0].ID
+		}
+	}
+	return ""
+}
+
+// sources returns the credential source of each detector in ds, once,
+// in order, as a list for a person to read: "A", "A or B", or
+// "A, B, or C".
+func sources(ds []catalog.Detector) string {
+	var names []string
+	for _, d := range ds {
+		if !slices.Contains(names, d.Source) {
+			names = append(names, d.Source)
+		}
+	}
+	switch len(names) {
+	case 0:
+		return "a credential"
+	case 1:
+		return names[0]
+	case 2:
+		return names[0] + " or " + names[1]
+	}
+	last := len(names) - 1
+	return strings.Join(names[:last], ", ") + ", or " + names[last]
 }
 
 func sessionsDir(getenv func(string) string) (string, error) {
@@ -402,67 +553,6 @@ func runPrompt(ctx context.Context, a *agent.Agent, t printer, prompt string) er
 		t.print(e)
 	}
 	return nil
-}
-
-// newModel binds a model to a provider. It returns the binding and the
-// name of the provider. If provider is empty, the first key that is set
-// picks it. If model is empty, newModel uses the first model of the
-// provider. A model that the provider does not list has no prices, so
-// its runs show no cost.
-func newModel(provider, model string, getenv func(string) string) (ai.LanguageModel, string, error) {
-	if provider == "" {
-		switch {
-		case getenv("ANTHROPIC_API_KEY") != "":
-			provider = "anthropic"
-		case getenv("OPENAI_API_KEY") != "":
-			provider = "openai"
-		default:
-			return ai.LanguageModel{}, "", errors.New("no provider: set ANTHROPIC_API_KEY or OPENAI_API_KEY, or use --provider")
-		}
-	}
-
-	var p ai.TextProvider
-	var models []ai.Model
-	switch provider {
-	case "anthropic":
-		p = anthropic.New()
-		models = anthropic.Models()
-	case "openai":
-		p = openai.New()
-		models = openai.Models()
-	case "openaichat":
-		p = openaichat.New()
-	default:
-		return ai.LanguageModel{}, "", fmt.Errorf("unknown provider %q: use anthropic, openai, or openaichat", provider)
-	}
-
-	m, err := pickModel(models, model)
-	if err != nil {
-		return ai.LanguageModel{}, "", fmt.Errorf("%s: %w", provider, err)
-	}
-	lm := ai.LanguageModel{
-		Model:    m,
-		Provider: p,
-	}
-	return lm, provider, nil
-}
-
-// pickModel returns the model with the ID from models. If id is empty,
-// it returns the first model, because a provider lists its default
-// model first.
-func pickModel(models []ai.Model, id string) (ai.Model, error) {
-	if id == "" {
-		if len(models) == 0 {
-			return ai.Model{}, errors.New("the provider has no default model: use --model")
-		}
-		return models[0], nil
-	}
-	for _, m := range models {
-		if m.ID == id {
-			return m, nil
-		}
-	}
-	return ai.Model{ID: id}, nil
 }
 
 // maxTurns stops a run before the model call of turn n+1. The agent

@@ -1,0 +1,51 @@
+{
+  "models": [
+    {
+      "name": "accounts/fireworks/models/nomic-embed-text-v1p5",
+      "displayName": "Nomic Embed Text v1.5",
+      "kind": "EMBEDDING_MODEL",
+      "state": "READY",
+      "public": true,
+      "contextLength": 8192
+    },
+    {
+      "name": "accounts/fireworks/models/flux-1-dev-fp8",
+      "displayName": "FLUX.1 [dev] FP8",
+      "kind": "FLUMINA_BASE_MODEL",
+      "state": "READY",
+      "public": true,
+      "supportsServerless": true
+    },
+    {
+      "name": "accounts/fireworks/models/llama-v3p1-405b-instruct-long",
+      "displayName": "Llama 3.1 405B Instruct Long",
+      "kind": "HF_BASE_MODEL",
+      "state": "READY",
+      "public": true,
+      "contextLength": 131072,
+      "supportsTools": true,
+      "supportsServerless": false
+    },
+    {
+      "name": "accounts/fireworks/models/glm-5p2",
+      "displayName": "GLM 5.2",
+      "kind": "HF_BASE_MODEL",
+      "state": "UPLOADING",
+      "public": true,
+      "contextLength": 202752,
+      "supportsTools": true,
+      "supportsServerless": true
+    },
+    {
+      "name": "accounts/fireworks/models/deepseek-v3p2",
+      "displayName": "DeepSeek V3.2",
+      "kind": "HF_BASE_MODEL",
+      "state": "READY",
+      "public": true,
+      "contextLength": 163840,
+      "supportsTools": true,
+      "supportsServerless": true
+    }
+  ],
+  "totalSize": 7
+}

@@ -121,10 +121,12 @@ type controlRequest struct {
 }
 
 // controlResponse is the response of a control_response line.
+// Response is the body of a success.
 type controlResponse struct {
-	Subtype   string `json:"subtype"`
-	RequestID string `json:"request_id"`
-	Error     string `json:"error"`
+	Subtype   string          `json:"subtype"`
+	RequestID string          `json:"request_id"`
+	Error     string          `json:"error"`
+	Response  json.RawMessage `json:"response"`
 }
 
 // outRequest is a control_request that the agent sends.

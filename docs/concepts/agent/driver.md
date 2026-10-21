@@ -32,6 +32,9 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 - A hook that implements no point fails `Start`, because it is a hook with a misspelled method.
 - The approve function and the hook points have the same types for each driver, so a caller writes them once. The tool names in a call are the names of the agent: Claude Code sends `Bash`, and the harness and Codex send `bash`.
 - A driver of a CLI reads the model ID from the resolved model. The harness reads the spec, because it resolves the spec in its own catalog.
+- A driver of a CLI lists the models of the installed CLI with `ListModels`, over the protocol that a run uses: the initialize response of Claude Code, and `model/list` of Codex. The CLI starts as for a run, so the hooks of its settings run. Claude Code lists each alias, such as `opus`, and gopi keeps the aliases next to the full IDs, because `--model` takes both.
+- A list fails after 30 seconds with no answer, because a CLI that waits for a login does not exit. A failed list of Codex kills the app server at once.
+- The thinking levels of a listed model replace the registered levels, because the CLI knows the levels that it takes. A new version of a CLI can add a level.
 
 ## Map
 
@@ -42,6 +45,7 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 | Change how Claude Code takes the config | `pkg/agent/claude/driver.go` |
 | Change how Codex takes the config       | `pkg/agent/codex/driver.go`  |
 | Find the hook points of a CLI agent     | `pkg/agent/<cli>/hooks.go`   |
+| Change how a CLI lists its models       | `pkg/agent/<cli>/models.go`  |
 
 ## Related Concepts
 

@@ -40,6 +40,7 @@ import (
 
 	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 // The capabilities of the provider, checked at compile time.
@@ -57,127 +58,33 @@ type Error = sdk.Error
 // The text models that this package serves. Each one carries its output
 // cap, so a call without [ai.MaxTokens] gets the full cap. For a model
 // with no cap, the request omits the cap, and the API uses the cap of
-// the model. The models
-// are values, so a model from another package, such as
-// openaichat, can use them too. The values come from the model pages
-// and the pricing page of the OpenAI docs. A prompt of more than
-// longContext input tokens has the prices of the tier.
+// the model. The models are values, so a model from another package,
+// such as openaichat, can use them too. The values are in the "openai"
+// entry of pkg/catalog/models/models.json, and come from the model pages and the
+// pricing page of the OpenAI docs. A prompt of more than 272000 input
+// tokens has the prices of the tier.
 var (
-	GPT6Sol = ai.Model{
-		ID:             "gpt-6-sol",
-		Name:           "GPT-6 Sol",
-		MaxTokens:      128_000,
-		ContextWindow:  1_050_000,
-		Input:          gptInput,
-		Reasoning:      true,
-		ThinkingLevels: gptLevels,
-		Pricing: ai.Pricing{
-			Input:      2,
-			Output:     10,
-			CacheRead:  0.2,
-			CacheWrite: 2.5,
-			Tiers: []ai.PriceTier{
-				{InputAbove: longContext, Input: 4, Output: 15, CacheRead: 0.4, CacheWrite: 5},
-			},
-		},
-	}
-	GPT6Luna = ai.Model{
-		ID:             "gpt-6-luna",
-		Name:           "GPT-6 Luna",
-		MaxTokens:      128_000,
-		ContextWindow:  1_050_000,
-		Input:          gptInput,
-		Reasoning:      true,
-		ThinkingLevels: gptLevels,
-		Pricing: ai.Pricing{
-			Input:      0.1,
-			Output:     0.5,
-			CacheRead:  0.01,
-			CacheWrite: 0.125,
-			Tiers: []ai.PriceTier{
-				{InputAbove: longContext, Input: 0.2, Output: 0.75, CacheRead: 0.02, CacheWrite: 0.25},
-			},
-		},
-	}
-	GPT6Astra = ai.Model{
-		ID:            "gpt-6-astra",
-		Name:          "GPT-6 Astra",
-		MaxTokens:     128_000,
-		ContextWindow: 1_050_000,
-		Input:         gptInput,
-		Reasoning:     true,
-		// The model has no effort of none, so it rejects off.
-		ThinkingLevels: gptLevels[1:],
-		Pricing: ai.Pricing{
-			Input:      10,
-			Output:     50,
-			CacheRead:  1,
-			CacheWrite: 12.5,
-			Tiers: []ai.PriceTier{
-				{InputAbove: longContext, Input: 20, Output: 75, CacheRead: 2, CacheWrite: 25},
-			},
-		},
-	}
-	// GPT5_6 is the alias that routes to gpt-5.6-sol.
-	GPT5_6 = ai.Model{
-		ID:             "gpt-5.6",
-		Name:           "GPT-5.6",
-		MaxTokens:      128_000,
-		ContextWindow:  1_050_000,
-		Input:          gptInput,
-		Reasoning:      true,
-		ThinkingLevels: gptLevels,
-		Pricing: ai.Pricing{
-			Input:      4,
-			Output:     20,
-			CacheRead:  0.4,
-			CacheWrite: 5,
-			Tiers: []ai.PriceTier{
-				{InputAbove: longContext, Input: 8, Output: 30, CacheRead: 0.8, CacheWrite: 10},
-			},
-		},
-	}
+	GPT6Sol   = models.Must(providerID, "gpt-6-sol")
+	GPT6Luna  = models.Must(providerID, "gpt-6-luna")
+	GPT6Astra = models.Must(providerID, "gpt-6-astra")
+	GPT5_6    = models.Must(providerID, "gpt-5.6")
 )
-
-// longContext is the input size above which a GPT model has the prices
-// of its long-context tier.
-const longContext = 272_000
-
-// gptInput is what every GPT text model reads.
-var gptInput = []ai.Modality{ai.ModalityText, ai.ModalityImage}
-
-// gptLevels are the thinking levels of a GPT text model. Off maps to the
-// effort none.
-var gptLevels = []ai.ThinkingLevel{
-	ai.ThinkingOff,
-	ai.ThinkingLow,
-	ai.ThinkingMedium,
-	ai.ThinkingHigh,
-	ai.ThinkingXHigh,
-	ai.ThinkingMax,
-}
 
 // The image models that this package serves. [Provider.GenerateImage]
 // takes them.
 var (
-	GPTImage2           = ai.Model{ID: "gpt-image-2", Name: "GPT Image 2"}
-	GPTImage2_5Flare    = ai.Model{ID: "gpt-image-2.5-flare", Name: "GPT Image 2.5 Flare"}
-	GPTImage2_5Sunburst = ai.Model{ID: "gpt-image-2.5-sunburst", Name: "GPT Image 2.5 Sunburst"}
+	GPTImage2           = models.Must(providerID, "gpt-image-2")
+	GPTImage2_5Flare    = models.Must(providerID, "gpt-image-2.5-flare")
+	GPTImage2_5Sunburst = models.Must(providerID, "gpt-image-2.5-sunburst")
 )
 
+// providerID is the ID of this provider in pkg/catalog/models/models.json.
+const providerID = "openai"
+
 // Models returns the models that this package serves. The default text
-// model comes first, so a caller that must pick one takes the first. The
-// image models come after the text models.
+// model comes first, so a caller that must pick one takes the first.
 func Models() []ai.Model {
-	return []ai.Model{
-		GPT6Sol,
-		GPT6Luna,
-		GPT6Astra,
-		GPT5_6,
-		GPTImage2,
-		GPTImage2_5Flare,
-		GPTImage2_5Sunburst,
-	}
+	return models.Of(providerID)
 }
 
 // PromptCacheKey sets the prompt cache key of a call. The API routes the
@@ -196,14 +103,19 @@ type Option func(*config)
 
 type config struct {
 	apiKey     string
+	apiKeySet  bool
 	baseURL    string
 	httpClient *http.Client
 }
 
 // APIKey sets the API key. If it is unset, the SDK reads
-// OPENAI_API_KEY.
+// OPENAI_API_KEY. An empty key replaces OPENAI_API_KEY too, so a
+// provider for another server does not send the OpenAI key to it.
 func APIKey(key string) Option {
-	return func(c *config) { c.apiKey = key }
+	return func(c *config) {
+		c.apiKey = key
+		c.apiKeySet = true
+	}
 }
 
 // BaseURL sets the base URL of the API, for a compatible API, a proxy,
@@ -230,7 +142,7 @@ func New(opts ...Option) *Provider {
 	clientOpts := []option.RequestOption{
 		option.WithMaxRetries(0),
 	}
-	if c.apiKey != "" {
+	if c.apiKeySet {
 		clientOpts = append(clientOpts, option.WithAPIKey(c.apiKey))
 	}
 	if c.baseURL != "" {

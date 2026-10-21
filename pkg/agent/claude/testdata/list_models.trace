@@ -1,0 +1,6 @@
+stdiorr trace v1
+# Hand-written. The initialize response lists two aliases of one model,
+# an alias of another model, and a full ID that takes thinking off.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"system","subtype":"hook_started","session_id":"sess-1"}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[{"value":"default","resolvedModel":"claude-sonnet-5-5","displayName":"Default (recommended)","description":"Sonnet 5.5","supportsEffort":true,"supportedEffortLevels":["low","medium","high","xhigh","max"],"supportsThinkingOff":false},{"value":"opus","resolvedModel":"claude-opus-5-5","displayName":"Opus 5.5","supportsEffort":true,"supportedEffortLevels":["low","high","max"],"supportsThinkingOff":false},{"value":"sonnet","resolvedModel":"claude-sonnet-5-5","displayName":"Sonnet 5.5","supportsEffort":true,"supportedEffortLevels":["low","medium","high","xhigh","max"]},{"value":"claude-haiku-4-5-20251001","resolvedModel":"claude-haiku-4-5-20251001","displayName":"Haiku 4.5","supportsThinkingOff":true}]}}}

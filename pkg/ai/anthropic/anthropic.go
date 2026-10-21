@@ -36,6 +36,7 @@ import (
 
 	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 // The capabilities of the provider, checked at compile time.
@@ -57,124 +58,26 @@ type Error = sdk.Error
 // and [Sonnet5_5] use the effort high. Their IDs on OpenRouter get the
 // same default. Another model uses its own default.
 //
-// The values come from the models overview and the pricing page of the
-// Claude docs.
-// CacheWrite is the price of the 5-minute cache. CacheWriteLong is the
-// price of the 1-hour cache, two times the input price.
+// The values are in the "anthropic" entry of pkg/catalog/models/models.json, and
+// come from the models overview and the pricing page of the Claude
+// docs. CacheWrite is the price of the 5-minute cache. CacheWriteLong is
+// the price of the 1-hour cache, two times the input price.
 var (
-	Fable5_1 = ai.Model{
-		ID:            "claude-fable-5-1",
-		Name:          "Claude Fable 5.1",
-		MaxTokens:     128_000,
-		ContextWindow: 1_000_000,
-		Input:         claudeInput,
-		Reasoning:     true,
-		// Thinking is always on, so the model rejects off.
-		ThinkingLevels: []ai.ThinkingLevel{
-			ai.ThinkingLow,
-			ai.ThinkingMedium,
-			ai.ThinkingHigh,
-			ai.ThinkingXHigh,
-			ai.ThinkingMax,
-		},
-		Pricing: ai.Pricing{Input: 10, Output: 50, CacheRead: 0.25, CacheWrite: 12.5, CacheWriteLong: 20},
-	}
-	Opus5_5 = ai.Model{
-		ID:            "claude-opus-5-5",
-		Name:          "Claude Opus 5.5",
-		MaxTokens:     128_000,
-		ContextWindow: 1_000_000,
-		Input:         claudeInput,
-		Reasoning:     true,
-		// Adaptive thinking is always on, so the model rejects off.
-		ThinkingLevels: []ai.ThinkingLevel{
-			ai.ThinkingLow,
-			ai.ThinkingMedium,
-			ai.ThinkingHigh,
-			ai.ThinkingXHigh,
-			ai.ThinkingMax,
-		},
-		Pricing: ai.Pricing{Input: 4, Output: 20, CacheRead: 0.2, CacheWrite: 5, CacheWriteLong: 8},
-	}
-	Opus5 = ai.Model{
-		ID:            "claude-opus-5",
-		Name:          "Claude Opus 5",
-		MaxTokens:     128_000,
-		ContextWindow: 1_000_000,
-		Input:         claudeInput,
-		Reasoning:     true,
-		// The provider always sends adaptive thinking, so that a change
-		// of effort keeps the cache. So off is not a level here.
-		ThinkingLevels: []ai.ThinkingLevel{
-			ai.ThinkingLow,
-			ai.ThinkingMedium,
-			ai.ThinkingHigh,
-			ai.ThinkingXHigh,
-			ai.ThinkingMax,
-		},
-		Pricing: ai.Pricing{Input: 5, Output: 25, CacheRead: 0.5, CacheWrite: 6.25, CacheWriteLong: 10},
-	}
-	Sonnet5_5 = ai.Model{
-		ID:            "claude-sonnet-5-5",
-		Name:          "Claude Sonnet 5.5",
-		MaxTokens:     128_000,
-		ContextWindow: 1_000_000,
-		Input:         claudeInput,
-		Reasoning:     true,
-		// The model rejects disabled thinking. Its way to turn thinking
-		// off has no level here.
-		ThinkingLevels: []ai.ThinkingLevel{
-			ai.ThinkingLow,
-			ai.ThinkingMedium,
-			ai.ThinkingHigh,
-			ai.ThinkingXHigh,
-			ai.ThinkingMax,
-		},
-		Pricing: ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4},
-	}
-	Sonnet5 = ai.Model{
-		ID:            "claude-sonnet-5",
-		Name:          "Claude Sonnet 5",
-		MaxTokens:     128_000,
-		ContextWindow: 1_000_000,
-		Input:         claudeInput,
-		Reasoning:     true,
-		ThinkingLevels: []ai.ThinkingLevel{
-			ai.ThinkingLow,
-			ai.ThinkingMedium,
-			ai.ThinkingHigh,
-			ai.ThinkingXHigh,
-			ai.ThinkingMax,
-		},
-		Pricing: ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4},
-	}
-	// Haiku4_5 thinks only with a token budget, and the provider sends
-	// effort levels. So the provider can only turn its thinking off.
-	Haiku4_5 = ai.Model{
-		ID:             "claude-haiku-4-5",
-		Name:           "Claude Haiku 4.5",
-		MaxTokens:      64_000,
-		ContextWindow:  200_000,
-		Input:          claudeInput,
-		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingOff},
-		Pricing:        ai.Pricing{Input: 1, Output: 5, CacheRead: 0.1, CacheWrite: 1.25, CacheWriteLong: 2},
-	}
+	Fable5_1  = models.Must(providerID, "claude-fable-5-1")
+	Opus5_5   = models.Must(providerID, "claude-opus-5-5")
+	Opus5     = models.Must(providerID, "claude-opus-5")
+	Sonnet5_5 = models.Must(providerID, "claude-sonnet-5-5")
+	Sonnet5   = models.Must(providerID, "claude-sonnet-5")
+	Haiku4_5  = models.Must(providerID, "claude-haiku-4-5")
 )
 
-// claudeInput is what every Claude model reads.
-var claudeInput = []ai.Modality{ai.ModalityText, ai.ModalityImage, ai.ModalityPDF}
+// providerID is the ID of this provider in pkg/catalog/models/models.json.
+const providerID = "anthropic"
 
 // Models returns the models that this package serves. The default model
 // comes first, so a caller that must pick one takes the first.
 func Models() []ai.Model {
-	return []ai.Model{
-		Sonnet5_5,
-		Fable5_1,
-		Opus5_5,
-		Opus5,
-		Sonnet5,
-		Haiku4_5,
-	}
+	return models.Of(providerID)
 }
 
 // Provider calls the Anthropic Messages API. Create one with [New].

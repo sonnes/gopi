@@ -1,11 +1,11 @@
-.PHONY: test check build tidy fmt record record-cli \
+.PHONY: test check build tidy fmt record record-cli models \
 	site-install site-dev site-build site-preview site-check site-test \
 	docs-links
 
 # MODULES lists the directory of each module. go.work joins them, but
 # ./... stops at the root of a nested module, so each target runs in
 # each module.
-MODULES := . pkg/ai/anthropic pkg/ai/openai pkg/ai/openaichat pkg/catalog/env pkg/mcp examples cmd/gopi
+MODULES := . pkg/ai/anthropic pkg/ai/fireworks pkg/ai/openai pkg/ai/openaichat pkg/ai/openrouter pkg/catalog/env pkg/mcp examples cmd/gopi cmd/modelsync
 
 # Run the tests. Pass flags to go test with ARGS, for example
 # `make test ARGS="-run TestStreamText -v"`. To test some packages only,
@@ -82,6 +82,14 @@ AGENT ?= codex
 CLIRUN = $(if $(filter command line environment,$(origin RUN)),$(RUN),TestRecorded)
 record-cli:
 	go test ./pkg/agent/$(AGENT) -clirecord='$(CLIRUN)' -run='$(CLIRUN)'
+
+# Update pkg/catalog/models/models.json from the model lists of the providers and
+# the drivers, and from models.dev. IDS limits the IDs, for example
+# `make models IDS=openrouter,fireworks`. PRUNE=1 removes a model that its
+# list leaves out. A provider lists with its key, and a driver with its
+# CLI on the PATH. Review the diff before you commit it.
+models:
+	go run ./cmd/modelsync -file pkg/catalog/models/models.json -ids '$(IDS)' $(if $(PRUNE),-prune)
 
 # The site lives in web/. Its README has the layout.
 site-install:

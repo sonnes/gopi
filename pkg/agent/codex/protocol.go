@@ -233,3 +233,28 @@ type tokenBreakdown struct {
 	CacheWriteInputTokens int `json:"cacheWriteInputTokens"`
 	OutputTokens          int `json:"outputTokens"`
 }
+
+// modelListParams are the parameters of model/list. The first page has
+// no cursor.
+type modelListParams struct {
+	Cursor string `json:"cursor,omitempty"`
+}
+
+// modelListResult is one page of model/list. NextCursor is empty on the
+// last page.
+type modelListResult struct {
+	Data       []listedModel `json:"data"`
+	NextCursor string        `json:"nextCursor"`
+}
+
+// listedModel is one model of model/list.
+type listedModel struct {
+	ID                        string   `json:"id"`
+	DisplayName               string   `json:"displayName"`
+	Hidden                    bool     `json:"hidden"`
+	IsDefault                 bool     `json:"isDefault"`
+	InputModalities           []string `json:"inputModalities"`
+	SupportedReasoningEfforts []struct {
+		ReasoningEffort string `json:"reasoningEffort"`
+	} `json:"supportedReasoningEfforts"`
+}

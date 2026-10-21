@@ -1,0 +1,5 @@
+stdiorr trace v1
+# Hand-written. The CLI does not answer initialize, and keeps stdout
+# open: the trace waits for a line that the client never writes.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+> {"never":"written"}

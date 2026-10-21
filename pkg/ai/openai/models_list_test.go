@@ -42,3 +42,44 @@ func TestListModels(t *testing.T) {
 		{ID: "anthropic/claude-sonnet-5", Name: "Anthropic: Claude Sonnet 5"},
 	}, got)
 }
+
+func TestAPIKey(t *testing.T) {
+	tests := []struct {
+		name string
+		opts []openai.Option
+		want string
+	}{
+		{
+			name: "no key reads OPENAI_API_KEY",
+			want: "Bearer env-key",
+		},
+		{
+			name: "a key replaces OPENAI_API_KEY",
+			opts: []openai.Option{openai.APIKey("my-key")},
+			want: "Bearer my-key",
+		},
+		{
+			name: "an empty key sends no key",
+			opts: []openai.Option{openai.APIKey("")},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("OPENAI_API_KEY", "env-key")
+			var got string
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = r.Header.Get("Authorization")
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"object":"list","data":[]}`))
+			}))
+			t.Cleanup(server.Close)
+			opts := append(tt.opts, openai.BaseURL(server.URL+"/v1"))
+
+			_, err := openai.New(opts...).ListModels(context.Background())
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

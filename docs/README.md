@@ -25,6 +25,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | ------------- | ----------------------------------------------------------- | --------------------------- |
 | provider      | One backend that answers a model call                        | vendor, service, client     |
 | model         | One named model that a provider serves                       | engine, LLM                 |
+| host provider | A provider for one server that copies an OpenAI API. It sends its calls through the provider of that API, and lists the models of the server | pseudo provider, gateway, wrapper |
 | message       | What one role adds to a conversation, with its content       | turn, entry                 |
 | content block | One part of a message: text, thinking, a tool call, or a file | part, chunk, segment        |
 | tool          | One function that a model can call                           | function, action, skill     |
@@ -42,7 +43,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter |
 | catalog       | What maps a spec to a model bound to its provider, or to the driver of its agent | registry, model list |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
-| detector      | What reads one credential source and gives a catalog a provider | probe, loader            |
+| detector      | What reads one source and gives a catalog a provider or a driver | probe, loader            |
 | harness       | What assembles a coding agent from options, the files of a project, and a catalog, on each call | builder, factory, runtime |
 | assembly      | What one call of a harness resolved: the model, the instruction files, the skills, the subagents, and the tools | build, config |
 | source        | A place that a harness reads instruction files, skills, and subagents from: the project or the home folder | layout, origin |

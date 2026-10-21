@@ -10,6 +10,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
+	"github.com/sonnes/gopi/pkg/harness"
 )
 
 // Resolve a spec with the built-in detectors, and give the model to an
@@ -58,4 +59,34 @@ func Example_fetchModels() {
 		}
 		fmt.Printf("%s lists %d models\n", r.Provider, r.Models)
 	}
+}
+
+// Detect the agent CLIs next to the providers. One spec then names the
+// kind of agent and its model. A spec of a provider runs on the
+// default driver, the harness.
+func ExampleDriverDetectors() {
+	ctx := context.Background()
+	c := catalog.New()
+	c.Detect(env.Detectors()...)
+	c.DetectDrivers(env.DriverDetectors()...)
+	c.DefaultDriver(harness.New(harness.Catalog(c)))
+
+	// Optional: add the models of the installed CLIs to the registered
+	// models. Each list starts its CLI.
+	c.FetchDriverModels(ctx)
+
+	spec := "claude-code/opus"
+	d, model, err := c.Driver(spec)
+	if err != nil {
+		panic(err)
+	}
+	runner, err := d.Start(ctx, agent.Config{
+		Session: "fix-login",
+		Spec:    spec,
+		Model:   model,
+	})
+	if err != nil {
+		panic(err)
+	}
+	_ = runner
 }

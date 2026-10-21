@@ -15,12 +15,14 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Stream](ai/stream.md)       | How one model call reports its events and its final message.                 |
 | [Provider](ai/provider.md)   | How a provider serves a model call, and how the Anthropic provider builds its requests. |
 | [OpenAI Providers](ai/openai.md) | How the two OpenAI providers build their requests, keep reasoning between calls, and serve compatible servers. |
+| [Host Provider](ai/host-provider.md) | How a provider for a server that copies an OpenAI API sends its calls through the provider of that API, and lists the models of the server with their limits and prices. |
 
 ## catalog
 
 | Concept                          | Description                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | [Catalog](catalog/catalog.md)    | How a spec resolves to a model bound to its provider or to the driver of its agent, and how detectors fill a catalog from the credentials of a process. |
+| [Model Data](catalog/model-data.md) | How the default models of each provider and driver live in one embedded models.json, how a fetch updates a catalog at runtime, and how make models updates the file. |
 
 ## tool
 

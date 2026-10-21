@@ -15,11 +15,11 @@ OpenAI has two text APIs, and gopi has one provider for each. `openai` calls the
 
 ```
                      +--> openai.Provider       Responses API
-                     |      api.openai.com, OpenRouter
+                     |      api.openai.com, OpenRouter through openrouter.Provider
 ai.LanguageModel ----+
                      |
                      +--> openaichat.Provider   Chat Completions API
-                            api.openai.com, OpenRouter, Fireworks
+                            api.openai.com, OpenRouter, Fireworks through fireworks.Provider
 ```
 
 ## Design
@@ -52,5 +52,6 @@ ai.LanguageModel ----+
 ## Related Concepts
 
 - [Provider](provider.md)
+- [Host Provider](host-provider.md)
 - [Message](message.md)
 - [Stream](stream.md)

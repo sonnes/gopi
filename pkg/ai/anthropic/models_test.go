@@ -7,13 +7,14 @@ import (
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 func TestModels(t *testing.T) {
 	got := anthropic.Models()
 
-	// The default model comes first.
-	assert.Equal(t, []ai.Model{
+	assert.Equal(t, anthropic.Sonnet5_5, got[0], "the default model comes first")
+	assert.ElementsMatch(t, []ai.Model{
 		anthropic.Sonnet5_5,
 		anthropic.Fable5_1,
 		anthropic.Opus5_5,
@@ -21,6 +22,7 @@ func TestModels(t *testing.T) {
 		anthropic.Sonnet5,
 		anthropic.Haiku4_5,
 	}, got)
+	assert.Equal(t, models.Of("anthropic"), got, "the models come from models.json")
 }
 
 func TestModels_Limits(t *testing.T) {

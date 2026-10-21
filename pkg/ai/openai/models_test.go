@@ -7,13 +7,14 @@ import (
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
+	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 func TestModels(t *testing.T) {
 	got := openai.Models()
 
-	// The default text model comes first. The image models come last.
-	assert.Equal(t, []ai.Model{
+	assert.Equal(t, openai.GPT6Sol, got[0], "the default text model comes first")
+	assert.ElementsMatch(t, []ai.Model{
 		openai.GPT6Sol,
 		openai.GPT6Luna,
 		openai.GPT6Astra,
@@ -22,4 +23,5 @@ func TestModels(t *testing.T) {
 		openai.GPTImage2_5Flare,
 		openai.GPTImage2_5Sunburst,
 	}, got)
+	assert.Equal(t, models.Of("openai"), got, "the models come from models.json")
 }
