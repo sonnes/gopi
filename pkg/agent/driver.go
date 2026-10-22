@@ -43,6 +43,9 @@ type Config struct {
 	System string
 	// Skills names the skills that the agent loads at the start.
 	Skills []string
+	// Mode is the permission mode of the agent. If it is empty, the
+	// driver keeps its own mode.
+	Mode Mode
 	// Allow, Ask, and Deny are the permission rules of the agent, in
 	// the format "Tool" or "Tool(content)".
 	Allow []string
@@ -147,4 +150,47 @@ func CheckHooks(hooks []Hook, supported ...Point) error {
 		}
 	}
 	return nil
+}
+
+// Mode is a permission mode. It decides the tool calls that no rule
+// matches: a call runs, asks the approve function, or is blocked. The
+// names are the names of the permission modes of Claude Code, because
+// the harness uses the same names.
+type Mode string
+
+// The permission modes, from the strictest.
+const (
+	// ModePlan runs the read tools and blocks each other call.
+	ModePlan Mode = "plan"
+	// ModeDefault runs the read tools. Each other call asks.
+	ModeDefault Mode = "default"
+	// ModeAcceptEdits runs the read tools and the edit tools. Each
+	// other call asks.
+	ModeAcceptEdits Mode = "acceptEdits"
+	// ModeBypass runs each call.
+	ModeBypass Mode = "bypassPermissions"
+)
+
+// AllModes lists each [Mode], from the strictest.
+var AllModes = []Mode{
+	ModePlan,
+	ModeDefault,
+	ModeAcceptEdits,
+	ModeBypass,
+}
+
+// CheckMode returns an error if a driver cannot honor the mode m. An
+// empty m keeps the mode of the driver, so it gives no error. A mode
+// that is not in supported gives an error that wraps
+// [errors.ErrUnsupported]. A driver fails on such a mode, because an
+// agent with another mode runs calls that its caller did not allow. A
+// mode that is not in [AllModes] gives another error.
+func CheckMode(m Mode, supported ...Mode) error {
+	if m == "" || slices.Contains(supported, m) {
+		return nil
+	}
+	if !slices.Contains(AllModes, m) {
+		return fmt.Errorf("agent: unknown mode %q", m)
+	}
+	return fmt.Errorf("agent: the mode %s: %w", m, errors.ErrUnsupported)
 }

@@ -32,7 +32,10 @@ func (stopHook) BeforeStop(context.Context, agent.State) ([]session.Entry, error
 
 func TestDriverStart(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	d := claude.Driver(claude.Binary("/opt/claude"))
+	d := claude.Driver(
+		claude.Binary("/opt/claude"),
+		claude.PermissionMode(claude.PermissionBypass),
+	)
 
 	r, err := d.Start(context.Background(), agent.Config{
 		Session: "s1",
@@ -41,6 +44,7 @@ func TestDriverStart(t *testing.T) {
 		Model:   ai.Model{ID: "haiku"},
 		Dir:     "/work",
 		System:  "Be brief.",
+		Mode:    agent.ModePlan,
 		Allow:   []string{"Read"},
 		Ask:     []string{"Bash(gh pr comment:*)"},
 		Deny:    []string{"WebFetch"},
@@ -65,9 +69,11 @@ func TestDriverStart(t *testing.T) {
 		"--allowedTools Read",
 		"--disallowedTools WebFetch",
 		`--settings {"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
+		"--permission-mode plan",
 	} {
 		assert.Contains(t, args, want)
 	}
+	assert.NotContains(t, args, "bypassPermissions", "the mode of the config replaces the mode of the driver")
 }
 
 func TestDriverRejects(t *testing.T) {
@@ -120,6 +126,14 @@ func TestDriverRejects(t *testing.T) {
 				Hooks:   []agent.Hook{agent.BaseHook{}},
 			},
 			errText: "claude: agent: hook 1 (agent.BaseHook) implements no point",
+		},
+		{
+			name: "an unknown mode",
+			config: agent.Config{
+				Session: "s1",
+				Mode:    "auto",
+			},
+			errText: `claude: agent: unknown mode "auto"`,
 		},
 	}
 	for _, tt := range tests {

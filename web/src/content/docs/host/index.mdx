@@ -1,0 +1,116 @@
+---
+title: Host
+summary: A host runs sessions of any gopi agent for a Go program. The model spec of each session picks the harness, Claude Code, or Codex. The host stream reports the state of each session, and each session has a stream of its agent events.
+---
+
+import LayerStack from "../../../components/figures/LayerStack.astro";
+
+An [agent](../agent/index.mdx) runs while your program holds it. A host keeps a set of sessions for you. It runs the messages of each session one at a time, and reports each change of their state. Without a host, you start each driver, and you keep the queue and the status of each session yourself.
+
+<LayerStack
+  alt="The layers of a host. pkg/host runs the sessions. A driver of the catalog starts each agent: the harness, Claude Code, or Codex. pkg/session keeps the log of each session."
+  layers={[
+    { name: "pkg/host", job: "runs the sessions", hue: "harness" },
+    {
+      name: "pkg/catalog",
+      job: "resolves a spec to the driver of its agent",
+      hue: "ai",
+      plug: { label: "drivers", items: ["harness", "claude-code", "codex"] },
+    },
+    { name: "pkg/agent", job: "runs the model with tools", hue: "agent" },
+    { name: "pkg/session", job: "keeps the log of each session", hue: "durable" },
+  ]}
+/>
+
+## Start a Session
+
+Register a driver for each CLI in the catalog, and the harness as the default driver. Then start a session with a spec.
+
+```go
+cat.RegisterDriver("claude-code", claude.Driver(), claude.Models()...)
+cat.DefaultDriver(harness.New(harness.Catalog(cat)))
+
+h := host.New(cat, host.Store(store))
+defer h.Close()
+s, err := h.Start(ctx, host.Spec{
+	Model:  "claude-code/claude-opus-5-5",
+	Dir:    repoDir,
+	System: "Review the diff. Report findings. Do not push.",
+	Deny:   []string{"Bash(git push:*)"},
+})
+```
+
+`anthropic/claude-opus-5-5` runs the same model in the harness. If the store has the log of `Spec.ID`, the session resumes it. `s.Close` stops the agent and keeps the log.
+
+## Send a Message
+
+`Send` returns when the session accepts the message. The run ends on the host stream with `run_end`.
+
+```go
+err := s.Send(ctx, host.Text("Review the diff against main."), host.Queue)
+```
+
+| Policy           | A message to a busy session                                  |
+| ---------------- | ------------------------------------------------------------ |
+| `Queue`, or `""` | runs after the messages before it                            |
+| `Steer`          | goes to the active run before its next model call, or queues |
+| `Interrupt`      | cancels the active run, then runs first                      |
+| `Reject`         | fails with `ErrBusy`                                         |
+
+`s.Interrupt()` cancels the active run and keeps the queue. An interrupted run ends with the error of `host.ErrInterrupted`.
+
+## Answer Approvals
+
+A tool call that needs a person goes to the `Approve` function of the spec. The function runs while the agent waits, so it must return when its context ends. The context ends when the run ends. Do not call `Close` from it, because `Close` waits for the run.
+
+```go
+spec := host.Spec{
+	Model: "claude-code/claude-opus-5-5",
+	Mode:  agent.ModeAcceptEdits,
+	Approve: func(ctx context.Context, c ai.ToolCall) (agent.Decision, error) {
+		return ask(ctx, c)
+	},
+}
+```
+
+`ask` shows the call to a person, and waits for the answer.
+
+The `Mode` of the spec decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. Codex honors only `agent.ModePlan` and `agent.ModeBypass`. With another mode, `Start` fails with `errors.ErrUnsupported`. An empty mode keeps the mode of the driver.
+
+The host stream gets `EventApprovalStart` before the call, and `EventApprovalEnd` after it. While a call waits, the status of the session is `StatusRequiresAction`. The call has the tool name of the agent: `Bash` in Claude Code, and `bash` in the harness and in Codex. With no `Approve`, the agent denies each call that needs a person. If the run ends while a call waits, the call gets `EventApprovalEnd` before `run_end`, and the host drops a later answer.
+
+## Follow the Host
+
+`Events` gives the state of each session, and then each event after that state.
+
+```go
+state, events := h.Events(ctx)
+for ev, err := range events {
+	if err != nil {
+		return err
+	}
+	state.Apply(ev)
+	fmt.Println(ev.SessionID(), state.Sessions[ev.SessionID()].Status())
+}
+```
+
+## Follow a Session
+
+The host stream has no agent events. `s.Events` gives the [state](../agent/events.mdx) of the agent of one session, and then each agent event of each of its runs.
+
+```go
+state, events := s.Events(ctx)
+for ev, err := range events {
+	if err != nil {
+		return err
+	}
+	state.Apply(ev)
+	fmt.Println(state.Streaming(), len(state.Messages()))
+}
+```
+
+If a reader of either stream falls too far behind, its stream ends with `host.ErrSlowReader`. Call `Events` again.
+
+Each snippet comes from the examples of the package in [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/host).
+
+The design is in [docs/concepts/host/host.md](../../../../../docs/concepts/host/host.md).

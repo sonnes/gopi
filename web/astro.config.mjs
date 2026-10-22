@@ -131,6 +131,10 @@ export default defineConfig({
           items: [{ label: "Sessions", slug: "docs/session" }],
         },
         {
+          label: "pkg/host",
+          items: [{ label: "Host", slug: "docs/host" }],
+        },
+        {
           label: "Providers",
           items: [
             { label: "Anthropic", slug: "docs/providers/anthropic" },

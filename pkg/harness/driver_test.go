@@ -122,6 +122,17 @@ func TestStartAddsTheRules(t *testing.T) {
 			mode:   permission.Bypass,
 			config: agent.Config{Deny: []string{"echo"}},
 		},
+		{
+			name:    "the mode of the config replaces the mode of the harness",
+			mode:    permission.Default,
+			config:  agent.Config{Mode: agent.ModeBypass},
+			wantRan: true,
+		},
+		{
+			name:   "the plan mode blocks a call that the harness asks for",
+			mode:   permission.Default,
+			config: agent.Config{Mode: agent.ModePlan},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,6 +180,14 @@ func TestStartFails(t *testing.T) {
 				Skills:  []string{"missing"},
 			},
 			errText: `harness: preload the skill "missing": no skill has this name`,
+		},
+		{
+			name: "an unknown mode",
+			config: agent.Config{
+				Session: "s1",
+				Mode:    "auto",
+			},
+			errText: `harness: agent: unknown mode "auto"`,
 		},
 	}
 	for _, tt := range tests {

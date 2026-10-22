@@ -28,7 +28,11 @@ func Models() []ai.Model {
 // The driver maps Model to the ID of the model, Dir, System, and
 // Approve. With an Approve function, the policy is [ApprovalUntrusted]
 // unless an option of the driver sets [Policy], so that the CLI asks
-// before a command that is not known to be safe. The driver rejects
+// before a command that is not known to be safe. The driver maps the
+// plan mode to [SandboxReadOnly] and the bypass mode to
+// [SandboxDangerFullAccess], both with [ApprovalNever]. The mode
+// replaces the policy and the sandbox of the options. The driver
+// rejects the default mode and the accept edits mode. The driver rejects
 // Skills and Tools, because the CLI loads its own skills and runs only
 // its own tools. It rejects Allow, Ask, and Deny, because Codex has no
 // rules for each tool. It runs the hooks at the points of [Hooks]. Start
@@ -73,6 +77,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
+	if err := agent.CheckMode(c.Mode, modes...); err != nil {
+		return nil, fmt.Errorf("codex: %w", err)
+	}
 
 	var opts []Option
 	if c.Approve != nil {
@@ -91,6 +98,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.System != "" {
 		opts = append(opts, System(c.System))
 	}
+	opts = append(opts, modeOptions(c.Mode)...)
 	if c.Approve != nil {
 		opts = append(opts, Approve(c.Approve))
 	}
@@ -98,6 +106,35 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Hooks(c.Hooks...))
 	}
 	return Durable(ctx, c.Session, opts...)
+}
+
+// modes are the modes that the driver honors. Codex has a policy for
+// commands and a sandbox, and no rule for each tool. So it cannot ask
+// before an edit and run a read, as the default mode and the accept
+// edits mode do.
+var modes = []agent.Mode{
+	agent.ModePlan,
+	agent.ModeBypass,
+}
+
+// modeOptions returns the policy and the sandbox of the mode m. The
+// policy of each mode is [ApprovalNever]: the plan mode blocks a write
+// in the sandbox, and the bypass mode runs each command.
+func modeOptions(m agent.Mode) []Option {
+	switch m {
+	case agent.ModePlan:
+		return []Option{
+			Policy(ApprovalNever),
+			Sandbox(SandboxReadOnly),
+		}
+	case agent.ModeBypass:
+		return []Option{
+			Policy(ApprovalNever),
+			Sandbox(SandboxDangerFullAccess),
+		}
+	default:
+		return nil
+	}
 }
 
 // unsupported returns the error of a config field that the driver

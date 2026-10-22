@@ -81,6 +81,49 @@ func TestDriverAsksWithAnApproveFunction(t *testing.T) {
 	assert.Equal(t, []string{"bash"}, asked)
 }
 
+func TestDriverMode(t *testing.T) {
+	approve := func(context.Context, ai.ToolCall) (agent.Decision, error) {
+		return agent.Decision{}, nil
+	}
+	tests := []struct {
+		name        string
+		mode        agent.Mode
+		wantPolicy  ApprovalPolicy
+		wantSandbox SandboxMode
+	}{
+		{
+			name:        "no mode keeps the untrusted policy of an approve function",
+			wantPolicy:  ApprovalUntrusted,
+			wantSandbox: SandboxWorkspaceWrite,
+		},
+		{
+			name:        "the plan mode reads and never asks",
+			mode:        agent.ModePlan,
+			wantPolicy:  ApprovalNever,
+			wantSandbox: SandboxReadOnly,
+		},
+		{
+			name:        "the bypass mode turns the sandbox off and never asks",
+			mode:        agent.ModeBypass,
+			wantPolicy:  ApprovalNever,
+			wantSandbox: SandboxDangerFullAccess,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d := Driver(Sandbox(SandboxWorkspaceWrite))
+			a := startAgent(t, d, agent.Config{
+				Mode:    tt.mode,
+				Approve: approve,
+			})
+
+			p := a.threadParams("", nil, "")
+			assert.Equal(t, tt.wantPolicy, p.ApprovalPolicy)
+			assert.Equal(t, tt.wantSandbox, p.Sandbox)
+		})
+	}
+}
+
 func TestDriverRejects(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -128,6 +171,23 @@ func TestDriverRejects(t *testing.T) {
 			name:    "a hook with no point",
 			config:  agent.Config{Hooks: []agent.Hook{agent.BaseHook{}}},
 			errText: "codex: agent: hook 1 (agent.BaseHook) implements no point",
+		},
+		{
+			name:        "the default mode",
+			config:      agent.Config{Mode: agent.ModeDefault},
+			unsupported: true,
+			errText:     "codex: agent: the mode default: unsupported operation",
+		},
+		{
+			name:        "the accept edits mode",
+			config:      agent.Config{Mode: agent.ModeAcceptEdits},
+			unsupported: true,
+			errText:     "codex: agent: the mode acceptEdits: unsupported operation",
+		},
+		{
+			name:    "an unknown mode",
+			config:  agent.Config{Mode: "auto"},
+			errText: `codex: agent: unknown mode "auto"`,
 		},
 	}
 	for _, tt := range tests {

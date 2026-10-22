@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 )
 
 // Start starts the durable agent of the session c.Session, as
@@ -13,12 +14,16 @@ import (
 // h. A harness is the default [agent.Driver] of a catalog: it runs a
 // model of each text provider.
 //
-// The harness honors each field of c, and each point of a hook. The
-// System of c goes after the [System] of h, as a CLI agent adds it to
-// its own prompt. The Skills of c are preloaded, as with [Preload]. The
-// rules of c go after the rules of h.
+// The harness honors each field of c, each mode, and each point of a
+// hook. The Mode of c replaces the [Mode] of h. The System of c goes
+// after the [System] of h, as a CLI agent adds it to its own prompt.
+// The Skills of c are preloaded, as with [Preload]. The rules of c go
+// after the rules of h.
 func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	if err := agent.CheckHooks(c.Hooks, agent.AllPoints...); err != nil {
+		return nil, fmt.Errorf("harness: %w", err)
+	}
+	if err := agent.CheckMode(c.Mode, agent.AllModes...); err != nil {
 		return nil, fmt.Errorf("harness: %w", err)
 	}
 
@@ -36,6 +41,10 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	}
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
+	}
+	if c.Mode != "" {
+		// The modes of a config have the names of the permission modes.
+		opts = append(opts, Mode(permission.Mode(c.Mode)))
 	}
 	if c.System != "" {
 		opts = append(opts, System(joinText(h.system, c.System)))

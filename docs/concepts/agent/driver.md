@@ -10,7 +10,7 @@ read_when:
 
 # Driver
 
-A driver starts an agent of one kind for one session. The harness, the Claude Code agent, and the Codex agent each have one. The caller gives a driver one config: the session and its store, the model, the prompt text, the skills, the rules, the approve function, the hooks, and the tools. The driver returns a runner, the part of the agent that the caller uses.
+A driver starts an agent of one kind for one session. The harness, the Claude Code agent, and the Codex agent each have one. The caller gives a driver one config: the session and its store, the model, the prompt text, the skills, the permission mode, the rules, the approve function, the hooks, and the tools. The driver returns a runner, the part of the agent that the caller uses.
 
 ```
   Driver.Start(ctx, Config)
@@ -28,6 +28,7 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 - One interface starts each kind of agent, so a caller has one code path for the harness and the CLIs. Each agent keeps its own type and its own options, and its driver maps the config to them.
 - A runner shows an extra feature with another interface, such as `Steerer` or `io.Closer`. The caller asks with a type assertion and fills the gap when the answer is no. The cost: a new feature needs a new interface.
 - If a driver cannot honor a field of the config, `Start` fails with an error that wraps `errors.ErrUnsupported` and names the field. An agent that drops a rule or a tool does something that its caller did not ask for. The doc comment of each `Driver` function names the fields that it rejects, and the `Hooks` option of each CLI agent names its hook points.
+- The config names a permission mode with the names of Claude Code, because the harness uses the same names. A driver that cannot honor the mode fails `Start`, as for a field. Codex has a sandbox and a policy for commands, and no rule for each tool, so it honors only plan and bypassPermissions.
 - Each hook point is its own interface, so a driver sees the points that a hook uses. If the agent cannot call a point, `Start` fails and names the point, because a hook that guards a call must not miss one. The cost: one set of hooks does not run on every driver.
 - A hook that implements no point fails `Start`, because it is a hook with a misspelled method.
 - The approve function and the hook points have the same types for each driver, so a caller writes them once. The tool names in a call are the names of the agent: Claude Code sends `Bash`, and the harness and Codex send `bash`.

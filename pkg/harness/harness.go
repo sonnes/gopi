@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync/atomic"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/catalog"
@@ -188,29 +187,6 @@ func (h *Harness) resolve(ctx context.Context, id string, opts []Option) (*Harne
 	if callSpec == "" && stored != "" {
 		call.spec = stored
 	}
-	call.store = &loaded{
-		Storer: call.store,
-		id:     id,
-		snap:   snap,
-	}
+	call.store = session.Preloaded(call.store, id, snap)
 	return call, stored, nil
-}
-
-// loaded is a store that answers the first load of one session with a
-// snapshot that the harness already read. The agent then does not read
-// the session a second time. Every other call goes to the store.
-type loaded struct {
-	session.Storer
-	id   string
-	snap session.Snapshot
-	used atomic.Bool
-}
-
-// Load returns the snapshot of the harness on the first load of the
-// session, and loads from the store after that.
-func (s *loaded) Load(ctx context.Context, id string) (session.Snapshot, error) {
-	if id == s.id && s.used.CompareAndSwap(false, true) {
-		return s.snap, nil
-	}
-	return s.Storer.Load(ctx, id)
 }

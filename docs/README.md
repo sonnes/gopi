@@ -70,6 +70,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | hook          | A function that the loop calls at a lifecycle point          | callback                    |
 | hook point    | One point of the loop at which a hook runs, such as BeforeTool. Each point is its own interface | hook type, lifecycle event |
 | approve function | The function that decides a tool call that needs a person, the same type for each agent | permission callback, can-use-tool function |
+| host          | What runs sessions of any gopi agent for a Go program, with one stream of the state of each session | runtime, orchestrator, platform |
 | driver        | What starts an agent of one kind for one session: the harness, the Claude Code agent, or the Codex agent | adapter, backend |
 | runner        | The part of an agent that a caller of a driver uses: Run, Log, and State | instance, handle, connection |
 | steer         | An entry that the agent reads before its next model call     | interrupt, injection        |

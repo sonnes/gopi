@@ -13,9 +13,10 @@ gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a m
 ## The Stack
 
 <LayerStack
-  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/agent, or pkg/ai directly. pkg/agent runs the tools of pkg/tool, and writes its history to pkg/session. The providers plug into pkg/ai from the side."
+  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/host, pkg/agent, or pkg/ai directly. pkg/host runs sessions of the agents. pkg/agent runs the tools of pkg/tool, and writes its history to pkg/session. The providers plug into pkg/ai from the side."
   layers={[
-    { name: "your application", job: "calls pkg/agent, or pkg/ai directly" },
+    { name: "your application", job: "calls pkg/host, pkg/agent, or pkg/ai" },
+    { name: "pkg/host", job: "the sessions: one run at a time, streams", hue: "harness" },
     { name: "pkg/agent", job: "the loop: model calls, tools, hooks", hue: "agent" },
     { name: "pkg/session", job: "the history: entries, values, stores", hue: "durable" },
     { name: "pkg/tool", job: "the tools: typed input, deferral, middleware", hue: "wire" },
@@ -93,6 +94,11 @@ fmt.Println(msg.Text())`,
     The log of an agent, its entries and values, and the stores that keep it.
 
     [pkg/session](session/index.mdx)
+  </Card>
+  <Card title="Host" icon="laptop">
+    Sessions of any agent for a Go program, with a stream of their state.
+
+    [pkg/host](host/index.mdx)
   </Card>
   <Card title="Guides" icon="list-format">
     One page for each job, with snippets for the choices and one complete program that compiles.

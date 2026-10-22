@@ -53,6 +53,12 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Subagent](harness/subagent.md)      | How the task tool runs a subagent in a child session, what the parent model gets back, and how a child resumes.                  |
 | [Permission](harness/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied.                 |
 
+## host
+
+| Concept              | Description                                                                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [Host](host/host.md) | How a host runs sessions of any gopi agent for a Go program, and how one stream of the host reports the state of each session. |
+
 ## session
 
 | Concept                    | Description                                                                                   |

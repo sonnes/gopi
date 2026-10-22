@@ -101,3 +101,47 @@ func TestCheckHooks(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckMode(t *testing.T) {
+	tests := []struct {
+		name        string
+		mode        agent.Mode
+		supported   []agent.Mode
+		errText     string
+		unsupported bool
+	}{
+		{
+			name: "an empty mode keeps the mode of the driver",
+			mode: "",
+		},
+		{
+			name:      "a supported mode",
+			mode:      agent.ModePlan,
+			supported: []agent.Mode{agent.ModePlan, agent.ModeBypass},
+		},
+		{
+			name:        "a mode that the driver cannot honor",
+			mode:        agent.ModeAcceptEdits,
+			supported:   []agent.Mode{agent.ModePlan},
+			errText:     "agent: the mode acceptEdits: unsupported operation",
+			unsupported: true,
+		},
+		{
+			name:      "an unknown mode",
+			mode:      "auto",
+			supported: agent.AllModes,
+			errText:   `agent: unknown mode "auto"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := agent.CheckMode(tt.mode, tt.supported...)
+			if tt.errText == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.EqualError(t, err, tt.errText)
+			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
+		})
+	}
+}

@@ -27,9 +27,9 @@ func Models() []ai.Model {
 // each session. The options of the driver come first, and the fields of
 // the config come after them.
 //
-// The driver maps Model to the ID of the model, Dir, System, Allow to
-// [AllowedTools], Ask to [AskTools], Deny to [DisallowedTools], and
-// Approve. It rejects Skills and Tools, because the CLI loads its own
+// The driver maps Model to the ID of the model, Dir, System, Mode to
+// [PermissionMode], Allow to [AllowedTools], Ask to [AskTools], Deny to
+// [DisallowedTools], and Approve. It rejects Skills and Tools, because the CLI loads its own
 // skills and runs only its own tools. It runs the hooks at the points of
 // [Hooks]. Start rejects a hook at a model call, in the options of the
 // driver or in the config.
@@ -68,6 +68,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("claude: %w", err)
 	}
+	if err := agent.CheckMode(c.Mode, agent.AllModes...); err != nil {
+		return nil, fmt.Errorf("claude: %w", err)
+	}
 
 	opts := append([]Option(nil), d.opts...)
 	if c.Store != nil {
@@ -81,6 +84,10 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 	if c.System != "" {
 		opts = append(opts, System(c.System))
+	}
+	if c.Mode != "" {
+		// The modes of a config have the names of the modes of the CLI.
+		opts = append(opts, PermissionMode(Permission(c.Mode)))
 	}
 	if len(c.Allow) > 0 {
 		opts = append(opts, AllowedTools(c.Allow...))
