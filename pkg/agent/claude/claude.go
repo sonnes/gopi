@@ -216,12 +216,18 @@ func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
 	return a, nil
 }
 
-// newAgent applies opts and returns an agent with no log.
-func newAgent(opts []Option) *Agent {
+// newConfig applies opts over the defaults.
+func newConfig(opts []Option) config {
 	c := config{binary: defaultBinary}
 	for _, opt := range opts {
 		opt(&c)
 	}
+	return c
+}
+
+// newAgent applies opts and returns an agent with no log.
+func newAgent(opts []Option) *Agent {
+	c := newConfig(opts)
 	return &Agent{
 		name: c.name,
 		cfg:  c,

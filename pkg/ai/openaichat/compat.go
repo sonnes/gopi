@@ -2,8 +2,6 @@ package openaichat
 
 import (
 	"strings"
-
-	"github.com/sonnes/gopi/pkg/ai/openai"
 )
 
 // features holds what a model accepts beyond the base Chat Completions
@@ -30,10 +28,10 @@ var openAIModel = features{
 // modelFeatures maps a model ID of the OpenAI API to its features. The
 // list comes from the OpenAI docs.
 var modelFeatures = map[string]features{
-	openai.GPT6Sol.ID:   openAIModel,
-	openai.GPT6Luna.ID:  openAIModel,
-	openai.GPT6Astra.ID: openAIModel,
-	openai.GPT5_6.ID:    openAIModel,
+	"gpt-6-sol":   openAIModel,
+	"gpt-6-luna":  openAIModel,
+	"gpt-6-astra": openAIModel,
+	"gpt-5.6":     openAIModel,
 }
 
 // openRouterPrefix starts the ID of an OpenAI model on OpenRouter, such

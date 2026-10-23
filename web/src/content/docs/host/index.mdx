@@ -24,10 +24,12 @@ An [agent](../agent/index.mdx) runs while your program holds it. A host keeps a 
 
 ## Start a Session
 
-Register a driver for each CLI in the catalog, and the harness as the default driver. Then start a session with a spec.
+Read the model file. Register a driver for each CLI in the catalog, with the models of the CLI from the file. Register the harness as the default driver. Then start a session with a spec.
 
 ```go
-cat.RegisterDriver("claude-code", claude.Driver(), claude.Models()...)
+file, _ := catalog.ReadModelFile(ctx, "models.json")
+cat := catalog.New()
+cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
 h := host.New(cat, host.Store(store))
@@ -40,7 +42,7 @@ s, err := h.Start(ctx, host.Spec{
 })
 ```
 
-`anthropic/claude-opus-5-5` runs the same model in the harness. If the store has the log of `Spec.ID`, the session resumes it. `s.Close` stops the agent and keeps the log.
+`anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Start`. If the store has the log of `Spec.ID`, the session resumes it. `s.Close` stops the agent and keeps the log.
 
 ## Send a Message
 

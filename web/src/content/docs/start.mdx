@@ -34,10 +34,10 @@ import hello from "../../../../examples/hello/main.go?raw";
 ## Read the Program
 
 <TypeChain
-  alt="anthropic.New() and anthropic.Sonnet5 bind into an ai.LanguageModel. StreamText(ctx, messages) gives an *ai.EventStream, Wait() gives the final *ai.Message, and Text() gives the answer as a string. Wait() skips the events."
+  alt="anthropic.New() and the model claude-sonnet-5 bind into an ai.LanguageModel. StreamText(ctx, messages) gives an *ai.EventStream, Wait() gives the final *ai.Message, and Text() gives the answer as a string. Wait() skips the events."
   inputs={[
     { type: "anthropic.New()", note: "the provider, with the key", kind: "wire" },
-    { type: "anthropic.Sonnet5", note: "the model, its output cap" },
+    { type: 'ai.Model{ID: "claude-sonnet-5"}', note: "the model, named by its ID" },
   ]}
   join="bind"
   binding={{ type: "ai.LanguageModel", note: "the binding of the two", kind: "accent" }}

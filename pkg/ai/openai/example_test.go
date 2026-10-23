@@ -12,7 +12,7 @@ import (
 // cache.
 func ExamplePromptCacheKey() {
 	ctx := context.Background()
-	lm := ai.LanguageModel{Model: openai.GPT6Luna, Provider: openai.New()}
+	lm := ai.LanguageModel{Model: ai.Model{ID: "gpt-6-luna"}, Provider: openai.New()}
 	system := "You are a helpful assistant."
 	conversationID := "conv-42"
 
@@ -30,7 +30,7 @@ func ExamplePromptCacheKey() {
 func ExampleProvider_GenerateImage() {
 	ctx := context.Background()
 
-	im := ai.ImageModel{Model: openai.GPTImage2, Provider: openai.New()}
+	im := ai.ImageModel{Model: ai.Model{ID: "gpt-image-2"}, Provider: openai.New()}
 	resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1024x1024"))
 	if err != nil {
 		panic(err)

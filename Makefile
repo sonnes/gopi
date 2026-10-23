@@ -83,13 +83,13 @@ CLIRUN = $(if $(filter command line environment,$(origin RUN)),$(RUN),TestRecord
 record-cli:
 	go test ./pkg/agent/$(AGENT) -clirecord='$(CLIRUN)' -run='$(CLIRUN)'
 
-# Update pkg/catalog/models/models.json from the model lists of the providers and
+# Update models.json from the model lists of the providers and
 # the drivers, and from models.dev. IDS limits the IDs, for example
 # `make models IDS=openrouter,fireworks`. PRUNE=1 removes a model that its
 # list leaves out. A provider lists with its key, and a driver with its
 # CLI on the PATH. Review the diff before you commit it.
 models:
-	go run ./cmd/modelsync -file pkg/catalog/models/models.json -ids '$(IDS)' $(if $(PRUNE),-prune)
+	go run ./cmd/modelsync -file models.json -ids '$(IDS)' $(if $(PRUNE),-prune)
 
 # The site lives in web/. Its README has the layout.
 site-install:

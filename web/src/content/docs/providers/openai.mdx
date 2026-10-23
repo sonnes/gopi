@@ -8,7 +8,7 @@ import Ladder from "../../../components/figures/Ladder.astro";
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
 <SpecSheet
-  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, and HTTPClient. The models are GPT6Luna, GPT6Sol, GPT6Astra, and GPT5_6, and the image models are GPTImage2, GPTImage2_5Flare, and GPTImage2_5Sunburst. A model and the provider bind into a language model."
+  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are gpt-6-luna, gpt-6-sol, gpt-6-astra, and gpt-5.6, and the image model IDs are gpt-image-2, gpt-image-2.5-flare, and gpt-image-2.5-sunburst. A model and the provider bind into a language model."
   pkg="pkg/ai/openai"
   api="Responses API"
   implements={["TextProvider", "ObjectProvider", "TokenCounter", "ImageProvider", "ModelLister"]}
@@ -18,16 +18,20 @@ import PrefixBar from "../../../components/figures/PrefixBar.astro";
     ["HTTPClient(c)", "a recording client"],
   ]}
   models={[
-    ["openai.GPT6Luna", "ai"],
-    ["openai.GPT6Sol", "ai"],
-    ["openai.GPT6Astra", "ai"],
-    ["openai.GPT5_6", "ai"],
-    ["openai.GPTImage2", "value"],
-    ["openai.GPTImage2_5Flare", "value"],
-    ["openai.GPTImage2_5Sunburst", "value"],
+    ["gpt-6-luna", "ai"],
+    ["gpt-6-sol", "ai"],
+    ["gpt-6-astra", "ai"],
+    ["gpt-5.6", "ai"],
+    ["gpt-image-2", "value"],
+    ["gpt-image-2.5-flare", "value"],
+    ["gpt-image-2.5-sunburst", "value"],
   ]}
   bind={["model + openai.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
 />
+
+## Models
+
+Name a model by the ID of the API, such as `ai.Model{ID: "gpt-6-luna"}`. [models.json](../../../../../models.json) holds the limits and prices of each ID in the figure. [Models](../ai/models.mdx#get-the-full-model) says how to read it. A call to a model with no `MaxTokens` and no `ai.MaxTokens` sends no output cap, and the API uses its own limit.
 
 ## Thinking
 
@@ -98,10 +102,10 @@ GPT-6 and GPT-5.6 take a developer message in the conversation, and the provider
 
 ## Images
 
-`GenerateImage` takes `openai.GPTImage2` or a GPT Image 2.5 model, with `ai.ImageSize` and `ai.ImageCount`.
+`GenerateImage` takes `gpt-image-2` or a GPT Image 2.5 model, with `ai.ImageSize` and `ai.ImageCount`.
 
 ```go
-im := ai.ImageModel{Model: openai.GPTImage2, Provider: openai.New()}
+im := ai.ImageModel{Model: ai.Model{ID: "gpt-image-2"}, Provider: openai.New()}
 resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1024x1024"))
 ```
 

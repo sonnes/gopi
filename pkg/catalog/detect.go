@@ -17,7 +17,7 @@ type Detector struct {
 	// Models are the models that the catalog registers with the
 	// provider. The first model is the default of the provider: a
 	// caller that names no model, such as the CLI, uses it.
-	// models.Of returns the models of models.json in this order.
+	// [ModelFile.Of] returns the models of models.json in this order.
 	Models []ai.Model
 	// Detect builds the provider. If the credential is absent, it
 	// returns false.

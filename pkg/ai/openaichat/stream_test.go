@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 )
 
@@ -49,7 +48,7 @@ func run(t *testing.T, p *openaichat.Provider) ([]ai.Event, *ai.Message, error) 
 
 	stream := p.StreamText(
 		t.Context(),
-		openai.GPT6Luna,
+		luna,
 		[]ai.Message{ai.UserMessage("Hi")},
 		nil,
 	)
@@ -111,10 +110,10 @@ func TestStream_Text(t *testing.T) {
 	assert.Equal(t, "Olá!", events[4].Content)
 
 	assert.Equal(t, "Olá!", msg.Text())
-	assert.Equal(t, openai.GPT6Luna.ID, msg.Model)
+	assert.Equal(t, luna.ID, msg.Model)
 	assert.Equal(t, ai.StopReasonStop, msg.StopReason)
 	usage := ai.Usage{Input: 50, Output: 7, CacheRead: 20, CacheWrite: 30}
-	usage.Cost = openai.GPT6Luna.Pricing.Cost(usage)
+	usage.Cost = luna.Pricing.Cost(usage)
 	assert.NotZero(t, usage.Cost.Total(), "the model has prices")
 	assert.Equal(t, usage, msg.Usage)
 
@@ -277,7 +276,7 @@ func TestStream_UsageOnFinishChunk(t *testing.T) {
 
 	assert.Len(t, events, 4)
 	want := ai.Usage{Input: 10, Output: 2}
-	want.Cost = openai.GPT6Luna.Pricing.Cost(want)
+	want.Cost = luna.Pricing.Cost(want)
 	assert.Equal(t, want, msg.Usage)
 }
 
@@ -305,10 +304,10 @@ func TestStream_ReasoningRoundTrip(t *testing.T) {
 		chunk(`{}`, "stop"),
 	)
 
-	first, err := p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+	first, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
 	require.NoError(t, err)
 
-	_, err = p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi"), *first}, nil).Wait()
+	_, err = p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi"), *first}, nil).Wait()
 	require.NoError(t, err)
 
 	sent := body["messages"].([]any)
@@ -342,7 +341,7 @@ func TestStreamText_RetryHeadersAndPayload(t *testing.T) {
 	})
 	msg, err := p.StreamText(
 		t.Context(),
-		openai.GPT6Luna,
+		luna,
 		[]ai.Message{ai.UserMessage("Hi")},
 		ai.JoinOptions(ai.MaxRetries(1), ai.Headers(map[string]string{"X-Team": "infra"}), hook),
 	).Wait()

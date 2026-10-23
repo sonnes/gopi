@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/fireworks"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 // The variables that the chain reads. Each test clears all of them, so
@@ -85,7 +85,7 @@ func TestDetectors(t *testing.T) {
 			}
 			c := catalog.New()
 
-			got := c.Detect(env.Detectors()...)
+			got := c.Detect(env.Detectors(repoFile)...)
 
 			assert.Equal(t, tt.want, got)
 		})
@@ -97,7 +97,7 @@ func TestDetectors_Capabilities(t *testing.T) {
 		t.Setenv(v, "test-key")
 	}
 	c := catalog.New()
-	c.Detect(env.Detectors()...)
+	c.Detect(env.Detectors(repoFile)...)
 
 	_, sonnet := c.LanguageModel("claude-sonnet-5")
 	_, image := c.ImageModel("gpt-image-2")
@@ -128,7 +128,7 @@ func TestDetectors_ListedProviders(t *testing.T) {
 		t.Setenv(v, "test-key")
 	}
 	c := catalog.New()
-	c.Detect(env.Detectors()...)
+	c.Detect(env.Detectors(repoFile)...)
 
 	for _, id := range []string{"openrouter", "fireworks"} {
 		c.RegisterModel(id, ai.Model{ID: "m"})
@@ -187,7 +187,7 @@ func TestDriverDetectors(t *testing.T) {
 			fakePath(t, tt.path...)
 			c := catalog.New()
 
-			got := c.DetectDrivers(env.DriverDetectors()...)
+			got := c.DetectDrivers(env.DriverDetectors(repoFile)...)
 
 			assert.Equal(t, tt.want, got)
 			assert.Subset(t, c.DriverSpecs(), tt.wantSpecs)
@@ -199,26 +199,41 @@ func TestDriverDetectors(t *testing.T) {
 	}
 }
 
+// repoFile is models.json of this repository.
+var repoFile = modelstest.File()
+
+// TestDetectors_EmptyFile checks that the zero file registers no models,
+// so a program that could not load models.json still detects each
+// provider and driver.
+func TestDetectors_EmptyFile(t *testing.T) {
+	for _, d := range env.Detectors(catalog.ModelFile{}) {
+		assert.Empty(t, d.Models, d.Provider)
+	}
+	for _, d := range env.DriverDetectors(catalog.ModelFile{}) {
+		assert.Empty(t, d.Models, d.Provider)
+	}
+}
+
 // TestDetectors_ModelsFromFile checks that each detector with models
 // registers the models of its entry in models.json, with the default
 // model first.
 func TestDetectors_ModelsFromFile(t *testing.T) {
-	for _, d := range env.Detectors() {
+	for _, d := range env.Detectors(repoFile) {
 		if len(d.Models) == 0 {
 			continue
 		}
-		assert.Equal(t, models.Of(d.Provider), d.Models, d.Provider)
+		assert.Equal(t, repoFile.Of(d.Provider), d.Models, d.Provider)
 	}
-	for _, d := range env.DriverDetectors() {
+	for _, d := range env.DriverDetectors(repoFile) {
 		require.NotEmpty(t, d.Models, d.Provider)
-		assert.Equal(t, models.Of(d.Provider), d.Models, d.Provider)
+		assert.Equal(t, repoFile.Of(d.Provider), d.Models, d.Provider)
 	}
 }
 
 // TestDetectors_HostModels checks that the hosts register the models of
 // models.json, so a spec of a host resolves with no fetch.
 func TestDetectors_HostModels(t *testing.T) {
-	for _, d := range env.Detectors() {
+	for _, d := range env.Detectors(repoFile) {
 		if d.Provider == "openrouter" || d.Provider == "fireworks" {
 			assert.NotEmpty(t, d.Models, d.Provider)
 		}

@@ -1,27 +1,29 @@
 ---
 title: Model Data
-description: How the default models of each provider and driver live in one embedded models.json, how a fetch updates a catalog at runtime, and how make models updates the file.
-package: pkg/catalog/models, internal/modelsfile, cmd/modelsync
+description: How make models writes the default models of each provider and driver to models.json, how a program reads the file, and how a fetch updates a catalog at runtime.
+package: pkg/catalog, internal/modelsfile, cmd/modelsync
 read_when:
   - You add a model, a price, or a provider to models.json
   - You run make models, or read its report
   - You need the meaning of a field or a price in models.json
-  - A typed model, such as anthropic.Opus5_5, has a wrong limit or price
+  - A model from the file has a wrong limit or price
   - A spec resolves after a fetch but not before it
 ---
 
 # Model Data
 
-The model data of gopi is one file, `pkg/catalog/models/models.json`. It holds the default models of each provider and each driver, keyed by the ID of its detector, such as `anthropic` or `claude-code`. The binary embeds the file. `FetchModels` and `FetchDriverModels` add the models of today to a catalog at runtime. `make models` updates the file from the same lists.
+The model data of gopi is one file, `models.json`, at the root of the repository. It holds the default models of each provider and each driver, keyed by the ID of its detector, such as `anthropic` or `claude-code`. `make models` writes the file. A program reads it with `catalog.ReadModelFile`, from a path or a URL, and gives it to the detectors. `FetchModels` and `FetchDriverModels` add the models of today to a catalog at runtime.
 
 ```
   provider lists      CLI lists       models.dev
         \                 |               /
          +---- make models (modelsync) --+     a person reviews the diff
                           |
-                    models.json  ---- embedded by pkg/catalog/models
+                    models.json
                           |
-        typed models (anthropic.Opus5_5), env detectors
+        catalog.ReadModelFile(path or URL)     the program chooses when
+                          |
+                   env detectors
                           |
                        catalog  <---- FetchModels, FetchDriverModels at runtime
 ```
@@ -67,9 +69,11 @@ The file holds no cache durations, because no model list gives them. The provide
 
 ## Design
 
-- One file holds the defaults, so a spec resolves with no network call, and a typed model and a catalog have the same values.
-- `pkg/catalog/models` imports only `pkg/ai`. A provider module already imports the root module, so a provider package reads the file and adds no dependency.
-- The file changes only with a release. A fetch at runtime gives the models of today.
+- gopi does not embed the file, and it reads the file only when a program asks. The program chooses the source, a path or a URL, and when to read it again. A new model then needs a new file, and no new release of the program.
+- `ReadModelFile` keeps no copy and no cache. A program that wants a copy on disk writes it, and reads that path.
+- A provider package names no models. Its tests read the file of the repository through `internal/modelstest`, so a recorded request sends the limits of the file. The cost: a model that the code names by ID has no limits or prices until a catalog registers it from the file.
+- `ParseModelFile` accepts a field that it does not know, so a newer file still loads in an older program. The generator reads the file with `modelsfile.Parse`, which rejects an unknown field, so a typo in the file fails `make models`.
+- With no file, the detectors register no models. A spec then resolves only after `FetchModels` or `FetchDriverModels`.
 - The generator is the module `cmd/modelsync`, because it imports the detectors of `pkg/catalog/env` and the providers. The root module imports neither.
 - `make models` merges a list with `catalog.MergeModel`, the rule of `FetchModels`, or with `catalog.MergeDriverModel` for a driver. A list then gives the same values to the file and to a catalog. Only the generator fills values from models.dev.
 - A value in the file always wins over models.dev. models.dev fills only an empty value, because models.dev can be late or wrong, and it has no price for the 1-hour cache of Anthropic. The report names each price that differs, so a person checks it.
@@ -79,19 +83,20 @@ The file holds no cache durations, because no model list gives them. The provide
 - The OpenRouter entry holds only the models with tools, because each call of a gopi agent sends tools. It holds no model of the Batch API. The list of OpenRouter is public, so its update needs no key.
 - The Fireworks entry comes from models.dev, because the list of Fireworks has no prices and no output caps.
 - The list of OpenAI holds models that are not for chat, such as embedding models. A model of that list joins the file only if models.dev has it with tools.
-- Each entry has a `default`. `models.Of` returns it first, and the CLI uses the first model of a detector when `--model` is unset. The generator gives a new provider entry its first model by ID, and a person sets the default. A driver entry takes the first model of the list of its CLI, because the CLI lists its default first.
+- Each entry has a `default`. `ModelFile.Of` returns it first, and the CLI uses the first model of a detector when `--model` is unset. The generator gives a new provider entry its first model by ID, and a person sets the default. A driver entry takes the first model of the list of its CLI, because the CLI lists its default first.
 - A reason for a value goes in `note`, because JSON has no comments.
 
 ## Map
 
 | Task                                  | File                                 |
 | ------------------------------------- | ------------------------------------ |
-| Change a model, a price, or a default | `pkg/catalog/models/models.json`     |
+| Change a model, a price, or a default | `models.json`                        |
 | Update the file from the lists        | `make models`, `make models IDS=...` |
 | Change how the generator merges       | `cmd/modelsync/sync.go`              |
 | Change how models.dev maps to a model | `cmd/modelsync/dev.go`               |
 | Change the format of the file         | `internal/modelsfile/modelsfile.go`  |
-| Change the checks of the file         | `pkg/catalog/models/models_test.go`  |
+| Change how a program reads the file   | `pkg/catalog/modelfile.go`           |
+| Change the checks of the file         | `pkg/catalog/modelfile_test.go`      |
 
 ## Related Concepts
 

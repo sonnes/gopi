@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/internal/httprr"
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
@@ -24,9 +25,12 @@ import (
 // ID through, so the prefix is a test concern only.
 var testModel = ai.Model{
 	ID:        "openai/gpt-6-luna",
-	Name:      openai.GPT6Luna.Name,
-	MaxTokens: openai.GPT6Luna.MaxTokens,
+	Name:      luna.Name,
+	MaxTokens: luna.MaxTokens,
 }
+
+// luna is GPT-6 Luna with the limits and the prices of models.json.
+var luna = modelstest.Model("openai", "gpt-6-luna")
 
 // openModel is an open model with visible reasoning, served by
 // OpenRouter. It sends its reasoning as text, and it needs the

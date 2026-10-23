@@ -7,6 +7,7 @@ gopi is a Go SDK for building AI agents.
 - `pkg/` - the SDK. One directory per package. Each provider under `pkg/ai/` and `pkg/mcp` is its own module, and `go.work` joins the modules.
 - `internal/` - the code that every provider shares: the retry loop, the message rules, and the test cases.
 - `cmd/gopi/` - the CLI, a test drive of the SDK. Build output goes to `.bin/`.
+- `models.json` - the default models of each provider and driver. `make models` writes it, and a program reads it with `catalog.ReadModelFile`.
 - `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout.
 - `web/` - the site for the users of gopi, with Astro and Starlight. `web/README.md` has the layout.
 - `examples/` - the programs of the site guides. It is its own module, and `make test` builds it.
@@ -26,7 +27,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make fmt`   | Run `gofmt -w` on every Go file                                 |
 | `make record` | Re-record the fixtures of one provider. Set `PKG` and `RUN`. |
 | `make record-cli` | Re-record the trace of one CLI agent. Set `AGENT`. |
-| `make models` | Update `pkg/catalog/models/models.json`. Set `IDS` and `PRUNE`. |
+| `make models` | Update `models.json`. Set `IDS` and `PRUNE`. |
 | `make site-dev` | Serve the site with hot reload. Run `make site-install` first. |
 | `make site-check` | Type-check the site                                       |
 | `make site-test` | Run the tests of the site                                  |

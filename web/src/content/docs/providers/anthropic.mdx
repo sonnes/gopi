@@ -8,7 +8,7 @@ import Ladder from "../../../components/figures/Ladder.astro";
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
 <SpecSheet
-  alt="The anthropic package calls the Messages API. It implements TextProvider, ObjectProvider, TokenCounter, and ModelLister, and not ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The models are Fable5_1, Opus5_5, Opus5, Sonnet5_5, Sonnet5, and Haiku4_5. A model and the provider bind into a language model."
+  alt="The anthropic package calls the Messages API. It implements TextProvider, ObjectProvider, TokenCounter, and ModelLister, and not ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are claude-fable-5-1, claude-opus-5-5, claude-opus-5, claude-sonnet-5-5, claude-sonnet-5, and claude-haiku-4-5. A model and the provider bind into a language model."
   pkg="pkg/ai/anthropic"
   api="Messages API"
   implements={["TextProvider", "ObjectProvider", "TokenCounter", "ModelLister"]}
@@ -19,15 +19,19 @@ import PrefixBar from "../../../components/figures/PrefixBar.astro";
     ["HTTPClient(c)", "a recording client"],
   ]}
   models={[
-    ["anthropic.Fable5_1", "ai"],
-    ["anthropic.Opus5_5", "ai"],
-    ["anthropic.Opus5", "ai"],
-    ["anthropic.Sonnet5_5", "ai"],
-    ["anthropic.Sonnet5", "ai"],
-    ["anthropic.Haiku4_5", "ai"],
+    ["claude-fable-5-1", "ai"],
+    ["claude-opus-5-5", "ai"],
+    ["claude-opus-5", "ai"],
+    ["claude-sonnet-5-5", "ai"],
+    ["claude-sonnet-5", "ai"],
+    ["claude-haiku-4-5", "ai"],
   ]}
   bind={["model + anthropic.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
 />
+
+## Models
+
+Name a model by the ID of the API, such as `ai.Model{ID: "claude-sonnet-5"}`. [models.json](../../../../../models.json) holds the limits and prices of each ID in the figure. [Models](../ai/models.mdx#get-the-full-model) says how to read it. A call to a model with no `MaxTokens` and no `ai.MaxTokens` asks for 64000 tokens.
 
 ## Thinking
 

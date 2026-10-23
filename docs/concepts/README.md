@@ -22,7 +22,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | Concept                          | Description                                                                                              |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | [Catalog](catalog/catalog.md)    | How a spec resolves to a model bound to its provider or to the driver of its agent, and how detectors fill a catalog from the credentials of a process. |
-| [Model Data](catalog/model-data.md) | How the default models of each provider and driver live in one embedded models.json, how a fetch updates a catalog at runtime, and how make models updates the file. |
+| [Model Data](catalog/model-data.md) | How make models writes the default models of each provider and driver to models.json, how a program reads the file, and how a fetch updates a catalog at runtime. |
 
 ## tool
 

@@ -59,6 +59,62 @@ type Config struct {
 	Tools []tool.Tool
 }
 
+// Checker is a [Driver] that reports its [Status]: whether it can start
+// an agent, and with which account. The Claude Code and Codex drivers
+// implement it. A caller asks with a type assertion, as for [Steerer]. A
+// check uses the setup of the driver, such as its binary and its
+// environment, so a caller sees what a session would start.
+type Checker interface {
+	// Check reports the status of the driver. If the driver needs a
+	// program that is not installed, the error wraps [ErrNotInstalled].
+	// A driver with no account signed in gives LoggedIn false and no
+	// error.
+	Check(ctx context.Context) (Status, error)
+}
+
+// Status is what a [Checker] reports about its driver. It never holds a
+// key or a token. It can hold the email of the account, so a caller
+// decides who sees it.
+type Status struct {
+	// Version is the version of what the driver runs, such as
+	// "2.1.308" for Claude Code. It is empty if the driver has none.
+	Version string
+	// LoggedIn reports that an account is signed in.
+	LoggedIn bool
+	// Method is how the driver signs in. It is empty if no account is
+	// signed in, or if the driver does not say.
+	Method AuthMethod
+	// Plan names the plan or the cloud of the account for a person, such
+	// as "Claude Max", "ChatGPT Plus", or "Amazon Bedrock". It is empty
+	// if the driver does not say.
+	Plan string
+	// Account is the email of the account. It is empty if the driver
+	// does not say.
+	Account string
+	// Org is the name of the organization of the account. It is empty if
+	// the driver does not say.
+	Org string
+}
+
+// AuthMethod is how a driver signs in to the provider of its models.
+type AuthMethod string
+
+// The methods of a [Status].
+const (
+	// AuthSubscription is a subscription for a person, such as Claude
+	// Max or ChatGPT Plus.
+	AuthSubscription AuthMethod = "subscription"
+	// AuthAPIKey is an API key, from the environment or from a helper.
+	AuthAPIKey AuthMethod = "api_key"
+	// AuthCloud is the account of a cloud, such as Amazon Bedrock or
+	// Google Vertex AI. The plan names the cloud.
+	AuthCloud AuthMethod = "cloud"
+)
+
+// ErrNotInstalled is the error of a [Checker] whose program is not
+// installed, such as a CLI that is not at its path.
+var ErrNotInstalled = errors.New("agent: the CLI is not installed")
+
 // Runner is the part of an agent that a host uses. [Agent], the Claude
 // Code agent, and the Codex agent implement it. A runner shows an extra
 // feature with another interface, such as [Steerer] or [io.Closer].

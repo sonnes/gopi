@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/internal/httprr"
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -24,9 +25,12 @@ import (
 // concern only.
 var testModel = ai.Model{
 	ID:        "openai/gpt-6-luna",
-	Name:      openai.GPT6Luna.Name,
-	MaxTokens: openai.GPT6Luna.MaxTokens,
+	Name:      luna.Name,
+	MaxTokens: luna.MaxTokens,
 }
+
+// luna is GPT-6 Luna with the limits and the prices of models.json.
+var luna = modelstest.Model("openai", "gpt-6-luna")
 
 // canonicalHost is the host in every fixture. The scrubber replaces the
 // host and the path prefix of a recording, so a replay does not depend
@@ -346,7 +350,7 @@ func TestGenerateObject(t *testing.T) {
 func TestCountTokens(t *testing.T) {
 	skipOnCompatibleAPI(t)
 	p := newTestProvider(t)
-	lm := ai.LanguageModel{Model: openai.GPT6Luna, Provider: p}
+	lm := ai.LanguageModel{Model: ai.Model{ID: "gpt-6-luna"}, Provider: p}
 
 	count, err := ai.CountTokens(
 		t.Context(),
@@ -362,7 +366,7 @@ func TestCountTokens(t *testing.T) {
 func TestGenerateImage(t *testing.T) {
 	skipOnCompatibleAPI(t)
 	p := newTestProvider(t)
-	im := ai.ImageModel{Model: openai.GPTImage2, Provider: p}
+	im := ai.ImageModel{Model: ai.Model{ID: "gpt-image-2"}, Provider: p}
 
 	resp, err := im.GenerateImage(
 		t.Context(),

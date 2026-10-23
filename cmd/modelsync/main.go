@@ -27,6 +27,7 @@ import (
 	"github.com/sonnes/gopi/internal/modelsfile"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
+	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
 )
 
@@ -37,7 +38,7 @@ const devURL = "https://models.dev/api.json"
 const fetchTimeout = 2 * time.Minute
 
 func main() {
-	path := flag.String("file", "pkg/catalog/models/models.json", "the path of models.json")
+	path := flag.String("file", "models.json", "the path of models.json")
 	ids := flag.String("ids", "", "the provider and driver IDs to update, with commas. Empty updates each ID")
 	prune := flag.Bool("prune", false, "remove a model that its list leaves out")
 	flag.Parse()
@@ -115,7 +116,7 @@ func selectSources(all []source, ids string) ([]source, error) {
 // models.json, from the detectors of package env.
 func allSources() []source {
 	providers := make(map[string]ai.TextProvider)
-	for _, d := range env.Detectors() {
+	for _, d := range env.Detectors(catalog.ModelFile{}) {
 		if _, done := providers[d.Provider]; done {
 			continue
 		}
@@ -153,7 +154,7 @@ func allSources() []source {
 	}
 
 	sources := []source{anthropic, openai, router, fireworks}
-	for _, d := range env.DriverDetectors() {
+	for _, d := range env.DriverDetectors(catalog.ModelFile{}) {
 		s := source{
 			ID:   d.Provider,
 			Kind: modelsfile.KindDriver,

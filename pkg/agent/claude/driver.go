@@ -8,20 +8,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
-
-// Models returns the models of Claude Code that a catalog registers with
-// the driver: the aliases that --model takes, such as "opus", and the
-// full IDs, with the default model first. The list is the "claude-code"
-// entry of pkg/catalog/models/models.json. Each call returns a new list. A bare
-// model ID names the driver only if no text provider serves the same
-// ID. Otherwise give the full spec, such as
-// "claude-code/claude-opus-5-5". To list the models of the installed
-// CLI, call the ListModels method of the driver.
-func Models() []ai.Model {
-	return models.Of("claude-code")
-}
 
 // Driver returns an [agent.Driver] that starts a Claude Code agent for
 // each session. The options of the driver come first, and the fields of

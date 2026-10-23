@@ -693,9 +693,9 @@ func TestBuildParams_Temperature(t *testing.T) {
 			model: plainModel,
 			opts:  ai.JoinOptions(ai.Temperature(0.2), ai.Thinking(ai.ThinkingLow)),
 		},
-		{name: "not to an effort model", model: Opus5_5, opts: ai.Temperature(0.2)},
-		{name: "not to Sonnet 5", model: Sonnet5, opts: ai.Temperature(0.2)},
-		{name: "to Haiku 4.5", model: Haiku4_5, opts: ai.Temperature(0.2), want: 0.2},
+		{name: "not to an effort model", model: ai.Model{ID: "claude-opus-5-5"}, opts: ai.Temperature(0.2)},
+		{name: "not to Sonnet 5", model: ai.Model{ID: "claude-sonnet-5"}, opts: ai.Temperature(0.2)},
+		{name: "to Haiku 4.5", model: ai.Model{ID: "claude-haiku-4-5"}, opts: ai.Temperature(0.2), want: 0.2},
 	}
 
 	for _, tt := range tests {
@@ -755,13 +755,13 @@ func TestBuildRequest_Effort(t *testing.T) {
 		}
 	}
 
-	req, err := buildRequest(Opus5_5, messages, ai.Thinking(ai.ThinkingXHigh))
+	req, err := buildRequest(ai.Model{ID: "claude-opus-5-5"}, messages, ai.Thinking(ai.ThinkingXHigh))
 	require.NoError(t, err)
 	assert.Equal(t, "xhigh", req.effort)
 	assert.Contains(t, req.betas, midConversationOutputConfigBeta)
 	assert.Contains(t, req.betas, thinkingBindingControlsBeta)
 
-	body := wire(t, Opus5_5, messages, ai.Thinking(ai.ThinkingXHigh))
+	body := wire(t, ai.Model{ID: "claude-opus-5-5"}, messages, ai.Thinking(ai.ThinkingXHigh))
 	assert.Equal(t, map[string]any{
 		"type":    "adaptive",
 		"display": "summarized",
@@ -778,13 +778,13 @@ func TestBuildRequest_Effort(t *testing.T) {
 	assert.Equal(t, "assistant", sent[3].(map[string]any)["role"], "an effort of another API is not sent")
 	assert.Equal(t, effortMessage("xhigh"), sent[5], "the effort of this call")
 
-	body = wire(t, Opus5_5, messages[:1], nil)
+	body = wire(t, ai.Model{ID: "claude-opus-5-5"}, messages[:1], nil)
 	sent = body["messages"].([]any)
 	assert.Equal(t, effortMessage("high"), sent[1], "high by default")
 }
 
 func TestBuildRequest_EffortModelRejectsOff(t *testing.T) {
-	_, err := buildRequest(Opus5_5, nil, ai.Thinking(ai.ThinkingOff))
+	_, err := buildRequest(ai.Model{ID: "claude-opus-5-5"}, nil, ai.Thinking(ai.ThinkingOff))
 	require.Error(t, err)
 }
 
@@ -899,7 +899,7 @@ func TestBuildMessage_Refusal(t *testing.T) {
 
 func TestBuildMessage_Effort(t *testing.T) {
 	acc := sdk.Message{StopReason: sdk.StopReasonEndTurn}
-	msg, err := buildMessage(Opus5_5, acc, "xhigh")
+	msg, err := buildMessage(ai.Model{ID: "claude-opus-5-5"}, acc, "xhigh")
 	require.NoError(t, err)
 	assert.Equal(t, "xhigh", msg.Effort)
 }

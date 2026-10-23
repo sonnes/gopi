@@ -20,8 +20,9 @@ func ExampleHost_Start() {
 	store := session.NewMemoryStore() // a store that outlives the process
 	repoDir := "."
 
+	file, _ := catalog.ReadModelFile(ctx, "models.json")
 	cat := catalog.New()
-	cat.RegisterDriver("claude-code", claude.Driver(), claude.Models()...)
+	cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 	cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
 	h := host.New(cat, host.Store(store))

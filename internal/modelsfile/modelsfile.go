@@ -1,7 +1,7 @@
 // Package modelsfile reads and writes the format of models.json: the
-// default models of each provider and each driver, by ID. Package
-// catalog/models embeds the file, and the command cmd/modelsync writes
-// it.
+// default models of each provider and each driver, by ID. The command
+// cmd/modelsync writes the file, and
+// [github.com/sonnes/gopi/pkg/catalog.ReadModelFile] reads it.
 package modelsfile
 
 import (

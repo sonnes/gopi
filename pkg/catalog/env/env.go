@@ -32,27 +32,30 @@ import (
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
 	"github.com/sonnes/gopi/pkg/catalog"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
-// Detectors returns the built-in chain, in precedence order:
+// Detectors returns the built-in chain, in precedence order. Each
+// detector registers the models of its entry in file:
 //
-//   - anthropic, from ANTHROPIC_API_KEY, with [anthropic.Models].
-//   - openai, from OPENAI_API_KEY, with [openai.Models].
+//   - anthropic, from ANTHROPIC_API_KEY.
+//   - openai, from OPENAI_API_KEY.
 //   - openrouter, from OPENROUTER_API_KEY, with [openrouter.New] and
-//     the models with tools of models.json. Call
-//     [catalog.Catalog.FetchModels] to list the models of today.
+//     the models with tools. Call [catalog.Catalog.FetchModels] to list
+//     the models of today.
 //   - fireworks, from FIREWORKS_API_KEY, with [fireworks.New] and the
-//     models of models.json, which come from models.dev.
+//     models that come from models.dev.
 //   - openaichat, from OPENAI_API_KEY. It registers no models, because
 //     it serves any server at OPENAI_BASE_URL. Call
 //     [catalog.Catalog.FetchModels] to list the models of the server.
-func Detectors() []catalog.Detector {
+//
+// With the zero file, each detector registers no models. A spec then
+// resolves only after a fetch.
+func Detectors(file catalog.ModelFile) []catalog.Detector {
 	return []catalog.Detector{
 		{
 			Provider: "anthropic",
 			Source:   "ANTHROPIC_API_KEY",
-			Models:   anthropic.Models(),
+			Models:   file.Of("anthropic"),
 			Detect: func() (ai.TextProvider, bool) {
 				if os.Getenv("ANTHROPIC_API_KEY") == "" {
 					return nil, false
@@ -63,7 +66,7 @@ func Detectors() []catalog.Detector {
 		{
 			Provider: "openai",
 			Source:   "OPENAI_API_KEY",
-			Models:   openai.Models(),
+			Models:   file.Of("openai"),
 			Detect: func() (ai.TextProvider, bool) {
 				if os.Getenv("OPENAI_API_KEY") == "" {
 					return nil, false
@@ -74,7 +77,7 @@ func Detectors() []catalog.Detector {
 		{
 			Provider: "openrouter",
 			Source:   "OPENROUTER_API_KEY",
-			Models:   models.Of("openrouter"),
+			Models:   file.Of("openrouter"),
 			Detect: func() (ai.TextProvider, bool) {
 				key := os.Getenv("OPENROUTER_API_KEY")
 				if key == "" {
@@ -86,7 +89,7 @@ func Detectors() []catalog.Detector {
 		{
 			Provider: "fireworks",
 			Source:   "FIREWORKS_API_KEY",
-			Models:   models.Of("fireworks"),
+			Models:   file.Of("fireworks"),
 			Detect: func() (ai.TextProvider, bool) {
 				key := os.Getenv("FIREWORKS_API_KEY")
 				if key == "" {
@@ -109,20 +112,20 @@ func Detectors() []catalog.Detector {
 }
 
 // DriverDetectors returns the built-in chain of drivers, in precedence
-// order:
+// order. Each detector registers the models of its entry in file:
 //
-//   - claude-code, if claude is on the PATH, with [claude.Models].
-//   - codex, if codex is on the PATH, with [codex.Models].
+//   - claude-code, if claude is on the PATH.
+//   - codex, if codex is on the PATH.
 //
 // A detector does not start the CLI, so it does not know if the CLI is
 // logged in. Call [catalog.Catalog.FetchDriverModels] to list the
 // models of the installed CLI.
-func DriverDetectors() []catalog.DriverDetector {
+func DriverDetectors(file catalog.ModelFile) []catalog.DriverDetector {
 	return []catalog.DriverDetector{
 		{
 			Provider: "claude-code",
 			Source:   "claude on PATH",
-			Models:   claude.Models(),
+			Models:   file.Of("claude-code"),
 			Detect: func() (agent.Driver, bool) {
 				if _, err := exec.LookPath("claude"); err != nil {
 					return nil, false
@@ -133,7 +136,7 @@ func DriverDetectors() []catalog.DriverDetector {
 		{
 			Provider: "codex",
 			Source:   "codex on PATH",
-			Models:   codex.Models(),
+			Models:   file.Of("codex"),
 			Detect: func() (agent.Driver, bool) {
 				if _, err := exec.LookPath("codex"); err != nil {
 					return nil, false

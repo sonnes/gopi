@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
@@ -25,10 +26,10 @@ func TestCases(t *testing.T) {
 
 // The models of the cases.
 var (
-	haiku    = anthropic.Haiku4_5
-	sonnet5  = anthropic.Sonnet5
-	sonnet55 = anthropic.Sonnet5_5
-	fable    = anthropic.Fable5_1
+	haiku    = modelstest.Model("anthropic", "claude-haiku-4-5")
+	sonnet5  = modelstest.Model("anthropic", "claude-sonnet-5")
+	sonnet55 = modelstest.Model("anthropic", "claude-sonnet-5-5")
+	fable    = modelstest.Model("anthropic", "claude-fable-5-1")
 )
 
 // stream runs one call and returns the final message.

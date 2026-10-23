@@ -40,7 +40,6 @@ import (
 
 	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 // The capabilities of the provider, checked at compile time.
@@ -54,38 +53,6 @@ var (
 // Error is an API error from OpenAI. A caller reads the status code and
 // the request ID from it with errors.As.
 type Error = sdk.Error
-
-// The text models that this package serves. Each one carries its output
-// cap, so a call without [ai.MaxTokens] gets the full cap. For a model
-// with no cap, the request omits the cap, and the API uses the cap of
-// the model. The models are values, so a model from another package,
-// such as openaichat, can use them too. The values are in the "openai"
-// entry of pkg/catalog/models/models.json, and come from the model pages and the
-// pricing page of the OpenAI docs. A prompt of more than 272000 input
-// tokens has the prices of the tier.
-var (
-	GPT6Sol   = models.Must(providerID, "gpt-6-sol")
-	GPT6Luna  = models.Must(providerID, "gpt-6-luna")
-	GPT6Astra = models.Must(providerID, "gpt-6-astra")
-	GPT5_6    = models.Must(providerID, "gpt-5.6")
-)
-
-// The image models that this package serves. [Provider.GenerateImage]
-// takes them.
-var (
-	GPTImage2           = models.Must(providerID, "gpt-image-2")
-	GPTImage2_5Flare    = models.Must(providerID, "gpt-image-2.5-flare")
-	GPTImage2_5Sunburst = models.Must(providerID, "gpt-image-2.5-sunburst")
-)
-
-// providerID is the ID of this provider in pkg/catalog/models/models.json.
-const providerID = "openai"
-
-// Models returns the models that this package serves. The default text
-// model comes first, so a caller that must pick one takes the first.
-func Models() []ai.Model {
-	return models.Of(providerID)
-}
 
 // PromptCacheKey sets the prompt cache key of a call. The API routes the
 // calls with the same key to the same cache, so a conversation hits the

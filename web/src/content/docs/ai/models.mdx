@@ -11,7 +11,7 @@ A model is one named model that a provider serves. It holds an ID, a name, its l
 <BindingEquation
   alt="An ai.Model holds an ID, a name, its limits, its capabilities, and its prices, and no credentials. An ai.TextProvider holds the credentials and the wire format. Together they make an ai.LanguageModel. It has StreamText."
   terms={[
-    { type: "ai.Model", fields: ["ID", "Name", "limits", "Pricing"], lacks: "no credentials", example: "anthropic.Sonnet5" },
+    { type: "ai.Model", fields: ["ID", "Name", "limits", "Pricing"], lacks: "no credentials", example: 'ai.Model{ID: "claude-sonnet-5"}' },
     {
       type: "ai.TextProvider",
       fields: ["credentials", "wire format", "StreamText(...)"],
@@ -33,7 +33,7 @@ A model is one named model that a provider serves. It holds an ID, a name, its l
 
 ```go
 model := ai.LanguageModel{
-	Model:    anthropic.Sonnet5,
+	Model:    ai.Model{ID: "claude-sonnet-5"},
 	Provider: anthropic.New(),
 }
 ```
@@ -42,11 +42,30 @@ The same model value binds to any provider that serves it. The same provider ser
 
 `ai.GenerateObject` and `ai.CountTokens` are package functions that take the binding as an argument. [The Optional Capabilities](index.mdx#the-optional-capabilities) says which providers implement them.
 
+## Get the Full Model
+
+A model with only its `ID` works with its provider. Its other fields are zero, and a zero field is unknown. Its cost is zero until it has `Pricing`.
+
+The file [models.json](../../../../../models.json) holds the full model of each ID that a provider or a driver serves. `make models` writes it from the model lists of the providers and from models.dev. Your program reads the file with `catalog.ReadModelFile`, from a path or an http or https URL. The function keeps no cache. Your program picks where the file comes from and when to read it again.
+
+```go
+file, err := catalog.ReadModelFile(ctx, "models.json")
+m, ok := file.Lookup("openrouter", "moonshotai/kimi-k3")
+```
+
+A catalog takes the models of the file. `env.Detectors(file)` registers the models of each provider that has a key. `RegisterDriver` takes the models of a driver, such as `file.Of("claude-code")`, and `RegisterModel` adds one model. With the zero file, a detector registers no models, and a spec resolves only after `FetchModels`.
+
+```go
+c := catalog.New()
+c.Detect(env.Detectors(file)...)
+lm, err := c.LanguageModel("claude-sonnet-5")
+```
+
+The gopi CLI reads the file from `$GOPI_MODELS`, a path or a URL. If `$GOPI_MODELS` is not set, it reads `$GOPI_HOME/models.json`. If `$GOPI_HOME` is not set, it reads `~/.gopi/models.json`. Without the file, a spec resolves after the CLI asks the provider for its models.
+
 ## Read the Metadata
 
-Each typed model, such as `anthropic.Sonnet5`, comes from the file `pkg/catalog/models/models.json`, which the maintainers update from the model lists of the providers and from models.dev. A zero field is unknown.
-
-A call without `ai.MaxTokens` uses the output cap of the model. The other fields are for your code: pick a model that reads PDFs, check a request against the context window, or offer only the thinking levels that a model takes. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#Model) lists the fields.
+A call without `ai.MaxTokens` uses the output cap of the model. If the model has no cap, the call uses the default of the provider. The other fields are for your code: pick a model that reads PDFs, check a request against the context window, or offer only the thinking levels that a model takes. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#Model) lists the fields.
 
 The provider prices each response from `Pricing`, so the usage of a message holds its cost:
 
@@ -57,17 +76,15 @@ fmt.Printf("$%.4f\n", msg.Usage.Cost.Total())
 
 `Pricing.CacheWrite` is the price of a write to the default cache of the provider. `Pricing.CacheWriteLong` is the price of a write to the long cache that `ai.CacheLong` asks for.
 
-A model with only its `ID` works with its provider, but its cost is zero until you set `Pricing`. `models.Lookup("openrouter", "moonshotai/kimi-k3")` returns a model of the file with its limits and prices.
-
 ## Wrap
 
 The binding is a struct, so a wrapper goes around the provider. A wrapper implements `StreamText` and calls the inner provider.
 
 <Nesting
-  alt="Your code calls StreamText on an ai.LanguageModel. Its model is anthropic.Sonnet5. Its provider is a logging wrapper, and the wrapper holds the Anthropic provider. The call goes in through the wrapper to the Anthropic provider, and the *ai.EventStream comes back out unchanged."
+  alt="Your code calls StreamText on an ai.LanguageModel. Its model is claude-sonnet-5. Its provider is a logging wrapper, and the wrapper holds the Anthropic provider. The call goes in through the wrapper to the Anthropic provider, and the *ai.EventStream comes back out unchanged."
   caller="your code"
   layers={[
-    { title: "ai.LanguageModel", chip: "Model: anthropic.Sonnet5" },
+    { title: "ai.LanguageModel", chip: 'Model: ai.Model{ID: "claude-sonnet-5"}' },
     { title: "Provider: logging{...}", note: "logs the call, returns the inner stream", kind: "accent" },
     { title: "inner: anthropic.New()", note: "speaks the wire format", kind: "wire" },
   ]}
@@ -85,5 +102,6 @@ The binding is a struct, so a wrapper goes around the provider. A wrapper implem
 
 - [Options](options.mdx) carry every setting of a call.
 - [Streams](streams.mdx) are what a call returns.
+- [Model Data](../../../../../docs/concepts/catalog/model-data.md) says how `make models` writes the file.
 
 The design is in [docs/concepts/ai/provider.md](../../../../../docs/concepts/ai/provider.md).

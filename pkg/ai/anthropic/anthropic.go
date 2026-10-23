@@ -36,7 +36,6 @@ import (
 
 	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 // The capabilities of the provider, checked at compile time.
@@ -49,36 +48,6 @@ var (
 // Error is an API error from Anthropic. A caller reads the status code
 // and the request ID from it with errors.As.
 type Error = sdk.Error
-
-// The models that this package serves. Each one carries its output cap,
-// so a call without [ai.MaxTokens] gets the full cap. A model with no
-// cap, such as a model that a caller passes by ID, gets 64000 tokens.
-//
-// If a call sets no [ai.Thinking] level, [Fable5_1], [Opus5_5], [Opus5],
-// and [Sonnet5_5] use the effort high. Their IDs on OpenRouter get the
-// same default. Another model uses its own default.
-//
-// The values are in the "anthropic" entry of pkg/catalog/models/models.json, and
-// come from the models overview and the pricing page of the Claude
-// docs. CacheWrite is the price of the 5-minute cache. CacheWriteLong is
-// the price of the 1-hour cache, two times the input price.
-var (
-	Fable5_1  = models.Must(providerID, "claude-fable-5-1")
-	Opus5_5   = models.Must(providerID, "claude-opus-5-5")
-	Opus5     = models.Must(providerID, "claude-opus-5")
-	Sonnet5_5 = models.Must(providerID, "claude-sonnet-5-5")
-	Sonnet5   = models.Must(providerID, "claude-sonnet-5")
-	Haiku4_5  = models.Must(providerID, "claude-haiku-4-5")
-)
-
-// providerID is the ID of this provider in pkg/catalog/models/models.json.
-const providerID = "anthropic"
-
-// Models returns the models that this package serves. The default model
-// comes first, so a caller that must pick one takes the first.
-func Models() []ai.Model {
-	return models.Of(providerID)
-}
 
 // Provider calls the Anthropic Messages API. Create one with [New].
 type Provider struct {

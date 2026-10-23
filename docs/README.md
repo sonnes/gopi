@@ -42,6 +42,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
 | CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter |
 | catalog       | What maps a spec to a model bound to its provider, or to the driver of its agent | registry, model list |
+| model file    | One models.json: the default models of each provider and each driver. A program reads it from a path or a URL | model list, manifest, registry |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
 | detector      | What reads one source and gives a catalog a provider or a driver | probe, loader            |
 | harness       | What assembles a coding agent from options, the files of a project, and a catalog, on each call | builder, factory, runtime |

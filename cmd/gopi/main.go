@@ -32,6 +32,11 @@
 // bare model ID asks every provider, so two providers can list the ID,
 // and gopi then asks for the full spec.
 //
+// gopi reads the models of each provider from models.json: the path or
+// the URL in $GOPI_MODELS, or $GOPI_HOME/models.json, or
+// ~/.gopi/models.json. Without the file, a spec resolves after gopi asks
+// the provider for its models.
+//
 // With --session-id, gopi keeps the conversation in a JSONL file of
 // that name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The first run
 // creates the session, and each later run with the same ID resumes it.
@@ -51,6 +56,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -221,7 +228,8 @@ func run(ctx context.Context, o options, args []string) error {
 	if err != nil {
 		return err
 	}
-	cat, spec, err := newCatalog(ctx, cmp.Or(o.model, stored), env.Detectors())
+	set := loadModels(ctx, os.Stderr, os.Getenv)
+	cat, spec, err := newCatalog(ctx, cmp.Or(o.model, stored), env.Detectors(set))
 	if err != nil {
 		return err
 	}
@@ -474,15 +482,55 @@ func sources(ds []catalog.Detector) string {
 	return strings.Join(names[:last], ", ") + ", or " + names[last]
 }
 
-func sessionsDir(getenv func(string) string) (string, error) {
+// gopiHome returns $GOPI_HOME, or ~/.gopi.
+func gopiHome(getenv func(string) string) (string, error) {
 	if home := getenv("GOPI_HOME"); home != "" {
-		return filepath.Join(home, "sessions"), nil
+		return home, nil
 	}
 	home := getenv("HOME")
 	if home == "" {
 		return "", errors.New("no home folder: set HOME or GOPI_HOME")
 	}
-	return filepath.Join(home, ".gopi", "sessions"), nil
+	return filepath.Join(home, ".gopi"), nil
+}
+
+func sessionsDir(getenv func(string) string) (string, error) {
+	home, err := gopiHome(getenv)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, "sessions"), nil
+}
+
+// modelsSource returns where gopi reads models.json: $GOPI_MODELS, a
+// path or a URL, or $GOPI_HOME/models.json, or ~/.gopi/models.json.
+func modelsSource(getenv func(string) string) (string, error) {
+	if src := getenv("GOPI_MODELS"); src != "" {
+		return src, nil
+	}
+	home, err := gopiHome(getenv)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, "models.json"), nil
+}
+
+// loadModels returns models.json. The CLI still runs without it,
+// because a spec resolves after a fetch of the model list of its
+// provider. So loadModels writes an error to errOut and returns the
+// zero file. A missing default file is not an error.
+func loadModels(ctx context.Context, errOut io.Writer, getenv func(string) string) catalog.ModelFile {
+	src, err := modelsSource(getenv)
+	if err != nil {
+		fmt.Fprintf(errOut, "gopi: %v\n", err)
+		return catalog.ModelFile{}
+	}
+	file, err := catalog.ReadModelFile(ctx, src)
+	missing := errors.Is(err, fs.ErrNotExist) && getenv("GOPI_MODELS") == ""
+	if err != nil && !missing {
+		fmt.Fprintf(errOut, "gopi: %v\n", err)
+	}
+	return file
 }
 
 // fenceError explains an error of a fence that has no backend on this

@@ -24,7 +24,7 @@ func main() {
 	ctx := context.Background()
 
 	model := ai.LanguageModel{
-		Model:    anthropic.Sonnet5,
+		Model:    ai.Model{ID: "claude-sonnet-5"},
 		Provider: anthropic.New(),
 	}
 

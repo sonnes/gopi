@@ -29,10 +29,10 @@ var gpt = features{
 // modelFeatures maps a model ID of the OpenAI API to its features. The
 // list comes from the OpenAI docs.
 var modelFeatures = map[string]features{
-	GPT6Sol.ID:   gpt,
-	GPT6Luna.ID:  gpt,
-	GPT6Astra.ID: gpt,
-	GPT5_6.ID:    gpt,
+	"gpt-6-sol":   gpt,
+	"gpt-6-luna":  gpt,
+	"gpt-6-astra": gpt,
+	"gpt-5.6":     gpt,
 }
 
 // openRouterPrefix starts the ID of an OpenAI model on OpenRouter, such

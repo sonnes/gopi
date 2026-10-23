@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/ai/openai"
@@ -36,6 +37,9 @@ func (l lister) ListModels(context.Context) ([]ai.Model, error) {
 	}
 	return l.models, l.err
 }
+
+// repoFile is models.json of this repository.
+var repoFile = modelstest.File()
 
 // detector returns a detector of the provider id with models. It finds
 // its credential if found is true. Its provider lists no models.
@@ -264,23 +268,23 @@ func TestNewCatalog_Env(t *testing.T) {
 		{
 			name:         "the Anthropic key comes first",
 			env:          map[string]string{"ANTHROPIC_API_KEY": "k", "OPENAI_API_KEY": "k"},
-			wantSpec:     "anthropic/" + anthropic.Models()[0].ID,
-			wantModel:    anthropic.Models()[0],
+			wantSpec:     "anthropic/" + repoFile.Of("anthropic")[0].ID,
+			wantModel:    repoFile.Of("anthropic")[0],
 			wantProvider: &anthropic.Provider{},
 		},
 		{
 			name:         "the OpenAI key alone picks OpenAI",
 			env:          map[string]string{"OPENAI_API_KEY": "k"},
-			wantSpec:     "openai/" + openai.Models()[0].ID,
-			wantModel:    openai.Models()[0],
+			wantSpec:     "openai/" + repoFile.Of("openai")[0].ID,
+			wantModel:    repoFile.Of("openai")[0],
 			wantProvider: &openai.Provider{},
 		},
 		{
 			name:         "a known model keeps its prices",
-			spec:         "anthropic/" + anthropic.Opus5_5.ID,
+			spec:         "anthropic/" + "claude-opus-5-5",
 			env:          map[string]string{"ANTHROPIC_API_KEY": "k"},
-			wantSpec:     "anthropic/" + anthropic.Opus5_5.ID,
-			wantModel:    anthropic.Opus5_5,
+			wantSpec:     "anthropic/" + "claude-opus-5-5",
+			wantModel:    modelstest.Model("anthropic", "claude-opus-5-5"),
 			wantProvider: &anthropic.Provider{},
 		},
 	}
@@ -297,7 +301,7 @@ func TestNewCatalog_Env(t *testing.T) {
 				t.Setenv(key, tt.env[key])
 			}
 
-			cat, spec, err := newCatalog(t.Context(), tt.spec, env.Detectors())
+			cat, spec, err := newCatalog(t.Context(), tt.spec, env.Detectors(repoFile))
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantSpec, spec)
@@ -429,6 +433,38 @@ func TestSessionsDir(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			getenv := func(k string) string { return tt.env[k] }
 			got, err := sessionsDir(getenv)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestModelsSource(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{
+			name: "GOPI_MODELS",
+			env:  map[string]string{"GOPI_MODELS": "https://example.com/models.json", "GOPI_HOME": "/data/gopi"},
+			want: "https://example.com/models.json",
+		},
+		{
+			name: "GOPI_HOME",
+			env:  map[string]string{"GOPI_HOME": "/data/gopi", "HOME": "/home/ada"},
+			want: "/data/gopi/models.json",
+		},
+		{
+			name: "the home of the user",
+			env:  map[string]string{"HOME": "/home/ada"},
+			want: "/home/ada/.gopi/models.json",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			getenv := func(k string) string { return tt.env[k] }
+			got, err := modelsSource(getenv)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})

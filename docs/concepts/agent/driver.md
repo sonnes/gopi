@@ -6,6 +6,7 @@ read_when:
   - You start an agent of any kind for a session
   - You add a driver for another agent
   - A driver rejects a config field or a hook
+  - You show whether an agent CLI is installed and signed in
 ---
 
 # Driver
@@ -35,6 +36,8 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 - A driver of a CLI reads the model ID from the resolved model. The harness reads the spec, because it resolves the spec in its own catalog.
 - A driver of a CLI lists the models of the installed CLI with `ListModels`, over the protocol that a run uses: the initialize response of Claude Code, and `model/list` of Codex. The CLI starts as for a run, so the hooks of its settings run. Claude Code lists each alias, such as `opus`, and gopi keeps the aliases next to the full IDs, because `--model` takes both.
 - A list fails after 30 seconds with no answer, because a CLI that waits for a login does not exit. A failed list of Codex kills the app server at once.
+- A driver can be a `Checker`, which reports its status: the version of what it runs, and the account that is signed in. A check uses the setup of the driver, so a caller checks what a session would start. The CLI drivers run the version and the sign-in commands of the CLI with the binary and the environment of the driver. The status also gives the account: how the driver signs in, the plan or the cloud, the email, and the organization. It never holds a key or a token. It can hold an email, so the caller decides who sees it.
+- Claude Code gives the account in `claude auth status --json`. `codex login status` gives only the sign-in method, so the Codex driver also reads the claims of the ID token in `auth.json` of the Codex home. That file is a private format of Codex. If the driver cannot read it, the status keeps the method and the name from the status line.
 - The thinking levels of a listed model replace the registered levels, because the CLI knows the levels that it takes. A new version of a CLI can add a level.
 
 ## Map
@@ -47,6 +50,7 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 | Change how Codex takes the config       | `pkg/agent/codex/driver.go`  |
 | Find the hook points of a CLI agent     | `pkg/agent/<cli>/hooks.go`   |
 | Change how a CLI lists its models       | `pkg/agent/<cli>/models.go`  |
+| Change how a CLI reports its sign-in    | `pkg/agent/<cli>/check.go`   |
 
 ## Related Concepts
 

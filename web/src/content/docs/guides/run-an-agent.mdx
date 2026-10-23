@@ -38,7 +38,7 @@ To call a real model, bind a provider. This model needs `ANTHROPIC_API_KEY`.
 
 ```go
 model := ai.LanguageModel{
-	Model:    anthropic.Sonnet5,
+	Model:    ai.Model{ID: "claude-sonnet-5"},
 	Provider: anthropic.New(),
 }
 ```

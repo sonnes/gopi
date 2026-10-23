@@ -21,7 +21,7 @@ func TestParse_RejectsUnknownFields(t *testing.T) {
 // form that the file has, so a generated file differs from the old one
 // only where a value changed.
 func TestMarshal_RoundTrip(t *testing.T) {
-	data, err := os.ReadFile("../../pkg/catalog/models/models.json")
+	data, err := os.ReadFile("../../models.json")
 	require.NoError(t, err)
 	f, err := modelsfile.Parse(data)
 	require.NoError(t, err)

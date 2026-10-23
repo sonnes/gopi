@@ -36,11 +36,11 @@ var claude5 = features{
 // modelFeatures maps a model ID of the Anthropic API to its features.
 // The list comes from the Claude docs.
 var modelFeatures = map[string]features{
-	Fable5_1.ID:  claude5,
-	Opus5_5.ID:   claude5,
-	Opus5.ID:     claude5,
-	Sonnet5_5.ID: claude5,
-	Sonnet5.ID:   {noTemperature: true},
+	"claude-fable-5-1":  claude5,
+	"claude-opus-5-5":   claude5,
+	"claude-opus-5":     claude5,
+	"claude-sonnet-5-5": claude5,
+	"claude-sonnet-5":   {noTemperature: true},
 }
 
 // openRouterPrefix starts the ID of a Claude model on OpenRouter, such

@@ -5,26 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/ai/anthropic"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
-func TestModels(t *testing.T) {
-	got := anthropic.Models()
-
-	assert.Equal(t, anthropic.Sonnet5_5, got[0], "the default model comes first")
-	assert.ElementsMatch(t, []ai.Model{
-		anthropic.Sonnet5_5,
-		anthropic.Fable5_1,
-		anthropic.Opus5_5,
-		anthropic.Opus5,
-		anthropic.Sonnet5,
-		anthropic.Haiku4_5,
-	}, got)
-	assert.Equal(t, models.Of("anthropic"), got, "the models come from models.json")
-}
-
+// The limits and the levels of the Claude models in models.json.
 func TestModels_Limits(t *testing.T) {
 	tests := []struct {
 		model         ai.Model
@@ -34,21 +19,21 @@ func TestModels_Limits(t *testing.T) {
 		pricing       ai.Pricing
 	}{
 		{
-			model:         anthropic.Fable5_1,
+			model:         modelstest.Model("anthropic", "claude-fable-5-1"),
 			id:            "claude-fable-5-1",
 			maxTokens:     128_000,
 			contextWindow: 1_000_000,
 			pricing:       ai.Pricing{Input: 10, Output: 50, CacheRead: 0.25, CacheWrite: 12.5, CacheWriteLong: 20},
 		},
 		{
-			model:         anthropic.Sonnet5_5,
+			model:         modelstest.Model("anthropic", "claude-sonnet-5-5"),
 			id:            "claude-sonnet-5-5",
 			maxTokens:     128_000,
 			contextWindow: 1_000_000,
 			pricing:       ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4},
 		},
 		{
-			model:         anthropic.Haiku4_5,
+			model:         modelstest.Model("anthropic", "claude-haiku-4-5"),
 			id:            "claude-haiku-4-5",
 			maxTokens:     64_000,
 			contextWindow: 200_000,
@@ -69,15 +54,18 @@ func TestModels_Limits(t *testing.T) {
 func TestModels_ThinkingLevels(t *testing.T) {
 	// The four models that manage their effort always think. Haiku 4.5
 	// takes only a token budget, which the provider does not send.
-	for _, m := range []ai.Model{
-		anthropic.Fable5_1,
-		anthropic.Opus5_5,
-		anthropic.Opus5,
-		anthropic.Sonnet5_5,
+	for _, id := range []string{
+		"claude-fable-5-1",
+		"claude-opus-5-5",
+		"claude-opus-5",
+		"claude-sonnet-5-5",
 	} {
+		m := modelstest.Model("anthropic", id)
 		assert.NotContains(t, m.ThinkingLevels, ai.ThinkingOff, m.ID)
 	}
-	assert.Contains(t, anthropic.Sonnet5.ThinkingLevels, ai.ThinkingLow)
-	assert.Equal(t, []ai.ThinkingLevel{ai.ThinkingOff}, anthropic.Haiku4_5.ThinkingLevels)
-	assert.False(t, anthropic.Haiku4_5.Reasoning)
+	sonnet5 := modelstest.Model("anthropic", "claude-sonnet-5")
+	haiku := modelstest.Model("anthropic", "claude-haiku-4-5")
+	assert.Contains(t, sonnet5.ThinkingLevels, ai.ThinkingLow)
+	assert.Equal(t, []ai.ThinkingLevel{ai.ThinkingOff}, haiku.ThinkingLevels)
+	assert.False(t, haiku.Reasoning)
 }

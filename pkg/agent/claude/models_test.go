@@ -15,7 +15,6 @@ import (
 	"github.com/sonnes/gopi/internal/stdiorr"
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 )
 
 func TestDriver_ListModels(t *testing.T) {
@@ -134,22 +133,4 @@ func TestRecordedListModels(t *testing.T) {
 	for _, m := range got {
 		assert.NotEmpty(t, m.Name, m.ID)
 	}
-}
-
-func TestModels(t *testing.T) {
-	models := claude.Models()
-
-	ids := make([]string, len(models))
-	for i, m := range models {
-		ids[i] = m.ID
-	}
-	assert.Equal(t, "default", ids[0], "the default alias comes first")
-	assert.Subset(t, ids, []string{"opus", "sonnet", "haiku", "claude-opus-5-5"})
-
-	models[0].ID = "changed"
-	assert.Equal(t, "default", claude.Models()[0].ID, "each call returns a new list")
-}
-
-func TestModels_FromFile(t *testing.T) {
-	assert.Equal(t, models.Of("claude-code"), claude.Models())
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/catalog/models"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -276,14 +275,6 @@ func TestRecordedListModels(t *testing.T) {
 	}
 }
 
-func TestModels(t *testing.T) {
-	models := Models()
-
-	require.NotEmpty(t, models)
-	models[0].ID = "changed"
-	assert.NotEqual(t, "changed", Models()[0].ID, "each call returns a new list")
-}
-
 func TestDriver_ListModelsRepeatedCursor(t *testing.T) {
 	useTraces(t, []string{"list_models_repeat.trace"})
 
@@ -334,8 +325,4 @@ func countKills(t *testing.T) *int {
 		return p, nil
 	}
 	return &n
-}
-
-func TestModels_FromFile(t *testing.T) {
-	assert.Equal(t, models.Of("codex"), Models())
 }

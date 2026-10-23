@@ -100,7 +100,7 @@ The provider must implement `ai.ObjectProvider`. If it does not, the call return
 The binding holds the provider. Change the binding, and every call stays the same.
 
 ```go
-lm := ai.LanguageModel{Model: openai.GPT6Luna, Provider: openai.New()}
+lm := ai.LanguageModel{Model: ai.Model{ID: "gpt-6-luna"}, Provider: openai.New()}
 ```
 
 | Provider                                    | Reads the key from  | Calls                                         |

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 
@@ -24,7 +25,8 @@ func modelsCommand() *cli.Command {
 		Usage:     "list the model specs of the providers that gopi finds. Each provider lists its models from its API",
 		ArgsUsage: "[provider...]",
 		Action: func(ctx context.Context, c *cli.Command) error {
-			return printModels(ctx, c.Root().Writer, c.Root().ErrWriter, env.Detectors(), c.Args().Slice())
+			set := loadModels(ctx, c.Root().ErrWriter, os.Getenv)
+			return printModels(ctx, c.Root().Writer, c.Root().ErrWriter, env.Detectors(set), c.Args().Slice())
 		},
 	}
 }

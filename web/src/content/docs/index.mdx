@@ -37,7 +37,7 @@ gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a m
   steps={[
     {
       code: `model := ai.LanguageModel{
-\tModel:    anthropic.Sonnet5,
+\tModel:    ai.Model{ID: "claude-sonnet-5"},
 \tProvider: anthropic.New(),
 }`,
       title: "bind",

@@ -157,7 +157,7 @@ func TestStreamText_Betas(t *testing.T) {
 	api := &fakeAPI{handlers: []http.HandlerFunc{ok}}
 	p := newFakeProvider(t, api)
 
-	_, err := p.StreamText(t.Context(), Opus5_5, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+	_, err := p.StreamText(t.Context(), ai.Model{ID: "claude-opus-5-5"}, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
 	require.NoError(t, err)
 	assert.Equal(
 		t,
@@ -208,7 +208,7 @@ func TestStreamText_Effort(t *testing.T) {
 
 	msg, err := p.StreamText(
 		t.Context(),
-		Opus5_5,
+		ai.Model{ID: "claude-opus-5-5"},
 		[]ai.Message{ai.UserMessage("Hi")},
 		ai.Thinking(ai.ThinkingLow),
 	).Wait()

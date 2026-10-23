@@ -45,7 +45,7 @@ func run(t *testing.T, p *openai.Provider) ([]ai.Event, *ai.Message, error) {
 
 	stream := p.StreamText(
 		t.Context(),
-		openai.GPT6Luna,
+		luna,
 		[]ai.Message{ai.UserMessage("Hi")},
 		nil,
 	)
@@ -100,11 +100,11 @@ func TestStream_Text(t *testing.T) {
 	assert.Equal(t, "Olá!", events[4].Content)
 
 	assert.Equal(t, ai.RoleAssistant, msg.Role)
-	assert.Equal(t, openai.GPT6Luna.ID, msg.Model)
+	assert.Equal(t, luna.ID, msg.Model)
 	assert.Equal(t, "Olá!", msg.Text())
 	assert.Equal(t, ai.StopReasonStop, msg.StopReason)
 	usage := ai.Usage{Input: 50, Output: 7, CacheRead: 20, CacheWrite: 30}
-	usage.Cost = openai.GPT6Luna.Pricing.Cost(usage)
+	usage.Cost = luna.Pricing.Cost(usage)
 	assert.NotZero(t, usage.Cost.Total(), "the model has prices")
 	assert.Equal(t, usage, msg.Usage)
 }
@@ -190,10 +190,10 @@ func TestStream_ReasoningRoundTrip(t *testing.T) {
 	t.Cleanup(srv.Close)
 	p := openai.New(openai.APIKey("test-key"), openai.BaseURL(srv.URL))
 
-	first, err := p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+	first, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
 	require.NoError(t, err)
 
-	_, err = p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi"), *first}, nil).Wait()
+	_, err = p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi"), *first}, nil).Wait()
 	require.NoError(t, err)
 
 	items := body["input"].([]any)
@@ -379,7 +379,7 @@ func TestStreamText_Retry(t *testing.T) {
 	}}
 	p := sequenceProvider(t, s)
 
-	msg, err := p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi")}, ai.MaxRetries(1)).Wait()
+	msg, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, ai.MaxRetries(1)).Wait()
 	require.NoError(t, err)
 	assert.Equal(t, "Hi", msg.Text())
 	assert.Equal(t, int32(2), s.calls.Load())
@@ -389,7 +389,7 @@ func TestStreamText_NoRetryByDefault(t *testing.T) {
 	s := &sequence{handlers: []http.HandlerFunc{failing(http.StatusTooManyRequests, nil), completed}}
 	p := sequenceProvider(t, s)
 
-	_, err := p.StreamText(t.Context(), openai.GPT6Luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+	_, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
 	require.Error(t, err)
 	assert.Equal(t, int32(1), s.calls.Load())
 }
@@ -404,7 +404,7 @@ func TestStreamText_HeadersAndPayload(t *testing.T) {
 	})
 	_, err := p.StreamText(
 		t.Context(),
-		openai.GPT6Luna,
+		luna,
 		[]ai.Message{ai.UserMessage("Hi")},
 		ai.JoinOptions(ai.Headers(map[string]string{"X-Team": "infra"}), hook),
 	).Wait()

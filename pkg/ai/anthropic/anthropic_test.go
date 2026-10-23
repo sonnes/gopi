@@ -13,13 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/internal/httprr"
+	"github.com/sonnes/gopi/internal/modelstest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // testModel is the model of the recorded tests.
-var testModel = anthropic.Sonnet5
+var testModel = modelstest.Model("anthropic", "claude-sonnet-5")
 
 // canonicalHost is the host in every fixture. The scrubber replaces the
 // host and the path prefix of a recording, so a replay does not depend
