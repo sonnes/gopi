@@ -1,4 +1,4 @@
-package skill
+package def
 
 import (
 	"context"
@@ -21,9 +21,10 @@ type Skill struct {
 	// A reader of files sets it to the name of the skill folder. In
 	// code, the caller sets it.
 	Name string
-	// Qualifier tells two skills with the same name apart. The harness
-	// sets it to "", to a relative path such as "apps/web", or to "~"
-	// for the home folder. A reader leaves it empty.
+	// Qualifier tells two skills with the same name apart, such as
+	// "ops" in "ops:deploy". The caller sets it. A reader of files
+	// leaves it empty, so a later skill with the same name replaces an
+	// earlier one.
 	Qualifier string
 	// Description tells the model when to load the skill. A reader sets
 	// it to "description", then "\n\n" and "when_to_use" if the file
@@ -56,11 +57,11 @@ type Skill struct {
 	// Agent names the subagent that runs a fork. The frontmatter key is
 	// "agent". If it is empty, the harness picks the subagent.
 	Agent string
-	// Meta holds each other frontmatter key with its parsed value, such
-	// as "license", "metadata", "hooks", "paths", "user-invocable", and
-	// "argument-hint". It also holds "name" if the frontmatter name is
-	// not the folder name. It is nil if there are no other keys.
-	Meta map[string]any
+	// Extra holds each frontmatter key that no field takes, such as
+	// "metadata", "license", "hooks", "paths", and "user-invocable". It
+	// also holds "name" if the frontmatter name is not the folder name.
+	// It is nil if there are no other keys.
+	Extra Extra
 }
 
 // ReadSkills returns s as the one skill of a reader. A Skill is then a

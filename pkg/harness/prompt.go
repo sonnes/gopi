@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -54,7 +55,7 @@ const agentsIntro = "A subagent does a task in its own context with the `task` t
 // DefaultPrompt is the prompt builder that the harness uses when none
 // is set. It returns up to three sections, in this order:
 //
-//   - "instructions": the text of each instruction file, root first.
+//   - "instructions": the text of each instruction, in the order of the readers.
 //   - "skills": the name and the description of each skill that the
 //     model can call, not the body.
 //   - "agents": the name and the description of each subagent.
@@ -93,7 +94,7 @@ func DefaultPrompt(_ context.Context, asm *Assembly) ([]ai.Section, error) {
 
 // instructionsText returns the instruction files as one text, each
 // with its path.
-func instructionsText(files []Instruction) string {
+func instructionsText(files []def.Instruction) string {
 	parts := make([]string, len(files))
 	for i, f := range files {
 		parts[i] = fmt.Sprintf("Contents of %s:\n\n%s", f.Path, strings.TrimSpace(f.Text))

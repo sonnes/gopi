@@ -1,4 +1,4 @@
-package skill_test
+package def_test
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/pkg/harness/skill"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 func TestASkillIsAReader(t *testing.T) {
-	s := skill.Skill{
+	s := def.Skill{
 		Name:        "deploy",
 		Description: "Deploy.",
 		Body:        "Run it.",
@@ -19,7 +19,7 @@ func TestASkillIsAReader(t *testing.T) {
 
 	got, err := s.ReadSkills(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, []skill.Skill{s}, got)
+	assert.Equal(t, []def.Skill{s}, got)
 }
 
 func TestQualifiedName(t *testing.T) {
@@ -34,7 +34,7 @@ func TestQualifiedName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := skill.Skill{
+			s := def.Skill{
 				Name:      "deploy",
 				Qualifier: tt.qualifier,
 			}

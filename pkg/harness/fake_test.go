@@ -15,8 +15,8 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/skill"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -93,8 +93,8 @@ func newCatalog(p *script) *catalog.Catalog {
 }
 
 // base returns the options of a harness for a test: the catalog of p,
-// the model fake/one, no built-in tools, no seed, and a project and a
-// home in empty temporary folders.
+// the model fake/one, no built-in tools, no seed, and a work folder in
+// an empty temporary folder.
 func base(t *testing.T, p *script) []harness.Option {
 	t.Helper()
 	return []harness.Option{
@@ -103,7 +103,6 @@ func base(t *testing.T, p *script) []harness.Option {
 		harness.Builtin(harness.NoBuiltins),
 		harness.Seed(harness.NoSeed),
 		harness.Dir(t.TempDir()),
-		harness.Home(t.TempDir()),
 	}
 }
 
@@ -180,7 +179,7 @@ func skillFile(description, body string) string {
 }
 
 // deploy is the skill deploy, with a support file.
-var deploy = skill.Skill{
+var deploy = def.Skill{
 	Name:        "deploy",
 	Description: "Deploy the service.",
 	Body:        "Run scripts/run.sh.",

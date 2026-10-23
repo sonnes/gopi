@@ -44,6 +44,20 @@ s, err := h.Start(ctx, host.Spec{
 
 `anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Start`. If the store has the log of `Spec.ID`, the session resumes it. `s.Close` stops the agent and keeps the log.
 
+## Start an Agent From a Folder
+
+`Agent` names an agent file in the `agents/` folder of `Dirs`:
+
+```go
+s, err := h.Start(ctx, host.Spec{
+	Dirs:  []string{teamDir, repoDir},
+	Agent: "reviewer",
+	Dir:   repoDir,
+})
+```
+
+The model, the mode, the effort, and the prompt of the file fill the empty fields of the spec. If two dirs have the agent, the later dir wins. A resumed session runs the agent that it started with. The harness also reads the skills and the subagents of `Dirs`. Claude Code and Codex load their own.
+
 ## Send a Message
 
 `Send` returns when the session accepts the message. The run ends on the host stream with `run_end`.

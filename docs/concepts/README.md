@@ -44,11 +44,17 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [CLI Agent](agent/cli-agent.md)     | How an agent CLI such as Codex or Claude Code runs as a gopi agent, with the same events, state, and log as the loop. |
 | [Driver](agent/driver.md)           | How one interface starts the harness, Claude Code, or Codex for a session, and what a driver does with a field or a hook point that its agent cannot honor. |
 
+## def
+
+| Concept                          | Description                                                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Definition](def/definition.md)  | How an agent, a skill, and an instruction text reach an agent from any store through one reader interface for each. |
+
 ## harness
 
 | Concept                              | Description                                                                                                                     |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the files of a project and a home folder, and a catalog, on each call.     |
+| [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the definitions of its readers, and a catalog, on each call.     |
 | [Skill](harness/skill.md)            | How a skill reaches the model on demand through the skill tool, how the system prompt lists the skills, and how two skills with one name both stay. |
 | [Subagent](harness/subagent.md)      | How the task tool runs a subagent in a child session, what the parent model gets back, and how a child resumes.                  |
 | [Permission](harness/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied.                 |

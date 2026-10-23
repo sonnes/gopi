@@ -1,7 +1,7 @@
 ---
 title: Subagent
 description: How the task tool runs a subagent in a child session, what the parent model gets back, and how a child resumes.
-package: pkg/harness, pkg/harness/subagent, pkg/harness/files
+package: pkg/harness, pkg/def, pkg/store/fs
 read_when:
   - You give an agent subagents from agent files or from code
   - You show the work of a subagent in a UI
@@ -27,7 +27,7 @@ A subagent is a named agent that the model gives a task to. The `agents` section
 
 ## Design
 
-- A child is an assembly of the same harness with the subagent on top. It then reads the same sources and runs with the same catalog, store, and seeders, and the harness has one path to build an agent.
+- A child is an assembly of the same harness with the subagent on top. It then reads the same readers and runs with the same catalog, store, and seeders, and the harness has one path to build an agent.
 - A child keeps its log in its own session of the store, as each of Claude Code, [Codex](https://github.com/openai/codex/blob/8270a7c74d73ace00d93cdc5939a06c6cb811b1c/codex-rs/core/src/agent/control.rs), and [oh-my-pi](https://github.com/can1357/oh-my-pi/blob/06aecdd51f07e689e970ceaa180abe2be0c14bbb/packages/coding-agent/src/task/executor.ts) keeps a transcript for each child. The history of the parent then holds only the result, and a UI can open the child.
 - The ID of a child is the parent ID, ".", the name, "-", and random hex, as in oh-my-pi. A store that takes no "/" in an ID then keeps it, and the ID shows its parent.
 - A child names its parent and the task call in the `Parent` value, as a Codex thread keeps `parent_thread_id`. The link is data, so a store needs no folder layout to keep it.
@@ -45,13 +45,14 @@ A subagent is a named agent that the model gives a task to. The `agents` section
 | -------------------------------------------------- | ------------------------------- |
 | Change what the task tool takes or returns         | `pkg/harness/task_tool.go`      |
 | Change the tools, the model, or the mode of a child | `pkg/harness/task_tool.go`     |
-| Change what an agent file must hold                | `pkg/harness/files/agents.go`   |
-| Change the fields of a subagent                    | `pkg/harness/subagent/agent.go` |
+| Change what an agent file must hold                | `pkg/store/fs/agents.go`        |
+| Change the fields of a subagent                    | `pkg/def/agent.go`              |
 | Change how the prompt lists the subagents          | `pkg/harness/prompt.go`         |
 
 ## Related Concepts
 
 - [Harness](harness.md)
+- [Definition](../def/definition.md)
 - [Permission](permission.md)
 - [Run Stream](../agent/run-stream.md)
 - [Value](../session/value.md)

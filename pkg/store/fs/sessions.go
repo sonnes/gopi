@@ -1,29 +1,9 @@
-// Package jsonl is a [session.Storer] over one append-only file per
-// session.
-//
-// The file of a session is <root>/<id>.jsonl. The first line is the
-// [session.Session] record with the type "session_init". Each later
-// line is one [session.Entry] with the type "message", or one value
-// write with the type "value". A custom entry has the type "message"
-// too, so a file of an older version loads as it is. The fields sit
-// next to the type, flat. The store never rewrites a line. Only
-// [Store.Load] changes the end of the file: it cuts a torn last line,
-// or adds the newline to a whole one, so the next append starts on a
-// new line. So call Load only from the one writer of a session, or when
-// no writer runs. A Load in a second process can cut a line that the
-// writer has not finished.
-//
-// A value write has the op "set" or "delete". Load replays the value
-// lines in file order, so a later set replaces an earlier one. Each set
-// adds a line, so a value that changes often makes the file grow.
-//
-// A session ID is a file name, so it must not be empty, ".", "..", or
-// hold a path separator.
-package jsonl
+package fs
 
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -31,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -48,6 +29,9 @@ const (
 	// opSet and opDelete are the ops of a value line.
 	opSet    = "set"
 	opDelete = "delete"
+
+	// sessionExt is the extension of the file of a session.
+	sessionExt = ".jsonl"
 
 	dirPerm  = 0o755
 	filePerm = 0o644
@@ -69,7 +53,7 @@ type entryLine struct {
 }
 
 // errTornRecord marks a first line with no newline that does not
-// decode: a crash stopped [Store.Create] before the record was whole.
+// decode: a crash stopped [SessionStore.Create] before the record was whole.
 var errTornRecord = errors.New("torn session record")
 
 // lineType is the part of a line that Load reads first, to choose the
@@ -91,22 +75,41 @@ type valueLine struct {
 // middle, as a full disk does.
 var write = (*os.File).Write
 
-// Store keeps each session as one append-only JSONL file under a root
-// directory. It is safe for concurrent use in one process.
-type Store struct {
+// SessionStore keeps each session as one append-only JSONL file under
+// a root directory. It is safe for concurrent use in one process.
+//
+// The file of a session is <root>/<id>.jsonl. The first line is the
+// [session.Session] record with the type "session_init". Each later
+// line is one [session.Entry] with the type "message", or one value
+// write with the type "value". A custom entry has the type "message"
+// too, so a file of an older version loads as it is. The fields sit
+// next to the type, flat. The store never rewrites a line. Only
+// [SessionStore.Load] changes the end of the file: it cuts a torn last
+// line, or adds the newline to a whole one, so the next append starts
+// on a new line. So call Load only from the one writer of a session,
+// or when no writer runs. A Load in a second process can cut a line
+// that the writer has not finished.
+//
+// A value write has the op "set" or "delete". Load replays the value
+// lines in file order, so a later set replaces an earlier one. Each set
+// adds a line, so a value that changes often makes the file grow.
+//
+// A session ID is a file name, so it must not be empty, ".", "..", or
+// hold a path separator.
+type SessionStore struct {
 	mu   sync.Mutex
 	root string
 }
 
-var _ session.Storer = (*Store)(nil)
+var _ session.Storer = (*SessionStore)(nil)
 
-// New returns a [Store] rooted at dir. If the directory does not exist,
-// New creates it.
-func New(dir string) (*Store, error) {
+// Sessions returns a [SessionStore] rooted at dir. If the directory
+// does not exist, Sessions creates it.
+func Sessions(dir string) (*SessionStore, error) {
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return nil, err
 	}
-	return &Store{root: dir}, nil
+	return &SessionStore{root: dir}, nil
 }
 
 // Create implements [session.Storer]. It writes the record as the first
@@ -114,7 +117,7 @@ func New(dir string) (*Store, error) {
 // atomic. A file with a torn record holds nothing to recover, so Create
 // replaces it. If the write fails, Create removes the file, so a later
 // Create can use the ID.
-func (s *Store) Create(_ context.Context, rec session.Session) error {
+func (s *SessionStore) Create(_ context.Context, rec session.Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -175,7 +178,7 @@ func openTorn(path string) (*os.File, error) {
 // its newline. Either way the next append starts on a new line. A line
 // that ends with a newline and does not decode is corruption, and Load
 // returns an error.
-func (s *Store) Load(_ context.Context, id string) (session.Snapshot, error) {
+func (s *SessionStore) Load(_ context.Context, id string) (session.Snapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -183,6 +186,60 @@ func (s *Store) Load(_ context.Context, id string) (session.Snapshot, error) {
 	if err != nil {
 		return session.Snapshot{}, err
 	}
+	return readSession(path, id, true)
+}
+
+// List returns the record and the values of each session in the root,
+// in the order of creation, then of ID. Entries is nil in each
+// snapshot. List reads each file to its end, because a value line can
+// come after any entry. It skips each file that it cannot read as a
+// session: a file of another kind, a torn record, or a corrupt line.
+// One bad file then does not hide the other sessions. [SessionStore.Load]
+// of the ID gives the error of the file. List changes no file, so it
+// can run while another process writes a session.
+func (s *SessionStore) List(ctx context.Context) ([]session.Snapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	files, err := os.ReadDir(s.root)
+	if err != nil {
+		return nil, err
+	}
+
+	var out []session.Snapshot
+	for _, f := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		id, isSession := strings.CutSuffix(f.Name(), sessionExt)
+		if !isSession || !f.Type().IsRegular() {
+			continue
+		}
+		path, err := s.path(id)
+		if err != nil {
+			continue
+		}
+
+		snap, err := readSession(path, id, false)
+		if err != nil {
+			continue
+		}
+		snap.Entries = nil
+		out = append(out, snap)
+	}
+
+	slices.SortStableFunc(out, func(a, b session.Snapshot) int {
+		return cmp.Or(
+			a.Session.CreatedAt.Compare(b.Session.CreatedAt),
+			cmp.Compare(a.Session.ID, b.Session.ID),
+		)
+	})
+	return out, nil
+}
+
+// readSession reads the file of the session id at path. If repair is
+// true, it ends the file on a newline, as [SessionStore.Load] says.
+func readSession(path, id string, repair bool) (session.Snapshot, error) {
 	f, err := os.Open(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return session.Snapshot{}, session.ErrNotFound
@@ -202,9 +259,9 @@ func (s *Store) Load(_ context.Context, id string) (session.Snapshot, error) {
 	}
 	// A crash before the newline of the record leaves a whole record
 	// with no newline. It gets its newline, as a whole last line does.
-	if !bytes.HasSuffix(raw, []byte{'\n'}) {
+	if repair && !bytes.HasSuffix(raw, []byte{'\n'}) {
 		if err := endLastLine(path, 0, raw, true); err != nil {
-			return session.Snapshot{}, fmt.Errorf("jsonl: repair %q: %w", id, err)
+			return session.Snapshot{}, fmt.Errorf("fs: repair %q: %w", id, err)
 		}
 	}
 	size := int64(len(raw))
@@ -216,7 +273,7 @@ func (s *Store) Load(_ context.Context, id string) (session.Snapshot, error) {
 	for {
 		raw, err := r.ReadBytes('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
-			return session.Snapshot{}, fmt.Errorf("jsonl: read %q: %w", id, err)
+			return session.Snapshot{}, fmt.Errorf("fs: read %q: %w", id, err)
 		}
 		// ReadBytes stops short of a newline only at the end of the
 		// file, so io.EOF marks the one line a torn write can leave.
@@ -230,12 +287,14 @@ func (s *Store) Load(_ context.Context, id string) (session.Snapshot, error) {
 			derr = decodeLine(line, &entries, values)
 		}
 		if derr != nil && !last {
-			return session.Snapshot{}, fmt.Errorf("jsonl: decode line in %q: %w", id, derr)
+			return session.Snapshot{}, fmt.Errorf("fs: decode line in %q: %w", id, derr)
+		}
+		if last && repair {
+			if err := endLastLine(path, whole, raw, derr == nil); err != nil {
+				return session.Snapshot{}, fmt.Errorf("fs: repair %q: %w", id, err)
+			}
 		}
 		if last {
-			if err := endLastLine(path, whole, raw, derr == nil); err != nil {
-				return session.Snapshot{}, fmt.Errorf("jsonl: repair %q: %w", id, err)
-			}
 			break
 		}
 	}
@@ -324,7 +383,7 @@ func (r *replay) current() []session.StoredValue {
 
 // Append implements [session.Storer]. It writes one line per entry and
 // never touches the first line.
-func (s *Store) Append(_ context.Context, id string, entries ...session.Entry) error {
+func (s *SessionStore) Append(_ context.Context, id string, entries ...session.Entry) error {
 	lines := make([]any, 0, len(entries))
 	for i := range entries {
 		lines = append(lines, entryLine{
@@ -336,7 +395,7 @@ func (s *Store) Append(_ context.Context, id string, entries ...session.Entry) e
 }
 
 // SetValue implements [session.Storer]. It writes one value line.
-func (s *Store) SetValue(_ context.Context, id string, v session.StoredValue) error {
+func (s *SessionStore) SetValue(_ context.Context, id string, v session.StoredValue) error {
 	return s.appendLines(id, valueLine{
 		Type:      typeValue,
 		Op:        opSet,
@@ -347,7 +406,7 @@ func (s *Store) SetValue(_ context.Context, id string, v session.StoredValue) er
 }
 
 // DeleteValue implements [session.Storer]. It writes one value line.
-func (s *Store) DeleteValue(_ context.Context, id, namespace, key string) error {
+func (s *SessionStore) DeleteValue(_ context.Context, id, namespace, key string) error {
 	return s.appendLines(id, valueLine{
 		Type:      typeValue,
 		Op:        opDelete,
@@ -359,7 +418,7 @@ func (s *Store) DeleteValue(_ context.Context, id, namespace, key string) error 
 // appendLines encodes each line as JSON and appends them to the file of
 // id in one write. If the file does not exist, it returns
 // [session.ErrNotFound]. If the write fails, the file does not change.
-func (s *Store) appendLines(id string, lines ...any) error {
+func (s *SessionStore) appendLines(id string, lines ...any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -407,17 +466,17 @@ func (s *Store) appendLines(id string, lines ...any) error {
 func readRecord(r *bufio.Reader, id string) (session.Session, []byte, error) {
 	raw, err := r.ReadBytes('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return session.Session{}, nil, fmt.Errorf("jsonl: read %q: %w", id, err)
+		return session.Session{}, nil, fmt.Errorf("fs: read %q: %w", id, err)
 	}
 	var l recordLine
 	if err := json.Unmarshal(bytes.TrimSpace(raw), &l); err != nil {
 		if !bytes.HasSuffix(raw, []byte{'\n'}) {
-			return session.Session{}, nil, fmt.Errorf("jsonl: %q: %w", id, errTornRecord)
+			return session.Session{}, nil, fmt.Errorf("fs: %q: %w", id, errTornRecord)
 		}
-		return session.Session{}, nil, fmt.Errorf("jsonl: decode session %q: %w", id, err)
+		return session.Session{}, nil, fmt.Errorf("fs: decode session %q: %w", id, err)
 	}
 	if l.Type != typeSession {
-		return session.Session{}, nil, fmt.Errorf("jsonl: %q does not start with a session_init line", id)
+		return session.Session{}, nil, fmt.Errorf("fs: %q does not start with a session_init line", id)
 	}
 	return l.Session, raw, nil
 }
@@ -445,10 +504,10 @@ func endLastLine(path string, whole int64, raw []byte, decoded bool) error {
 }
 
 // path returns the file of id, or an error if id is not a safe name.
-func (s *Store) path(id string) (string, error) {
+func (s *SessionStore) path(id string) (string, error) {
 	unsafe := id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`)
 	if unsafe {
-		return "", fmt.Errorf("jsonl: invalid session id %q", id)
+		return "", fmt.Errorf("fs: invalid session id %q", id)
 	}
-	return filepath.Join(s.root, id+".jsonl"), nil
+	return filepath.Join(s.root, id+sessionExt), nil
 }

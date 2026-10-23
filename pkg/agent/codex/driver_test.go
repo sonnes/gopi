@@ -46,20 +46,18 @@ func startAgent(t *testing.T, d agent.Driver, c agent.Config) *Agent {
 
 func TestDriverStart(t *testing.T) {
 	useTraces(t, []string{"text.trace"})
-	d := Driver(
-		Sandbox(SandboxReadOnly),
-		Thinking(ai.ThinkingHigh),
-	)
+	d := Driver(Sandbox(SandboxReadOnly))
 	a := startAgent(t, d, agent.Config{
 		Store:  session.NewMemoryStore(),
 		Spec:   "codex/gpt-5-codex",
 		Model:  ai.Model{ID: "gpt-5-codex"},
 		Dir:    workDir,
 		System: "Be brief.",
+		Effort: ai.ThinkingHigh,
 	})
 
 	_, msgs, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
-	require.NoError(t, err, "the thread has the model, the dir, the system, and the sandbox")
+	require.NoError(t, err, "the thread has the model, the dir, the system, the sandbox, and the effort")
 	require.Len(t, msgs, 1)
 	assert.Equal(t, "Hello", msgs[0].Text())
 }

@@ -13,7 +13,7 @@ The program in this guide needs `ANTHROPIC_API_KEY`.
 `agent.Durable` takes a session ID, and the `Store` option sets where the session lives. If the session does not exist, `Durable` creates it. If it exists, `Durable` resumes it after its last entry.
 
 ```go
-store, err := jsonl.New(dir)
+store, err := storefs.Sessions(dir)
 if err != nil {
 	log.Fatal(err)
 }
@@ -66,7 +66,7 @@ For context that must stay, such as a skill, add an ordinary entry with its own 
 
 ## Use Your Own Database
 
-The `jsonl` store is for one process on one machine. For a service, implement `session.Storer` over your database. [Sessions](../session/index.mdx#stores) lists the stores.
+The file store is for one process on one machine. For a service, implement `session.Storer` over your database. [Sessions](../session/index.mdx#stores) lists the stores.
 
 ## The Full Example
 

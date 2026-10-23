@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -86,9 +87,24 @@ type Spec struct {
 	// ID is the ID of the session. If it is empty, Start makes a new
 	// ID. If the store has a log with the ID, the session resumes it.
 	ID string
+	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
+	// first. A later folder wins for a name. The host reads only the
+	// file of Agent. The driver gets Dirs.
+	Dirs []string
+	// Agent names an agent file in Dirs. The file fills each empty field
+	// of Model, Mode, and Effort. Its prompt goes before System, its
+	// disallowed tools go after Deny, and its skills go after Skills. The
+	// host does not read the tools and the maxTurns keys of the file. A
+	// resumed session runs the agent that it started with, as
+	// [SessionAgent] keeps it.
+	Agent string
 	// Model is the model spec, such as "claude-code/claude-opus-5-5".
-	// It picks the driver. It is required.
+	// It picks the driver. It is required if Agent gives no model.
 	Model string
+	// Effort is the thinking level of each model call. If it is empty,
+	// the driver keeps the default of the model. A value that is not a
+	// level fails the start.
+	Effort ai.ThinkingLevel
 	// Mode is the permission mode of the agent. If it is empty, the
 	// driver keeps its own mode. A driver that cannot honor the mode
 	// fails the start.
@@ -143,11 +159,12 @@ func (h *Host) Start(ctx context.Context, spec Spec) (*Session, error) {
 	// The host publishes the start under its lock, so that no event of
 	// the session reaches the stream before it.
 	h.sessions[id] = s
+	// The spec of the session has the fields of its agent file.
 	h.hub.publish(EventSessionStart{
 		Session: id,
-		Model:   spec.Model,
-		Mode:    spec.Mode,
-		Dir:     spec.Dir,
+		Model:   s.spec.Model,
+		Mode:    s.spec.Mode,
+		Dir:     s.spec.Dir,
 		Resumed: resumed,
 	})
 	h.mu.Unlock()
@@ -168,9 +185,25 @@ func (h *Host) startSession(ctx context.Context, id string, spec Spec) (*Session
 		// second time.
 		store = session.Preloaded(h.store, id, snap)
 	}
+	spec, pin, err := withAgent(ctx, spec, snap, resumed)
+	if err == nil {
+		err = checkEffort(spec)
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("host: session %s: %w", id, err)
+	}
 	d, model, err := h.cat.Driver(spec.Model)
 	if err != nil {
 		return nil, false, fmt.Errorf("host: session %s: %w", id, err)
+	}
+	if pin != nil {
+		// The session keeps its agent before the driver starts, so a
+		// crash in the start cannot leave a session with no agent. The
+		// driver then reads the session from the store.
+		if err := keepAgent(ctx, h.store, id, *pin); err != nil {
+			return nil, false, fmt.Errorf("host: session %s: keep the agent: %w", id, err)
+		}
+		store = h.store
 	}
 
 	// The session exists before its agent, so that the approve function
@@ -185,6 +218,8 @@ func (h *Host) startSession(ctx context.Context, id string, spec Spec) (*Session
 		Dir:     spec.Dir,
 		System:  spec.System,
 		Skills:  spec.Skills,
+		Dirs:    spec.Dirs,
+		Effort:  spec.Effort,
 		Allow:   spec.Allow,
 		Ask:     spec.Ask,
 		Deny:    spec.Deny,

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/ai"
 )
@@ -127,4 +128,29 @@ func TestGetOption_CallSettings(t *testing.T) {
 	assert.InDelta(t, 0.2, temperature, 1e-9)
 	assert.Equal(t, map[string]string{"x-team": "infra"}, headers)
 	assert.Equal(t, ai.CacheLong, retention)
+}
+
+func TestParseThinking(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    ai.ThinkingLevel
+		wantErr string
+	}{
+		{in: "high", want: ai.ThinkingHigh},
+		{in: "off", want: ai.ThinkingOff},
+		{in: "max", want: ai.ThinkingMax},
+		{in: "huge", wantErr: `unknown thinking level "huge"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			got, err := ai.ParseThinking(tt.in)
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

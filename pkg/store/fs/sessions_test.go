@@ -1,4 +1,4 @@
-package jsonl_test
+package fs_test
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/session"
-	"github.com/sonnes/gopi/pkg/session/jsonl"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 func record(id string) session.Session {
@@ -33,7 +33,7 @@ func entry(id, text string) session.Entry {
 func TestStoreRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(filepath.Join(dir, "sessions"))
+	store, err := storefs.Sessions(filepath.Join(dir, "sessions"))
 	require.NoError(t, err, "New creates the directory")
 
 	rec := record("s1")
@@ -43,7 +43,7 @@ func TestStoreRoundTrip(t *testing.T) {
 	require.NoError(t, store.Append(ctx, "s1", entry("e1", "a")))
 	require.NoError(t, store.Append(ctx, "s1", entry("e2", "b")))
 
-	reopened, err := jsonl.New(filepath.Join(dir, "sessions"))
+	reopened, err := storefs.Sessions(filepath.Join(dir, "sessions"))
 	require.NoError(t, err)
 	snap, err := reopened.Load(ctx, "s1")
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestStoreLoadsMinimalFile(t *testing.T) {
 	}, "\n") + "\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "s1.jsonl"), []byte(file), 0o644))
 
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 	snap, err := store.Load(ctx, "s1")
 	require.NoError(t, err, "the old parent_id fields do not stop the load")
@@ -85,7 +85,7 @@ func TestStoreLoadsMinimalFile(t *testing.T) {
 func TestStoreValues(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 	require.NoError(t, store.Create(ctx, record("s1")))
 
@@ -129,7 +129,7 @@ func TestStoreValues(t *testing.T) {
 func TestStoreIgnoresTornValueLine(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 	require.NoError(t, store.Create(ctx, record("s1")))
 
@@ -152,7 +152,7 @@ func TestStoreIgnoresTornValueLine(t *testing.T) {
 
 func TestStoreNotFound(t *testing.T) {
 	ctx := context.Background()
-	store, err := jsonl.New(t.TempDir())
+	store, err := storefs.Sessions(t.TempDir())
 	require.NoError(t, err)
 
 	_, err = store.Load(ctx, "nope")
@@ -162,7 +162,7 @@ func TestStoreNotFound(t *testing.T) {
 
 func TestStoreRejectsUnsafeID(t *testing.T) {
 	ctx := context.Background()
-	store, err := jsonl.New(t.TempDir())
+	store, err := storefs.Sessions(t.TempDir())
 	require.NoError(t, err)
 
 	for _, id := range []string{"", ".", "..", "a/b", `a\b`} {
@@ -173,7 +173,7 @@ func TestStoreRejectsUnsafeID(t *testing.T) {
 func TestStoreIgnoresTornLastLine(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 
 	require.NoError(t, store.Create(ctx, record("s1")))
@@ -212,7 +212,7 @@ func TestStoreRejectsBadLine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			dir := t.TempDir()
-			store, err := jsonl.New(dir)
+			store, err := storefs.Sessions(dir)
 			require.NoError(t, err)
 			require.NoError(t, store.Create(ctx, record("s1")))
 
@@ -231,7 +231,7 @@ func TestStoreRejectsBadLine(t *testing.T) {
 func TestStoreAppendsAfterTornLine(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 
 	require.NoError(t, store.Create(ctx, record("s1")))
@@ -256,7 +256,7 @@ func TestStoreAppendsAfterTornLine(t *testing.T) {
 
 func TestStoreRoundTripsCustomEntry(t *testing.T) {
 	ctx := context.Background()
-	store, err := jsonl.New(t.TempDir())
+	store, err := storefs.Sessions(t.TempDir())
 	require.NoError(t, err)
 	require.NoError(t, store.Create(ctx, record("s1")))
 
@@ -278,7 +278,7 @@ func TestStoreAppendsAfterLineWithNoNewline(t *testing.T) {
 	file := `{"type":"session_init","id":"s1","created_at":"2026-09-23T12:00:00Z"}` + "\n" +
 		`{"type":"message","id":"e1","created_at":"2026-09-23T12:00:01Z","message":{"role":"user","content":[{"type":"text","text":"a"}]}}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "s1.jsonl"), []byte(file), 0o644))
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 
 	_, err = store.Load(ctx, "s1")
@@ -297,7 +297,7 @@ func TestStoreAppendsAfterRecordWithNoNewline(t *testing.T) {
 	dir := t.TempDir()
 	file := `{"type":"session_init","id":"s1","created_at":"2026-09-23T12:00:00Z"}`
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "s1.jsonl"), []byte(file), 0o644))
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 
 	_, err = store.Load(ctx, "s1")
@@ -312,7 +312,7 @@ func TestStoreAppendsAfterRecordWithNoNewline(t *testing.T) {
 func TestStoreTornRecordIsNotFound(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 	path := filepath.Join(dir, "s1.jsonl")
 	require.NoError(t, os.WriteFile(path, []byte(`{"type":"session_init","id":"s`), 0o644))
@@ -329,7 +329,7 @@ func TestStoreTornRecordIsNotFound(t *testing.T) {
 func TestStoreCreateKeepsAWholeRecord(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	require.NoError(t, err)
 	require.NoError(t, store.Create(ctx, record("s1")))
 	require.NoError(t, store.Append(ctx, "s1", entry("e1", "a")))

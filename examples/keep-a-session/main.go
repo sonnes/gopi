@@ -17,7 +17,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/session"
-	"github.com/sonnes/gopi/pkg/session/jsonl"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	}
 
 	dir := filepath.Join(os.TempDir(), "gopi-sessions")
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	if err != nil {
 		log.Fatal(err)
 	}

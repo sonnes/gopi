@@ -1,20 +1,20 @@
 ---
 title: Harness
-summary: A harness assembles a coding agent from options. It reads the instruction files, the skills, and the subagents of Claude Code, Codex, and gopi, and it checks each tool call against a permission mode and rules.
+summary: A harness assembles a coding agent from options. It reads the instruction texts, the skills, and the subagents that its readers give, and it checks each tool call against a permission mode and rules.
 ---
 
 import LayerStack from "../../../components/figures/LayerStack.astro";
 
-An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs the rules of the repository, skills that it loads on demand, subagents for side tasks, and a decision for each command that it wants to run. Without a harness, you build each of these with agent options. With a harness, you give options, and each call of `New` or `Durable` assembles the agent again from the files on disk.
+An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs the rules of the repository, skills that it loads on demand, subagents for side tasks, and a decision for each command that it wants to run. Without a harness, you build each of these with agent options. With a harness, you give options, and each call of `New` or `Durable` assembles the agent again from its readers.
 
 <LayerStack
-  alt="The layers of a harness. pkg/harness assembles the agent from its sources: the home folder and the project. pkg/harness/permission checks each tool call. pkg/agent runs the loop. pkg/catalog resolves the model spec."
+  alt="The layers of a harness. pkg/harness assembles the agent from the definitions of its readers. pkg/harness/permission checks each tool call. pkg/agent runs the loop. pkg/catalog resolves the model spec."
   layers={[
     {
       name: "pkg/harness",
       job: "assembles a coding agent on each call",
       hue: "harness",
-      plug: { label: "sources", items: ["AGENTS.md", "CLAUDE.md", "skills", "agents"] },
+      plug: { label: "definitions", items: ["AGENTS.md", "skills", "agents"] },
     },
     { name: "pkg/harness/permission", job: "runs, asks, or denies each tool call", hue: "harness" },
     { name: "pkg/agent", job: "runs the model with tools", hue: "agent" },
@@ -41,26 +41,30 @@ msgs, err := a.Run(ctx, session.Text("Fix the login test.")).Wait()
 
 `Durable` returns an `*agent.Agent`, so you read its events and its log as for any agent. A call can add its own options, such as the `Dir` of another repository. A resumed session keeps its model spec. A `Model` on the call changes it.
 
-## Sources
+## Definitions
 
-| Source    | Reads                                                                                         |
-| --------- | --------------------------------------------------------------------------------------------- |
-| `Project` | `CLAUDE.md`, `AGENTS.md`, the skills in `.codex`, `.claude`, and `.agents`, and the subagents in `.claude/agents` and `.agents/agents`, in `Dir` and each parent up to the git root |
-| `User`    | The same layouts in the home folder, and `.gopi`                                              |
+`Defs` takes a reader of each folder, lowest first. `storefs.Dir` reads the `agents/`, `skills/`, and `AGENTS.md` of one folder:
 
-The harness reads both by default. A skill in a subfolder of `Dir` gets its path as a qualifier, such as `apps/web:deploy`. If two skills have one name, the project skill and then the skill in code get the bare name.
+```go
+harness.Defs(
+	storefs.Dir(filepath.Join(home, ".claude")),
+	storefs.Dir(dir),
+),
+```
+
+Without `Defs`, the harness reads no file. If two folders have a skill or a subagent with one name, the later folder wins.
 
 ## Skills and Subagents
 
 A skill in code goes in `Skillset`, and a subagent in code goes in `Agents`:
 
 ```go
-harness.Skillset(skill.Skill{
+harness.Skillset(def.Skill{
 	Name:        "deploy",
 	Description: "Deploy the service.",
 	Body:        "Run make deploy.",
 }),
-harness.Agents(subagent.Agent{
+harness.Agents(def.Agent{
 	Name:        "reviewer",
 	Description: "Review a diff.",
 	Prompt:      "You review code.",
@@ -82,7 +86,7 @@ A `Deny` rule wins over every mode. Then an `Ask` rule, then an `Allow` rule. Th
 
 The built-in tools run in a local sandbox with the workspace fence, so a command cannot write outside `Dir`. The fence runs only on macOS. On another OS, give a sandbox with `Sandbox`.
 
-Each call of `New` or `Durable` reads the files again, so an edit to `AGENTS.md` or a skill reaches the next agent.
+Each call of `New` or `Durable` reads its readers again, so an edit to `AGENTS.md` or a skill reaches the next agent.
 
 Read [Agents](../agent/index.mdx), [Sections](../agent/sections.mdx), and [Sessions](../session/index.mdx) first.
 

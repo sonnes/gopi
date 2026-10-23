@@ -1,4 +1,4 @@
-package files_test
+package fs_test
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/pkg/harness/files"
-	"github.com/sonnes/gopi/pkg/harness/skill"
+	"github.com/sonnes/gopi/pkg/def"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 func file(text string) *fstest.MapFile {
@@ -23,7 +23,7 @@ func skillFile(description, body string) *fstest.MapFile {
 	return file("---\ndescription: " + description + "\n---\n" + body)
 }
 
-func skillNames(skills []skill.Skill) []string {
+func skillNames(skills []def.Skill) []string {
 	out := make([]string, len(skills))
 	for i, s := range skills {
 		out[i] = s.Name
@@ -47,13 +47,13 @@ func (b brokenFS) Open(name string) (fs.File, error) {
 }
 
 // readSkill reads the one skill of text as skills/deploy/SKILL.md.
-func readSkill(t *testing.T, text string) skill.Skill {
+func readSkill(t *testing.T, text string) def.Skill {
 	t.Helper()
 	fsys := fstest.MapFS{
 		"skills/deploy/SKILL.md": file(text),
 	}
 
-	got, err := files.Skills(fsys, "skills").ReadSkills(context.Background())
+	got, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	return got[0]
@@ -69,7 +69,7 @@ func TestSkillsReadsEachSkillFolder(t *testing.T) {
 		".agents/skills/deep/nested/SKILL.md":  skillFile("Too deep.", "body"),
 	}
 
-	got, err := files.Skills(fsys, ".agents/skills").ReadSkills(context.Background())
+	got, err := storefs.Skills(fsys, ".agents/skills").ReadSkills(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"deploy", "review"}, skillNames(got))
@@ -78,7 +78,7 @@ func TestSkillsReadsEachSkillFolder(t *testing.T) {
 	assert.Equal(t, "Run scripts/run.sh.", deploy.Body)
 	assert.Equal(t, ".agents/skills/deploy/SKILL.md", deploy.Path)
 	assert.Empty(t, deploy.Qualifier)
-	assert.Nil(t, deploy.Meta)
+	assert.Nil(t, deploy.Extra)
 
 	script, err := fs.ReadFile(deploy.Files, "scripts/run.sh")
 	require.NoError(t, err)
@@ -87,9 +87,9 @@ func TestSkillsReadsEachSkillFolder(t *testing.T) {
 
 func TestSkillsTakeTheNameOfTheFolder(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		wantMeta map[string]any
+		name      string
+		text      string
+		wantExtra def.Extra
 	}{
 		{
 			name: "no name",
@@ -100,9 +100,9 @@ func TestSkillsTakeTheNameOfTheFolder(t *testing.T) {
 			text: "---\nname: deploy\ndescription: Deploy.\n---\nbody",
 		},
 		{
-			name:     "another name",
-			text:     "---\nname: ship\ndescription: Deploy.\n---\nbody",
-			wantMeta: map[string]any{"name": "ship"},
+			name:      "another name",
+			text:      "---\nname: ship\ndescription: Deploy.\n---\nbody",
+			wantExtra: def.Extra{"name": "ship"},
 		},
 	}
 	for _, tt := range tests {
@@ -110,7 +110,7 @@ func TestSkillsTakeTheNameOfTheFolder(t *testing.T) {
 			got := readSkill(t, tt.text)
 
 			assert.Equal(t, "deploy", got.Name)
-			assert.Equal(t, tt.wantMeta, got.Meta)
+			assert.Equal(t, tt.wantExtra, got.Extra)
 		})
 	}
 }
@@ -175,7 +175,7 @@ Run it.
 
 	got := readSkill(t, text)
 
-	want := skill.Skill{
+	want := def.Skill{
 		Name:        "deploy",
 		Description: "Deploy.",
 		Body:        "Run it.",
@@ -188,7 +188,7 @@ Run it.
 		NoModelCall: true,
 		Fork:        true,
 		Agent:       "deployer",
-		Meta: map[string]any{
+		Extra: map[string]any{
 			"license":        "MIT",
 			"user-invocable": false,
 			"argument-hint":  "[env]",
@@ -231,7 +231,7 @@ body`
 	got := readSkill(t, text)
 
 	assert.Equal(t, "Deploy. Use when: the user asks to ship.", got.Description)
-	assert.Equal(t, map[string]any{"argument-hint": "[env] [region]"}, got.Meta)
+	assert.Equal(t, def.Extra{"argument-hint": "[env] [region]"}, got.Extra)
 }
 
 func TestSkillsSkipBadSkills(t *testing.T) {
@@ -252,7 +252,7 @@ func TestSkillsSkipBadSkills(t *testing.T) {
 				"skills/good/SKILL.md": skillFile("Works.", "body"),
 			}
 
-			got, err := files.Skills(fsys, "skills").ReadSkills(context.Background())
+			got, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
 			require.NoError(t, err)
 
 			assert.Equal(t, []string{"good"}, skillNames(got))
@@ -277,7 +277,7 @@ func TestSkillsOnDisk(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { root.Close() })
 
-	got, err := files.Skills(root.FS(), ".claude/skills").ReadSkills(context.Background())
+	got, err := storefs.Skills(root.FS(), ".claude/skills").ReadSkills(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"deploy"}, skillNames(got))
@@ -289,7 +289,7 @@ func TestSkillsThatFindNothingGiveNothing(t *testing.T) {
 	missing := os.DirFS(filepath.Join(t.TempDir(), "missing"))
 
 	for _, fsys := range []fs.FS{empty, missing} {
-		got, err := files.Skills(fsys, ".agents/skills").ReadSkills(ctx)
+		got, err := storefs.Skills(fsys, ".agents/skills").ReadSkills(ctx)
 		require.NoError(t, err)
 		assert.Empty(t, got)
 	}
@@ -303,6 +303,6 @@ func TestSkillsFailOnAFileThatCannotBeRead(t *testing.T) {
 		broken: "skills/deploy/SKILL.md",
 	}
 
-	_, err := files.Skills(fsys, "skills").ReadSkills(context.Background())
+	_, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
 	assert.Error(t, err)
 }

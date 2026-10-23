@@ -1,4 +1,4 @@
-package files
+package fs
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/sonnes/gopi/pkg/harness/skill"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 // skillFile is the file that defines a skill in its folder.
@@ -19,7 +19,7 @@ const skillFile = "SKILL.md"
 const forkContext = "fork"
 
 // descriptionSep divides the description from when_to_use in
-// [skill.Skill.Description].
+// [def.Skill.Description].
 const descriptionSep = "\n\n"
 
 var errNoDescription = errors.New("the skill has no description and no body")
@@ -48,14 +48,14 @@ func Skills(fsys fs.FS, dir string) SkillDir {
 // ReadSkills reads each dir/<name>/SKILL.md in name order. The name of
 // a skill is the name of its folder, so two skills of one dir never
 // have the same name. If the frontmatter gives another name, the skill
-// keeps it in Meta["name"]. ReadSkills skips a malformed file.
-func (d SkillDir) ReadSkills(ctx context.Context) ([]skill.Skill, error) {
+// keeps it in Extra["name"]. ReadSkills skips a malformed file.
+func (d SkillDir) ReadSkills(ctx context.Context) ([]def.Skill, error) {
 	entries, err := readDir(d.fsys, d.dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var out []skill.Skill
+	var out []def.Skill
 	for _, e := range entries {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -71,7 +71,7 @@ func (d SkillDir) ReadSkills(ctx context.Context) ([]skill.Skill, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("files: read %s: %w", name, err)
+			return nil, fmt.Errorf("fs: read %s: %w", name, err)
 		}
 
 		s, err := parseSkill(e.Name(), data)
@@ -92,16 +92,16 @@ func (d SkillDir) ReadSkills(ctx context.Context) ([]skill.Skill, error) {
 
 // parseSkill reads a SKILL.md file in the folder name. A skill needs a
 // description, because the model picks a skill by its description.
-func parseSkill(name string, data []byte) (skill.Skill, error) {
+func parseSkill(name string, data []byte) (def.Skill, error) {
 	f, body, err := parseFile(data)
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 
 	rawName := f["name"]
 	fileName, err := f.text("name")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	isOtherName := fileName != "" && fileName != name
 	if isOtherName {
@@ -110,39 +110,39 @@ func parseSkill(name string, data []byte) (skill.Skill, error) {
 
 	description, err := f.text("description")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	if description == "" {
 		description = firstLine(body)
 	}
 	whenToUse, err := f.text("when_to_use")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	description = joinNonEmpty(description, whenToUse)
 	if description == "" {
-		return skill.Skill{}, errNoDescription
+		return def.Skill{}, errNoDescription
 	}
 
 	allowed, _, err := f.list("allowed-tools")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	if len(allowed) == 0 {
 		allowed = nil
 	}
 	model, err := f.text("model")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	agent, err := f.text("agent")
 	if err != nil {
-		return skill.Skill{}, err
+		return def.Skill{}, err
 	}
 	noModelCall := f.flag("disable-model-invocation")
 	fork := isFork(f)
 
-	return skill.Skill{
+	return def.Skill{
 		Name:         name,
 		Description:  description,
 		Body:         body,
@@ -151,13 +151,13 @@ func parseSkill(name string, data []byte) (skill.Skill, error) {
 		NoModelCall:  noModelCall,
 		Fork:         fork,
 		Agent:        agent,
-		Meta:         f.meta(),
+		Extra:        f.meta(),
 	}, nil
 }
 
 // isFork reports whether the frontmatter says "context: fork". If it
 // does, isFork removes the key. Another value of "context" stays in the
-// frontmatter, so it reaches Meta.
+// frontmatter, so it reaches Extra.
 func isFork(f fields) bool {
 	v, ok := f["context"].(string)
 	if !ok || strings.TrimSpace(v) != forkContext {
@@ -205,7 +205,7 @@ func readDir(fsys fs.FS, dir string) ([]fs.DirEntry, error) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("files: read %s: %w", dir, err)
+		return nil, fmt.Errorf("fs: read %s: %w", dir, err)
 	}
 	return entries, nil
 }

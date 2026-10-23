@@ -1,7 +1,7 @@
 ---
 title: Store
 description: How a session record, its entry log, and its values are kept, and what a store must promise.
-package: pkg/session, pkg/session/jsonl
+package: pkg/session, pkg/store/fs
 read_when:
   - You implement a store over your own database
   - You open a session that another process wrote
@@ -32,6 +32,8 @@ A store keeps three things for each session: the record, which says that the ses
 - A failed append cuts the file back to its size before the write. A partial line would join the next line, and Load rejects a complete line that does not decode.
 - A torn record is a create that a crash stopped, so Load reports the session as not found, and Create replaces the file. A create that fails removes its file, so a later create can use the ID.
 - Each line has a `type` field, and the other fields sit flat next to it. The first line has the type `session_init`, an entry line has the type `message`, and a value line has the type `value`. A custom entry has the type `message` too, so a file of an older version loads as it is.
+- List reads each session file to its end and changes no file, so a second process can list the sessions while a writer runs. The cost is that a list reads every entry of every session.
+- List skips a file that it cannot read as a session, so one bad file does not hide the other sessions. Load of that ID reports the error.
 - A value line is a write, not the state. Load replays the value lines in order, so the file never rewrites a line. The cost is that a value that changes often makes the file grow.
 
 ## Map
@@ -40,7 +42,7 @@ A store keeps three things for each session: the record, which says that the ses
 | -------------------------------------------- | ---------------------------- |
 | Implement a store                            | `pkg/session/store.go`       |
 | See a store in memory                        | `pkg/session/memstore.go`    |
-| Change the file format                       | `pkg/session/jsonl/store.go` |
+| Change the file format                       | `pkg/store/fs/sessions.go`   |
 | Change where the CLI keeps the session files | `cmd/gopi/main.go`           |
 
 ## Related Concepts

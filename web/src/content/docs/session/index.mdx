@@ -148,7 +148,7 @@ If a run fails in its tool calls and the process lives on, the next run stores t
 | Store                      | Keeps                              | Use it for                 |
 | -------------------------- | ---------------------------------- | -------------------------- |
 | `session.NewMemoryStore()` | Maps in process memory             | Tests. `Durable` uses it when you set no `Store` |
-| `jsonl.New(dir)`           | One append-only file per session   | One process on one machine |
+| `storefs.Sessions(dir)`    | One append-only file per session   | One process on one machine |
 
 For a service, implement [`session.Storer`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/session#Storer) over your database.
 

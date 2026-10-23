@@ -8,6 +8,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/session"
@@ -22,30 +23,28 @@ var SessionModel = session.Value[string]{
 }
 
 // Harness holds the builders of an agent: the catalog and the model
-// spec, the sources and the readers of skills, subagents, and tools, the
+// spec, the readers of instructions, skills, subagents, and tools, the
 // permission rules, the prompt builder, the seeders, and the agent
 // options. It builds nothing until a call of [Harness.New] or
 // [Harness.Durable]. One harness can serve many sessions, and a call can
 // add its own options, such as the [Dir] of one repository.
 type Harness struct {
-	cat        *catalog.Catalog
-	spec       string
-	store      session.Storer
-	dir        string
-	home       string
-	sources    []Source
-	sourcesSet bool
-	skills     []SkillsReader
-	agents     []AgentsReader
-	tools      []ToolsReader
-	builtin    Builtins
-	box        sandbox.Sandbox
-	system     string
-	preload    []string
-	prompt     PromptBuilder
-	seeds      []Seeder
-	agentOpts  []agent.Option
-	policy     permission.Policy
+	cat          *catalog.Catalog
+	spec         string
+	store        session.Storer
+	dir          string
+	instructions []def.InstructionsReader
+	skills       []def.SkillsReader
+	agents       []def.AgentsReader
+	tools        []ToolsReader
+	builtin      Builtins
+	box          sandbox.Sandbox
+	system       string
+	preload      []string
+	prompt       PromptBuilder
+	seeds        []Seeder
+	agentOpts    []agent.Option
+	policy       permission.Policy
 
 	subagentEvents func(callID string, e agent.Event)
 
@@ -69,7 +68,7 @@ func New(opts ...Option) *Harness {
 // same time.
 func (h *Harness) with(opts []Option) *Harness {
 	c := *h
-	c.sources = slices.Clip(c.sources)
+	c.instructions = slices.Clip(c.instructions)
 	c.skills = slices.Clip(c.skills)
 	c.preload = slices.Clip(c.preload)
 	c.agents = slices.Clip(c.agents)
@@ -86,7 +85,7 @@ func (h *Harness) with(opts []Option) *Harness {
 }
 
 // New assembles an agent over an unsaved session, with opts on top of
-// the baseline. It reads the sources and the readers, makes the agent,
+// the baseline. It reads the readers, makes the agent,
 // and seeds its log. The agent builds the prompt before each model call.
 // A subagent of an unsaved agent is unsaved too, so the task tool cannot
 // resume it.

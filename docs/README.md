@@ -45,13 +45,15 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | model file    | One models.json: the default models of each provider and each driver. A program reads it from a path or a URL | model list, manifest, registry |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
 | detector      | What reads one source and gives a catalog a provider or a driver | probe, loader            |
-| harness       | What assembles a coding agent from options, the files of a project, and a catalog, on each call | builder, factory, runtime |
+| harness       | What assembles a coding agent from options, the definitions of its readers, and a catalog, on each call | builder, factory, runtime |
 | assembly      | What one call of a harness resolved: the model, the instruction files, the skills, the subagents, and the tools | build, config |
-| source        | A place that a harness reads instruction files, skills, and subagents from: the project or the home folder | layout, origin |
+| definition    | An agent, a skill, or an instruction text that a person writes, and that a store reads for the harness | spec, manifest, config |
+| extra key     | A frontmatter key that no field of a definition takes. The definition keeps it with its value | meta, unknown field |
 | instruction file | A file of rules for the agent, such as AGENTS.md or CLAUDE.md | memory file, rules file  |
 | skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
-| qualified name | The qualifier of a skill, ":", and its name, such as `apps/web:deploy` | full name, path name |
+| qualified name | The qualifier of a skill, ":", and its name, such as `ops:deploy` | full name, path name |
 | subagent      | A named agent that the model gives a task to with the task tool | worker, delegate, sub-task |
+| pinned agent  | The agent file that a session started with, which the host keeps in a session value | saved agent, agent snapshot |
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
@@ -66,7 +68,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | ephemeral entry | An entry that the model reads in its run, and that the store does not keep | transient message, temp entry |
 | custom entry  | An entry with a kind and data and no message. The model never reads it | marker, meta entry |
 | value         | One piece of application state in a session, named by a namespace and a key | metadata, attribute, setting |
-| store         | What keeps the sessions: the record, the entries, and the values | database, backend, repository |
+| store         | What keeps the sessions, with the record, the entries, and the values of each. A store can also read the definitions | database, backend, repository |
 | snapshot      | A copy of a state, as JSON, that a viewer applies events to. `session.Snapshot` is a session as a store loads it | dump, checkpoint |
 | hook          | A function that the loop calls at a lifecycle point          | callback                    |
 | hook point    | One point of the loop at which a hook runs, such as BeforeTool. Each point is its own interface | hook type, lifecycle event |

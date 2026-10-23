@@ -41,7 +41,7 @@ A value is one piece of application state in a session: a title, a model choice,
 | Task                                  | File                         |
 | ------------------------------------- | ---------------------------- |
 | Change how a value is read or written | `pkg/session/value.go`       |
-| Change how a file keeps a value       | `pkg/session/jsonl/store.go` |
+| Change how a file keeps a value       | `pkg/store/fs/sessions.go`   |
 
 ## Related Concepts
 

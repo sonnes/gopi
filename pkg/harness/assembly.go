@@ -9,8 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/harness/skill"
-	"github.com/sonnes/gopi/pkg/harness/subagent"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -25,21 +24,20 @@ type Assembly struct {
 	Model ai.Model
 	// System is the base text that [System] set.
 	System string
-	// Instructions holds the instruction files of the sources, root
-	// first.
-	Instructions []Instruction
+	// Instructions holds the instruction texts of the readers of
+	// [Instructions] and [Defs], in order.
+	Instructions []def.Instruction
 	// Tools describes the tools that the model can call, in order: the
 	// built-in tools, the tools of [Toolset], the skill tool, then the
 	// task tool. A deferred tool is not in the list, because the model
 	// cannot call it until the search of the agent loads it.
 	Tools []ai.ToolInfo
-	// Skills holds the skills of the sources and the readers, merged by
-	// qualified name. [Assembly.SkillName] gives the name that the model
+	// Skills holds the skills of the readers, merged by qualified name. [Assembly.SkillName] gives the name that the model
 	// sees.
-	Skills []skill.Skill
+	Skills []def.Skill
 	// Agents holds the subagents, merged by name. A child assembly has
 	// none, so a subagent cannot start a subagent.
-	Agents []subagent.Agent
+	Agents []def.Agent
 	// Dir is the folder that the agent works in.
 	Dir string
 
@@ -62,13 +60,13 @@ func (a *Assembly) SkillName(i int) string {
 
 // skill returns the skill that has the name or the qualified name, and
 // reports whether it exists.
-func (a *Assembly) skill(name string) (skill.Skill, bool) {
+func (a *Assembly) skill(name string) (def.Skill, bool) {
 	for i, s := range a.Skills {
 		if name == a.SkillName(i) || name == s.QualifiedName() {
 			return s, true
 		}
 	}
-	return skill.Skill{}, false
+	return def.Skill{}, false
 }
 
 // withSkills returns text with the body of each named skill after it.
@@ -86,7 +84,7 @@ func (a *Assembly) withSkills(text string, names []string) (string, error) {
 }
 
 // skillText is the text of a preloaded skill in the prompt.
-func skillText(name string, s skill.Skill) string {
+func skillText(name string, s def.Skill) string {
 	return "## Skill: " + name + "\n\n" + s.Body
 }
 
@@ -95,7 +93,7 @@ func (a *Assembly) taskTool() bool {
 	return len(a.Agents) > 0 && a.h.child == nil
 }
 
-// assemble reads the sources and the readers of h, and fills in an
+// assemble reads the readers of h, and fills in an
 // Assembly for the spec of h. id is the ID of the session, or "".
 func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 	model, err := h.model()
@@ -106,7 +104,7 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 	if err != nil {
 		return nil, err
 	}
-	src, err := h.readSources(dir)
+	instructions, err := readInstructions(ctx, h.instructions)
 	if err != nil {
 		return nil, err
 	}
@@ -115,12 +113,12 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		Spec:         h.spec,
 		Model:        model,
 		System:       h.system,
-		Instructions: src.instructions,
+		Instructions: instructions,
 		Dir:          dir,
 		h:            h,
 		session:      id,
 	}
-	asm.Skills, err = readSkills(ctx, append(src.skills, h.skills...))
+	asm.Skills, err = readSkills(ctx, h.skills)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +130,7 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		if err != nil {
 			return nil, err
 		}
-		asm.Agents, err = readAgents(ctx, append(src.agents, h.agents...))
+		asm.Agents, err = readAgents(ctx, h.agents)
 		if err != nil {
 			return nil, err
 		}
@@ -175,14 +173,28 @@ func (h *Harness) workDir() (string, error) {
 	return filepath.Abs(h.dir)
 }
 
+// readInstructions reads each instructions reader in order. An error of
+// a reader fails the assembly.
+func readInstructions(ctx context.Context, readers []def.InstructionsReader) ([]def.Instruction, error) {
+	var out []def.Instruction
+	for i, r := range readers {
+		texts, err := r.ReadInstructions(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("harness: instructions reader %d (%T): %w", i, r, err)
+		}
+		out = append(out, texts...)
+	}
+	return out, nil
+}
+
 // readSkills reads each skills reader in order and merges the skills by
 // qualified name. A later skill replaces an earlier skill with the same
 // qualified name, at the position of the earlier one, so the list that
 // the model sees keeps its order. An error of a reader fails the
 // assembly.
-func readSkills(ctx context.Context, readers []SkillsReader) ([]skill.Skill, error) {
+func readSkills(ctx context.Context, readers []def.SkillsReader) ([]def.Skill, error) {
 	var (
-		out []skill.Skill
+		out []def.Skill
 		at  = make(map[string]int)
 	)
 	for i, r := range readers {
@@ -206,7 +218,7 @@ func readSkills(ctx context.Context, readers []SkillsReader) ([]skill.Skill, err
 // skillNames returns the name that the model sees for each skill. The
 // last skill with a bare name gets the bare name, and the others get
 // their qualified names. No skill is lost on a clash.
-func skillNames(skills []skill.Skill) []string {
+func skillNames(skills []def.Skill) []string {
 	last := make(map[string]int, len(skills))
 	for i, s := range skills {
 		last[s.Name] = i
@@ -224,9 +236,9 @@ func skillNames(skills []skill.Skill) []string {
 
 // readAgents reads each agents reader in order. A later subagent
 // replaces an earlier one with the same name, at its position.
-func readAgents(ctx context.Context, readers []AgentsReader) ([]subagent.Agent, error) {
+func readAgents(ctx context.Context, readers []def.AgentsReader) ([]def.Agent, error) {
 	var (
-		out []subagent.Agent
+		out []def.Agent
 		at  = make(map[string]int)
 	)
 	for i, r := range readers {

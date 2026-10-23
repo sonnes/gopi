@@ -28,8 +28,10 @@ A host runs sessions of gopi agents for a Go program. The caller gives a `Spec` 
 
 ## Design
 
-- The caller gives the `Spec` at each `Start`, and the host keeps no record of it. The host then has no agent registry and no index. The cost: after a restart, the caller gives the spec again.
-- The host writes nothing into the session log, so the log is the same log that the agent keeps without a host. If the store has a log with the ID of a `Spec`, the driver resumes it.
+- The caller gives the `Spec` at each `Start`, and the host keeps no record of it except the agent file. The host then has no agent registry and no index. The cost: after a restart, the caller gives the spec again.
+- A spec can name an agent file in its dirs. The host reads only that file, because its model picks the driver, and the driver gets the dirs for the rest. A field that the spec sets wins over the file, so a caller can change one field of an agent.
+- A new session with an agent file keeps the agent in the `gopi.host/agent` value before the driver starts, and a resume runs that agent. A crash during the start then cannot leave a session with no agent. An edit of the file then changes only the sessions that start after it, as the model of a harness session stays. A resume with another agent name fails, because one session runs one agent.
+- The host writes no entry into the session log, so the model reads the same log that the agent keeps without a host. If the store has a log with the ID of a `Spec`, the driver resumes it.
 - One host owns a session. Two hosts on one store must not run the same session, because their entries interleave in one log.
 - The host events follow the pattern of the [agent events](../agent/run-stream.md): a sealed interface, one type for each event, and a `State` that applies each event.
 - Each `Events` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. `State.Apply` changes the state in place, and the hub clones it for each new reader, because the host applies every event and a reader joins less often. A reader that falls too far behind loses its stream, so one stalled reader cannot hold the events in memory.
@@ -51,6 +53,7 @@ A host runs sessions of gopi agents for a Go program. The caller gives a `Spec` 
 | Task                                              | File                   |
 | ------------------------------------------------- | ---------------------- |
 | Change how a session starts                       | `pkg/host/host.go`     |
+| Change how an agent file fills a spec             | `pkg/host/agentfile.go` |
 | Change how a session closes, or its agent stream  | `pkg/host/session.go`  |
 | Change how a message queues or runs               | `pkg/host/run.go`      |
 | Change how an approval reaches the spec           | `pkg/host/approval.go` |
@@ -61,6 +64,7 @@ A host runs sessions of gopi agents for a Go program. The caller gives a `Spec` 
 ## Related Concepts
 
 - [Driver](../agent/driver.md)
+- [Definition](../def/definition.md)
 - [Catalog](../catalog/catalog.md)
 - [Run Stream](../agent/run-stream.md)
 - [Log](../session/log.md)

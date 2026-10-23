@@ -11,8 +11,8 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/skill"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -132,7 +132,7 @@ func TestNewNeedsAModel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := with(tt.opts, harness.Builtin(harness.NoBuiltins), harness.Sources())
+			opts := with(tt.opts, harness.Builtin(harness.NoBuiltins))
 			_, err := harness.New(opts...).New(context.Background())
 			assert.ErrorContains(t, err, tt.want)
 		})
@@ -160,7 +160,7 @@ func TestDurableUpdatesTheSkillsSection(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("a"), reply("b"), reply("c")}}
 	h := harness.New(with(base(t, p), harness.Store(session.NewMemoryStore()))...)
 	withSkill := func(description string) harness.Option {
-		return harness.Skillset(skill.Skill{Name: "deploy", Description: description, Body: "Run make deploy."})
+		return harness.Skillset(def.Skill{Name: "deploy", Description: description, Body: "Run make deploy."})
 	}
 
 	for _, r := range []struct{ description, input string }{
@@ -301,7 +301,6 @@ func TestTheDefaultBuiltinsAreTheCodingTools(t *testing.T) {
 				harness.Catalog(newCatalog(&script{})),
 				harness.Model("fake/one"),
 				harness.Seed(harness.NoSeed),
-				harness.Sources(),
 				harness.Dir(t.TempDir()),
 				tt.opt,
 			}

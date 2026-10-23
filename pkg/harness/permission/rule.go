@@ -11,15 +11,25 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox/grep"
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/sandbox/write"
+	"github.com/sonnes/gopi/pkg/tool/askquestion"
+	"github.com/sonnes/gopi/pkg/tool/todowrite"
 )
 
 // aliases maps each Claude Code tool name to the gopi tools that it
-// names in a rule.
+// names in a rule. A rule of Claude Code, such as a disallowedTools
+// list of an agent file, then works on the tools of gopi.
 var aliases = map[string][]string{
-	"Bash":  {bash.Name},
-	"Read":  {read.Name, grep.Name, find.Name},
-	"Edit":  {edit.Name, write.Name},
-	"Write": {write.Name},
+	"Bash":            {bash.Name},
+	"Read":            {read.Name, grep.Name, find.Name},
+	"Edit":            {edit.Name, write.Name},
+	"Write":           {write.Name},
+	"Grep":            {grep.Name},
+	"Glob":            {find.Name},
+	"MultiEdit":       {edit.Name},
+	"TodoWrite":       {todowrite.Name},
+	"AskUserQuestion": {askquestion.Name},
+	"Skill":           {skillTool},
+	"Task":            {taskTool},
 }
 
 // contentKind is what the content of a rule matches.

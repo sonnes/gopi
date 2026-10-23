@@ -16,11 +16,12 @@
 // folder, and it has no network. The file tools obey the same rules.
 // ask_user_question asks on the terminal.
 //
-// gopi builds the agent with package harness. It reads the instruction
-// files, the skills, and the subagents of the home folder and of the
-// root folder, in the layouts of Claude Code, Codex, and gopi. Each
-// tool call obeys --permission-mode and the --allow and --deny rules. A
-// call that needs an approval asks on the terminal.
+// gopi builds the agent with package harness. It reads the CLAUDE.md
+// and AGENTS.md files, the skills, and the subagents of each --dir
+// folder, lowest first. Without --dir, it reads ~/.claude,
+// <root>/.claude, and <root>. --agent names an agent file of those
+// folders, which fills the unset flags. Each tool call obeys --permission-mode and the --allow and
+// --deny rules. A call that needs an approval asks on the terminal.
 //
 // gopi finds the providers from ANTHROPIC_API_KEY, OPENAI_API_KEY,
 // OPENROUTER_API_KEY, and FIREWORKS_API_KEY, with the detectors of
@@ -64,9 +65,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/urfave/cli/v3"
+
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
@@ -78,11 +83,10 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/sandbox/write"
 	"github.com/sonnes/gopi/pkg/session"
-	"github.com/sonnes/gopi/pkg/session/jsonl"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 	"github.com/sonnes/gopi/pkg/tool/todowrite"
-	"github.com/urfave/cli/v3"
 )
 
 // prompt asks for the next line on stderr, so that stdout holds only
@@ -92,6 +96,19 @@ const prompt = "> "
 // errShown is the error of a run that the tree shows. A run that starts
 // always sends agent_end with its error, so main exits with no message.
 var errShown = errors.New("the run failed")
+
+// inheritModel is the model of an agent file that keeps the model of
+// the flags.
+const inheritModel = "inherit"
+
+// instructionFiles are the instruction files that gopi reads in each
+// folder, in order: the file of Claude Code, then the file of the other
+// agents.
+var instructionFiles = []string{"CLAUDE.md", "AGENTS.md"}
+
+// claudeDir is the folder of Claude Code, with agents/ and skills/,
+// that gopi reads without --dir.
+const claudeDir = ".claude"
 
 // defaultTools names every tool of gopi, in the order that the model
 // gets them.
@@ -121,6 +138,20 @@ type options struct {
 	// allow and deny are the permission rules of the tool calls.
 	allow []string
 	deny  []string
+	// dirs are the folders of the definitions, lowest first. Empty
+	// means the folders of [defDirs].
+	dirs []string
+	// agent names an agent file in the dirs. Empty means no agent file.
+	agent string
+	// system is the base text of the system prompt: the prompt of the
+	// agent file. Empty means no base text.
+	system string
+	// agentModel is the model of the agent file. --model and the model
+	// of a resumed session win over it.
+	agentModel string
+	// skills names the skills that the agent loads at the start: the
+	// skills of the agent file.
+	skills []string
 }
 
 func main() {
@@ -179,6 +210,14 @@ func main() {
 				Name:  "deny",
 				Usage: "a rule for the tool calls that never run, such as 'bash(git push *)'. Give the flag again to add a rule",
 			},
+			&cli.StringSliceFlag{
+				Name:  "dir",
+				Usage: "a folder with agents/, skills/, CLAUDE.md, and AGENTS.md. Give the flag again to add a folder. A later folder wins for a name. If unset, gopi reads ~/.claude, <root>/.claude, and <root>",
+			},
+			&cli.StringFlag{
+				Name:  "agent",
+				Usage: "the name of an agent file in agents/ of the --dir folders. Its model, thinking level, permission mode, prompt, and disallowed tools fill the flags that are unset. gopi reads the file at each start",
+			},
 			&cli.StringFlag{
 				Name:  "mcp",
 				Usage: "the path of an mcp.json file. gopi starts its servers and gives their tools to the agent. The fence does not confine the servers",
@@ -199,9 +238,11 @@ func main() {
 				json:      c.Bool("json"),
 				mcp:       c.String("mcp"),
 				sessionID: c.String("session-id"),
-				mode:      c.String("permission-mode"),
+				mode:      setString(c, "permission-mode"),
 				allow:     c.StringSlice("allow"),
 				deny:      c.StringSlice("deny"),
+				dirs:      c.StringSlice("dir"),
+				agent:     c.String("agent"),
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
@@ -222,6 +263,13 @@ func run(ctx context.Context, o options, args []string) error {
 	if err != nil {
 		return err
 	}
+	if o.agent != "" {
+		a, err := findAgent(ctx, o)
+		if err != nil {
+			return err
+		}
+		o = withAgent(o, a)
+	}
 	// A resumed session keeps its model unless --model changes it, so
 	// gopi resolves the model that the harness uses.
 	stored, err := storedSpec(ctx, dir, o.sessionID)
@@ -229,7 +277,7 @@ func run(ctx context.Context, o options, args []string) error {
 		return err
 	}
 	set := loadModels(ctx, os.Stderr, os.Getenv)
-	cat, spec, err := newCatalog(ctx, cmp.Or(o.model, stored), env.Detectors(set))
+	cat, spec, err := newCatalog(ctx, modelSpec(o, stored), env.Detectors(set))
 	if err != nil {
 		return err
 	}
@@ -269,12 +317,19 @@ func run(ctx context.Context, o options, args []string) error {
 		harness.Allow(o.allow...),
 		harness.Deny(o.deny...),
 		harness.Approve(answers.Approve),
+		harness.Defs(defReaders(o)...),
+	}
+	if o.system != "" {
+		opts = append(opts, harness.System(o.system))
+	}
+	if len(o.skills) > 0 {
+		opts = append(opts, harness.Preload(o.skills...))
 	}
 	if o.turns > 0 {
 		opts = append(opts, harness.AgentDefaults(maxTurns(o.turns)))
 	}
 	if o.thinking != "" {
-		level, err := parseThinking(o.thinking)
+		level, err := ai.ParseThinking(o.thinking)
 		if err != nil {
 			return err
 		}
@@ -330,7 +385,7 @@ func newAgent(
 	if sessionID == "" {
 		return harness.New(opts...).New(ctx, harness.Model(spec))
 	}
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +401,7 @@ func storedSpec(ctx context.Context, dir, id string) (string, error) {
 	if id == "" {
 		return "", nil
 	}
-	store, err := jsonl.New(dir)
+	store, err := storefs.Sessions(dir)
 	if err != nil {
 		return "", err
 	}
@@ -540,6 +595,76 @@ func fenceError(err error) error {
 		return fmt.Errorf("%w: the fence runs only on macOS. Run gopi with --fence=false to run the tools without a sandbox", err)
 	}
 	return err
+}
+
+// setString returns the value of the flag name, or "" if the command
+// line does not set it. A flag with a default then cannot hide the
+// value of an agent file.
+func setString(c *cli.Command, name string) string {
+	if !c.IsSet(name) {
+		return ""
+	}
+	return c.String(name)
+}
+
+// findAgent returns the agent file o.agent of the folders of
+// [defDirs]. A later folder wins.
+func findAgent(ctx context.Context, o options) (def.Agent, error) {
+	dirs := defReaders(o)
+	readers := make([]def.AgentsReader, len(dirs))
+	for i, r := range dirs {
+		readers[i] = r
+	}
+	return def.FindAgent(ctx, o.agent, readers...)
+}
+
+// withAgent fills each unset flag of o from the agent file a. The
+// prompt of a becomes the base text of the system prompt, its
+// disallowed tools go after --deny, and gopi preloads its skills.
+func withAgent(o options, a def.Agent) options {
+	if !strings.EqualFold(a.Model, inheritModel) {
+		o.agentModel = a.Model
+	}
+	o.thinking = cmp.Or(o.thinking, string(a.Effort))
+	o.mode = cmp.Or(o.mode, a.Mode)
+	o.system = a.Prompt
+	o.deny = append(slices.Clip(o.deny), a.Disallowed...)
+	o.skills = a.Skills
+	return o
+}
+
+// modelSpec returns the model of the run: --model, then the model of a
+// resumed session, then the model of the agent file.
+func modelSpec(o options, stored string) string {
+	return cmp.Or(o.model, stored, o.agentModel)
+}
+
+// defReaders returns a reader of each folder of [defDirs].
+func defReaders(o options) []def.Reader {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	dirs := defDirs(o, home)
+	readers := make([]def.Reader, len(dirs))
+	for i, d := range dirs {
+		readers[i] = storefs.Dir(d, storefs.InstructionFiles(instructionFiles...))
+	}
+	return readers
+}
+
+// defDirs returns the folders of the definitions: the --dir flags, or
+// the folders of Claude Code in home and in the root, then the root. An
+// empty home adds no folder.
+func defDirs(o options, home string) []string {
+	if len(o.dirs) > 0 {
+		return o.dirs
+	}
+	var dirs []string
+	if home != "" {
+		dirs = append(dirs, filepath.Join(home, claudeDir))
+	}
+	return append(dirs, filepath.Join(o.root, claudeDir), o.root)
 }
 
 // newTools returns the tools that names lists, in its order. The

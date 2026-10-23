@@ -7,11 +7,11 @@ import (
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
-	"github.com/sonnes/gopi/pkg/harness/skill"
-	"github.com/sonnes/gopi/pkg/harness/subagent"
 	"github.com/sonnes/gopi/pkg/session"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 // done is a provider that answers each call with "Done.".
@@ -26,7 +26,7 @@ func (done) StreamText(context.Context, ai.Model, []ai.Message, ai.Options) *ai.
 }
 
 // A harness assembles a coding agent from options. Durable reads the
-// files of the project on each call, and the session keeps its model.
+// definitions of the folder on each call, and the session keeps its model.
 func Example() {
 	ctx := context.Background()
 	cat := catalog.New()
@@ -38,14 +38,14 @@ func Example() {
 		harness.Catalog(cat),
 		harness.Model("fake/one"),
 		harness.Dir(dir),
-		harness.Sources(harness.Project),
+		harness.Defs(storefs.Dir(dir)),
 		harness.Builtin(harness.NoBuiltins),
-		harness.Skillset(skill.Skill{
+		harness.Skillset(def.Skill{
 			Name:        "deploy",
 			Description: "Deploy the service.",
 			Body:        "Run make deploy.",
 		}),
-		harness.Agents(subagent.Agent{
+		harness.Agents(def.Agent{
 			Name:        "reviewer",
 			Description: "Review a diff.",
 			Prompt:      "You review code.",

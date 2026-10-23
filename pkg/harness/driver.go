@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 // Start starts the durable agent of the session c.Session, as
@@ -15,7 +17,7 @@ import (
 // model of each text provider.
 //
 // The harness honors each field of c, each mode, and each point of a
-// hook. The Mode of c replaces the [Mode] of h. The System of c goes
+// hook. It reads each folder of the Dirs of c, after the readers of h. The Mode of c replaces the [Mode] of h. The System of c goes
 // after the [System] of h, as a CLI agent adds it to its own prompt.
 // The Skills of c are preloaded, as with [Preload]. The rules of c go
 // after the rules of h.
@@ -42,6 +44,12 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
 	}
+	if len(c.Dirs) > 0 {
+		opts = append(opts, Defs(dirReaders(c.Dirs)...))
+	}
+	if c.Effort != "" {
+		opts = append(opts, AgentDefaults(agent.Thinking(c.Effort)))
+	}
 	if c.Mode != "" {
 		// The modes of a config have the names of the permission modes.
 		opts = append(opts, Mode(permission.Mode(c.Mode)))
@@ -59,6 +67,15 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 		opts = append(opts, Toolset(Tools(c.Tools...)))
 	}
 	return h.Durable(ctx, c.Session, opts...)
+}
+
+// dirReaders returns a reader of each folder of dirs, in order.
+func dirReaders(dirs []string) []def.Reader {
+	readers := make([]def.Reader, len(dirs))
+	for i, d := range dirs {
+		readers[i] = storefs.Dir(d)
+	}
+	return readers
 }
 
 // joinText returns the texts that are not empty, joined by a blank

@@ -1,4 +1,4 @@
-package jsonl
+package fs
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func halfWrite(t *testing.T) {
 func TestAppendFailureLeavesFile(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := Sessions(dir)
 	require.NoError(t, err)
 	rec := session.Session{
 		ID:        "s1",
@@ -53,7 +53,7 @@ func TestAppendFailureLeavesFile(t *testing.T) {
 func TestCreateFailureFreesTheID(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	store, err := New(dir)
+	store, err := Sessions(dir)
 	require.NoError(t, err)
 	rec := session.Session{
 		ID:        "s1",

@@ -198,3 +198,37 @@ func TestStartFails(t *testing.T) {
 		})
 	}
 }
+
+func TestStartReadsTheDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "skills/deploy/SKILL.md", skillFile("Deploy from the dir.", "body"))
+	writeFile(t, dir, "AGENTS.md", "Use tabs.")
+	p := &script{responses: []ai.Message{reply("done")}}
+	h := harness.New(base(t, p)...)
+
+	a := start(t, h, agent.Config{
+		Session: "s1",
+		Dirs:    []string{dir},
+	})
+	run(t, a, "hi")
+
+	assert.Contains(t, section(a, "skills"), "Deploy from the dir.")
+	assert.Contains(t, section(a, "instructions"), "Use tabs.")
+}
+
+func TestStartSetsTheEffort(t *testing.T) {
+	p := &script{responses: []ai.Message{reply("done")}}
+	h := harness.New(base(t, p)...)
+
+	a := start(t, h, agent.Config{
+		Session: "s1",
+		Effort:  ai.ThinkingHigh,
+	})
+	run(t, a, "hi")
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	level, ok := ai.GetOption(p.opts[0], ai.Thinking)
+	assert.True(t, ok)
+	assert.Equal(t, ai.ThinkingHigh, level)
+}

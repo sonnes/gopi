@@ -1,11 +1,16 @@
-// Package files reads skills and subagents from Markdown files in an
-// [io/fs.FS].
+// Package fs is the store of gopi on the file system. It reads the
+// definitions of [def] from Markdown files, and it keeps each session
+// in one JSONL file.
 //
-// [Skills] returns a [SkillDir], a skills reader. [Agents] returns an
-// [AgentDir], an agents reader. Both take an fs.FS, so an [embed.FS] of
-// files that ship in the binary reads the same as a folder on disk. The
-// paths in the results are relative to the fs.FS. The package does not
-// import the harness, because the harness imports it.
+// [Dir] reads the agents, the skills, and the AGENTS.md file of one
+// folder on disk. [Skills] and [Agents] read one directory of an
+// [io/fs.FS], so an [embed.FS] of files that ship in the binary reads
+// the same as a folder on disk. Their paths are relative to the fs.FS.
+// [Sessions] returns the [SessionStore], a [session.Storer].
+//
+// The package name hides io/fs. A caller imports it as storefs:
+//
+//	import storefs "github.com/sonnes/gopi/pkg/store/fs"
 //
 // A layout on disk, such as .agents or .claude, is a list of calls:
 //
@@ -14,8 +19,8 @@
 //		return err
 //	}
 //	repoFS := root.FS()
-//	skills := files.Skills(repoFS, ".claude/skills")
-//	agents := files.Agents(repoFS, ".claude/agents")
+//	skills := storefs.Skills(repoFS, ".claude/skills")
+//	agents := storefs.Agents(repoFS, ".claude/agents")
 //
 // A file starts with YAML frontmatter between two --- lines. The
 // readers parse it as Claude Code and Codex do:
@@ -28,7 +33,7 @@
 //   - A list of tools or names is a YAML list, or text that the reader
 //     splits on commas and white space. The reader does not split
 //     inside parentheses, so "Bash(git push *), Read" is two tools.
-//   - A key that no field takes goes to the Meta field with its parsed
+//   - A key that no field takes goes to the Extra field with its parsed
 //     value.
 //
 // A caller must obey these rules:
@@ -43,4 +48,4 @@
 //     description, and reads the others. One typo must not stop every
 //     session. A file that cannot be read is an error, because a fix
 //     to the text cannot correct it.
-package files
+package fs

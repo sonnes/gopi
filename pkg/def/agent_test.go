@@ -1,4 +1,4 @@
-package subagent_test
+package def_test
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/pkg/harness/subagent"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 func TestAnAgentIsAReader(t *testing.T) {
-	a := subagent.Agent{
+	a := def.Agent{
 		Name:        "reviewer",
 		Description: "Review a diff.",
 		Prompt:      "Read the diff.",
@@ -19,5 +19,5 @@ func TestAnAgentIsAReader(t *testing.T) {
 
 	got, err := a.ReadAgents(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, []subagent.Agent{a}, got)
+	assert.Equal(t, []def.Agent{a}, got)
 }

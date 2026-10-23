@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/skill"
 )
 
-var review = skill.Skill{
+var review = def.Skill{
 	Name:        "review",
 	Description: "Review a diff.",
 	Body:        "Read the diff.",

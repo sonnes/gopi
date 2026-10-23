@@ -40,28 +40,3 @@ func TestJSONLines(t *testing.T) {
 	require.NoError(t, sc.Err())
 	assert.Equal(t, events, got)
 }
-
-func TestParseThinking(t *testing.T) {
-	tests := []struct {
-		in      string
-		want    ai.ThinkingLevel
-		wantErr string
-	}{
-		{in: "high", want: ai.ThinkingHigh},
-		{in: "off", want: ai.ThinkingOff},
-		{in: "max", want: ai.ThinkingMax},
-		{in: "huge", wantErr: `unknown thinking level "huge"`},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.in, func(t *testing.T) {
-			got, err := parseThinking(tt.in)
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}

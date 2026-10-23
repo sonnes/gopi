@@ -1,10 +1,15 @@
-package subagent
+package def
 
-import "context"
+import (
+	"context"
 
-// Agent is the definition of a subagent. The main agent sees the name
-// and the description, and it starts the subagent for a task. The
-// subagent runs with the prompt as its system prompt.
+	"github.com/sonnes/gopi/pkg/ai"
+)
+
+// Agent is the definition of an agent. The host starts an agent by its
+// name. As a subagent, the main agent sees the name and the
+// description, and it starts the subagent for a task. The agent runs
+// with the prompt as its system prompt.
 //
 // A reader of agent files sets the fields from the frontmatter. The doc
 // comment of each field names its frontmatter key.
@@ -30,6 +35,10 @@ type Agent struct {
 	// or a "provider/id" spec. If it is "" or "inherit", the agent uses
 	// the model of the parent.
 	Model string
+	// Effort is the thinking level of the agent, as the file writes it.
+	// The frontmatter key is "effort". If it is empty, the agent uses
+	// the thinking level of the parent.
+	Effort ai.ThinkingLevel
 	// Mode is the permission mode of the agent, as the file writes it.
 	// The frontmatter key is "permissionMode". The harness maps it. If
 	// it is empty, the agent uses the mode of the parent.
@@ -47,10 +56,10 @@ type Agent struct {
 	// Path is the location of the agent file, for a reader. It is empty
 	// for an agent in code.
 	Path string
-	// Meta holds each other frontmatter key with its parsed value, such
-	// as "mcpServers", "hooks", "memory", "color", "isolation",
-	// "background", and "effort". It is nil if there are no other keys.
-	Meta map[string]any
+	// Extra holds each frontmatter key that no field takes, such as
+	// "mcpServers", "hooks", "memory", "color", and "isolation". It is
+	// nil if there are no other keys.
+	Extra Extra
 }
 
 // ReadAgents returns a as the one agent of a reader. An Agent is then

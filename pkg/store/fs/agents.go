@@ -1,4 +1,4 @@
-package files
+package fs
 
 import (
 	"context"
@@ -9,7 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/sonnes/gopi/pkg/harness/subagent"
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 // agentExt is the extension of an agent file.
@@ -45,13 +46,13 @@ func Agents(fsys fs.FS, dir string) AgentDir {
 // ReadAgents reads each agent file in path order. It skips a malformed
 // file. It keeps each agent, also when two files give the same name.
 // The caller picks the agent that wins.
-func (d AgentDir) ReadAgents(ctx context.Context) ([]subagent.Agent, error) {
+func (d AgentDir) ReadAgents(ctx context.Context) ([]def.Agent, error) {
 	names, err := d.agentFiles()
 	if err != nil {
 		return nil, err
 	}
 
-	var out []subagent.Agent
+	var out []def.Agent
 	for _, name := range names {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -59,7 +60,7 @@ func (d AgentDir) ReadAgents(ctx context.Context) ([]subagent.Agent, error) {
 
 		data, err := fs.ReadFile(d.fsys, name)
 		if err != nil {
-			return nil, fmt.Errorf("files: read %s: %w", name, err)
+			return nil, fmt.Errorf("fs: read %s: %w", name, err)
 		}
 		a, err := parseAgent(data)
 		if err != nil {
@@ -81,7 +82,7 @@ func (d AgentDir) agentFiles() ([]string, error) {
 			return fs.SkipAll
 		}
 		if err != nil {
-			return fmt.Errorf("files: read %s: %w", name, err)
+			return fmt.Errorf("fs: read %s: %w", name, err)
 		}
 		if !e.IsDir() && path.Ext(name) == agentExt {
 			names = append(names, name)
@@ -97,61 +98,66 @@ func (d AgentDir) agentFiles() ([]string, error) {
 }
 
 // parseAgent reads an agent file.
-func parseAgent(data []byte) (subagent.Agent, error) {
+func parseAgent(data []byte) (def.Agent, error) {
 	f, prompt, err := parseFile(data)
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 
 	name, err := f.text("name")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	if name == "" {
-		return subagent.Agent{}, errNoName
+		return def.Agent{}, errNoName
 	}
 	description, err := f.text("description")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	if description == "" {
-		return subagent.Agent{}, errNoAgentDetail
+		return def.Agent{}, errNoAgentDetail
 	}
 	description = strings.ReplaceAll(description, `\n`, "\n")
 
 	tools, err := agentTools(f)
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	disallowed, err := optionalList(f, "disallowedTools")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	skills, err := optionalList(f, "skills")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	model, err := f.text("model")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
+	}
+	effort, err := f.text("effort")
+	if err != nil {
+		return def.Agent{}, err
 	}
 	mode, err := f.text("permissionMode")
 	if err != nil {
-		return subagent.Agent{}, err
+		return def.Agent{}, err
 	}
 	maxTurns := f.count("maxTurns")
 
-	return subagent.Agent{
+	return def.Agent{
 		Name:        name,
 		Description: description,
 		Tools:       tools,
 		Disallowed:  disallowed,
 		Model:       model,
+		Effort:      ai.ThinkingLevel(effort),
 		Mode:        mode,
 		MaxTurns:    maxTurns,
 		Skills:      skills,
 		Prompt:      prompt,
-		Meta:        f.meta(),
+		Extra:       f.meta(),
 	}, nil
 }
 

@@ -13,8 +13,8 @@ import (
 // session. The options of the driver come first, and the fields of the
 // config come after them.
 //
-// The driver maps Model to the ID of the model, Dir, System, and
-// Approve. With an Approve function, the policy is [ApprovalUntrusted]
+// The driver maps Model to the ID of the model, Dir, System, Effort to
+// [Thinking], and Approve. With an Approve function, the policy is [ApprovalUntrusted]
 // unless an option of the driver sets [Policy], so that the CLI asks
 // before a command that is not known to be safe. The driver maps the
 // plan mode to [SandboxReadOnly] and the bypass mode to
@@ -22,8 +22,9 @@ import (
 // replaces the policy and the sandbox of the options. The driver
 // rejects the default mode and the accept edits mode. The driver rejects
 // Skills and Tools, because the CLI loads its own skills and runs only
-// its own tools. It rejects Allow, Ask, and Deny, because Codex has no
-// rules for each tool. It runs the hooks at the points of [Hooks]. Start
+// its own tools. It skips Dirs: the caller gives the CLI its skills and
+// agents. It rejects Allow, Ask, and Deny, because Codex has no rules
+// for each tool. It runs the hooks at the points of [Hooks]. Start
 // rejects a hook at another point, from the config or from an option.
 func Driver(opts ...Option) agent.Driver {
 	return driver{opts: opts}
@@ -85,6 +86,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 	if c.System != "" {
 		opts = append(opts, System(c.System))
+	}
+	if c.Effort != "" {
+		opts = append(opts, Thinking(c.Effort))
 	}
 	opts = append(opts, modeOptions(c.Mode)...)
 	if c.Approve != nil {

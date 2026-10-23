@@ -1,6 +1,10 @@
 package ai
 
-import "time"
+import (
+	"fmt"
+	"slices"
+	"time"
+)
 
 // Options is one option or a joined set of options. The zero value is no
 // options. A setter such as [MaxTokens], or a setter from [NewOption],
@@ -97,6 +101,26 @@ const (
 // MaxTokens caps the output tokens of a call. If it is unset, a provider
 // uses [Model.MaxTokens], then its own default.
 var MaxTokens = NewOption[int]()
+
+// thinkingLevels lists each thinking level, from off to the most.
+var thinkingLevels = []ThinkingLevel{
+	ThinkingOff,
+	ThinkingLow,
+	ThinkingMedium,
+	ThinkingHigh,
+	ThinkingXHigh,
+	ThinkingMax,
+}
+
+// ParseThinking returns the thinking level that s names. A name that is
+// not a level is an error that lists the levels.
+func ParseThinking(s string) (ThinkingLevel, error) {
+	level := ThinkingLevel(s)
+	if !slices.Contains(thinkingLevels, level) {
+		return "", fmt.Errorf("ai: unknown thinking level %q: use off, low, medium, high, xhigh, or max", s)
+	}
+	return level, nil
+}
 
 // Thinking sets the thinking level. If it is unset, a provider uses the
 // default of the model. A provider package names each model that gets

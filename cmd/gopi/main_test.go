@@ -19,6 +19,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 )
 
@@ -478,7 +479,6 @@ func TestStoredSpec(t *testing.T) {
 	opts := []harness.Option{
 		harness.Catalog(cat),
 		harness.Builtin(harness.NoBuiltins),
-		harness.Sources(),
 	}
 
 	none, err := storedSpec(t.Context(), dir, "")
@@ -510,7 +510,6 @@ func TestNewAgentKeepsASession(t *testing.T) {
 		harness.Catalog(cat),
 		harness.Model("fake/test"),
 		harness.Builtin(harness.NoBuiltins),
-		harness.Sources(),
 	}
 
 	a, err := newAgent(t.Context(), opts, "fake/test", "ada", dir)
@@ -574,6 +573,117 @@ func TestPrintModels(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantOut, out.String())
 			assert.Equal(t, tt.wantErrOut, errOut.String())
+		})
+	}
+}
+
+func TestDefDirs(t *testing.T) {
+	tests := []struct {
+		name string
+		dirs []string
+		home string
+		want []string
+	}{
+		{
+			name: "the flags",
+			dirs: []string{"/a", "/b"},
+			home: "/home/ada",
+			want: []string{"/a", "/b"},
+		},
+		{
+			name: "no flag",
+			home: "/home/ada",
+			want: []string{"/home/ada/.claude", "/repo/.claude", "/repo"},
+		},
+		{
+			name: "no flag and no home folder",
+			want: []string{"/repo/.claude", "/repo"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := options{root: "/repo", dirs: tt.dirs}
+
+			assert.Equal(t, tt.want, defDirs(o, tt.home))
+		})
+	}
+}
+
+func TestWithAgent(t *testing.T) {
+	reviewer := def.Agent{
+		Name:       "reviewer",
+		Model:      "anthropic/claude-opus-5-5",
+		Effort:     ai.ThinkingHigh,
+		Mode:       "acceptEdits",
+		Prompt:     "You review.",
+		Disallowed: []string{"Bash"},
+		Skills:     []string{"deploy"},
+	}
+	tests := []struct {
+		name  string
+		opts  options
+		agent def.Agent
+		want  options
+	}{
+		{
+			name:  "the file fills the empty flags",
+			opts:  options{deny: []string{"write_file"}},
+			agent: reviewer,
+			want: options{
+				agentModel: "anthropic/claude-opus-5-5",
+				thinking:   "high",
+				mode:       "acceptEdits",
+				system:     "You review.",
+				deny:       []string{"write_file", "Bash"},
+				skills:     []string{"deploy"},
+			},
+		},
+		{
+			name: "a flag wins over the file",
+			opts: options{
+				model:    "openai/gpt-5",
+				thinking: "low",
+				mode:     "plan",
+			},
+			agent: reviewer,
+			want: options{
+				model:      "openai/gpt-5",
+				agentModel: "anthropic/claude-opus-5-5",
+				thinking:   "low",
+				mode:       "plan",
+				system:     "You review.",
+				deny:       []string{"Bash"},
+				skills:     []string{"deploy"},
+			},
+		},
+		{
+			name:  "inherit gives no model",
+			agent: def.Agent{Name: "a", Model: "inherit"},
+			want:  options{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, withAgent(tt.opts, tt.agent))
+		})
+	}
+}
+
+func TestModelSpec(t *testing.T) {
+	tests := []struct {
+		name   string
+		opts   options
+		stored string
+		want   string
+	}{
+		{"the flag", options{model: "a/flag", agentModel: "a/file"}, "a/stored", "a/flag"},
+		{"the stored model of a resumed session", options{agentModel: "a/file"}, "a/stored", "a/stored"},
+		{"the agent file", options{agentModel: "a/file"}, "", "a/file"},
+		{"none", options{}, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, modelSpec(tt.opts, tt.stored))
 		})
 	}
 }

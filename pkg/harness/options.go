@@ -3,6 +3,7 @@ package harness
 import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/session"
@@ -38,48 +39,56 @@ func Store(s session.Storer) Option {
 	return func(h *Harness) { h.store = s }
 }
 
-// Dir sets the folder that the agent works in. The project files come
-// from it and from its parents, and the built-in tools start in it.
-// Without Dir, the harness uses the working directory of the process.
+// Dir sets the folder that the agent works in. The built-in tools start
+// in it. Without Dir, the harness uses the working directory of the
+// process. The harness reads no file of Dir: give the definitions with
+// [Defs].
 func Dir(path string) Option {
 	return func(h *Harness) { h.dir = path }
 }
 
-// Home sets the home folder of the [User] source. Without Home, the
-// harness uses [os.UserHomeDir].
-func Home(path string) Option {
-	return func(h *Harness) { h.home = path }
-}
-
-// Sources sets the places that the harness reads instructions, skills,
-// and subagents from. Without Sources, the harness reads [User] and
-// [Project]. Sources with no argument reads no file, so an agent gets
-// only the skills and the subagents in code.
-func Sources(s ...Source) Option {
+// Defs adds readers of instructions, skills, and subagents, such as a
+// folder of package github.com/sonnes/gopi/pkg/store/fs. It adds each reader to the lists of
+// [Instructions], [Skillset], and [Agents]. Without Defs and these
+// options, the harness reads no file, so the caller picks every folder
+// that an agent reads.
+func Defs(readers ...def.Reader) Option {
 	return func(h *Harness) {
-		h.sources = s
-		h.sourcesSet = true
+		for _, r := range readers {
+			h.instructions = append(h.instructions, r)
+			h.skills = append(h.skills, r)
+			h.agents = append(h.agents, r)
+		}
 	}
 }
 
-// Skillset adds readers of skills. The harness reads them after the
-// files of [Sources], in order. A later skill with the same name takes
-// the bare name. A [skill.Skill] is a reader, so a skill in code goes
+// Instructions adds readers of instruction texts. The harness reads
+// them in order, and [DefaultPrompt] puts their texts in the
+// "instructions" section of the system prompt, in the same order. A
+// [def.Instruction] is a reader, so a text in code goes in the same
+// list.
+func Instructions(readers ...def.InstructionsReader) Option {
+	return func(h *Harness) { h.instructions = append(h.instructions, readers...) }
+}
+
+// Skillset adds readers of skills. The harness reads them in order. A
+// later skill with the same qualified name replaces an earlier one, and
+// the last skill with a name takes the bare name. A [def.Skill] is a reader, so a skill in code goes
 // in the same list.
 //
 // An assembly with skills gives the model the skill tool, after the
 // tools of [Toolset], and [DefaultPrompt] lists the skills in a section
 // of the system prompt. An assembly with no skills has no skill tool,
 // because a tool with nothing to load only confuses the model.
-func Skillset(readers ...SkillsReader) Option {
+func Skillset(readers ...def.SkillsReader) Option {
 	return func(h *Harness) { h.skills = append(h.skills, readers...) }
 }
 
-// Agents adds readers of subagents. The harness reads them after the
-// files of [Sources], in order. A later subagent replaces an earlier
+// Agents adds readers of subagents. The harness reads them in order. A
+// later subagent replaces an earlier
 // one with the same name. An assembly with subagents gives the model
 // the task tool, which runs a subagent in a child session.
-func Agents(readers ...AgentsReader) Option {
+func Agents(readers ...def.AgentsReader) Option {
 	return func(h *Harness) { h.agents = append(h.agents, readers...) }
 }
 

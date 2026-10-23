@@ -1,4 +1,4 @@
-package files_test
+package fs_test
 
 import (
 	"context"
@@ -10,15 +10,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/pkg/harness/files"
-	"github.com/sonnes/gopi/pkg/harness/subagent"
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 func agentFile(name, description, prompt string) *fstest.MapFile {
 	return file("---\nname: " + name + "\ndescription: " + description + "\n---\n" + prompt)
 }
 
-func agentNames(agents []subagent.Agent) []string {
+func agentNames(agents []def.Agent) []string {
 	out := make([]string, len(agents))
 	for i, a := range agents {
 		out[i] = a.Name
@@ -27,13 +28,13 @@ func agentNames(agents []subagent.Agent) []string {
 }
 
 // readAgent reads the one agent of text as agents/a.md.
-func readAgent(t *testing.T, text string) subagent.Agent {
+func readAgent(t *testing.T, text string) def.Agent {
 	t.Helper()
 	fsys := fstest.MapFS{
 		"agents/a.md": file(text),
 	}
 
-	got, err := files.Agents(fsys, "agents").ReadAgents(context.Background())
+	got, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	return got[0]
@@ -49,7 +50,7 @@ func TestAgentsReadEveryFileInPathOrder(t *testing.T) {
 		".claude/agents/notes.txt":        agentFile("notes", "Not markdown.", "body"),
 	}
 
-	got, err := files.Agents(fsys, ".claude/agents").ReadAgents(context.Background())
+	got, err := storefs.Agents(fsys, ".claude/agents").ReadAgents(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"reviewer", "team", "deep", "deployer"}, agentNames(got))
@@ -64,6 +65,7 @@ description: Review a diff.\nUse it after each change.
 tools: Read, Grep, Bash(git diff *)
 disallowedTools: [Write]
 model: anthropic/claude-sonnet-4-5
+effort: high
 permissionMode: acceptEdits
 maxTurns: 12
 skills: lint, test
@@ -77,7 +79,7 @@ Read the diff.
 
 	got := readAgent(t, text)
 
-	want := subagent.Agent{
+	want := def.Agent{
 		Name:        "reviewer",
 		Description: "Review a diff.\nUse it after each change.",
 		Tools: []string{
@@ -87,6 +89,7 @@ Read the diff.
 		},
 		Disallowed: []string{"Write"},
 		Model:      "anthropic/claude-sonnet-4-5",
+		Effort:     ai.ThinkingHigh,
 		Mode:       "acceptEdits",
 		MaxTurns:   12,
 		Skills: []string{
@@ -95,7 +98,7 @@ Read the diff.
 		},
 		Prompt: "Read the diff.",
 		Path:   "agents/a.md",
-		Meta: map[string]any{
+		Extra: map[string]any{
 			"color":      "blue",
 			"background": true,
 			"mcpServers": []any{"github"},
@@ -177,7 +180,7 @@ func TestAgentsSkipBadFiles(t *testing.T) {
 				"agents/good.md": agentFile("good", "Works.", "body"),
 			}
 
-			got, err := files.Agents(fsys, "agents").ReadAgents(context.Background())
+			got, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
 			require.NoError(t, err)
 
 			assert.Equal(t, []string{"good"}, agentNames(got))
@@ -189,11 +192,11 @@ func TestAgentsThatFindNothingGiveNothing(t *testing.T) {
 	ctx := context.Background()
 	missing := os.DirFS(filepath.Join(t.TempDir(), "missing"))
 
-	got, err := files.Agents(missing, ".claude/agents").ReadAgents(ctx)
+	got, err := storefs.Agents(missing, ".claude/agents").ReadAgents(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	got, err = files.Agents(fstest.MapFS{}, ".claude/agents").ReadAgents(ctx)
+	got, err = storefs.Agents(fstest.MapFS{}, ".claude/agents").ReadAgents(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -206,6 +209,6 @@ func TestAgentsFailOnAFileThatCannotBeRead(t *testing.T) {
 		broken: "agents/a.md",
 	}
 
-	_, err := files.Agents(fsys, "agents").ReadAgents(context.Background())
+	_, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
 	assert.Error(t, err)
 }

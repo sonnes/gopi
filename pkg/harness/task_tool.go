@@ -16,8 +16,8 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
-	"github.com/sonnes/gopi/pkg/harness/subagent"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -41,7 +41,7 @@ type ParentRef struct {
 
 // childCall is the subagent of a child call of the harness.
 type childCall struct {
-	sub    subagent.Agent
+	sub    def.Agent
 	parent ParentRef
 }
 
@@ -72,14 +72,14 @@ const taskToolDescription = "Give a task to a subagent. The subagent works in it
 type taskTool struct {
 	asm    *Assembly
 	names  []string
-	byName map[string]subagent.Agent
+	byName map[string]def.Agent
 }
 
 // newTaskTool returns the task tool for the subagents of asm.
 func newTaskTool(asm *Assembly) *taskTool {
 	t := &taskTool{
 		asm:    asm,
-		byName: make(map[string]subagent.Agent, len(asm.Agents)),
+		byName: make(map[string]def.Agent, len(asm.Agents)),
 	}
 	for _, a := range asm.Agents {
 		t.names = append(t.names, a.Name)
@@ -155,7 +155,7 @@ func (t *taskTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, er
 
 // childID returns the ID of the child session: resume, or a new ID. An
 // unsaved parent has unsaved children, so it returns "".
-func (t *taskTool) childID(ctx context.Context, sub subagent.Agent, resume string) (string, error) {
+func (t *taskTool) childID(ctx context.Context, sub def.Agent, resume string) (string, error) {
 	parent := t.asm.session
 	if parent == "" {
 		if resume != "" {
@@ -188,7 +188,7 @@ func newChildID(parent, name string) (string, error) {
 
 // start returns the child agent of sub over the session id, or over an
 // unsaved log if id is "".
-func (t *taskTool) start(ctx context.Context, sub subagent.Agent, id, callID string) (*agent.Agent, error) {
+func (t *taskTool) start(ctx context.Context, sub def.Agent, id, callID string) (*agent.Agent, error) {
 	h := t.asm.h
 	mode, err := permission.ParseMode(sub.Mode)
 	if err != nil {
@@ -220,7 +220,7 @@ func (t *taskTool) start(ctx context.Context, sub subagent.Agent, id, callID str
 
 // childSystem returns the base text of the prompt of a child: the prompt
 // of sub, then the body of each skill that sub preloads.
-func (t *taskTool) childSystem(sub subagent.Agent) string {
+func (t *taskTool) childSystem(sub def.Agent) string {
 	parts := []string{sub.Prompt}
 	for _, name := range sub.Skills {
 		s, ok := t.asm.skill(name)
@@ -348,7 +348,7 @@ var toolAliases = map[string][]string{
 // keepTools returns the tools that sub can call: the tools of its tools
 // key, or all of them if it has none, without the tools of its
 // disallowedTools key.
-func keepTools(tools []tool.Tool, sub subagent.Agent) []tool.Tool {
+func keepTools(tools []tool.Tool, sub def.Agent) []tool.Tool {
 	allowed := toolNames(sub.Tools)
 	denied := toolNames(sub.Disallowed)
 	var out []tool.Tool

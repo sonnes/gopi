@@ -43,6 +43,14 @@ type Config struct {
 	System string
 	// Skills names the skills that the agent loads at the start.
 	Skills []string
+	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
+	// first. A later folder wins for a name. The harness reads them. A
+	// driver of a CLI skips them, because the caller gives the CLI its
+	// own skills and agents.
+	Dirs []string
+	// Effort is the thinking level of each model call. If it is empty,
+	// the driver keeps the default of the model.
+	Effort ai.ThinkingLevel
 	// Mode is the permission mode of the agent. If it is empty, the
 	// driver keeps its own mode.
 	Mode Mode

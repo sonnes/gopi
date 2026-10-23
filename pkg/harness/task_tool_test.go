@@ -11,13 +11,13 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/subagent"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-var reviewer = subagent.Agent{
+var reviewer = def.Agent{
 	Name:        "reviewer",
 	Description: "Review a diff.",
 	Prompt:      "You review code.",
@@ -35,9 +35,9 @@ func childID(t *testing.T, m ai.Message) string {
 
 // taskHarness returns a durable harness over store, with the subagents
 // agents, and the model script p.
-func taskHarness(t *testing.T, p *script, store session.Storer, agents ...subagent.Agent) *harness.Harness {
+func taskHarness(t *testing.T, p *script, store session.Storer, agents ...def.Agent) *harness.Harness {
 	t.Helper()
-	readers := make([]harness.AgentsReader, len(agents))
+	readers := make([]def.AgentsReader, len(agents))
 	for i, a := range agents {
 		readers[i] = a
 	}

@@ -14,10 +14,11 @@ import (
 // each session. The options of the driver come first, and the fields of
 // the config come after them.
 //
-// The driver maps Model to the ID of the model, Dir, System, Mode to
-// [PermissionMode], Allow to [AllowedTools], Ask to [AskTools], Deny to
-// [DisallowedTools], and Approve. It rejects Skills and Tools, because the CLI loads its own
-// skills and runs only its own tools. It runs the hooks at the points of
+// The driver maps Model to the ID of the model, Dir, System, Effort to
+// [Thinking], Mode to [PermissionMode], Allow to [AllowedTools], Ask to
+// [AskTools], Deny to [DisallowedTools], and Approve. It rejects Skills
+// and Tools, because the CLI loads its own skills and runs only its own
+// tools. It skips Dirs: the caller gives the CLI its skills and agents. It runs the hooks at the points of
 // [Hooks]. Start rejects a hook at a model call, in the options of the
 // driver or in the config.
 func Driver(opts ...Option) agent.Driver {
@@ -71,6 +72,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 	if c.System != "" {
 		opts = append(opts, System(c.System))
+	}
+	if c.Effort != "" {
+		opts = append(opts, Thinking(c.Effort))
 	}
 	if c.Mode != "" {
 		// The modes of a config have the names of the modes of the CLI.

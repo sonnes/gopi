@@ -48,6 +48,7 @@ func TestDriverStart(t *testing.T) {
 		Allow:   []string{"Read"},
 		Ask:     []string{"Bash(gh pr comment:*)"},
 		Deny:    []string{"WebFetch"},
+		Effort:  ai.ThinkingHigh,
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -70,6 +71,7 @@ func TestDriverStart(t *testing.T) {
 		"--disallowedTools WebFetch",
 		`--settings {"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
 		"--permission-mode plan",
+		"--effort high",
 	} {
 		assert.Contains(t, args, want)
 	}

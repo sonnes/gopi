@@ -10,7 +10,7 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/harness/skill"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 // skillToolName is the name of the skill tool.
@@ -40,14 +40,14 @@ type skillTool struct {
 	names []string
 	// byName finds a skill by the name that the model sees, and by its
 	// qualified name.
-	byName map[string]skill.Skill
+	byName map[string]def.Skill
 }
 
 // newSkillTool returns the skill tool for skills, which the model sees
 // as names. It leaves out a skill that the model cannot call. With no
 // skill left, it returns nil.
-func newSkillTool(skills []skill.Skill, names []string) *skillTool {
-	t := &skillTool{byName: make(map[string]skill.Skill, len(skills))}
+func newSkillTool(skills []def.Skill, names []string) *skillTool {
+	t := &skillTool{byName: make(map[string]def.Skill, len(skills))}
 	for i, s := range skills {
 		if s.NoModelCall {
 			continue
@@ -118,7 +118,7 @@ func (t *skillTool) Run(_ context.Context, call ai.ToolCall) (ai.ToolResult, err
 }
 
 // skillBody returns the body of s, then the paths of its support files.
-func skillBody(s skill.Skill) string {
+func skillBody(s def.Skill) string {
 	files := supportFiles(s.Files)
 	if len(files) == 0 {
 		return s.Body
@@ -155,7 +155,7 @@ func supportFiles(fsys fs.FS) []string {
 }
 
 // readSkillFile returns the support file name of s.
-func readSkillFile(s skill.Skill, name string) ai.ToolResult {
+func readSkillFile(s def.Skill, name string) ai.ToolResult {
 	missing := fmt.Sprintf("the skill %q has no file %q", s.Name, name)
 	if s.Files == nil || !fs.ValidPath(name) {
 		return errorResult(missing)
