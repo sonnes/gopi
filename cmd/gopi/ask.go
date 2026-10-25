@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
@@ -93,7 +92,8 @@ func pick(q askquestion.Question, line string) string {
 // Approve asks on the terminal if a tool call can run. "y" allows the
 // call. "a" allows it and each later call that the same rule matches.
 // Any other line denies it.
-func (r terminal) Approve(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+func (r terminal) Approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	call := req.Call
 	if err := r.shown.wait(ctx, call.ID); err != nil {
 		return agent.Decision{}, err
 	}

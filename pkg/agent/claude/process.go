@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -152,12 +153,16 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (permission,
 	if pr.approve == nil {
 		return deny, nil
 	}
-	call := ai.ToolCall{
-		ID:    req.ToolUseID,
-		Name:  req.ToolName,
-		Input: req.Input,
+	ask := agent.ApprovalRequest{
+		Call: ai.ToolCall{
+			ID:    req.ToolUseID,
+			Name:  req.ToolName,
+			Input: req.Input,
+		},
+		Reason:   plainText(req.DecisionReason),
+		NoAlways: req.SuppressAlwaysAllowRule,
 	}
-	d, err := pr.approve(ctx, call)
+	d, err := pr.approve(ctx, ask)
 	if err != nil {
 		return permission{}, err
 	}
@@ -181,12 +186,21 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (permission,
 		ToolUseID:    req.ToolUseID,
 	}
 	// The suggestions describe the original input. With a new input,
-	// they would allow calls that the caller did not approve.
-	keep := d.Always && !newInput
+	// they would allow calls that the caller did not approve. A prompt
+	// with a rule that allows more than the call keeps no rule.
+	keep := d.Always && !newInput && !req.SuppressAlwaysAllowRule
 	if keep {
 		allow.UpdatedPermissions = forSession(req.PermissionSuggestions)
 	}
 	return allow, nil
+}
+
+// ansiEscape matches an ANSI escape sequence of a terminal.
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[@-_]`)
+
+// plainText returns s with no ANSI escapes and no space at the ends.
+func plainText(s string) string {
+	return strings.TrimSpace(ansiEscape.ReplaceAllString(s, ""))
 }
 
 // sessionDestination is the destination of a permission update that

@@ -75,7 +75,7 @@ type EventRunEnd struct {
 // function of the session.
 type EventApprovalStart struct {
 	Session string
-	Call    ai.ToolCall
+	Request agent.ApprovalRequest
 }
 
 // EventApprovalEnd closes an approval. It arrives on an error too, so
@@ -169,7 +169,9 @@ type eventJSON struct {
 	Usage ai.Usage `json:"usage,omitzero"`
 
 	// approval_start
-	Call *callJSON `json:"call,omitempty"`
+	Call     *callJSON `json:"call,omitempty"`
+	Reason   string    `json:"reason,omitempty"`
+	NoAlways bool      `json:"no_always,omitempty"`
 
 	// approval_end
 	ToolCallID string          `json:"tool_call_id,omitempty"`
@@ -211,10 +213,12 @@ func marshalEvent(e Event) ([]byte, error) {
 	case EventApprovalStart:
 		w.Type = typeApprovalStart
 		w.Call = &callJSON{
-			ID:    v.Call.ID,
-			Name:  v.Call.Name,
-			Input: v.Call.Input,
+			ID:    v.Request.Call.ID,
+			Name:  v.Request.Call.Name,
+			Input: v.Request.Call.Input,
 		}
+		w.Reason = v.Request.Reason
+		w.NoAlways = v.Request.NoAlways
 	case EventApprovalEnd:
 		w.Type = typeApprovalEnd
 		w.ToolCallID = v.ToolCallID
@@ -273,7 +277,11 @@ func UnmarshalEvent(data []byte) (Event, error) {
 		}
 		return EventApprovalStart{
 			Session: w.Session,
-			Call:    call,
+			Request: agent.ApprovalRequest{
+				Call:     call,
+				Reason:   w.Reason,
+				NoAlways: w.NoAlways,
+			},
 		}, nil
 	case typeApprovalEnd:
 		var d agent.Decision

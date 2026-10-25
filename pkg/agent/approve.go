@@ -12,12 +12,13 @@ import (
 // Code agent, and the Codex agent. One function then answers the
 // approvals of each agent.
 //
-// The call has the tool name of the agent. Claude Code names its tools
-// Bash and Read, and the harness and Codex name them bash and read.
+// The request has the call, with the tool name of the agent. Claude
+// Code names its tools Bash and Read, and the harness and Codex name
+// them bash and read.
 //
 // The function runs while the agent waits, so it must return when ctx
 // ends. If it returns an error, the call does not run.
-type ApproveFunc func(ctx context.Context, call ai.ToolCall) (Decision, error)
+type ApproveFunc func(ctx context.Context, req ApprovalRequest) (Decision, error)
 
 // Decision answers one tool call. The zero value denies the call.
 //
@@ -52,4 +53,20 @@ func (d *Decision) UnmarshalJSON(data []byte) error {
 	}
 	*d = Decision(p)
 	return nil
+}
+
+// ApprovalRequest is a tool call that needs a person, with what the
+// agent says about it. A [Decision] answers it.
+type ApprovalRequest struct {
+	// Call is the tool call.
+	Call ai.ToolCall
+	// Reason tells a person why the call asks, such as the safety check
+	// that the call did not pass. It is empty if the agent gives no
+	// reason.
+	Reason string
+	// NoAlways reports that the agent does not keep an Always decision
+	// for this call. An approve function does not offer Always then.
+	// The Claude Code agent sets it when the rule of the CLI for the
+	// call allows more than the call. It then allows only this call.
+	NoAlways bool
 }

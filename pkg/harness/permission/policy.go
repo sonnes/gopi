@@ -235,7 +235,7 @@ func (h *hook) requestApproval(
 		)
 		return c, agent.Deny(reason)
 	}
-	d, err := h.approve(ctx, c)
+	d, err := h.approve(ctx, agent.ApprovalRequest{Call: c})
 	if err != nil {
 		return c, fmt.Errorf("permission: approve the tool call %q: %w", c.Name, err)
 	}

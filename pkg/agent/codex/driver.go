@@ -14,18 +14,28 @@ import (
 // config come after them.
 //
 // The driver maps Model to the ID of the model, Dir, System, Effort to
-// [Thinking], and Approve. With an Approve function, the policy is [ApprovalUntrusted]
-// unless an option of the driver sets [Policy], so that the CLI asks
-// before a command that is not known to be safe. The driver maps the
-// plan mode to [SandboxReadOnly] and the bypass mode to
-// [SandboxDangerFullAccess], both with [ApprovalNever]. The mode
-// replaces the policy and the sandbox of the options. The driver
-// rejects the default mode and the accept edits mode. The driver rejects
-// Skills and Tools, because the CLI loads its own skills and runs only
-// its own tools. It skips Dirs: the caller gives the CLI its skills and
-// agents. It rejects Allow, Ask, and Deny, because Codex has no rules
-// for each tool. It runs the hooks at the points of [Hooks]. Start
-// rejects a hook at another point, from the config or from an option.
+// [Thinking], and Approve. With an Approve function, the
+// policy is [ApprovalUntrusted] unless an option of the driver sets
+// [Policy], so that the CLI asks before a command that is not known to
+// be safe. The mode replaces the policy and the sandbox of the options:
+//
+//   - The plan mode is [SandboxReadOnly] with [ApprovalNever]. A write
+//     fails in the sandbox.
+//   - The default mode is [SandboxReadOnly] with [ApprovalUntrusted]. A
+//     command that is not known to be safe asks, and so does each file
+//     change, because the sandbox does not let it write.
+//   - The accept edits mode is [SandboxWorkspaceWrite] with
+//     [ApprovalOnRequest]. A file change and a command in the working
+//     directory run with no question. A command that needs more asks.
+//     So the mode asks less than the accept edits mode of Claude Code.
+//   - The bypass mode is [SandboxDangerFullAccess] with [ApprovalNever].
+//
+// The driver rejects Skills and Tools, because the CLI loads its own
+// skills and runs only its own tools. It skips Dirs: the caller gives
+// the CLI its skills and agents. It rejects Allow, Ask, and Deny,
+// because Codex has no rules for each tool. It runs the hooks at the
+// points of [Hooks]. Start rejects a hook at another point, from the
+// config or from an option.
 func Driver(opts ...Option) agent.Driver {
 	return driver{opts: opts}
 }
@@ -66,7 +76,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
-	if err := agent.CheckMode(c.Mode, modes...); err != nil {
+	if err := agent.CheckMode(c.Mode, agent.AllModes...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
 
@@ -100,24 +110,24 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	return Durable(ctx, c.Session, opts...)
 }
 
-// modes are the modes that the driver honors. Codex has a policy for
-// commands and a sandbox, and no rule for each tool. So it cannot ask
-// before an edit and run a read, as the default mode and the accept
-// edits mode do.
-var modes = []agent.Mode{
-	agent.ModePlan,
-	agent.ModeBypass,
-}
-
-// modeOptions returns the policy and the sandbox of the mode m. The
-// policy of each mode is [ApprovalNever]: the plan mode blocks a write
-// in the sandbox, and the bypass mode runs each command.
+// modeOptions returns the policy and the sandbox of the mode m. The doc
+// of [Driver] gives the reason for each pair.
 func modeOptions(m agent.Mode) []Option {
 	switch m {
 	case agent.ModePlan:
 		return []Option{
 			Policy(ApprovalNever),
 			Sandbox(SandboxReadOnly),
+		}
+	case agent.ModeDefault:
+		return []Option{
+			Policy(ApprovalUntrusted),
+			Sandbox(SandboxReadOnly),
+		}
+	case agent.ModeAcceptEdits:
+		return []Option{
+			Policy(ApprovalOnRequest),
+			Sandbox(SandboxWorkspaceWrite),
 		}
 	case agent.ModeBypass:
 		return []Option{

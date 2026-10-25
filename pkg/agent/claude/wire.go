@@ -118,6 +118,12 @@ type controlRequest struct {
 	// PermissionSuggestions are the permission updates that the CLI
 	// offers for "allow always".
 	PermissionSuggestions json.RawMessage `json:"permission_suggestions"`
+	// DecisionReason tells a person why the call asks. It can hold the
+	// ANSI escapes of the terminal of the CLI.
+	DecisionReason string `json:"decision_reason"`
+	// SuppressAlwaysAllowRule reports that the rule for "allow always"
+	// allows more than the call, such as each call of the tool.
+	SuppressAlwaysAllowRule bool `json:"suppress_always_allow_rule"`
 }
 
 // controlResponse is the response of a control_response line.

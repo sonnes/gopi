@@ -34,8 +34,8 @@ type approver struct {
 	calls    []ai.ToolCall
 }
 
-func (a *approver) approve(_ context.Context, c ai.ToolCall) (agent.Decision, error) {
-	a.calls = append(a.calls, c)
+func (a *approver) approve(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a.calls = append(a.calls, req.Call)
 	return a.decision, nil
 }
 

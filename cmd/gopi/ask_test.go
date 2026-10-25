@@ -231,7 +231,7 @@ func TestTerminal_Approve(t *testing.T) {
 			}
 			call := ai.ToolCall{ID: "call_1", Name: "bash", Input: json.RawMessage(`{"command":"rm -rf .bin"}`)}
 
-			got, err := r.Approve(t.Context(), call)
+			got, err := r.Approve(t.Context(), agent.ApprovalRequest{Call: call})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)

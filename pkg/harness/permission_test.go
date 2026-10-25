@@ -30,7 +30,7 @@ func callEcho(t *testing.T, opts ...harness.Option) ai.Message {
 }
 
 func TestPermissions(t *testing.T) {
-	approve := func(context.Context, ai.ToolCall) (agent.Decision, error) {
+	approve := func(context.Context, agent.ApprovalRequest) (agent.Decision, error) {
 		return agent.Decision{Allow: true}, nil
 	}
 	tests := []struct {

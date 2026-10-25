@@ -74,13 +74,13 @@ The CLI runs its own tools. Each tool call of the CLI becomes a tool call in an 
 
 Claude Code reports the names of its own tools, such as `Bash` and `Edit`.
 
-`Approve` answers each approval request of Codex and each permission prompt of Claude Code. It takes an `agent.ApproveFunc`, the same function that the harness takes. The function gets the tool call with the name in the table above. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request. Codex declines a file change request that comes before its item, and the function does not see it.
+`Approve` answers each approval request of Codex and each permission prompt of Claude Code. It takes an `agent.ApproveFunc`, the same function that the harness takes. The function gets an `agent.ApprovalRequest`: the tool call, with the name in the table above, and the reason of the CLI. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request. Codex declines a file change request that comes before its item, and the function does not see it.
 
 ```go
 a := claude.New(
 	claude.AllowedTools("Read", "Grep"),
-	claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
-		if call.Name == "Bash" && !confirm(call.Input) {
+	claude.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		if req.Call.Name == "Bash" && !confirm(req.Call.Input) {
 			return agent.Decision{Message: "The user refused the command."}, nil
 		}
 		return agent.Decision{Allow: true}, nil
@@ -88,7 +88,7 @@ a := claude.New(
 )
 ```
 
-A `Decision` with no `Allow` denies the call. Claude Code sends its `Message` to the model, and Codex has no field for it. With `Always`, the CLI also allows the calls that it matches to this call, until the session ends. Claude Code keeps the rule for the session only and writes no settings file. On Claude Code, `Always` with a new `Input` allows only this call. Codex cannot change the input of an action, so a decision with an `Input` declines the action.
+A `Decision` with no `Allow` denies the call. Claude Code sends its `Message` to the model, and Codex has no field for it. With `Always`, the CLI also allows the calls that it matches to this call, until the session ends. Claude Code keeps the rule for the session only and writes no settings file. A rule of Claude Code can change the mode of the session, such as to `acceptEdits` after an edit. If Claude Code offers no "allow always" for the call, the request has `NoAlways`, and `Always` allows only this call. On Claude Code, `Always` with a new `Input` allows only this call. Codex cannot change the input of an action, so a decision with an `Input` declines the action.
 
 To let a CLI act with no request, set `Policy(codex.ApprovalNever)` and a `Sandbox` mode for Codex. For Claude Code, set a `PermissionMode` or `AllowedTools`.
 

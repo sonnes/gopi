@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
 )
 
 // approveFunc returns the approve function that the host gives the
@@ -29,7 +28,7 @@ type approval struct {
 // for.
 var errRunEnded = errors.New("host: the run ended")
 
-// approve passes call to the approve function of the spec. The host
+// approve passes req to the approve function of the spec. The host
 // stream gets [EventApprovalStart] before the call, and
 // [EventApprovalEnd] after it. Two calls can wait at the same time.
 //
@@ -42,7 +41,7 @@ var errRunEnded = errors.New("host: the run ended")
 // The Codex agent also does not wait for approve. So the end of the
 // run publishes the approval_end of each call that waits, before
 // run_end, and a later answer publishes nothing.
-func (s *Session) approve(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+func (s *Session) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 	s.mu.Lock()
 	runCtx := s.runCtx
 	if s.closing {
@@ -53,11 +52,11 @@ func (s *Session) approve(ctx context.Context, call ai.ToolCall) (agent.Decision
 		s.mu.Unlock()
 		return agent.Decision{}, fmt.Errorf("host: session %s: %w", s.id, ErrNoRun)
 	}
-	a := &approval{callID: call.ID}
+	a := &approval{callID: req.Call.ID}
 	s.pending = append(s.pending, a)
 	s.publishLocked(EventApprovalStart{
 		Session: s.id,
-		Call:    call,
+		Request: req,
 	})
 	s.mu.Unlock()
 
@@ -67,11 +66,11 @@ func (s *Session) approve(ctx context.Context, call ai.ToolCall) (agent.Decision
 		cancel(context.Cause(runCtx))
 	})
 	defer stop()
-	d, err := s.spec.Approve(ctx, call)
+	d, err := s.spec.Approve(ctx, req)
 
 	end := EventApprovalEnd{
 		Session:    s.id,
-		ToolCallID: call.ID,
+		ToolCallID: req.Call.ID,
 		Decision:   d,
 	}
 	// A call that the end of its context stopped reports the cause, such

@@ -67,8 +67,8 @@ func TestDriverAsksWithAnApproveFunction(t *testing.T) {
 	var asked []string
 	a := startAgent(t, Driver(), agent.Config{
 		Dir: workDir,
-		Approve: func(_ context.Context, c ai.ToolCall) (agent.Decision, error) {
-			asked = append(asked, c.Name)
+		Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			asked = append(asked, req.Call.Name)
 			return agent.Decision{Allow: true}, nil
 		},
 	})
@@ -79,7 +79,7 @@ func TestDriverAsksWithAnApproveFunction(t *testing.T) {
 }
 
 func TestDriverMode(t *testing.T) {
-	approve := func(context.Context, ai.ToolCall) (agent.Decision, error) {
+	approve := func(context.Context, agent.ApprovalRequest) (agent.Decision, error) {
 		return agent.Decision{}, nil
 	}
 	tests := []struct {
@@ -98,6 +98,18 @@ func TestDriverMode(t *testing.T) {
 			mode:        agent.ModePlan,
 			wantPolicy:  ApprovalNever,
 			wantSandbox: SandboxReadOnly,
+		},
+		{
+			name:        "the default mode reads, and asks before a write or an unsafe command",
+			mode:        agent.ModeDefault,
+			wantPolicy:  ApprovalUntrusted,
+			wantSandbox: SandboxReadOnly,
+		},
+		{
+			name:        "the accept edits mode writes in the workspace, and asks for more",
+			mode:        agent.ModeAcceptEdits,
+			wantPolicy:  ApprovalOnRequest,
+			wantSandbox: SandboxWorkspaceWrite,
 		},
 		{
 			name:        "the bypass mode turns the sandbox off and never asks",
@@ -168,18 +180,6 @@ func TestDriverRejects(t *testing.T) {
 			name:    "a hook with no point",
 			config:  agent.Config{Hooks: []agent.Hook{agent.BaseHook{}}},
 			errText: "codex: agent: hook 1 (agent.BaseHook) implements no point",
-		},
-		{
-			name:        "the default mode",
-			config:      agent.Config{Mode: agent.ModeDefault},
-			unsupported: true,
-			errText:     "codex: agent: the mode default: unsupported operation",
-		},
-		{
-			name:        "the accept edits mode",
-			config:      agent.Config{Mode: agent.ModeAcceptEdits},
-			unsupported: true,
-			errText:     "codex: agent: the mode acceptEdits: unsupported operation",
 		},
 		{
 			name:    "an unknown mode",

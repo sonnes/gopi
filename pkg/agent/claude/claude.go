@@ -164,16 +164,19 @@ func AskTools(names ...string) Option {
 }
 
 // Approve sets the function that answers each permission prompt of the
-// CLI. The call has the tool_use_id, the tool name, and the input of
-// the prompt. Without Approve, the agent denies every prompt. If fn
-// returns an error, the agent sends the error to the CLI, which denies
-// the call.
+// CLI. The call of the request has the tool_use_id, the tool name, and
+// the input of the prompt. The request has the reason of the CLI, and
+// has NoAlways if the CLI does not offer "allow always". Without
+// Approve, the agent denies every prompt. If fn returns
+// an error, the agent sends the error to the CLI, which denies the call.
 //
 // An Always decision sends the permission suggestions of the CLI back,
 // so that the CLI does not ask again for the calls that match them. The
 // CLI decides what matches. The agent sets the destination of each
 // suggestion to the session, so the CLI writes no rule to a settings
-// file. If the CLI offers no suggestions, Always does nothing. The
+// file. A suggestion can change the mode of the CLI for the session,
+// such as to acceptEdits after an edit. If the CLI offers no
+// suggestions, or if the prompt has NoAlways, Always does nothing. The
 // suggestions describe the original input, so an Always decision with
 // a new Input allows only this call. An Input that holds the same JSON
 // value as the input of the prompt is not a new Input.

@@ -690,8 +690,8 @@ func TestApprove(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
 			var got []ai.ToolCall
-			a := claude.New(claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
-				got = append(got, call)
+			a := claude.New(claude.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+				got = append(got, req.Call)
 				return tt.decision, tt.err
 			}))
 			defer closeAgent(t, a)
@@ -854,7 +854,7 @@ func TestApproveAlways(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
-			a := claude.New(claude.Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+			a := claude.New(claude.Approve(func(ctx context.Context, _ agent.ApprovalRequest) (agent.Decision, error) {
 				return agent.Decision{
 					Allow:  true,
 					Always: true,
@@ -867,6 +867,24 @@ func TestApproveAlways(t *testing.T) {
 			require.NoError(t, err, "the trace matches the answer to the prompt")
 		})
 	}
+}
+
+func TestApproveRequest(t *testing.T) {
+	claude.Replay(t, nil, "testdata/can_use_tool_no_always.trace")
+	var got agent.ApprovalRequest
+	a := claude.New(claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		got = req
+		return agent.Decision{
+			Allow:  true,
+			Always: true,
+		}, nil
+	}))
+	defer closeAgent(t, a)
+
+	_, _, err := run(context.Background(), a, "Delete a.txt")
+	require.NoError(t, err, "an Always decision on a prompt with no allow always sends no permission updates")
+	assert.Equal(t, "rm deletes files", got.Reason, "the request has the reason with no escapes")
+	assert.True(t, got.NoAlways)
 }
 
 func TestRunNotLoggedIn(t *testing.T) {

@@ -26,8 +26,8 @@ func newApprover() approver {
 	}
 }
 
-func (a approver) approve(ctx context.Context, c ai.ToolCall) (agent.Decision, error) {
-	a.calls <- c
+func (a approver) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a.calls <- req.Call
 	select {
 	case d := <-a.decisions:
 		return d, nil
@@ -38,8 +38,8 @@ func (a approver) approve(ctx context.Context, c ai.ToolCall) (agent.Decision, e
 
 // approveLate is an approve function that ignores the end of its
 // context.
-func (a approver) approveLate(_ context.Context, c ai.ToolCall) (agent.Decision, error) {
-	a.calls <- c
+func (a approver) approveLate(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a.calls <- req.Call
 	return <-a.decisions, nil
 }
 
@@ -64,7 +64,7 @@ func TestApproval(t *testing.T) {
 	end := next(t, events, is[host.EventApprovalEnd]).(host.EventApprovalEnd)
 
 	assert.Equal(t, "call_1", call.ID)
-	assert.Equal(t, "call_1", start.Call.ID)
+	assert.Equal(t, "call_1", start.Request.Call.ID)
 	assert.Equal(t, host.EventApprovalEnd{
 		Session:    "s1",
 		ToolCallID: "call_1",
@@ -73,8 +73,32 @@ func TestApproval(t *testing.T) {
 	assert.Empty(t, runEnd(t, events).Error)
 	assert.Equal(t, []string{"hi"}, toolResults(s))
 	assert.Equal(t, host.StatusRequiresAction, waiting.Sessions["s1"].Status())
+	assert.Empty(t, start.Request.Reason, "an agent that says nothing gives no reason")
 	idle, _ := f.h.Events(context.Background())
 	assert.Equal(t, host.StatusIdle, idle.Sessions["s1"].Status())
+}
+
+func TestApprovalReason(t *testing.T) {
+	f := newFixture(t)
+	f.driver.reason = "the command writes"
+	f.model.replies = []ai.Message{
+		callTool("call_1", "echo", `{"s":"hi"}`),
+		reply("done"),
+	}
+	a := newApprover()
+	s := f.start(t, host.Spec{
+		ID:      "s1",
+		Approve: a.approve,
+	})
+	_, events := f.watch(t)
+
+	send(t, s, "a", host.Queue)
+	<-a.calls
+	start := next(t, events, is[host.EventApprovalStart]).(host.EventApprovalStart)
+	a.decisions <- agent.Decision{Allow: true}
+
+	assert.Equal(t, "the command writes", start.Request.Reason, "the event has the reason of the agent")
+	assert.Empty(t, runEnd(t, events).Error)
 }
 
 func TestApprovalInterrupt(t *testing.T) {
@@ -164,7 +188,7 @@ func TestApprovalWithNoRun(t *testing.T) {
 	})
 	_, events := f.watch(t)
 
-	_, err := f.driver.configs[0].Approve(context.Background(), testCall)
+	_, err := f.driver.configs[0].Approve(context.Background(), agent.ApprovalRequest{Call: testCall})
 
 	assert.ErrorIs(t, err, host.ErrNoRun)
 	assert.Empty(t, a.calls, "the approve function of the spec did not run")

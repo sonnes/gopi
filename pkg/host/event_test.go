@@ -63,8 +63,20 @@ func TestEventJSON(t *testing.T) {
 		},
 		{
 			name:  "approval start",
-			event: host.EventApprovalStart{Session: "s1", Call: testCall},
+			event: host.EventApprovalStart{Session: "s1", Request: agent.ApprovalRequest{Call: testCall}},
 			want:  `{"type":"approval_start","session":"s1","call":{"id":"call_1","name":"bash","input":{"command":"ls"}}}`,
+		},
+		{
+			name: "approval start with a reason",
+			event: host.EventApprovalStart{
+				Session: "s1",
+				Request: agent.ApprovalRequest{
+					Call:     testCall,
+					Reason:   "the command writes",
+					NoAlways: true,
+				},
+			},
+			want: `{"type":"approval_start","session":"s1","call":{"id":"call_1","name":"bash","input":{"command":"ls"}},"reason":"the command writes","no_always":true}`,
 		},
 		{
 			name: "approval end",
@@ -109,7 +121,7 @@ func TestStateApply(t *testing.T) {
 	interrupt := host.EventInput{Session: "s1", Policy: host.Interrupt}
 	runStart := host.EventRunStart{Session: "s1"}
 	runEnd := host.EventRunEnd{Session: "s1"}
-	ask := host.EventApprovalStart{Session: "s1", Call: testCall}
+	ask := host.EventApprovalStart{Session: "s1", Request: agent.ApprovalRequest{Call: testCall}}
 	answer := host.EventApprovalEnd{Session: "s1", ToolCallID: "call_1"}
 
 	tests := []struct {
@@ -193,11 +205,11 @@ func TestStateClone(t *testing.T) {
 	var s host.State
 	s.Apply(host.EventSessionStart{Session: "s1"})
 	s.Apply(host.EventRunStart{Session: "s1"})
-	s.Apply(host.EventApprovalStart{Session: "s1", Call: testCall})
+	s.Apply(host.EventApprovalStart{Session: "s1", Request: agent.ApprovalRequest{Call: testCall}})
 	s.Apply(host.EventApprovalEnd{Session: "s1", ToolCallID: "call_1"})
 	snapshot := s.Clone()
 
-	s.Apply(host.EventApprovalStart{Session: "s1", Call: testCall})
+	s.Apply(host.EventApprovalStart{Session: "s1", Request: agent.ApprovalRequest{Call: testCall}})
 	s.Apply(host.EventSessionStart{Session: "s2"})
 
 	assert.Empty(t, snapshot.Sessions["s1"].Waiting)

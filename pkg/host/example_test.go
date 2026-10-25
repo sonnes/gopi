@@ -6,7 +6,6 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/host"
@@ -88,15 +87,15 @@ func ExampleSession_Events() {
 // context.
 func ExampleSpec_approve() {
 	// ask shows the call to a person, and waits for the answer.
-	ask := func(_ context.Context, c ai.ToolCall) (agent.Decision, error) {
-		return agent.Decision{Allow: c.Name == "Read"}, nil
+	ask := func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		return agent.Decision{Allow: req.Call.Name == "Read"}, nil
 	}
 
 	spec := host.Spec{
 		Model: "claude-code/claude-opus-5-5",
 		Mode:  agent.ModeAcceptEdits,
-		Approve: func(ctx context.Context, c ai.ToolCall) (agent.Decision, error) {
-			return ask(ctx, c)
+		Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			return ask(ctx, req)
 		},
 	}
 	_ = spec

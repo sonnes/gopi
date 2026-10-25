@@ -83,15 +83,15 @@ A tool call that needs a person goes to the `Approve` function of the spec. The 
 spec := host.Spec{
 	Model: "claude-code/claude-opus-5-5",
 	Mode:  agent.ModeAcceptEdits,
-	Approve: func(ctx context.Context, c ai.ToolCall) (agent.Decision, error) {
-		return ask(ctx, c)
+	Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		return ask(ctx, req)
 	},
 }
 ```
 
-`ask` shows the call to a person, and waits for the answer.
+`ask` shows the call of the request to a person, and waits for the answer. The `agent.ApprovalRequest` also holds the reason of the CLI, and `NoAlways` if the CLI keeps no Always for the call.
 
-The `Mode` of the spec decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. Codex honors only `agent.ModePlan` and `agent.ModeBypass`. With another mode, `Start` fails with `errors.ErrUnsupported`. An empty mode keeps the mode of the driver.
+The `Mode` of the spec decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. Codex maps each mode to a sandbox and a policy. Its default mode is a read-only sandbox that asks before each write. An empty mode keeps the mode of the driver.
 
 The host stream gets `EventApprovalStart` before the call, and `EventApprovalEnd` after it. While a call waits, the status of the session is `StatusRequiresAction`. The call has the tool name of the agent: `Bash` in Claude Code, and `bash` in the harness and in Codex. With no `Approve`, the agent denies each call that needs a person. If the run ends while a call waits, the call gets `EventApprovalEnd` before `run_end`, and the host drops a later answer.
 

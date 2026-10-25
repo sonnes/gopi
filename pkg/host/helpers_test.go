@@ -111,6 +111,9 @@ type fakeDriver struct {
 	// abandon stops the wait for the approve function when the run
 	// ends, as the Codex agent does. The approve function goes on.
 	abandon bool
+	// reason goes with each call to the approve function, as an agent
+	// says why a call asks.
+	reason string
 
 	mu      sync.Mutex
 	configs []agent.Config
@@ -131,14 +134,14 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 	if c.Approve != nil {
 		approve := c.Approve
 		if d.detached {
-			approve = func(_ context.Context, call ai.ToolCall) (agent.Decision, error) {
-				return c.Approve(context.Background(), call)
+			approve = func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+				return c.Approve(context.Background(), req)
 			}
 		}
 		if d.abandon {
 			approve = abandoned(approve)
 		}
-		opts = append(opts, agent.BeforeTool(askFirst(approve)))
+		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason)))
 	}
 	r, err := agent.Durable(ctx, d.lm, c.Session, opts...)
 	if err != nil || !d.plain {
@@ -154,10 +157,10 @@ func abandoned(approve agent.ApproveFunc) agent.ApproveFunc {
 		d   agent.Decision
 		err error
 	}
-	return func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
+	return func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		done := make(chan result, 1)
 		go func() {
-			d, err := approve(ctx, call)
+			d, err := approve(ctx, req)
 			done <- result{
 				d:   d,
 				err: err,
@@ -172,10 +175,15 @@ func abandoned(approve agent.ApproveFunc) agent.ApproveFunc {
 	}
 }
 
-// askFirst returns a hook that asks approve before each tool call.
-func askFirst(approve agent.ApproveFunc) agent.BeforeToolFunc {
+// askFirst returns a hook that asks approve before each tool call, with
+// reason.
+func askFirst(approve agent.ApproveFunc, reason string) agent.BeforeToolFunc {
 	return func(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
-		d, err := approve(ctx, c)
+		req := agent.ApprovalRequest{
+			Call:   c,
+			Reason: reason,
+		}
+		d, err := approve(ctx, req)
 		if err != nil {
 			return c, err
 		}

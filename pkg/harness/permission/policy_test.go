@@ -397,7 +397,7 @@ func TestDenyChecksTheEditedInput(t *testing.T) {
 func TestApproveError(t *testing.T) {
 	boom := errors.New("boom")
 	p := &permission.Policy{
-		Approve: func(context.Context, ai.ToolCall) (agent.Decision, error) {
+		Approve: func(context.Context, agent.ApprovalRequest) (agent.Decision, error) {
 			return allow, boom
 		},
 	}

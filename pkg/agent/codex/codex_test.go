@@ -949,6 +949,8 @@ func TestApprove(t *testing.T) {
 		decision agent.Decision
 		err      error
 		want     ai.ToolCall
+		// reason is the reason of the request of the call.
+		reason string
 	}{
 		{
 			name:     "allow a command",
@@ -989,16 +991,21 @@ func TestApprove(t *testing.T) {
 				Name:  "apply_patch",
 				Input: json.RawMessage(`{"changes":[{"path":"/tmp/x","kind":{"type":"delete"}}]}`),
 			},
+			reason: "write outside the workspace",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
-			var got []ai.ToolCall
+			var (
+				got     []ai.ToolCall
+				reasons []string
+			)
 			a := newAgent(t,
 				Policy(ApprovalUntrusted),
-				Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
-					got = append(got, call)
+				Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+					got = append(got, req.Call)
+					reasons = append(reasons, req.Reason)
 					return tt.decision, tt.err
 				}),
 			)
@@ -1011,6 +1018,7 @@ func TestApprove(t *testing.T) {
 			assert.Equal(t, tt.want.ID, got[0].ID)
 			assert.Equal(t, tt.want.Name, got[0].Name)
 			assert.JSONEq(t, string(tt.want.Input), string(got[0].Input))
+			assert.Equal(t, tt.reason, reasons[0], "the request has the reason of the CLI")
 		})
 	}
 }
@@ -1051,8 +1059,8 @@ func TestApproveBeforeItem(t *testing.T) {
 			var got []ai.ToolCall
 			a := newAgent(t,
 				Policy(ApprovalUntrusted),
-				Approve(func(ctx context.Context, call ai.ToolCall) (agent.Decision, error) {
-					got = append(got, call)
+				Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+					got = append(got, req.Call)
 					return agent.Decision{Allow: true}, nil
 				}),
 			)
@@ -1093,8 +1101,8 @@ func TestRecordedApproval(t *testing.T) {
 		Dir(dir),
 		Policy(ApprovalUntrusted),
 		Thinking(ai.ThinkingLow),
-		Approve(func(_ context.Context, call ai.ToolCall) (agent.Decision, error) {
-			asked = append(asked, call.Name)
+		Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			asked = append(asked, req.Call.Name)
 			return agent.Decision{Allow: true}, nil
 		}),
 	)

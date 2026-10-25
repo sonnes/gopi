@@ -177,7 +177,7 @@ func (c *conn) answer(m message) {
 	case methodCommandApproval, methodFileChangeApproval:
 		call, known := c.approvalCall(m)
 		if c.approve != nil && known {
-			go c.decide(m.ID, call)
+			go c.decide(m.ID, call, approvalReason(m))
 			return
 		}
 		res.Result = decisionResult(decisionDecline)
@@ -222,11 +222,22 @@ func (c *conn) approvalCall(m message) (ai.ToolCall, bool) {
 	})
 }
 
+// approvalReason returns the reason of the approval request m, or "".
+func approvalReason(m message) string {
+	var p approvalParams
+	_ = json.Unmarshal(m.Params, &p)
+	return p.Reason
+}
+
 // decide sends the decision of the approve function on call, as the
-// response to the request id. If the function fails, or the decision
-// changes the input, the agent declines.
-func (c *conn) decide(id json.RawMessage, call ai.ToolCall) {
-	d, err := c.approve(c.ctx, call)
+// response to the request id, with reason in the request. If the
+// function fails, or the decision changes the input, the agent declines.
+func (c *conn) decide(id json.RawMessage, call ai.ToolCall, reason string) {
+	req := agent.ApprovalRequest{
+		Call:   call,
+		Reason: reason,
+	}
+	d, err := c.approve(c.ctx, req)
 	declined := err != nil || !d.Allow || d.Input != nil
 	decision := decisionAccept
 	switch {

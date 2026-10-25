@@ -4,7 +4,6 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
 )
 
 // Status is the status of a session.
@@ -41,8 +40,8 @@ type SessionState struct {
 	Running bool
 	// Queued is the number of messages that wait for a run.
 	Queued int
-	// Waiting are the tool calls that wait for the approve function.
-	Waiting []ai.ToolCall
+	// Waiting are the requests that wait for the approve function.
+	Waiting []agent.ApprovalRequest
 }
 
 // Status returns the status of the session. An approval that waits
@@ -96,11 +95,11 @@ func (s *State) Apply(e Event) {
 	case EventRunEnd:
 		cur.Running = false
 	case EventApprovalStart:
-		cur.Waiting = append(cur.Waiting, e.Call)
+		cur.Waiting = append(cur.Waiting, e.Request)
 	case EventApprovalEnd:
 		cur.Waiting = slices.DeleteFunc(
 			cur.Waiting,
-			func(c ai.ToolCall) bool { return c.ID == e.ToolCallID },
+			func(r agent.ApprovalRequest) bool { return r.Call.ID == e.ToolCallID },
 		)
 	}
 	s.set(id, cur)

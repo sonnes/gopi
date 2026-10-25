@@ -145,8 +145,8 @@ func TestStartAddsTheRules(t *testing.T) {
 			c := tt.config
 			c.Session = "s1"
 			c.Tools = []tool.Tool{echo}
-			c.Approve = func(_ context.Context, call ai.ToolCall) (agent.Decision, error) {
-				asked = append(asked, call.Name)
+			c.Approve = func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+				asked = append(asked, req.Call.Name)
 				return agent.Decision{Allow: true}, nil
 			}
 
