@@ -65,6 +65,9 @@ type Config struct {
 	Hooks []Hook
 	// Tools are more tools for the agent.
 	Tools []tool.Tool
+	// MCP are the MCP servers of the agent. The agent gets the tools
+	// of each server.
+	MCP []MCPServer
 }
 
 // Checker is a [Driver] that reports its [Status]: whether it can start

@@ -9,8 +9,8 @@ import (
 
 // Update changes the config of the session id with change, keeps the new
 // config in the session, and returns the session. Use it to change the
-// model, the effort, the mode, the system text, the skills, or the rules
-// of a session.
+// model, the effort, the mode, the system text, the skills, the rules,
+// or the MCP servers of a session.
 //
 // The agent of an active run keeps its config to the end of the run. The
 // next run starts the agent again from the new config, and the driver

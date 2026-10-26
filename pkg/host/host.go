@@ -158,6 +158,10 @@ type Config struct {
 	Allow []string `json:"allow,omitempty"`
 	Ask   []string `json:"ask,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
+	// MCP are the MCP servers of the agent. The host keeps them in the
+	// session file with the rest of the config, so a header such as a
+	// bearer token is on disk.
+	MCP []agent.MCPServer `json:"mcp,omitempty"`
 }
 
 // Create makes the session of config, keeps config in it, and starts its

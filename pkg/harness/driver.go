@@ -20,7 +20,7 @@ import (
 // hook. It reads each folder of the Dirs of c, after the readers of h. The Mode of c replaces the [Mode] of h. The System of c goes
 // after the [System] of h, as a CLI agent adds it to its own prompt.
 // The Skills of c are preloaded, as with [Preload]. The rules of c go
-// after the rules of h.
+// after the rules of h. The MCP servers of c go after those of [MCP].
 func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	if err := agent.CheckHooks(c.Hooks, agent.AllPoints...); err != nil {
 		return nil, fmt.Errorf("harness: %w", err)
@@ -65,6 +65,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	}
 	if len(c.Tools) > 0 {
 		opts = append(opts, Toolset(Tools(c.Tools...)))
+	}
+	if len(c.MCP) > 0 {
+		opts = append(opts, MCP(c.MCP...))
 	}
 	return h.Durable(ctx, c.Session, opts...)
 }

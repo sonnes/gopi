@@ -10,7 +10,6 @@ replace (
 	github.com/sonnes/gopi/pkg/ai/openaichat => ../../pkg/ai/openaichat
 	github.com/sonnes/gopi/pkg/ai/openrouter => ../../pkg/ai/openrouter
 	github.com/sonnes/gopi/pkg/catalog/env => ../../pkg/catalog/env
-	github.com/sonnes/gopi/pkg/mcp => ../../pkg/mcp
 )
 
 require (
@@ -20,7 +19,6 @@ require (
 	github.com/sonnes/gopi/pkg/ai/openai v0.0.0
 	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0
 	github.com/sonnes/gopi/pkg/catalog/env v0.0.0
-	github.com/sonnes/gopi/pkg/mcp v0.0.0
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
 )

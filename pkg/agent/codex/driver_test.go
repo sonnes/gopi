@@ -324,3 +324,46 @@ func countKills(t *testing.T) *int {
 	}
 	return &n
 }
+
+func TestDriverMCP(t *testing.T) {
+	servers := []agent.MCPServer{
+		{
+			Name:    "lw",
+			Type:    agent.MCPHTTP,
+			URL:     "http://127.0.0.1:1/mcp",
+			Headers: map[string]string{"Authorization": "Bearer t"},
+		},
+		{
+			Name:    "local",
+			Command: "lw-mcp",
+			Args:    []string{"--quiet"},
+			Env:     map[string]string{"A": "1"},
+		},
+	}
+	wantServers := map[string]any{
+		"lw": map[string]any{
+			"url":          "http://127.0.0.1:1/mcp",
+			"http_headers": map[string]string{"Authorization": "Bearer t"},
+		},
+		"local": map[string]any{
+			"command": "lw-mcp",
+			"args":    []string{"--quiet"},
+			"env":     map[string]string{"A": "1"},
+		},
+	}
+
+	t.Run("the config of the thread holds the servers", func(t *testing.T) {
+		a := startAgent(t, Driver(), agent.Config{MCP: servers})
+
+		p := a.threadParams("", nil, "")
+		assert.Equal(t, wantServers, p.Config["mcp_servers"])
+	})
+
+	t.Run("the servers go next to the hooks", func(t *testing.T) {
+		a := startAgent(t, Driver(Hooks(stopHook{})), agent.Config{MCP: servers})
+
+		p := a.threadParams("", &hookServer{socket: "/tmp/hooks.sock"}, "gopi-hook")
+		assert.Equal(t, wantServers, p.Config["mcp_servers"])
+		assert.Contains(t, p.Config, "hooks")
+	})
+}

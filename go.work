@@ -11,5 +11,4 @@ use (
 	./pkg/ai/openaichat
 	./pkg/ai/openrouter
 	./pkg/catalog/env
-	./pkg/mcp
 )

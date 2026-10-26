@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/mcp"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -45,6 +47,7 @@ type Harness struct {
 	seeds        []Seeder
 	agentOpts    []agent.Option
 	policy       permission.Policy
+	mcp          []agent.MCPServer
 
 	subagentEvents func(callID string, e agent.Event)
 
@@ -75,6 +78,7 @@ func (h *Harness) with(opts []Option) *Harness {
 	c.tools = slices.Clip(c.tools)
 	c.seeds = slices.Clip(c.seeds)
 	c.agentOpts = slices.Clip(c.agentOpts)
+	c.mcp = slices.Clip(c.mcp)
 	c.policy.Allow = slices.Clip(c.policy.Allow)
 	c.policy.Ask = slices.Clip(c.policy.Ask)
 	c.policy.Deny = slices.Clip(c.policy.Deny)
@@ -90,7 +94,21 @@ func (h *Harness) with(opts []Option) *Harness {
 // A subagent of an unsaved agent is unsaved too, so the task tool cannot
 // resume it.
 func (h *Harness) New(ctx context.Context, opts ...Option) (*agent.Agent, error) {
-	asm, err := h.with(opts).assemble(ctx, "")
+	call, closeMCP, err := h.with(opts).connectMCP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a, err := call.newAgent(ctx, closeMCP)
+	if err != nil {
+		return nil, errors.Join(err, closeMCP())
+	}
+	return a, nil
+}
+
+// newAgent is [Harness.New] after the MCP servers connect. The agent
+// runs closeMCP on [agent.Agent.Close].
+func (h *Harness) newAgent(ctx context.Context, closeMCP func() error) (*agent.Agent, error) {
+	asm, err := h.assemble(ctx, "")
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +117,7 @@ func (h *Harness) New(ctx context.Context, opts ...Option) (*agent.Agent, error)
 		return nil, err
 	}
 
+	agentOpts = append(agentOpts, agent.OnClose(closeMCP))
 	a := agent.New(lm, agentOpts...)
 	if err := asm.seed(ctx, a.Log()); err != nil {
 		return nil, err
@@ -118,6 +137,22 @@ func (h *Harness) Durable(ctx context.Context, id string, opts ...Option) (*agen
 	if err != nil {
 		return nil, err
 	}
+	call, closeMCP, err := call.connectMCP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	a, err := call.durable(ctx, id, stored, closeMCP)
+	if err != nil {
+		return nil, errors.Join(err, closeMCP())
+	}
+	return a, nil
+}
+
+// durable is [Harness.Durable] after the MCP servers connect. stored is
+// the spec that the session keeps. The agent runs closeMCP on
+// [agent.Agent.Close].
+func (h *Harness) durable(ctx context.Context, id, stored string, closeMCP func() error) (*agent.Agent, error) {
+	call := h
 	asm, err := call.assemble(ctx, id)
 	if err != nil {
 		return nil, err
@@ -127,7 +162,11 @@ func (h *Harness) Durable(ctx context.Context, id string, opts ...Option) (*agen
 		return nil, err
 	}
 
-	agentOpts = append(agentOpts, agent.Store(call.store))
+	agentOpts = append(
+		agentOpts,
+		agent.Store(call.store),
+		agent.OnClose(closeMCP),
+	)
 	a, err := agent.Durable(ctx, lm, id, agentOpts...)
 	if err != nil {
 		return nil, err
@@ -147,6 +186,25 @@ func (h *Harness) Durable(ctx context.Context, id string, opts ...Option) (*agen
 		return nil, err
 	}
 	return a, nil
+}
+
+// connectMCP connects to the servers of [MCP], and returns a copy of h
+// with their tools and with no servers, and the function that closes
+// the sessions. The task tool builds a subagent from the copy, so a
+// subagent shares the sessions of its parent and connects to nothing.
+// If a server does not connect, connectMCP closes the others and fails.
+func (h *Harness) connectMCP(ctx context.Context) (*Harness, func() error, error) {
+	noop := func() error { return nil }
+	if len(h.mcp) == 0 {
+		return h, noop, nil
+	}
+	tools, closeMCP, err := mcp.Connect(ctx, h.mcp, os.Environ())
+	if err != nil {
+		return nil, nil, errors.Join(fmt.Errorf("harness: %w", err), closeMCP())
+	}
+	call := h.with([]Option{Toolset(Tools(tools...))})
+	call.mcp = nil
+	return call, closeMCP, nil
 }
 
 // resolve returns the harness of one call of [Harness.Durable]: a

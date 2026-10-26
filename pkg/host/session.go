@@ -188,6 +188,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Allow:   config.Allow,
 		Ask:     config.Ask,
 		Deny:    config.Deny,
+		MCP:     config.MCP,
 		Approve: s.approve,
 		Hooks:   h.hooks,
 		Tools:   h.tools,

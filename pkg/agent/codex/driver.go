@@ -14,7 +14,7 @@ import (
 // config come after them.
 //
 // The driver maps Model to the ID of the model, Dir, System, Effort to
-// [Thinking], and Approve. With an Approve function, the
+// [Thinking], MCP to [MCP], and Approve. With an Approve function, the
 // policy is [ApprovalUntrusted] unless an option of the driver sets
 // [Policy], so that the CLI asks before a command that is not known to
 // be safe. The mode replaces the policy and the sandbox of the options:
@@ -101,6 +101,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Thinking(c.Effort))
 	}
 	opts = append(opts, modeOptions(c.Mode)...)
+	if len(c.MCP) > 0 {
+		opts = append(opts, MCP(c.MCP...))
+	}
 	if c.Approve != nil {
 		opts = append(opts, Approve(c.Approve))
 	}

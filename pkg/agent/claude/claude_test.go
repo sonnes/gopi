@@ -600,6 +600,12 @@ func TestOptions(t *testing.T) {
 		claude.AllowedTools("Read", "Bash(git:*)"),
 		claude.DisallowedTools("WebFetch"),
 		claude.AskTools("Bash(gh pr comment:*)"),
+		claude.MCP(agent.MCPServer{
+			Name:    "lw",
+			Type:    agent.MCPHTTP,
+			URL:     "http://127.0.0.1:1/mcp",
+			Headers: map[string]string{"Authorization": "Bearer t"},
+		}),
 		claude.Env("FOO=bar"),
 	)
 	defer closeAgent(t, a)
@@ -625,6 +631,7 @@ func TestOptions(t *testing.T) {
 		"--allowedTools", "Read,Bash(git:*)",
 		"--disallowedTools", "WebFetch",
 		"--settings", `{"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
+		"--mcp-config", `{"mcpServers":{"lw":{"type":"http","url":"http://127.0.0.1:1/mcp","headers":{"Authorization":"Bearer t"}}}}`,
 	}, cmd.Args)
 	assert.Equal(t, "/work", cmd.Dir)
 	assert.Contains(t, cmd.Env, "FOO=bar")

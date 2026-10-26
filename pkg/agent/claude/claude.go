@@ -90,6 +90,7 @@ type config struct {
 	ask        []string
 	approve    agent.ApproveFunc
 	hooks      []agent.Hook
+	mcp        []agent.MCPServer
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -182,6 +183,14 @@ func AskTools(names ...string) Option {
 // value as the input of the prompt is not a new Input.
 func Approve(fn agent.ApproveFunc) Option {
 	return func(c *config) { c.approve = fn }
+}
+
+// MCP gives the CLI the MCP servers servers, with --mcp-config. The CLI
+// connects to them and names each tool "mcp__<server>__<tool>". The
+// servers of the settings of the CLI stay, so a server of servers
+// replaces a server of the settings with the same name.
+func MCP(servers ...agent.MCPServer) Option {
+	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
 
 // PermissionMode sets the permission mode of the CLI. Without it, the
@@ -367,6 +376,40 @@ func askSettings(rules []string) (string, error) {
 	return string(data), nil
 }
 
+// mcpEntry is one server of an mcp.json file, as the CLI reads it.
+type mcpEntry struct {
+	Type    string            `json:"type,omitempty"`
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+}
+
+// mcpConfig returns servers as the JSON of an mcp.json file, for
+// --mcp-config.
+func mcpConfig(servers []agent.MCPServer) (string, error) {
+	var f struct {
+		Servers map[string]mcpEntry `json:"mcpServers"`
+	}
+	f.Servers = make(map[string]mcpEntry, len(servers))
+	for _, s := range servers {
+		f.Servers[s.Name] = mcpEntry{
+			Type:    s.Type,
+			Command: s.Command,
+			Args:    s.Args,
+			Env:     s.Env,
+			URL:     s.URL,
+			Headers: s.Headers,
+		}
+	}
+	data, err := json.Marshal(f)
+	if err != nil {
+		return "", fmt.Errorf("claude: encode the MCP servers: %w", err)
+	}
+	return string(data), nil
+}
+
 // command returns the command that starts the CLI, and resumes the
 // session of the CLI if the log has one.
 func (a *Agent) command() (*exec.Cmd, error) {
@@ -431,6 +474,13 @@ func cliArgs(c config) ([]string, error) {
 			return nil, err
 		}
 		args = append(args, "--settings", settings)
+	}
+	if len(c.mcp) > 0 {
+		servers, err := mcpConfig(c.mcp)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "--mcp-config", servers)
 	}
 	return args, nil
 }

@@ -103,6 +103,16 @@ func Toolset(readers ...ToolsReader) Option {
 	return func(h *Harness) { h.tools = append(h.tools, readers...) }
 }
 
+// MCP adds the MCP servers servers. [Harness.New] and [Harness.Durable]
+// connect to them with [mcp.Connect], and the agent gets their tools as
+// deferred tools named "mcp__<server>__<tool>". A stdio server gets the
+// environment of the process. If a server does not connect, New and
+// Durable fail. [agent.Agent.Close] closes the sessions, and a
+// subagent shares the sessions of its parent.
+func MCP(servers ...agent.MCPServer) Option {
+	return func(h *Harness) { h.mcp = append(h.mcp, servers...) }
+}
+
 // Builtin sets the built-in tools. Without Builtin, the agent gets
 // [Coding].
 func Builtin(b Builtins) Option {

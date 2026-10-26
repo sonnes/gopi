@@ -2,6 +2,7 @@ package agent_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,4 +61,26 @@ func TestDuplicateToolName(t *testing.T) {
 	assert.PanicsWithError(t, `agent: two tools are named "echo"`, func() {
 		agent.New(model(p), agent.Toolset(echo, other))
 	})
+}
+
+func TestClose(t *testing.T) {
+	var closed []string
+	errDB := errors.New("db")
+	a := agent.New(model(&script{}),
+		agent.OnClose(func() error {
+			closed = append(closed, "first")
+			return nil
+		}),
+		agent.OnClose(func() error {
+			closed = append(closed, "second")
+			return errDB
+		}),
+	)
+
+	err := a.Close()
+	require.ErrorIs(t, err, errDB, "Close joins the error of each function")
+	assert.Equal(t, []string{"first", "second"}, closed, "Close runs each function in order")
+
+	require.NoError(t, a.Close(), "a second Close runs nothing")
+	assert.Len(t, closed, 2)
 }

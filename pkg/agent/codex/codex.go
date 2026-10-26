@@ -117,6 +117,7 @@ type config struct {
 	approval ApprovalPolicy
 	approve  agent.ApproveFunc
 	hooks    []agent.Hook
+	mcp      []agent.MCPServer
 	// hookCommand is the gopi binary that relays a hook.
 	hookCommand string
 }
@@ -184,6 +185,14 @@ func Sandbox(mode SandboxMode) Option {
 // [ApprovalNever].
 func Policy(policy ApprovalPolicy) Option {
 	return func(c *config) { c.approval = policy }
+}
+
+// MCP gives the CLI the MCP servers servers, as the mcp_servers table
+// of the config of the thread. The CLI connects to them. The servers of
+// the config.toml of the CLI stay, so a server of servers replaces a
+// server of the config with the same name.
+func MCP(servers ...agent.MCPServer) Option {
+	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
 
 // Approve sets the function that answers each approval request of the
@@ -486,7 +495,39 @@ func (a *Agent) threadParams(thread string, hooks *hookServer, hookCommand strin
 	if hooks != nil {
 		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
 	}
+	if len(a.cfg.mcp) > 0 {
+		if p.Config == nil {
+			p.Config = make(map[string]any)
+		}
+		p.Config["mcp_servers"] = mcpServers(a.cfg.mcp)
+	}
 	return p
+}
+
+// mcpServers returns servers as the mcp_servers table of the config of
+// the CLI, by name. A stdio server has command, args, and env. An HTTP
+// server has url and http_headers.
+func mcpServers(servers []agent.MCPServer) map[string]any {
+	out := make(map[string]any, len(servers))
+	for _, s := range servers {
+		entry := make(map[string]any)
+		if s.Type == agent.MCPHTTP {
+			entry["url"] = s.URL
+			if len(s.Headers) > 0 {
+				entry["http_headers"] = s.Headers
+			}
+		} else {
+			entry["command"] = s.Command
+			if len(s.Args) > 0 {
+				entry["args"] = s.Args
+			}
+			if len(s.Env) > 0 {
+				entry["env"] = s.Env
+			}
+		}
+		out[s.Name] = entry
+	}
+	return out
 }
 
 // findHookCommand returns the absolute path of the hook command. The

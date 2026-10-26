@@ -129,3 +129,25 @@ func TestUpdateAnUnknownSession(t *testing.T) {
 
 	assert.ErrorIs(t, err, host.ErrNotFound)
 }
+
+func TestUpdateChangesTheMCPServers(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	first := agent.MCPServer{Name: "lw", Type: agent.MCPHTTP, URL: "http://127.0.0.1:1/mcp"}
+	f.create(t, host.Config{ID: "s1", MCP: []agent.MCPServer{first}})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	runEnd(t, events)
+	assert.Equal(t, []agent.MCPServer{first}, f.lastConfig(t).MCP, "the driver gets the servers of the config")
+
+	second := agent.MCPServer{Name: "lw", Type: agent.MCPHTTP, URL: "http://127.0.0.1:2/mcp"}
+	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
+		c.MCP = []agent.MCPServer{second}
+	})
+	require.NoError(t, err)
+	next(t, events, func(host.Event) bool { return true })
+
+	f.send(t, "s1", "b")
+	runEnd(t, events)
+	assert.Equal(t, []agent.MCPServer{second}, f.lastConfig(t).MCP, "the next start reads the new servers")
+}

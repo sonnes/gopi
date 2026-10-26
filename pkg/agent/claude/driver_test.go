@@ -49,6 +49,7 @@ func TestDriverStart(t *testing.T) {
 		Ask:     []string{"Bash(gh pr comment:*)"},
 		Deny:    []string{"WebFetch"},
 		Effort:  ai.ThinkingHigh,
+		MCP:     []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -72,6 +73,7 @@ func TestDriverStart(t *testing.T) {
 		`--settings {"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
 		"--permission-mode plan",
 		"--effort high",
+		`--mcp-config {"mcpServers":{"local":{"command":"lw-mcp"}}}`,
 	} {
 		assert.Contains(t, args, want)
 	}

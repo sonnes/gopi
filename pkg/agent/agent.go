@@ -25,6 +25,8 @@ type Agent struct {
 
 	mu    sync.Mutex
 	state State
+	// closed is true after the first [Agent.Close].
+	closed bool
 }
 
 // config holds the options of an agent that do not change after [New]
@@ -45,6 +47,8 @@ type config struct {
 	// log as they are.
 	system SystemFunc
 	hooks  []Hook
+	// closers run once, at the first [Agent.Close].
+	closers []func() error
 }
 
 // Option configures an [Agent].
@@ -128,6 +132,33 @@ func MaxTokens(n int) Option {
 // model.
 func Thinking(level ai.ThinkingLevel) Option {
 	return func(a *Agent) { a.cfg.callOpts = ai.JoinOptions(a.cfg.callOpts, ai.Thinking(level)) }
+}
+
+// OnClose adds fn to the functions that [Agent.Close] runs. A builder of
+// the agent uses it to release what the tools of the agent hold, such
+// as the MCP sessions of the harness.
+func OnClose(fn func() error) Option {
+	return func(a *Agent) { a.cfg.closers = append(a.cfg.closers, fn) }
+}
+
+// Close runs each function of [OnClose] once, in order, and returns
+// their errors joined. A later Close runs nothing and returns nil.
+// Close does not stop a run. A tool that needs what a function
+// released fails after Close.
+func (a *Agent) Close() error {
+	a.mu.Lock()
+	if a.closed {
+		a.mu.Unlock()
+		return nil
+	}
+	a.closed = true
+	a.mu.Unlock()
+
+	var errs []error
+	for _, fn := range a.cfg.closers {
+		errs = append(errs, fn())
+	}
+	return errors.Join(errs...)
 }
 
 // New returns an agent over an unsaved log. The log lives in process

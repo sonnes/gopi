@@ -5,7 +5,7 @@
 # MODULES lists the directory of each module. go.work joins them, but
 # ./... stops at the root of a nested module, so each target runs in
 # each module.
-MODULES := . pkg/ai/anthropic pkg/ai/fireworks pkg/ai/openai pkg/ai/openaichat pkg/ai/openrouter pkg/catalog/env pkg/mcp examples cmd/gopi cmd/modelsync
+MODULES := . pkg/ai/anthropic pkg/ai/fireworks pkg/ai/openai pkg/ai/openaichat pkg/ai/openrouter pkg/catalog/env examples cmd/gopi cmd/modelsync
 
 # Run the tests. Pass flags to go test with ARGS, for example
 # `make test ARGS="-run TestStreamText -v"`. To test some packages only,
