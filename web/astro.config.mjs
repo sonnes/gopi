@@ -4,7 +4,10 @@ import starlight from "@astrojs/starlight";
 import { unified } from "@astrojs/markdown-remark";
 import { fileURLToPath } from "node:url";
 
+import { renderMermaid } from "./src/remark/render-mermaid.mjs";
 import { rewriteDocLinks } from "./src/remark/rewrite-doc-links.mjs";
+import { stripTitleHeading } from "./src/remark/strip-title-heading.mjs";
+import { conceptsGroup } from "./src/sidebar-concepts.mjs";
 
 // Project-site defaults for GitHub Pages. With a custom domain, set
 // base to "/" and site to the domain.
@@ -24,7 +27,24 @@ export default defineConfig({
   },
   markdown: {
     processor: unified({
-      remarkPlugins: [[rewriteDocLinks, { base: BASE, repo: REPO }]],
+      remarkPlugins: [
+        stripTitleHeading,
+        [
+          renderMermaid,
+          {
+            // The fonts of tokens.css. The diagram labels are measured in them.
+            fonts: {
+              regular: "@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff",
+              bold: "@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff",
+              mono: "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff",
+              monoBold: "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-700-normal.woff",
+            },
+            // No maxWidth: Pele breaks an identifier, such as
+            // EventApprovalStart, in the middle to fit a width.
+          },
+        ],
+        [rewriteDocLinks, { base: BASE, repo: REPO }],
+      ],
     }),
   },
   integrations: [
@@ -88,8 +108,10 @@ export default defineConfig({
           href: REPO,
         },
       ],
+      // An entry path is relative to web/. A concept page starts with
+      // "../docs/", which resolves to the docs directory of the repository.
       editLink: {
-        baseUrl: `${REPO}/edit/main/`,
+        baseUrl: `${REPO}/edit/main/web/`,
       },
       // Expressive Code options live in ec.config.mjs. That file is
       // required for the <Code> component to render outside markdown.
@@ -153,6 +175,7 @@ export default defineConfig({
             { label: "Keep a Session", slug: "docs/guides/keep-a-session" },
           ],
         },
+        conceptsGroup(),
         {
           label: "GoDoc",
           link: "https://pkg.go.dev/github.com/sonnes/gopi",

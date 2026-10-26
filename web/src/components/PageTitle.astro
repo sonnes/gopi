@@ -1,6 +1,7 @@
 ---
 // Overrides Starlight's PageTitle so the repo's frontmatter convention
-// reaches the page: `summary` sets the lede.
+// reaches the page: `summary` sets the lede. A concept page has no
+// `summary`, so its `description` sets the lede.
 //
 // Above the title sits the eyebrow — the name of the sidebar group the
 // page belongs to. A reader arriving from search lands mid-tree with no
@@ -18,10 +19,12 @@ const { entry, sidebar } = Astro.locals.starlightRoute;
 // Starlight does not export its SidebarEntry type from the package, so
 // the type is taken off the value the route already carries.
 type SidebarEntry = (typeof sidebar)[number];
-const { title, summary } = entry.data as {
+const { title, summary, description } = entry.data as {
   title: string;
   summary?: string;
+  description?: string;
 };
+const lede = summary ?? description;
 
 /** The label of the innermost group holding the current page. */
 function sectionOf(entries: SidebarEntry[], label?: string): string | undefined {
@@ -43,7 +46,7 @@ const section = sectionOf(sidebar);
 
 <h1 id={PAGE_TITLE_ID}>{title}</h1>
 
-{summary && <p class="page-lede">{summary}</p>}
+{lede && <p class="page-lede">{lede}</p>}
 
 <style>
   @layer starlight.core {

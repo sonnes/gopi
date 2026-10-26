@@ -7,7 +7,7 @@ description: The layout of `docs/`, where the rules are, and the glossary.
 
 The code is the source of truth. `docs/` holds what the code cannot say: the design rules of each part and their reasons, the terms, and a map to the files. If a page and the code disagree, the code is correct and the page has a bug.
 
-These pages are for the developers of gopi.
+These pages are for the developers of gopi. The site shows `concepts/` under Concepts.
 
 ## Layout
 

@@ -15,7 +15,7 @@ A page holds the design rules of the concept and a map to the code. The code hol
 - If you change a design rule, update the page in the same change.
 - If a change touches no design rule and no term, do not touch the page. Update the doc comment in the code.
 - If you remove an abstraction, remove the page.
-- After each change, update the index in `docs/concepts/README.md`.
+- After each change, update the index in `docs/concepts/README.md`. The Concepts group of the site sidebar follows the index.
 
 ## Frontmatter
 
@@ -33,7 +33,7 @@ read_when:
 ```
 
 - `title` is also the H1.
-- `description` is one sentence. The index shows it.
+- `description` is one sentence. The index shows it, and the site shows it under the title.
 - `package` names the Go packages that implement the concept.
 - `read_when` lists the tasks that bring a reader to the page.
 

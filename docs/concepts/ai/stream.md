@@ -12,12 +12,21 @@ read_when:
 
 A stream is the events of one model call, read in order, followed by one final message. The generic stream in `pkg/stream` connects one producer goroutine to one consumer. The event stream in `pkg/ai` is that stream with an event and a message as its types.
 
-```
-provider goroutine                    consumer
-  push(start)          -> Events() -> start
-  push(text_delta)     ->          -> text_delta
-  push(tool_end)       ->          -> tool_end
-  return message, err  -> Wait()   -> message, err
+```mermaid
+sequenceDiagram
+  accTitle: One model call as a stream
+  accDescr: The provider goroutine pushes each event to the stream, and the consumer reads it with Events. The consumer reads the final message and the error with Wait.
+  participant P as provider goroutine
+  participant S as stream
+  participant C as consumer
+  P->>S: push(start)
+  S->>C: Events(): start
+  P->>S: push(text_delta)
+  S->>C: Events(): text_delta
+  P->>S: push(tool_end)
+  S->>C: Events(): tool_end
+  P->>S: return message, err
+  S->>C: Wait(): message, err
 ```
 
 ## Design

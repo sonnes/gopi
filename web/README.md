@@ -1,9 +1,10 @@
 # gopi Site
 
 The site uses Astro and Starlight. The landing page has its own layout.
-The pages live in `src/content/docs/`. The developer docs in the
-repository's `docs/` directory are not part of the site. A page links to
-one of them as a relative path, and the link resolves to GitHub.
+The pages live in `src/content/docs/`. The concept pages in the
+repository's `docs/concepts/` are on the site too, under Concepts. The rest
+of `docs/` is not part of the site. A link to a file that the site does not
+show resolves to GitHub.
 
 ```
 make site-install   # pnpm install
@@ -40,10 +41,34 @@ form is a component, and the page gives it the content as props. The colors
 are the tokens, so a figure follows the theme switch. `design/diagrams/`
 holds the mockups, and `.claude/rules/site-docs.md` says how to pick a form.
 
-`src/remark/rewrite-doc-links.mjs` rewrites a relative link to a page into a
-site route, and a relative link to any other file in the repository into a
-link to GitHub. Authors write the link as a path to the file.
+`src/remark/rewrite-doc-links.mjs` rewrites a relative link to a page or a
+concept page into a site route, and a relative link to any other file in the
+repository into a link to GitHub. Authors write the link as a path to the file.
 `scripts/check-links.mjs` makes sure that each link resolves.
+
+## Concept Pages
+
+`src/content.config.ts` also loads each Markdown file in `../docs/concepts/`.
+GitHub and the site show the same files. A concept page keeps its path, so
+`docs/concepts/ai/stream.md` is the route `/docs/concepts/ai/stream/`.
+
+- `src/sidebar-concepts.mjs` builds the Concepts group from the index,
+  `docs/concepts/README.md`. Each H2 of the index is a subgroup, with its
+  pages in the order of its table.
+- `src/remark/strip-title-heading.mjs` removes the H1 of a concept page,
+  because `PageTitle.astro` shows the title. The H1 stays in the file for
+  GitHub.
+- `PageTitle.astro` shows the `description` of a concept page as the lede.
+- `src/remark/render-mermaid.mjs` renders each Mermaid block of a concept
+  page to an SVG with [Pele](https://pele.run) at build time. GitHub renders
+  the same block with Mermaid. The SVG reads the `--pele-*` variables in
+  `starlight.css`, so it follows the theme switch. A Mermaid block in a page
+  stops the build.
+
+Pele sizes each box from the width of its label. The plugin measures each
+label in the font files of the site, from the `@fontsource` packages. If
+`tokens.css` changes a font, change the font files in `astro.config.mjs`
+too.
 
 ## Design System
 

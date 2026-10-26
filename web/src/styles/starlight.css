@@ -468,7 +468,7 @@ site-search button[data-open-modal] kbd {
   height: auto;
   overflow: visible;
 }
-.fig svg text {
+.fig svg:not(.pele) text {
   font-family: var(--font-mono);
   font-size: 12px;
   fill: var(--text);
@@ -496,6 +496,31 @@ site-search button[data-open-modal] kbd {
 }
 .fig svg .head-accent {
   fill: var(--primary);
+}
+
+/* A Mermaid block on a page becomes a Pele SVG at build time. See
+   src/remark/render-mermaid.mjs. Pele reads these variables, so the
+   drawing follows the theme switch without a new render. */
+.pele-fig .pele {
+  --pele-bg: var(--panel);
+  --pele-fg: var(--text);
+  --pele-muted: var(--muted);
+  --pele-line: var(--muted-strong);
+  --pele-surface: var(--code-bg);
+  --pele-surface-alt: var(--panel-soft);
+  --pele-border: var(--line-strong);
+  --pele-accent: var(--primary);
+  --pele-critical: var(--err);
+  --pele-error: var(--err);
+  --pele-font: var(--font-sans);
+  --pele-font-mono: var(--font-mono);
+  --pele-radius: var(--r-sm);
+  --pele-series-1: var(--l-ai);
+  --pele-series-2: var(--l-agent);
+  --pele-series-3: var(--l-durable);
+  --pele-series-4: var(--l-harness);
+  --pele-series-5: var(--l-wire);
+  margin-inline: auto;
 }
 
 /* The label voice, inside a figure. */

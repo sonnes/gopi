@@ -5,7 +5,7 @@ paths:
 
 # Site Pages
 
-These rules apply to every page under `web/src/content/docs/`. The pages are for the users of gopi. The pages under `docs/` are for its developers, and `.claude/rules/docs.md` governs them.
+These rules apply to every page under `web/src/content/docs/`. The pages are for the users of gopi. The pages under `docs/` are for its developers, and `.claude/rules/docs.md` governs them. The site also shows the concept pages of `docs/concepts/`, under Concepts.
 
 ## Who Owns What
 
@@ -15,7 +15,7 @@ These rules apply to every page under `web/src/content/docs/`. The pages are for
 | What is this thing, and how do I use it    | `ai/`, `tool/`, and `agent/`, one page per abstraction |
 | What does one provider add to a call       | `providers/`, one page per provider |
 | How do I do one job                        | `guides/*.mdx`, one page per job  |
-| Why is it built this way, which file to open | `docs/concepts/`, on GitHub   |
+| Why is it built this way, which file to open | `docs/concepts/`, under Concepts |
 | One name for one thing                     | the glossary in `docs/README.md` |
 
 Do not write a type list, a method list, or a field table. Link GoDoc. Do not write a design rule or its reason. Link the concept page. Do not compare gopi with another project.
@@ -95,11 +95,11 @@ To add a figure:
 - A figure replaces the text and the table that say the same thing. Do not write both.
 - Keep a list of values as a table, unless a figure shows a pattern in it, such as a check matrix or a ladder.
 - An MDX prop loses the leading spaces of a string with more than one line. Put indented code in an `export const` under the imports.
-- `docs/` keeps ASCII diagrams. GitHub renders those, and it does not run the site build.
+- A page draws with a figure component. A Mermaid block in a page stops the build. A concept page draws with Mermaid, and `.claude/rules/docs.md` says how.
 
 ## Links
 
-- Write a link as a relative path to the file: `../ai/streams.mdx`, or `../../../../../docs/concepts/ai/stream.md`. The build turns a page path into a route and any other path into a GitHub link.
+- Write a link as a relative path to the file: `../ai/streams.mdx`, or `../../../../../docs/concepts/ai/stream.md`. The build turns the path of a page or a concept page into a route, and any other path into a GitHub link.
 - `make docs-links` fails on a dead link and on a site-absolute link.
 - Do not put a link in a component prop. The link checker and the rewriter read Markdown links only.
 

@@ -12,21 +12,25 @@ read_when:
 
 A permission policy decides, for each tool call, if the call runs, asks a person, or is denied. It holds a mode and three lists of rules in the format of the settings of Claude Code: `bash(git push *)`, `edit_file(docs/**)`, `mcp__github__*`. The policy becomes one `BeforeTool` hook of the agent.
 
+```mermaid
+flowchart TD
+  accTitle: The decision for one tool call
+  accDescr: A Deny rule denies the call. An Ask rule sends it to Approve. An Allow rule runs it. With no matching rule, the mode and the kind of the tool decide.
+  call([tool call]) --> deny{Deny rule?}
+  deny -- yes --> denied[denied, the model gets the rule]
+  deny -- no --> ask{Ask rule?}
+  ask -- yes --> approve[Approve: run, or denied]
+  ask -- no --> allow{Allow rule?}
+  allow -- yes --> run[run]
+  allow -- no --> mode[the mode and the kind decide]
 ```
-  tool call
-     |
-  Deny rule? ---- yes --> denied, the model gets the rule
-     |
-  Ask rule? ----- yes --> Approve --> run, or denied
-     |
-  Allow rule? --- yes --> run
-     |
-  mode x kind     Read    Edit    Exec    Other
-    default       run     ask     ask     ask
-    acceptEdits   run     run     ask     ask
-    plan          run     deny    deny    deny
-    bypass        run     run     run     run
-```
+
+| Mode          | Read | Edit | Exec | Other |
+| ------------- | ---- | ---- | ---- | ----- |
+| `default`     | run  | ask  | ask  | ask   |
+| `acceptEdits` | run  | run  | ask  | ask   |
+| `plan`        | run  | deny | deny | deny  |
+| `bypass`      | run  | run  | run  | run   |
 
 ## Design
 

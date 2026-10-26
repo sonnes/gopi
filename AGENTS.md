@@ -8,7 +8,7 @@ gopi is a Go SDK for building AI agents.
 - `internal/` - the code that every provider shares: the retry loop, the message rules, and the test cases.
 - `cmd/gopi/` - the CLI, a test drive of the SDK. Build output goes to `.bin/`.
 - `models.json` - the default models of each provider and driver. `make models` writes it, and a program reads it with `catalog.ReadModelFile`.
-- `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout.
+- `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout. The site shows the concept pages.
 - `web/` - the site for the users of gopi, with Astro and Starlight. `web/README.md` has the layout.
 - `examples/` - the programs of the site guides. It is its own module, and `make test` builds it.
 - `.claude/rules/` - path-scoped rules for Go code, tests, `docs/`, and the site pages

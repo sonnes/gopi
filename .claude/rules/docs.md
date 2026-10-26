@@ -38,8 +38,10 @@ Do not write a type list, a method list, or a flag list. Do not write an environ
 - Do not write a vague size or rate, such as "fast", "large", or "rare". Name the condition, or link the constant in the code.
 - Use title case for headings.
 - If a shape is hard to read as a sentence, draw it. A flow, a hierarchy, and a sequence are shapes.
-- Draw a diagram in ASCII, in a fenced block. Do not use Mermaid, an image, or a Unicode box character.
-- Keep a diagram at 72 columns or fewer, so it fits a terminal and a diff.
+- Draw a flow, a sequence, or a state as a Mermaid block. GitHub renders the block with Mermaid, and the site renders it with Pele.
+- Start a Mermaid block with an `accTitle` and an `accDescr` that say what the diagram shows.
+- If Mermaid has no form for a shape, draw the shape in ASCII in a fenced block. Do not use an image or a Unicode box character.
+- Keep an ASCII diagram at 72 columns or fewer, so it fits a terminal and a diff.
 - A diagram replaces the text that describes the shape. Do not write both.
 
 ## Go Examples

@@ -9,8 +9,9 @@ import { fileURLToPath } from "node:url";
  *     [tool.go](../../../../pkg/ai/tool.go)      a source file
  *
  * This plugin rewrites them for the site, where neither resolves: a
- * page target becomes a base-aware route, and everything else inside
- * the repository becomes an absolute link into GitHub.
+ * page target or a concept target becomes a base-aware route, and
+ * everything else inside the repository becomes an absolute link into
+ * GitHub. A concept page is a file in /docs/concepts.
  *
  * An author therefore never writes a site route by hand, and
  * scripts/check-links.mjs can make sure that every target exists.
@@ -18,17 +19,30 @@ import { fileURLToPath } from "node:url";
 
 const PAGES_DIR = fileURLToPath(new URL("../content/docs/", import.meta.url));
 const REPO_DIR = fileURLToPath(new URL("../../../", import.meta.url));
+const CONCEPTS_DIR = fileURLToPath(new URL("../../../docs/concepts/", import.meta.url));
 
 const EXTERNAL = /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i;
 const DOC_EXT = /\.mdx?$/;
 
-// Trailing "/index" is a directory index, and the collection maps the
-// root index.mdx to the bare "docs" id (see src/content.config.ts).
-function slugFor(absPath) {
-  const rel = relative(PAGES_DIR, absPath).split(sep).join("/");
-  const noExt = rel.replace(DOC_EXT, "");
-  const noIndex = noExt.replace(/(^|\/)index$/, "");
-  return noIndex.replace(/\/$/, "");
+// The ID of the page at absPath, as src/content.config.ts makes it, or
+// undefined if the site does not show the file. A trailing "/index" or
+// "/README" is a directory index.
+function idFor(absPath) {
+  let rel;
+  if (isInside(PAGES_DIR, absPath)) {
+    rel = relative(PAGES_DIR, absPath);
+  } else if (isInside(CONCEPTS_DIR, absPath)) {
+    rel = `concepts/${relative(CONCEPTS_DIR, absPath)}`;
+  } else {
+    return undefined;
+  }
+  const path = rel
+    .split(sep)
+    .join("/")
+    .replace(DOC_EXT, "")
+    .replace(/(^|\/)(index|README)$/, "")
+    .replace(/\/$/, "");
+  return path ? `docs/${path}` : "docs";
 }
 
 function isInside(dir, absPath) {
@@ -72,9 +86,9 @@ export function rewriteDocLinks({ base, repo, branch = "main" }) {
 
       const target = resolve(fromDir, pathPart);
 
-      if (DOC_EXT.test(pathPart) && isInside(PAGES_DIR, target)) {
-        const slug = slugFor(target);
-        node.url = `${prefix}/${slug ? `docs/${slug}` : "docs"}/${suffix}`;
+      const id = DOC_EXT.test(pathPart) ? idFor(target) : undefined;
+      if (id) {
+        node.url = `${prefix}/${id}/${suffix}`;
         return;
       }
 
