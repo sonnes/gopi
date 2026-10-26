@@ -114,10 +114,26 @@ type SystemFunc func(ctx context.Context) ([]ai.Section, error)
 //		return []ai.Section{{Name: "base", Text: "Answer in one sentence."}}, nil
 //	})
 //
-// If fn returns an error, the run fails. Without System, the agent
-// leaves the sections of the log as they are.
+// If fn returns an error, or two sections with one name, the run fails.
+// Without System, the agent leaves the sections of the log as they are.
 func System(fn SystemFunc) Option {
 	return func(a *Agent) { a.cfg.system = fn }
+}
+
+// SystemSection is the name of the section of [SystemText].
+const SystemSection = "system"
+
+// SystemText returns a [SystemFunc] with one section, named
+// [SystemSection], that holds text. If text is empty, the function
+// returns no section. The System option of each driver uses it, so a
+// fixed prompt is one section.
+func SystemText(text string) SystemFunc {
+	return func(context.Context) ([]ai.Section, error) {
+		if text == "" {
+			return nil, nil
+		}
+		return []ai.Section{{Name: SystemSection, Text: text}}, nil
+	}
 }
 
 // MaxTokens caps the output tokens of every model call. See

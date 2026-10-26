@@ -306,8 +306,8 @@ func uniqueNames(tools []tool.Tool) error {
 // the order that the harness promises: the permission hook, the agent
 // options of the baseline and of the call, then the prompt and the
 // tools. The agent builds the prompt before each model call, through
-// [agent.System]: the section of [Assembly.System], then the sections
-// of the prompt builder.
+// [agent.System]: the section of [Assembly.System], the sections of the
+// prompt builder, then the sections of [Sections].
 func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 	lm, err := a.h.cat.LanguageModel(a.Spec)
 	if err != nil {
@@ -323,10 +323,17 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 		if err != nil {
 			return nil, fmt.Errorf("harness: build the prompt: %w", err)
 		}
-		if a.System == "" {
+		if a.System != "" {
+			built = append([]ai.Section{{Name: SystemSection, Text: a.System}}, built...)
+		}
+		if a.h.sections == nil {
 			return built, nil
 		}
-		return append([]ai.Section{{Name: SystemSection, Text: a.System}}, built...), nil
+		more, err := a.h.sections(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("harness: build the prompt: %w", err)
+		}
+		return append(built, more...), nil
 	}
 
 	policy := a.h.policy

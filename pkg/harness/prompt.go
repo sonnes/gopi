@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
@@ -35,7 +36,7 @@ const SeedAuthor = "harness"
 
 // SystemSection is the name of the section that holds the text of
 // [System]. It is the first section of the prompt.
-const SystemSection = "system"
+const SystemSection = agent.SystemSection
 
 // The names of the sections of [DefaultPrompt].
 const (

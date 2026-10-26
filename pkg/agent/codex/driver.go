@@ -94,8 +94,8 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
 	}
-	if c.System != "" {
-		opts = append(opts, System(c.System))
+	if c.Sections != nil {
+		opts = append(opts, Sections(c.Sections))
 	}
 	if c.Effort != "" {
 		opts = append(opts, Thinking(c.Effort))

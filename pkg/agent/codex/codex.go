@@ -34,9 +34,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
+	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
@@ -110,7 +112,7 @@ type config struct {
 	binary   string
 	dir      string
 	model    string
-	system   string
+	sections agent.SystemFunc
 	thinking ai.ThinkingLevel
 	env      []string
 	sandbox  SandboxMode
@@ -155,10 +157,25 @@ func Model(name string) Option {
 	return func(c *config) { c.model = name }
 }
 
-// System sets the developer instructions of the thread. The CLI keeps
-// its own base instructions.
+// System sets the developer instructions of the thread, as one
+// section named [agent.SystemSection]. It is [Sections] with
+// [agent.SystemText].
 func System(s string) Option {
-	return func(c *config) { c.system = s }
+	return Sections(agent.SystemText(s))
+}
+
+// Sections sets the function that returns the sections of the
+// developer instructions of the thread. The CLI keeps its own base
+// instructions. The agent calls fn before each run. The first sections
+// of a session are the developer instructions, and the log keeps them
+// as its base, so each start and each resume of the thread gets the
+// same instructions. A later change goes as a developer message in the
+// history of the thread, before the next turn, because a Codex model
+// keeps a reminder in a user message only for its own turn. If fn
+// returns an error, the run fails. Without Sections, the thread has no
+// developer instructions.
+func Sections(fn agent.SystemFunc) Option {
+	return func(c *config) { c.sections = fn }
 }
 
 // Thinking sets the reasoning effort of each turn. [ai.ThinkingMax]
@@ -312,13 +329,31 @@ func (a *Agent) run(
 	if err := e.Start(); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
+	base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages())
+	if err != nil {
+		return e.Finish(ctx, ai.Usage{}, fmt.Errorf("codex: %w", err))
+	}
+	// The base goes in the log before the thread starts, because the
+	// thread gets it as its developer instructions.
+	if base != nil {
+		if err := e.Input(ctx, []session.Entry{session.NewEntry(*base)}); err != nil {
+			return e.Finish(ctx, ai.Usage{}, err)
+		}
+	}
 	// Connect before the input, so that a failed start stores no input
 	// that the CLI never got.
 	c, thread, err := a.connect(ctx)
 	if err != nil {
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
-	if err := e.Input(ctx, entries); err != nil {
+	stored := entries
+	if change != nil {
+		if err := c.inject(ctx, thread, transcript.SystemText(change.Content)); err != nil {
+			return e.Finish(ctx, ai.Usage{}, fmt.Errorf("codex: send the change of the sections: %w", err))
+		}
+		stored = append([]session.Entry{session.NewEntry(*change)}, entries...)
+	}
+	if err := e.Input(ctx, stored); err != nil {
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
 	t := &turn{
@@ -490,7 +525,7 @@ func (a *Agent) threadParams(thread string, hooks *hookServer, hookCommand strin
 		Cwd:                   a.cfg.dir,
 		ApprovalPolicy:        a.cfg.approval,
 		Sandbox:               a.cfg.sandbox,
-		DeveloperInstructions: a.cfg.system,
+		DeveloperInstructions: sections.Text(a.log.Messages()),
 	}
 	if hooks != nil {
 		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)

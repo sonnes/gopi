@@ -200,6 +200,7 @@ func (t *taskTool) start(ctx context.Context, sub def.Agent, id, callID string) 
 	}
 	opts := []Option{
 		func(c *Harness) {
+			c.sections = nil
 			c.child = &childCall{
 				sub: sub,
 				parent: ParentRef{

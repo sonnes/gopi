@@ -346,6 +346,25 @@ func (c *conn) initialize(ctx context.Context) error {
 	return c.write(notification{Method: "initialized"})
 }
 
+// inject appends a developer message with text to the history of the
+// thread, through thread/inject_items. The message goes in its place, so
+// the cached start of the thread stays.
+func (c *conn) inject(ctx context.Context, thread, text string) error {
+	params := injectParams{
+		ThreadID: thread,
+		Items: []injectItem{{
+			Type: "message",
+			Role: "developer",
+			Content: []injectContent{{
+				Type: "input_text",
+				Text: text,
+			}},
+		}},
+	}
+	var res struct{}
+	return c.call(ctx, "thread/inject_items", params, &res)
+}
+
 // handshake initializes the connection, then starts the thread, or
 // resumes it if params has a thread ID.
 func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult, error) {

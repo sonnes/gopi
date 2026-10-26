@@ -33,7 +33,8 @@ A host keeps the sessions of gopi agents for a Go program. A session is a resour
 
 - A caller names a session by its ID, and holds no handle. The host knows each session of the store, also one with no agent, so a read never asks if an agent runs.
 - The user events follow the user events of [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview): `Send` is `user.message`, `Interrupt` is `user.interrupt`, and `Confirm` is `user.tool_confirmation`. The status names follow it too.
-- `Create` keeps the config in the value `gopi.host/config`, with the fields of its agent file, before the driver starts. Each start of the agent reads that value, so a session keeps its agent, its model, and its folder after a restart. The cost: an edit of an agent file reaches only a new session.
+- `Create` keeps the config in the value `gopi.host/config`, with the fields of its agent file, before the driver starts. Each start of the agent reads that value, so a session keeps its agent, its model, and its folder after a restart. The cost: an edit of the model, the mode, the effort, the tools, or the skills of an agent file reaches only a new session.
+- The config holds no prompt. Before each run, the host reads the prompt of the agent file and calls the function of `Sections` for the session, and the driver sends only the [sections](../agent/section.md) that changed. A prompt depends on a state that changes during a session, so a stored copy goes stale.
 - `Update` writes the new config, and the next run starts the agent again from it. The active run keeps its agent, because a driver reads the config only when it starts the agent. A change of the ID, the folders, the agent file, or the kind of agent fails, because the new agent cannot resume the conversation.
 - The host writes the session to `gopi.host/session` at each change. `Open` makes each session that ran or waited idle, with the stop reason `restarted`, because no agent survives a restart.
 - A failed run is idle with the stop reason `error`. A session then has three statuses, and the stop reason tells the end of the last run.
@@ -50,6 +51,7 @@ A host keeps the sessions of gopi agents for a Go program. A session is a resour
 | Change how a session is created, read, or listed    | `pkg/host/host.go`      |
 | Change the status values, or the recovery at Open   | `pkg/host/status.go`    |
 | Change how an agent file fills a config             | `pkg/host/agentfile.go` |
+| Change the sections that a session gets             | `pkg/host/agentfile.go` |
 | Change how the agent of a session starts or stops   | `pkg/host/session.go`   |
 | Change how the status follows the run and the calls | `pkg/host/session.go`   |
 | Change how a message steers, waits, or runs         | `pkg/host/run.go`       |
@@ -61,6 +63,7 @@ A host keeps the sessions of gopi agents for a Go program. A session is a resour
 ## Related Concepts
 
 - [Driver](../agent/driver.md)
+- [Section](../agent/section.md)
 - [Definition](../def/definition.md)
 - [Catalog](../catalog/catalog.md)
 - [Run Stream](../agent/run-stream.md)

@@ -38,18 +38,18 @@ func TestDriverStart(t *testing.T) {
 	)
 
 	r, err := d.Start(context.Background(), agent.Config{
-		Session: "s1",
-		Store:   session.NewMemoryStore(),
-		Spec:    "claude-code/haiku",
-		Model:   ai.Model{ID: "haiku"},
-		Dir:     "/work",
-		System:  "Be brief.",
-		Mode:    agent.ModePlan,
-		Allow:   []string{"Read"},
-		Ask:     []string{"Bash(gh pr comment:*)"},
-		Deny:    []string{"WebFetch"},
-		Effort:  ai.ThinkingHigh,
-		MCP:     []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
+		Session:  "s1",
+		Store:    session.NewMemoryStore(),
+		Spec:     "claude-code/haiku",
+		Model:    ai.Model{ID: "haiku"},
+		Dir:      "/work",
+		Sections: agent.SystemText("Be brief."),
+		Mode:     agent.ModePlan,
+		Allow:    []string{"Read"},
+		Ask:      []string{"Bash(gh pr comment:*)"},
+		Deny:     []string{"WebFetch"},
+		Effort:   ai.ThinkingHigh,
+		MCP:      []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)

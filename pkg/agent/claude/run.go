@@ -28,6 +28,10 @@ type runner struct {
 	a    *Agent
 	proc *process
 	em   *emit.Emitter
+	// reminder is the change of the sections, as a text block before
+	// the input. The log keeps the change as a system message, and the
+	// input without the reminder.
+	reminder string
 
 	// cur is the API message in flight. The CLI sends one assistant
 	// line per content block, so the runner collects the blocks until
@@ -86,11 +90,15 @@ func (r *runner) run(
 	if err := r.em.Input(ctx, entries); err != nil {
 		return r.abort(ctx, ai.Usage{}, err)
 	}
+	input := emit.Input(entries)
+	if r.reminder != "" {
+		input = append([]ai.Content{ai.Text{Text: r.reminder}}, input...)
+	}
 	err := r.proc.send(outUser{
 		Type: "user",
 		Message: outUserMessage{
 			Role:    "user",
-			Content: blocks(emit.Input(entries)),
+			Content: blocks(input),
 		},
 	})
 	if err != nil {

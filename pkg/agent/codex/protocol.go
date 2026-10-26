@@ -84,6 +84,26 @@ type threadResult struct {
 	Model string `json:"model"`
 }
 
+// injectParams are the parameters of thread/inject_items. Items are raw
+// items of the Responses API that the thread appends to its history.
+type injectParams struct {
+	ThreadID string       `json:"threadId"`
+	Items    []injectItem `json:"items"`
+}
+
+// injectItem is one message item of thread/inject_items.
+type injectItem struct {
+	Type    string          `json:"type"`
+	Role    string          `json:"role"`
+	Content []injectContent `json:"content"`
+}
+
+// injectContent is one content part of an [injectItem].
+type injectContent struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
 type turnStartParams struct {
 	ThreadID string      `json:"threadId"`
 	Input    []userInput `json:"input"`

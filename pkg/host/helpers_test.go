@@ -134,6 +134,9 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		agent.Toolset(append([]tool.Tool{echo}, c.Tools...)...),
 		agent.Hooks(c.Hooks...),
 	}
+	if c.Sections != nil {
+		opts = append(opts, agent.System(c.Sections))
+	}
 	if d.ask {
 		approve := c.Approve
 		if d.detached {

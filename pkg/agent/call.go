@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent/internal/partial"
+	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -21,7 +22,7 @@ func (a *Agent) call(
 ) (*ai.Message, error) {
 	// The base goes in the options, so a provider sends it in the
 	// system prompt and the tool list of its API.
-	base, rest := splitBase(msgs)
+	base, rest := sections.Base(msgs)
 	opts := ai.JoinOptions(a.cfg.callOpts, baseOptions(base))
 	// The clip makes an append of a hook copy the messages, so the
 	// messages of the state do not change.

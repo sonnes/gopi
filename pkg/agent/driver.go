@@ -39,8 +39,13 @@ type Config struct {
 	Model ai.Model
 	// Dir is the working directory of the agent.
 	Dir string
-	// System is the text that the agent adds to its own prompt.
-	System string
+	// Sections returns the sections that the agent adds to its own
+	// prompt, in order. A native agent calls it before each model call,
+	// and an agent CLI calls it before each run. A change of the
+	// sections reaches the agent as a change in the conversation, so the
+	// start of the conversation stays the same for the cache. If it is
+	// nil, the agent adds no prompt.
+	Sections SystemFunc
 	// Skills names the skills that the agent loads at the start.
 	Skills []string
 	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest

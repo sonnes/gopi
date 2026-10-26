@@ -65,13 +65,16 @@ func TestStartAddsTheSystemAndTheSkills(t *testing.T) {
 
 	a := start(t, h, agent.Config{
 		Session: "s1",
-		System:  "Review the diff.",
-		Skills:  []string{"deploy"},
+		Sections: func(context.Context) ([]ai.Section, error) {
+			return []ai.Section{{Name: "review", Text: "Review the diff."}}, nil
+		},
+		Skills: []string{"deploy"},
 	})
 	run(t, a, "hi")
 
-	want := "You are a test agent.\n\nReview the diff.\n\n## Skill: deploy\n\nRun scripts/run.sh."
+	want := "You are a test agent.\n\n## Skill: deploy\n\nRun scripts/run.sh."
 	assert.Equal(t, want, section(a, harness.SystemSection))
+	assert.Equal(t, "Review the diff.", section(a, "review"), "the sections of the config come after")
 }
 
 func TestStartAddsTheHooksAndTheTools(t *testing.T) {

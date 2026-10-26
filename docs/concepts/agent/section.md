@@ -1,9 +1,10 @@
 ---
 title: Section
 description: How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it.
-package: pkg/ai, pkg/agent
+package: pkg/ai, pkg/agent, pkg/agent/internal/sections
 read_when:
   - A part of the system prompt changes during a conversation
+  - A Claude Code or Codex agent reads a prompt that you do not expect
   - A provider sends system text that you do not expect
   - A resumed session has a prompt that you do not expect
 ---
@@ -43,13 +44,21 @@ A section is a named part of the system prompt. A system message sets a section 
 - If it can, a change keeps the order of the history, and if it cannot, it resets every section. A reset is longer, but it gives the order of `fn`, so the model reads one order.
 - An agent without `System` leaves the sections of the history as they are. A caller that does not use sections then removes nothing that another agent wrote.
 - A provider sends each system message in its place, and never merges the sections into one prompt. The reasons are in [Message](../ai/message.md).
+- A Claude Code or Codex agent keeps the same log: the base first, then each change as a system message. The fold lives in one package, so every driver agrees on the sections that the model read.
+- An agent CLI gets the text of the base as its prompt at each start, and never the current sections. A resumed CLI then gets the same prompt, so the cache of the conversation stays.
+- Claude Code takes no system message in a conversation, so a change goes as a `<system-reminder>` text block before the input of the next run. The log keeps the input without the reminder.
+- Codex gets a change as a developer message in the history of the thread, through `thread/inject_items`, before the next turn. A Codex model reads a developer message over an older user message, so a reminder holds only for its own turn.
+- A CLI reads a change only at the next run, not at each model call.
+- After an agent CLI compacts its conversation, the model can lose a change, because the summary replaces the reminders.
 
 ## Map
 
 | Task                                              | File                           |
 | ------------------------------------------------- | ------------------------------ |
 | Change the section blocks                         | `pkg/ai/content.go`            |
-| Change the fold or when the agent writes a change | `pkg/agent/system.go`          |
+| Change the fold or the change blocks              | `pkg/agent/internal/sections/sections.go` |
+| Change when the native agent writes a change      | `pkg/agent/system.go`          |
+| Change how a CLI agent sends the base or a change | `pkg/agent/claude/claude.go`, `pkg/agent/codex/codex.go` |
 | Change how a provider sends a system message      | `pkg/ai/<provider>/convert.go` |
 
 ## Related Concepts

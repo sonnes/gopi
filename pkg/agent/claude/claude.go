@@ -9,9 +9,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
+	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
@@ -87,7 +89,7 @@ type config struct {
 	binary     string
 	dir        string
 	model      string
-	system     string
+	sections   agent.SystemFunc
 	thinking   ai.ThinkingLevel
 	env        []string
 	permission Permission
@@ -131,10 +133,24 @@ func Model(s string) Option {
 	return func(c *config) { c.model = s }
 }
 
-// System appends s to the system prompt of the CLI. The CLI keeps its
-// own prompt, because its tools depend on it.
+// System appends s to the system prompt of the CLI, as one section
+// named [agent.SystemSection]. It is [Sections] with
+// [agent.SystemText].
 func System(s string) Option {
-	return func(c *config) { c.system = s }
+	return Sections(agent.SystemText(s))
+}
+
+// Sections sets the function that returns the sections that the agent
+// appends to the system prompt of the CLI. The CLI keeps its own
+// prompt, because its tools depend on it. The agent calls fn before
+// each run. The first sections of a session go in the system prompt,
+// and the log keeps them as its base, so each start of the CLI gets
+// the same prompt. A later change goes as a reminder before the input
+// of the next run, so the cache of the conversation stays. If fn
+// returns an error, the run fails. Without Sections, the agent adds no
+// prompt.
+func Sections(fn agent.SystemFunc) Option {
+	return func(c *config) { c.sections = fn }
 }
 
 // Thinking sets the effort level of the CLI. [ai.ThinkingOff] turns
@@ -290,6 +306,17 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 		if err := em.Start(); err != nil {
 			return nil, fmt.Errorf("claude: %w", err)
 		}
+		base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages())
+		if err != nil {
+			return em.Finish(ctx, ai.Usage{}, fmt.Errorf("claude: %w", err))
+		}
+		// The base goes in the log before the CLI starts, because the
+		// CLI gets it as its system prompt.
+		if base != nil {
+			if err := em.Input(ctx, []session.Entry{session.NewEntry(*base)}); err != nil {
+				return em.Finish(ctx, ai.Usage{}, err)
+			}
+		}
 		// Start the CLI before the input, so that a failed start stores
 		// no input that the CLI never got.
 		proc, err := a.ensure(ctx)
@@ -303,6 +330,10 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 			proc:      proc,
 			em:        em,
 			subagents: map[string]bool{},
+		}
+		if change != nil {
+			r.reminder = transcript.Reminder(transcript.SystemText(change.Content))
+			entries = append([]session.Entry{session.NewEntry(*change)}, entries...)
 		}
 		msgs, err := r.run(ctx, entries)
 		// The CLI did not take these steers before the run ended. It
@@ -429,7 +460,7 @@ func mcpConfig(servers []agent.MCPServer) (string, error) {
 // command returns the command that starts the CLI, and resumes the
 // session of the CLI if the log has one.
 func (a *Agent) command() (*exec.Cmd, error) {
-	args, err := cliArgs(a.cfg)
+	args, err := cliArgs(a.cfg, sections.Text(a.log.Messages()))
 	if err != nil {
 		return nil, err
 	}
@@ -451,9 +482,10 @@ func cliCommand(c config, args []string) *exec.Cmd {
 	return cmd
 }
 
-// cliArgs returns the arguments of the CLI of c, without a session to
-// resume. The input never goes on the command line. It goes to stdin.
-func cliArgs(c config) ([]string, error) {
+// cliArgs returns the arguments of the CLI of c, with system as the
+// appended system prompt, without a session to resume. The input never goes on
+// the command line. It goes to stdin.
+func cliArgs(c config, system string) ([]string, error) {
 	args := []string{
 		"--print",
 		"--output-format", "stream-json",
@@ -466,8 +498,8 @@ func cliArgs(c config) ([]string, error) {
 	if c.model != "" {
 		args = append(args, "--model", c.model)
 	}
-	if c.system != "" {
-		args = append(args, "--append-system-prompt", c.system)
+	if system != "" {
+		args = append(args, "--append-system-prompt", system)
 	}
 	switch c.thinking {
 	case "":

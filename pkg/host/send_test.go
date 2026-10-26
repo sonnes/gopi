@@ -88,9 +88,8 @@ func TestAnUnreadSteerRunsNext(t *testing.T) {
 func TestSendWakesAStoredSession(t *testing.T) {
 	f := newFixture(t)
 	f.create(t, host.Config{
-		ID:     "s1",
-		Dir:    "/tmp",
-		System: "Be brief.",
+		ID:  "s1",
+		Dir: "/tmp",
 	})
 	_, events := f.watch(t)
 	f.send(t, "s1", "a")
@@ -104,7 +103,6 @@ func TestSendWakesAStoredSession(t *testing.T) {
 	c := f.lastConfig(t)
 	assert.Equal(t, 2, f.driver.starts())
 	assert.Equal(t, "/tmp", c.Dir, "the agent starts from the config of the session")
-	assert.Equal(t, "Be brief.", c.System)
 	f.model.mu.Lock()
 	last := f.model.calls[len(f.model.calls)-1]
 	f.model.mu.Unlock()

@@ -74,6 +74,10 @@ Updated system prompt section "todos":
 
 A removal reads `Removed system prompt section "todos".` A model that takes no system message in the conversation gets this text as a `<system-reminder>` in a user message.
 
+## Claude Code and Codex
+
+`claude.Sections` and `codex.Sections` take the same function. The agent calls it before each run. The first sections go in the prompt of the CLI. Claude Code gets each later change as a `<system-reminder>` before the input of the run. Codex gets it as a developer message before the turn. `claude.System` and `codex.System` give one fixed section.
+
 ## Resume a Session
 
 To keep a conversation and resume it later, open it with `agent.Durable` and a store.

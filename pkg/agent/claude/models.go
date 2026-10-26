@@ -52,7 +52,7 @@ var efforts = map[string]ai.ThinkingLevel{
 func listModels(ctx context.Context, c config) ([]ai.Model, error) {
 	ctx, cancel := context.WithTimeout(ctx, listTimeout)
 	defer cancel()
-	args, err := cliArgs(c)
+	args, err := cliArgs(c, "")
 	if err != nil {
 		return nil, fmt.Errorf("claude: list models: %w", err)
 	}

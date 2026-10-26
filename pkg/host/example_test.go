@@ -6,6 +6,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
+	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/host"
@@ -25,16 +26,23 @@ func ExampleHost_Create() {
 	cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 	cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
-	h, err := host.Open(ctx, cat, host.Store(store))
+	// The host asks for the sections of a session before each run, so
+	// a change of the review rules reaches the next run.
+	review := func(context.Context, string) ([]ai.Section, error) {
+		return []ai.Section{{
+			Name: "review",
+			Text: "Review the diff. Report findings. Do not push.",
+		}}, nil
+	}
+	h, err := host.Open(ctx, cat, host.Store(store), host.Sections(review))
 	if err != nil {
 		return
 	}
 	defer h.Close()
 	s, err := h.Create(ctx, host.Config{
-		Model:  "claude-code/claude-opus-5-5",
-		Dir:    repoDir,
-		System: "Review the diff. Report findings. Do not push.",
-		Deny:   []string{"Bash(git push:*)"},
+		Model: "claude-code/claude-opus-5-5",
+		Dir:   repoDir,
+		Deny:  []string{"Bash(git push:*)"},
 	})
 	if err != nil {
 		return

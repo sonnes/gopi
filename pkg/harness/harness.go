@@ -44,6 +44,7 @@ type Harness struct {
 	system       string
 	preload      []string
 	prompt       PromptBuilder
+	sections     agent.SystemFunc
 	seeds        []Seeder
 	agentOpts    []agent.Option
 	policy       permission.Policy

@@ -52,6 +52,7 @@ msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 | `Dir(path)`                        | both    | The working directory of the CLI                            |
 | `Model(name)`                      | both    | The model of the CLI                                        |
 | `System(s)`                        | both    | Instructions that the CLI adds to its own prompt            |
+| `Sections(fn)`                     | both    | The [sections](sections.mdx) that the CLI adds to its prompt, read before each run |
 | `Thinking(level)`                  | both    | The reasoning effort of the CLI. For Claude Code, `ai.ThinkingOff` turns thinking off |
 | `Env(kv...)`                       | both    | More environment variables for the CLI                      |
 | `Approve(fn)`                      | both    | The function that answers each approval request             |

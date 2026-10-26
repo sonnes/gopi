@@ -17,7 +17,12 @@ import (
 )
 
 // reviewer is an agent file on the fake model.
-const reviewer = `---
+var reviewer = reviewerWith("You review.")
+
+// reviewerWith returns the agent file of reviewer with the prompt
+// prompt.
+func reviewerWith(prompt string) string {
+	return `---
 name: reviewer
 description: Review a diff.
 model: fake/m
@@ -26,8 +31,22 @@ permissionMode: acceptEdits
 disallowedTools: [Bash]
 skills: [deploy]
 ---
-You review.
-`
+` + prompt + "\n"
+}
+
+// agentPrompt returns the text of the section [host.AgentSection] of c.
+func agentPrompt(t *testing.T, c agent.Config) string {
+	t.Helper()
+	require.NotNil(t, c.Sections)
+	sections, err := c.Sections(context.Background())
+	require.NoError(t, err)
+	for _, s := range sections {
+		if s.Name == host.AgentSection {
+			return s.Text
+		}
+	}
+	return ""
+}
 
 // writeAgent writes the agent file name.md with text in dir/agents.
 func writeAgent(t *testing.T, dir, name, text string) {
@@ -46,7 +65,6 @@ func TestStartWithAnAgentFillsTheSpec(t *testing.T) {
 		ID:     "s1",
 		Dirs:   []string{dir},
 		Agent:  "reviewer",
-		System: "Be brief.",
 		Deny:   []string{"Write"},
 		Skills: []string{"lint"},
 	})
@@ -56,7 +74,6 @@ func TestStartWithAnAgentFillsTheSpec(t *testing.T) {
 	assert.Equal(t, "fake/m", c.Spec)
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
 	assert.Equal(t, agent.Mode("acceptEdits"), c.Mode)
-	assert.Equal(t, "You review.\n\nBe brief.", c.System)
 	assert.Equal(t, []string{"Write", "Bash"}, c.Deny)
 	assert.Equal(t, []string{"lint", "deploy"}, c.Skills)
 	assert.Equal(t, []string{dir}, c.Dirs)
@@ -95,7 +112,7 @@ func TestTheAgentOfALaterDirWins(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "You review later.", f.lastConfig(t).System)
+	assert.Equal(t, "You review later.", agentPrompt(t, f.lastConfig(t)))
 }
 
 func TestStartWithAnUnknownAgentFails(t *testing.T) {
@@ -127,8 +144,8 @@ func TestAStoredSessionRunsItsAgent(t *testing.T) {
 	writeAgent(t, dir, "reviewer", "---\nname: reviewer\ndescription: New.\nmodel: fake/m\n---\nYou review again.\n")
 	f.send(t, "s1", "a")
 
-	assert.Equal(t, "You review.", f.lastConfig(t).System, "an edit of the file changes only a new session")
-	assert.Equal(t, ai.ThinkingHigh, f.lastConfig(t).Effort)
+	assert.Equal(t, "You review again.", agentPrompt(t, f.lastConfig(t)), "an edit of the prompt reaches the next run")
+	assert.Equal(t, ai.ThinkingHigh, f.lastConfig(t).Effort, "an edit of the effort changes only a new session")
 }
 
 func TestStartWithAnUnknownEffortFails(t *testing.T) {
@@ -177,5 +194,5 @@ func TestTheSessionKeepsItsSpecBeforeTheDriverStarts(t *testing.T) {
 	f.driver.setErr(nil)
 	f = f.restart(t)
 	f.send(t, "s1", "a")
-	assert.Equal(t, "You review.", f.lastConfig(t).System)
+	assert.Equal(t, "You review.", agentPrompt(t, f.lastConfig(t)))
 }

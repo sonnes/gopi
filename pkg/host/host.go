@@ -48,6 +48,8 @@ type Host struct {
 	store Storer
 	hooks []agent.Hook
 	tools []tool.Tool
+	// sections returns the sections of a session, by ID.
+	sections SectionsFunc
 	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
@@ -77,6 +79,20 @@ func Hooks(hs ...agent.Hook) Option {
 // the config value of a session cannot keep it.
 func Tools(ts ...tool.Tool) Option {
 	return func(h *Host) { h.tools = append(h.tools, ts...) }
+}
+
+// SectionsFunc returns the sections of the prompt of the session id, in
+// order. See [Sections].
+type SectionsFunc func(ctx context.Context, id string) ([]ai.Section, error)
+
+// Sections sets the function that returns the sections of the prompt
+// of each session. The host calls fn before each run, and never keeps
+// the result in the config, so a change of the state behind fn reaches
+// the next run. The driver sends only the sections that changed. If fn
+// returns an error, the run fails. Without Sections, a session gets
+// only the prompt of its agent file.
+func Sections(fn SectionsFunc) Option {
+	return func(h *Host) { h.sections = fn }
 }
 
 // Open returns a host that resolves the model spec of each session with
@@ -129,11 +145,13 @@ type Config struct {
 	// file of Agent. The driver gets Dirs.
 	Dirs []string `json:"dirs,omitempty"`
 	// Agent names an agent file in Dirs. The file fills each empty field
-	// of Model, Mode, and Effort. Its prompt goes before System, its
-	// disallowed tools go after Deny, and its skills go after Skills.
-	// The host does not read the tools and the maxTurns keys of the
-	// file. Create reads the file once, so an edit of the file changes
-	// only the sessions that start after it.
+	// of Model, Mode, and Effort. Its disallowed tools go after Deny,
+	// and its skills go after Skills. Create reads these once, so an
+	// edit of them changes only the sessions that start after it. The
+	// prompt of the file is the section [AgentSection], before the
+	// sections of [Sections]. The host reads the prompt before each run,
+	// so an edit of the prompt reaches the next run. The host does not
+	// read the tools and the maxTurns keys of the file.
 	Agent string `json:"agent,omitempty"`
 	// Model is the model spec, such as "claude-code/claude-opus-5-5".
 	// It picks the driver. It is required if Agent gives no model.
@@ -148,8 +166,6 @@ type Config struct {
 	Mode agent.Mode `json:"mode,omitempty"`
 	// Dir is the working directory of the agent.
 	Dir string `json:"dir,omitempty"`
-	// System is the text that the agent adds to its own prompt.
-	System string `json:"system,omitempty"`
 	// Skills names the skills that the agent loads at the start.
 	Skills []string `json:"skills,omitempty"`
 	// Allow, Ask, and Deny are the permission rules of the agent, in

@@ -143,9 +143,10 @@ func TestRunText(t *testing.T) {
 	checkLog(t, a)
 
 	entries := a.Log().Entries()
-	require.Len(t, entries, 2)
-	assert.Equal(t, ai.RoleUser, entries[0].Message.Role)
-	assert.Equal(t, "codex", entries[1].Author)
+	require.Len(t, entries, 3)
+	assert.Equal(t, ai.RoleSystem, entries[0].Message.Role, "the log keeps the base")
+	assert.Equal(t, ai.RoleUser, entries[1].Message.Role)
+	assert.Equal(t, "codex", entries[2].Author)
 
 	thread, err := conversation.Get(a.Log())
 	require.NoError(t, err)
@@ -261,13 +262,13 @@ func TestRunEphemeralInput(t *testing.T) {
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 
-	end, ok := events[5].(agent.EventMessageEnd)
-	require.True(t, ok, "the ephemeral message has its events: %T", events[5])
+	end, ok := events[7].(agent.EventMessageEnd)
+	require.True(t, ok, "the ephemeral message has its events: %T", events[7])
 	assert.True(t, end.Ephemeral)
 
 	entries := a.Log().Entries()
-	require.Len(t, entries, 2, "the log does not keep the ephemeral entry")
-	assert.Equal(t, "Say hello.", entries[0].Message.Text())
+	require.Len(t, entries, 3, "the log keeps the base, and not the ephemeral entry")
+	assert.Equal(t, "Say hello.", entries[1].Message.Text())
 	checkLog(t, a)
 }
 

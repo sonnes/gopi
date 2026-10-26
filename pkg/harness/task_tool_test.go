@@ -36,15 +36,20 @@ func childID(t *testing.T, m ai.Message) string {
 // taskHarness returns a durable harness over store, with the subagents
 // agents, and the model script p.
 func taskHarness(t *testing.T, p *script, store session.Storer, agents ...def.Agent) *harness.Harness {
-	t.Helper()
+	return harness.New(taskOptions(t, p, store, agents...)...)
+}
+
+// taskOptions returns the options of a harness with p, store, and the
+// subagents agents.
+func taskOptions(t *testing.T, p *script, store session.Storer, agents ...def.Agent) []harness.Option {
 	readers := make([]def.AgentsReader, len(agents))
 	for i, a := range agents {
 		readers[i] = a
 	}
-	return harness.New(with(base(t, p),
+	return with(base(t, p),
 		harness.Store(store),
 		harness.Agents(readers...),
-	)...)
+	)
 }
 
 func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {

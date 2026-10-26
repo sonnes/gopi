@@ -54,8 +54,8 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 		// The modes of a config have the names of the permission modes.
 		opts = append(opts, Mode(permission.Mode(c.Mode)))
 	}
-	if c.System != "" {
-		opts = append(opts, System(joinText(h.system, c.System)))
+	if c.Sections != nil {
+		opts = append(opts, Sections(c.Sections))
 	}
 	if c.Approve != nil {
 		opts = append(opts, Approve(c.Approve))

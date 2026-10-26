@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/internal/transcript"
+	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -212,7 +213,7 @@ func (s State) Tools() []ai.ToolInfo { return transcript.CurrentTools(nil, s.mes
 
 // Sections returns the sections of the system prompt after
 // [State.Messages].
-func (s State) Sections() []ai.Section { return currentSections(s.messages) }
+func (s State) Sections() []ai.Section { return sections.Current(s.messages) }
 
 // Turn returns the turn of the run. The first turn is 1. It is 0
 // before the first model call of a run.

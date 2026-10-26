@@ -143,6 +143,15 @@ func Preload(names ...string) Option {
 	return func(h *Harness) { h.preload = append(h.preload, names...) }
 }
 
+// Sections sets the function that returns more sections of the system
+// prompt. The harness puts them after the sections of the prompt
+// builder, and the agent calls fn before each model call, so a change
+// reaches the next call. A subagent does not get them, because the
+// file of the subagent is its prompt. If a name repeats, the run fails.
+func Sections(fn agent.SystemFunc) Option {
+	return func(h *Harness) { h.sections = fn }
+}
+
 // Prompt sets the builder of the system prompt. Without it, or with
 // nil, the harness uses [DefaultPrompt].
 func Prompt(b PromptBuilder) Option {

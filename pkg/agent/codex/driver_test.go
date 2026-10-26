@@ -48,12 +48,12 @@ func TestDriverStart(t *testing.T) {
 	useTraces(t, []string{"text.trace"})
 	d := Driver(Sandbox(SandboxReadOnly))
 	a := startAgent(t, d, agent.Config{
-		Store:  session.NewMemoryStore(),
-		Spec:   "codex/gpt-5-codex",
-		Model:  ai.Model{ID: "gpt-5-codex"},
-		Dir:    workDir,
-		System: "Be brief.",
-		Effort: ai.ThinkingHigh,
+		Store:    session.NewMemoryStore(),
+		Spec:     "codex/gpt-5-codex",
+		Model:    ai.Model{ID: "gpt-5-codex"},
+		Dir:      workDir,
+		Sections: agent.SystemText("Be brief."),
+		Effort:   ai.ThinkingHigh,
 	})
 
 	_, msgs, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
