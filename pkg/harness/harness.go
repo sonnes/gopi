@@ -50,9 +50,7 @@ type Harness struct {
 	policy       permission.Policy
 	mcp          []agent.MCPServer
 
-	subagentEvents func(callID string, e agent.Event)
-
-	// child is the subagent of a call that the task tool makes. It is
+	// child is the subagent of a call that the agent tool makes. It is
 	// nil in the call of a caller.
 	child *childCall
 	// mem keeps the sessions of [Harness.Durable] when no [Store] is
@@ -92,7 +90,7 @@ func (h *Harness) with(opts []Option) *Harness {
 // New assembles an agent over an unsaved session, with opts on top of
 // the baseline. It reads the readers, makes the agent,
 // and seeds its log. The agent builds the prompt before each model call.
-// A subagent of an unsaved agent is unsaved too, so the task tool cannot
+// A subagent of an unsaved agent is unsaved too, so the agent tool cannot
 // resume it.
 func (h *Harness) New(ctx context.Context, opts ...Option) (*agent.Agent, error) {
 	call, closeMCP, err := h.with(opts).connectMCP(ctx)
@@ -179,7 +177,7 @@ func (h *Harness) durable(ctx context.Context, id, stored string, closeMCP func(
 		}
 	}
 	if call.child != nil && len(a.Log().Entries()) == 0 {
-		if err := Parent.Set(ctx, w, call.child.parent); err != nil {
+		if err := agent.Parent.Set(ctx, w, call.child.parent); err != nil {
 			return nil, err
 		}
 	}
@@ -191,7 +189,7 @@ func (h *Harness) durable(ctx context.Context, id, stored string, closeMCP func(
 
 // connectMCP connects to the servers of [MCP], and returns a copy of h
 // with their tools and with no servers, and the function that closes
-// the sessions. The task tool builds a subagent from the copy, so a
+// the sessions. The agent tool builds a subagent from the copy, so a
 // subagent shares the sessions of its parent and connects to nothing.
 // If a server does not connect, connectMCP closes the others and fails.
 func (h *Harness) connectMCP(ctx context.Context) (*Harness, func() error, error) {

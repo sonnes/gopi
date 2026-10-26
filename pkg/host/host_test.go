@@ -38,7 +38,7 @@ func TestCreate(t *testing.T) {
 	assert.Equal(t, []host.Session{sess}, f.h.List())
 
 	c := f.lastConfig(t)
-	assert.Equal(t, "s1", c.Session)
+	assert.Equal(t, "s1", c.SessionID)
 	assert.Equal(t, "/tmp", c.Dir)
 	assert.Equal(t, agent.ModePlan, c.Mode)
 	assert.NotNil(t, c.Approve, "the host answers each call that asks")

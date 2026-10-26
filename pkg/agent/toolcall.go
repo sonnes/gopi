@@ -52,7 +52,8 @@ func (a *Agent) runTools(
 	var wg sync.WaitGroup
 	for i, tc := range calls {
 		wg.Go(func() {
-			result, err := a.execute(ctx, prepared[i])
+			callCtx := withSubagentSink(ctx, tc.ID, em.emit)
+			result, err := a.execute(callCtx, prepared[i])
 			// The lock keeps the end and the result of one call together,
 			// and out in the order of the log.
 			mu.Lock()

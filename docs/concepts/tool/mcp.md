@@ -33,7 +33,7 @@ flowchart TD
 - A CLI agent connects to its own servers, so gopi holds no MCP session for it. The servers of the settings of the CLI stay.
 - `pkg/mcp` is in the root module, because the harness connects with it. The cost: each caller of gopi depends on the MCP SDK.
 - `mcp.Tools` returns tools from `tool.Func`, so the agent and the providers need no MCP code. Its caller owns the session. `mcp.Connect` owns the sessions that it opens, and its close function closes them.
-- The harness connects at `New` or `Durable`, and `agent.Agent.Close` closes the sessions. A subagent of the task tool shares the sessions of its parent, so a task call opens no connection.
+- The harness connects at `New` or `Durable`, and `agent.Agent.Close` closes the sessions. A subagent of the agent tool shares the sessions of its parent, so a task call opens no connection.
 - `mcp.Connect` returns the tools of each server that connected, also with an error. The harness then fails the start of the agent, because a config that names a server expects its tools. The CLI writes a warning and continues, so one server that is down does not stop the work.
 - An MCP result with `isError` becomes an error result, and a failed call becomes a Go error. This obeys the two failure channels in [Tool](tool.md).
 - `mcp.Tools` changes each character that a provider rejects in a tool name to `_`, and cuts the name to the length limit of the providers. If two tools then have the same name, it returns an error, because the model calls a tool by its name.

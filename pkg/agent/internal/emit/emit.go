@@ -240,6 +240,14 @@ func (e *Emitter) Drop() {
 // before the CLI reports its own sum.
 func (e *Emitter) Usage() ai.Usage { return e.usage }
 
+// Subagent sends one subagent event: an [agent.EventSubagentStart],
+// an [agent.EventSubagent], or an [agent.EventSubagentEnd]. The state
+// ignores it, and the log stores nothing, because the child has its own
+// session.
+func (e *Emitter) Subagent(ev agent.Event) {
+	e.emit(ev)
+}
+
 // ToolStart sends tool_execution_start for a call. The call must be in
 // the last assistant message, which [Emitter.End] stored.
 func (e *Emitter) ToolStart(tc ai.ToolCall) {

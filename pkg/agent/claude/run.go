@@ -23,7 +23,9 @@ const interruptTimeout = 5 * time.Second
 // stream.
 const emptyInput = "{}"
 
-// runner maps the lines of one run to events and log entries.
+// runner maps the lines of one run to events and log entries. The
+// runner of a subagent maps the lines of the child to the log of the
+// child, and has no process.
 type runner struct {
 	a    *Agent
 	proc *process
@@ -32,6 +34,11 @@ type runner struct {
 	// the input. The log keeps the change as a system message, and the
 	// input without the reminder.
 	reminder string
+	// sessionID is the ID of the session of em, or "" if it is unsaved.
+	sessionID string
+	// tasks tracks the subagents of the run. The runner of the run and
+	// the runner of each child share it.
+	tasks *tasks
 
 	// cur is the API message in flight. The CLI sends one assistant
 	// line per content block, so the runner collects the blocks until
@@ -206,12 +213,14 @@ func fileBlock(f ai.File) outBlock {
 // is the usage of the run.
 func (r *runner) fail(ctx context.Context, err error) ([]ai.Message, error) {
 	r.a.drop(r.proc)
+	r.endChildren(ctx)
 	return r.em.Finish(ctx, r.em.Usage(), err)
 }
 
 // abort ends a run with an error, and the CLI keeps running. The
 // messages that the run stored are still its result.
 func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
+	r.endChildren(ctx)
 	return r.em.Finish(ctx, u, err)
 }
 
@@ -229,27 +238,34 @@ func (r *runner) handle(
 	if err := json.Unmarshal(data, &l); err != nil {
 		return nil, false, nil
 	}
-	// A line with a parent tool call is from a subagent. The subagent
-	// is part of the tool call, so its lines never reach the log.
-	fromSubagent := l.ParentToolUseID != nil
+	// A line with a parent tool call is from a subagent. Its lines go
+	// to the log of the child, and never to the log of the run.
+	if l.ParentToolUseID != nil {
+		return nil, false, r.childLine(ctx, *l.ParentToolUseID, &l)
+	}
 
 	switch l.Type {
 	case "control_request":
 		return nil, false, r.proc.answer(ctx, &l)
 
 	case "system":
-		if l.Subtype == "init" {
+		switch l.Subtype {
+		case "init":
 			return nil, false, r.saveSession(ctx, l.SessionID)
+		case "task_started":
+			return nil, false, r.taskStarted(ctx, &l)
+		case "task_notification":
+			return nil, false, r.taskEnded(ctx, &l)
 		}
 
 	case "stream_event":
-		if fromSubagent || l.Event == nil {
+		if l.Event == nil {
 			return nil, false, nil
 		}
 		return nil, false, r.stream(ctx, l.Event)
 
 	case "assistant":
-		if fromSubagent || l.Message == nil {
+		if l.Message == nil {
 			return nil, false, nil
 		}
 		return nil, false, r.assistant(ctx, l.Message)
@@ -258,7 +274,7 @@ func (r *runner) handle(
 		if l.IsReplay {
 			return nil, false, r.replayed(ctx, &l)
 		}
-		if fromSubagent || l.Message == nil {
+		if l.Message == nil {
 			return nil, false, nil
 		}
 		return nil, false, r.user(ctx, l.Message)
@@ -512,6 +528,9 @@ func (r *runner) finish(ctx context.Context) error {
 		if slices.Contains(subagentTools, tc.Name) {
 			r.subagents[tc.ID] = true
 		}
+		if err := r.callStarted(ctx, tc); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -569,6 +588,9 @@ func (r *runner) toolResults(ctx context.Context, m *wireMessage) error {
 			Content: toolContent(b.Content),
 			IsError: b.IsError,
 		}
+		if err := r.callEnded(ctx, b.ToolUseID, result); err != nil {
+			return err
+		}
 		if _, err := r.em.ToolEnd(ctx, b.ToolUseID, result); err != nil {
 			return err
 		}
@@ -608,6 +630,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if err := r.finish(ctx); err != nil {
 		return r.abort(ctx, u, err)
 	}
+	r.endChildren(ctx)
 	if r.interrupted {
 		return r.abort(ctx, u, ctx.Err())
 	}

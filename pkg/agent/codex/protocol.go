@@ -194,6 +194,19 @@ type item struct {
 
 	// webSearch
 	Query string `json:"query"`
+
+	// collabAgentToolCall, with Tool and Status. Tool is the call in
+	// camel case, such as wait or sendInput.
+	ReceiverThreadIDs []string        `json:"receiverThreadIds"`
+	AgentsStates      json.RawMessage `json:"agentsStates"`
+
+	// subAgentActivity. Kind is started, interacted, interrupted, or
+	// completed. The item of kind started has the ID of the
+	// spawn_agent call of the model.
+	Kind          string  `json:"kind"`
+	AgentThreadID string  `json:"agentThreadId"`
+	AgentPath     string  `json:"agentPath"`
+	Model         *string `json:"model"`
 }
 
 // The item types that the agent maps.
@@ -204,7 +217,15 @@ const (
 	itemFileChange       = "fileChange"
 	itemMcpToolCall      = "mcpToolCall"
 	itemWebSearch        = "webSearch"
+	// itemCollabAgentToolCall is a call of the model to a subagent,
+	// such as wait.
+	itemCollabAgentToolCall = "collabAgentToolCall"
+	// itemSubAgentActivity reports the life of a subagent.
+	itemSubAgentActivity = "subAgentActivity"
 )
+
+// activityStarted is the kind of the subAgentActivity item of a spawn.
+const activityStarted = "started"
 
 // The status values of a tool item that mean failure.
 const (

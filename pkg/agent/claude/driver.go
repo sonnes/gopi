@@ -39,7 +39,7 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 	return listModels(ctx, newAgent(d.opts).cfg)
 }
 
-// Start starts the durable agent of the session c.Session.
+// Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	if len(c.Skills) > 0 {
 		return nil, unsupported("Skills")
@@ -98,7 +98,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.Hooks) > 0 {
 		opts = append(opts, Hooks(c.Hooks...))
 	}
-	return Durable(ctx, c.Session, opts...)
+	return Durable(ctx, c.SessionID, opts...)
 }
 
 // unsupported returns the error of a config field that the driver

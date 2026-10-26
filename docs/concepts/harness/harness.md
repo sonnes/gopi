@@ -24,7 +24,7 @@ A harness holds the builders of a coding agent: a catalog and a model spec, the 
      |
   skills      merge by qualified name, the last one wins
   subagents   merge by name, the last one wins
-  tools       built-in, Toolset, skill tool, task tool
+  tools       built-in, Toolset, skill tool, agent tool
      v
   Assembly ---> System + prompt builder --> agent.System
      |      ---> permission hook ---------> agent.Hooks, first
@@ -58,7 +58,7 @@ A harness holds the builders of a coding agent: a catalog and a model spec, the 
 
 - [Definition](../def/definition.md)
 - [Skill](skill.md)
-- [Subagent](subagent.md)
+- [Agent Tool](agent-tool.md)
 - [Permission](permission.md)
 - [Catalog](../catalog/catalog.md)
 - [Section](../agent/section.md)

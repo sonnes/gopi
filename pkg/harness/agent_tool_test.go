@@ -3,7 +3,6 @@ package harness_test
 import (
 	"context"
 	"regexp"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,7 +55,7 @@ func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"Review auth.go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"Review auth.go"}`),
 		reply("2 problems"),
 		reply("done"),
 	}}
@@ -75,15 +74,15 @@ func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
 
 	snap, err := store.Load(ctx, id)
 	require.NoError(t, err)
-	parent, ok, err := harness.Parent.Read(snap)
+	parent, ok, err := agent.Parent.Read(snap)
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.Equal(t, harness.ParentRef{Session: "s1", ToolCallID: "c1"}, parent)
+	assert.Equal(t, agent.ParentRef{SessionID: "s1", ToolCallID: "c1"}, parent)
 
 	child, err := h.Durable(ctx, id)
 	require.NoError(t, err)
 	assert.Equal(t, "You review code.", section(child, harness.SystemSection))
-	assert.NotContains(t, toolNames(child), "task", "a child cannot start a subagent")
+	assert.NotContains(t, toolNames(child), "agent", "a child cannot start a subagent")
 }
 
 func TestTaskListsTheSubagents(t *testing.T) {
@@ -93,14 +92,14 @@ func TestTaskListsTheSubagents(t *testing.T) {
 	run(t, a, "hello")
 
 	assert.Contains(t, section(a, "agents"), "- reviewer: Review a diff.")
-	assert.Contains(t, toolNames(a), "task")
+	assert.Contains(t, toolNames(a), "agent")
 }
 
 func TestTaskResumesAChild(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"first"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"first"}`),
 		reply("one"),
 		reply("ok"),
 	}}
@@ -111,7 +110,7 @@ func TestTaskResumesAChild(t *testing.T) {
 	id := childID(t, toolResult(t, a))
 
 	p.responses = []ai.Message{
-		callTool("c2", "task", `{"agent":"reviewer","prompt":"second","resume":"`+id+`"}`),
+		callTool("c2", "agent", `{"agent":"reviewer","prompt":"second","resume":"`+id+`"}`),
 		reply("two"),
 		reply("ok"),
 	}
@@ -142,7 +141,7 @@ func TestTaskErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &script{responses: []ai.Message{
-				callTool("c1", "task", tt.input),
+				callTool("c1", "agent", tt.input),
 				reply("done"),
 			}}
 			a, err := taskHarness(t, p, session.NewMemoryStore(), reviewer).Durable(context.Background(), "s1")
@@ -163,7 +162,7 @@ func TestTaskGivesTheChildOnlyItsTools(t *testing.T) {
 	limited := reviewer
 	limited.Tools = []string{"echo"}
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		reply("done"),
 		reply("ok"),
 	}}
@@ -200,7 +199,7 @@ func TestTaskRunsTheChildOnItsModel(t *testing.T) {
 			sub := reviewer
 			sub.Model = tt.model
 			p := &script{responses: []ai.Message{
-				callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+				callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 				reply("done"),
 				reply("ok"),
 			}}
@@ -219,7 +218,7 @@ func TestTaskChildModelWithADriver(t *testing.T) {
 	sub := reviewer
 	sub.Model = "two"
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		reply("done"),
 		reply("ok"),
 	}}
@@ -243,7 +242,7 @@ func TestTaskFailsOnAnAmbiguousModel(t *testing.T) {
 	sub := reviewer
 	sub.Model = "two"
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		reply("ok"),
 	}}
 	cat := newCatalog(p)
@@ -263,40 +262,62 @@ func TestTaskFailsOnAnAmbiguousModel(t *testing.T) {
 	assert.Equal(t, []string{"one", "one"}, p.called(), "no child runs")
 }
 
-func TestTaskSendsTheChildEvents(t *testing.T) {
-	var (
-		mu    sync.Mutex
-		calls []string
-	)
-	record := func(callID string, e agent.Event) {
-		mu.Lock()
-		defer mu.Unlock()
-		if _, ok := e.(agent.EventAgentEnd); ok {
-			calls = append(calls, callID)
-		}
-	}
+func TestTaskSendsTheChildOnTheParentStream(t *testing.T) {
+	ctx := context.Background()
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","description":"Review auth","prompt":"go"}`),
 		reply("done"),
 		reply("ok"),
 	}}
-	h := harness.New(with(base(t, p),
-		harness.Agents(reviewer),
-		harness.SubagentEvents(record),
-	)...)
-
-	a, err := h.New(context.Background())
+	a, err := taskHarness(t, p, session.NewMemoryStore(), reviewer).Durable(ctx, "s1")
 	require.NoError(t, err)
-	run(t, a, "go")
 
-	assert.Equal(t, []string{"c1"}, calls)
+	var (
+		start  agent.EventSubagentStart
+		end    agent.EventSubagentEnd
+		events []agent.Event
+	)
+	s := a.Run(ctx, session.Text("go"))
+	for e, err := range s.Events() {
+		require.NoError(t, err)
+		switch e := e.(type) {
+		case agent.EventSubagentStart:
+			start = e
+		case agent.EventSubagent:
+			events = append(events, e.Event)
+		case agent.EventSubagentEnd:
+			end = e
+		}
+	}
+	_, err = s.Wait()
+	require.NoError(t, err)
+
+	id := childID(t, toolResult(t, a))
+	assert.Equal(t, agent.EventSubagentStart{
+		ToolCallID: "c1",
+		SessionID:  id,
+		Name:       "reviewer",
+		Title:      "Review auth",
+		Prompt:     "go",
+		Model:      start.Model,
+	}, start)
+	assert.NotEmpty(t, start.Model, "the start names the model of the child")
+	require.NotEmpty(t, events)
+	assert.IsType(t, agent.EventAgentStart{}, events[0], "the run of the child is wrapped whole")
+	assert.IsType(t, agent.EventAgentEnd{}, events[len(events)-1])
+	assert.Equal(t, agent.EventSubagentEnd{
+		ToolCallID: "c1",
+		SessionID:  id,
+		Status:     agent.SubagentCompleted,
+		Text:       "done",
+	}, end)
 }
 
 func TestTaskOfAnUnsavedAgentCannotResume(t *testing.T) {
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		reply("done"),
-		callTool("c2", "task", `{"agent":"reviewer","prompt":"go","resume":"x"}`),
+		callTool("c2", "agent", `{"agent":"reviewer","prompt":"go","resume":"x"}`),
 		reply("ok"),
 	}}
 	a, err := harness.New(with(base(t, p), harness.Agents(reviewer))...).New(context.Background())

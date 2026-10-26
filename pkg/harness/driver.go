@@ -11,7 +11,7 @@ import (
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
-// Start starts the durable agent of the session c.Session, as
+// Start starts the durable agent of the session c.SessionID, as
 // [Harness.Durable] does, with the fields of c on top of the options of
 // h. A harness is the default [agent.Driver] of a catalog: it runs a
 // model of each text provider.
@@ -69,7 +69,7 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
-	return h.Durable(ctx, c.Session, opts...)
+	return h.Durable(ctx, c.SessionID, opts...)
 }
 
 // dirReaders returns a reader of each folder of dirs, in order.

@@ -16,7 +16,7 @@ func TestSubagentGetsNoSections(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"Review auth.go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"Review auth.go"}`),
 		reply("2 problems"),
 		reply("done"),
 	}}

@@ -52,7 +52,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | instruction file | A file of rules for the agent, such as AGENTS.md or CLAUDE.md | memory file, rules file  |
 | skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
 | qualified name | The qualifier of a skill, ":", and its name, such as `ops:deploy` | full name, path name |
-| subagent      | A named agent that the model gives a task to with the task tool | worker, delegate, sub-task |
+| subagent      | An agent that one tool call of a parent starts: the agent tool, the Agent tool of Claude Code, or spawn_agent of Codex | worker, delegate, sub-task |
 | session config | The config that a session started with, with the fields of its agent file, which the host keeps in a session value | saved agent, agent snapshot |
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |

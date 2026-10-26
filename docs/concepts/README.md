@@ -43,6 +43,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
 | [CLI Agent](agent/cli-agent.md)     | How an agent CLI such as Codex or Claude Code runs as a gopi agent, with the same events, state, and log as the loop. |
 | [Driver](agent/driver.md)           | How one interface starts the harness, Claude Code, or Codex for a session, and what a driver does with a field or a hook point that its agent cannot honor. |
+| [Subagent](agent/subagent.md)       | How a subagent of any driver becomes a child session, and how the run stream of the parent shows its start, its events, and its end. |
 
 ## def
 
@@ -56,7 +57,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the definitions of its readers, and a catalog, on each call.     |
 | [Skill](harness/skill.md)            | How a skill reaches the model on demand through the skill tool, how the system prompt lists the skills, and how two skills with one name both stay. |
-| [Subagent](harness/subagent.md)      | How the task tool runs a subagent in a child session, what the parent model gets back, and how a child resumes.                  |
+| [Agent Tool](harness/agent-tool.md)    | How the agent tool of the harness runs a subagent in a child session, what the parent model gets back, and how a child resumes.   |
 | [Permission](harness/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied.                 |
 
 ## host

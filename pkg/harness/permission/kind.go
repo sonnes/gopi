@@ -34,7 +34,7 @@ const (
 const (
 	skillTool      = "skill"
 	toolSearchTool = "tool_search"
-	taskTool       = "task"
+	agentTool      = "agent"
 )
 
 // builtinKinds gives the kind of each built-in tool. A tool that is
@@ -47,7 +47,7 @@ var builtinKinds = map[string]Kind{
 	askquestion.Name: Read,
 	skillTool:        Read,
 	toolSearchTool:   Read,
-	taskTool:         Read,
+	agentTool:        Read,
 	write.Name:       Edit,
 	edit.Name:        Edit,
 	bash.Name:        Exec,

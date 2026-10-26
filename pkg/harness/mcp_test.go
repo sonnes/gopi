@@ -87,8 +87,8 @@ func TestStartConnectsTheMCPServers(t *testing.T) {
 	h := harness.New(with(base(t, p), harness.Mode(permission.Bypass))...)
 
 	a := start(t, h, agent.Config{
-		Session: "s1",
-		MCP:     []agent.MCPServer{srv.config()},
+		SessionID: "s1",
+		MCP:       []agent.MCPServer{srv.config()},
 	})
 	run(t, a, "hi")
 
@@ -116,8 +116,8 @@ func TestStartFailsIfAnMCPServerDoesNotConnect(t *testing.T) {
 	h := harness.New(base(t, p)...)
 
 	_, err := h.Start(context.Background(), agent.Config{
-		Session: "s1",
-		MCP:     []agent.MCPServer{{Name: "broken", Command: "gopi-test-no-such-command"}},
+		SessionID: "s1",
+		MCP:       []agent.MCPServer{{Name: "broken", Command: "gopi-test-no-such-command"}},
 	})
 
 	assert.ErrorContains(t, err, `mcp server "broken"`)

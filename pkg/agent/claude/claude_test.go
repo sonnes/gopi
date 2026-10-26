@@ -67,6 +67,20 @@ func closeAgent(t *testing.T, a *claude.Agent) {
 	require.NoError(t, a.Close())
 }
 
+func TestCLIRunsWithNoBackgroundTasks(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	a := claude.New(claude.Name("claude"))
+	defer closeAgent(t, a)
+
+	_, _, err := run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	cmds := starts.Cmds()
+	require.Len(t, cmds, 1)
+	assert.Contains(t, cmds[0].Env, "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1",
+		"a background task ends after the result, when no run reads its lines")
+}
+
 func TestRunText(t *testing.T) {
 	claude.Replay(t, nil, "testdata/text.trace")
 	a := claude.New(claude.Name("claude"))
@@ -639,7 +653,7 @@ func TestOptions(t *testing.T) {
 	for _, kv := range []string{"CLAUDECODE=1", "NODE_OPTIONS=--inspect", "DEBUG=1"} {
 		assert.NotContains(t, cmd.Env, kv)
 	}
-	assert.Equal(t, len(os.Environ())-2, len(cmd.Env), "three variables are out and FOO is in")
+	assert.Equal(t, len(os.Environ())-1, len(cmd.Env), "three variables are out, and FOO and the background flag are in")
 }
 
 func TestThinkingOffDisablesThinking(t *testing.T) {
@@ -917,4 +931,33 @@ func collectRun(s *agent.Stream) ([]agent.Event, []ai.Message, error) {
 	}
 	msgs, err := s.Wait()
 	return events, msgs, err
+}
+
+func TestSubagentOpenAtTheResultEndsInterrupted(t *testing.T) {
+	ctx := context.Background()
+	claude.Replay(t, nil, "testdata/subagent_open_at_result.trace")
+	store := session.NewMemoryStore()
+	a, err := claude.Durable(ctx, "s1", claude.Store(store))
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	events, _, err := run(ctx, a, "Use the Agent tool once.")
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	var (
+		end   agent.EventSubagentEnd
+		inner []agent.Event
+	)
+	for _, e := range events {
+		switch e := e.(type) {
+		case agent.EventSubagentEnd:
+			end = e
+		case agent.EventSubagent:
+			inner = append(inner, e.Event)
+		}
+	}
+	assert.Equal(t, agent.SubagentInterrupted, end.Status, "the run ends the child that is open")
+	emittest.CheckEvents(t, inner)
+	checkLog(t, a)
 }

@@ -20,7 +20,15 @@
 // [Approve] function answers it. To let the CLI act without a request,
 // set [Policy] to [ApprovalNever] and pick a [Sandbox] mode.
 //
-// The reasons are in docs/concepts/agent/cli-agent.md.
+// A subagent of the CLI, which a spawn_agent call starts, keeps its
+// messages in a child session. The stream of the run carries its
+// start, its events, and its end. A run waits for each subagent that
+// still runs when the turn completes. If one ends after the turn, the
+// run starts one more turn that gives the model its result. Without
+// [Store], the children are unsaved.
+//
+// The reasons are in docs/concepts/agent/cli-agent.md and
+// docs/concepts/agent/subagent.md.
 package codex
 
 import (
@@ -93,8 +101,11 @@ const (
 // Agent runs the Codex CLI. It starts the process on the first Run and
 // keeps it for the next runs.
 type Agent struct {
-	cfg   config
-	log   *session.Log
+	cfg config
+	log *session.Log
+	// store keeps the log and the child sessions of the subagents. It
+	// is nil for an agent of [New], whose children are unsaved too.
+	store session.Storer
 	state *emit.State
 
 	mu sync.Mutex
@@ -257,6 +268,7 @@ func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
 	return &Agent{
 		cfg:   cfg,
 		log:   log,
+		store: store,
 		state: emit.NewState(log),
 	}, nil
 }
@@ -342,13 +354,13 @@ func (a *Agent) run(
 	}
 	// Connect before the input, so that a failed start stores no input
 	// that the CLI never got.
-	c, thread, err := a.connect(ctx)
+	c, threadID, err := a.connect(ctx)
 	if err != nil {
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
 	stored := entries
 	if change != nil {
-		if err := c.inject(ctx, thread, transcript.SystemText(change.Content)); err != nil {
+		if err := c.inject(ctx, threadID, transcript.SystemText(change.Content)); err != nil {
 			return e.Finish(ctx, ai.Usage{}, fmt.Errorf("codex: send the change of the sections: %w", err))
 		}
 		stored = append([]session.Entry{session.NewEntry(*change)}, entries...)
@@ -359,14 +371,33 @@ func (a *Agent) run(
 	t := &turn{
 		conn:     c,
 		emitter:  e,
-		threadID: thread,
+		threadID: threadID,
 		model:    a.model,
 		effort:   effort(a.cfg.thinking),
 	}
+	if a.store != nil {
+		t.sessionID = a.log.Session().ID
+	}
+	t.subs = newSubagents(a, t)
 	// The error of a hook belongs to the run that called it.
 	_ = c.hookErr()
 	c.bindHooks(ctx)
 	usage, err := t.run(ctx, userInputs(emit.Input(entries)))
+	// Codex does not start a turn when a child ends after the turn of
+	// the run completed, so the run gives the model the result itself.
+	for err == nil {
+		report := t.subs.report()
+		if report == "" {
+			break
+		}
+		entry := session.Text(report)
+		if err = e.Input(ctx, []session.Entry{entry}); err != nil {
+			break
+		}
+		t.completed = false
+		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry})))
+	}
+	t.subs.endAll(context.WithoutCancel(ctx))
 	c.bindHooks(nil)
 	if err == nil {
 		err = c.hookErr()
@@ -383,12 +414,12 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	a.mu.Lock()
 	c := a.conn
 	a.mu.Unlock()
-	thread, err := conversation.Get(a.log)
+	threadID, err := conversation.Get(a.log)
 	if err != nil {
 		return nil, "", err
 	}
-	if c != nil && c.alive() && thread != "" {
-		return c, thread, nil
+	if c != nil && c.alive() && threadID != "" {
+		return c, threadID, nil
 	}
 	if c != nil {
 		a.drop(c)
@@ -422,10 +453,10 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	}
 	c = dial(p, a.cfg.approve)
 	c.hooks = hooks
-	res, err := c.handshake(ctx, a.threadParams(thread, hooks, hookCommand))
+	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand))
 	if err != nil {
 		c.kill()
-		if thread != "" && lostThread(err) {
+		if threadID != "" && lostThread(err) {
 			err = errors.Join(ErrNoConversation, conversation.Clear(ctx, a.log))
 		}
 		return nil, "", err
@@ -518,9 +549,9 @@ func appServer(c config) *exec.Cmd {
 // thread/resume if thread is set. With a hook server, the config adds
 // the hooks of the agent to the thread, and each hook runs the program
 // hookCommand.
-func (a *Agent) threadParams(thread string, hooks *hookServer, hookCommand string) threadParams {
+func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand string) threadParams {
 	p := threadParams{
-		ThreadID:              thread,
+		ThreadID:              threadID,
 		Model:                 a.cfg.model,
 		Cwd:                   a.cfg.dir,
 		ApprovalPolicy:        a.cfg.approval,

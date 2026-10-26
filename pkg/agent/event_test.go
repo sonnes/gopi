@@ -89,6 +89,37 @@ func TestEventJSON(t *testing.T) {
 				Result:     ai.ToolResult{Content: []ai.Content{ai.Text{Text: "ok"}}},
 			},
 		},
+		{
+			name: "subagent_start carries the child",
+			event: agent.EventSubagentStart{
+				ToolCallID: "c1",
+				SessionID:  "s1.helper-01",
+				Name:       "helper",
+				Title:      "Read the code",
+				Prompt:     "read pkg/agent",
+				Model:      "claude-haiku-5-5",
+			},
+			want: `{"type":"subagent_start","tool_call_id":"c1","session_id":"s1.helper-01","name":"helper","title":"Read the code","prompt":"read pkg/agent","model":"claude-haiku-5-5"}`,
+		},
+		{
+			name: "subagent wraps one event of the child",
+			event: agent.EventSubagent{
+				ToolCallID: "c1",
+				SessionID:  "s1.helper-01",
+				Event:      agent.EventTurnStart{Turn: 1},
+			},
+			want: `{"type":"subagent","tool_call_id":"c1","session_id":"s1.helper-01","event":{"type":"turn_start","turn":1}}`,
+		},
+		{
+			name: "subagent_end carries the status and the text",
+			event: agent.EventSubagentEnd{
+				ToolCallID: "c1",
+				SessionID:  "s1.helper-01",
+				Status:     agent.SubagentFailed,
+				Text:       "no access",
+			},
+			want: `{"type":"subagent_end","tool_call_id":"c1","session_id":"s1.helper-01","status":"failed","text":"no access"}`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

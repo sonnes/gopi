@@ -68,7 +68,7 @@ func TestASubagentRunsInTheStricterMode(t *testing.T) {
 	planner := reviewer
 	planner.Mode = "plan"
 	p := &script{responses: []ai.Message{
-		callTool("c1", "task", `{"agent":"reviewer","prompt":"go"}`),
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		callTool("c2", "echo", `{"s":"hi"}`),
 		reply("child done"),
 		reply("ok"),

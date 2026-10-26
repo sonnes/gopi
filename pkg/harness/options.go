@@ -87,7 +87,7 @@ func Skillset(readers ...def.SkillsReader) Option {
 // Agents adds readers of subagents. The harness reads them in order. A
 // later subagent replaces an earlier
 // one with the same name. An assembly with subagents gives the model
-// the task tool, which runs a subagent in a child session.
+// the agent tool, which runs a subagent in a child session.
 func Agents(readers ...def.AgentsReader) Option {
 	return func(h *Harness) { h.agents = append(h.agents, readers...) }
 }
@@ -95,7 +95,7 @@ func Agents(readers ...def.AgentsReader) Option {
 // Toolset adds readers of the tools that the model can call, after the
 // tools of [Builtin]. An assembly reads them in order. Give tools with
 // [Tools]. Two tools with one name make the assembly fail. The skill
-// tool has the name "skill", and the task tool has the name "task".
+// tool has the name "skill", and the agent tool has the name "agent".
 //
 // A deferred tool, from [tool.Deferred] or [tool.Defer], goes to the
 // agent with the others. See [agent.Toolset].
@@ -194,14 +194,6 @@ func Deny(rules ...string) Option {
 // model gets the reason.
 func Approve(fn agent.ApproveFunc) Option {
 	return func(h *Harness) { h.policy.Approve = fn }
-}
-
-// SubagentEvents sets a function that gets each event of each child
-// run, with the ID of the task call that started it. The run stream of
-// the parent does not carry these events. Without SubagentEvents, the
-// harness drops them.
-func SubagentEvents(fn func(callID string, e agent.Event)) Option {
-	return func(h *Harness) { h.subagentEvents = fn }
 }
 
 // AgentDefaults adds options for the agent, such as [agent.Thinking].

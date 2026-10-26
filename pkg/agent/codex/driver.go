@@ -53,7 +53,7 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 	return listModels(ctx, newConfig(d.opts))
 }
 
-// Start starts the durable agent of the session c.Session.
+// Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	rejected := []struct {
 		field string
@@ -110,7 +110,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.Hooks) > 0 {
 		opts = append(opts, Hooks(c.Hooks...))
 	}
-	return Durable(ctx, c.Session, opts...)
+	return Durable(ctx, c.SessionID, opts...)
 }
 
 // modeOptions returns the policy and the sandbox of the mode m. The doc

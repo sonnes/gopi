@@ -50,7 +50,7 @@ const skillsIntro = "A skill is a set of instructions that you load with the `sk
 	"Before you start a task that matches a skill, load the skill."
 
 // agentsIntro tells the model how to use the subagent list.
-const agentsIntro = "A subagent does a task in its own context with the `task` tool, " +
+const agentsIntro = "A subagent does a task in its own context with the `agent` tool, " +
 	"and returns its last message. Give a task to a subagent when its description matches the task."
 
 // DefaultPrompt is the prompt builder that the harness uses when none
@@ -82,7 +82,7 @@ func DefaultPrompt(_ context.Context, asm *Assembly) ([]ai.Section, error) {
 		out = append(out, ai.Section{Name: skillsSection, Text: text})
 	}
 
-	if asm.taskTool() {
+	if asm.agentTool() {
 		var agents []string
 		for _, a := range asm.Agents {
 			agents = append(agents, "- "+a.Name+": "+a.Description)

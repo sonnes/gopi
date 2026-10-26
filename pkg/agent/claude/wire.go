@@ -19,6 +19,17 @@ type line struct {
 	UUID     string `json:"uuid"`
 	IsReplay bool   `json:"isReplay"`
 
+	// system task_started and task_notification. TaskType is
+	// local_agent for a subagent, and local_bash for a background
+	// shell. Status is completed, failed, or stopped.
+	TaskID      string `json:"task_id"`
+	ToolUseID   string `json:"tool_use_id"`
+	TaskType    string `json:"task_type"`
+	Description string `json:"description"`
+	Prompt      string `json:"prompt"`
+	Status      string `json:"status"`
+	Summary     string `json:"summary"`
+
 	// stream_event
 	Event *streamEvent `json:"event"`
 

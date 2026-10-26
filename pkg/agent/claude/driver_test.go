@@ -38,18 +38,18 @@ func TestDriverStart(t *testing.T) {
 	)
 
 	r, err := d.Start(context.Background(), agent.Config{
-		Session:  "s1",
-		Store:    session.NewMemoryStore(),
-		Spec:     "claude-code/haiku",
-		Model:    ai.Model{ID: "haiku"},
-		Dir:      "/work",
-		Sections: agent.SystemText("Be brief."),
-		Mode:     agent.ModePlan,
-		Allow:    []string{"Read"},
-		Ask:      []string{"Bash(gh pr comment:*)"},
-		Deny:     []string{"WebFetch"},
-		Effort:   ai.ThinkingHigh,
-		MCP:      []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Spec:      "claude-code/haiku",
+		Model:     ai.Model{ID: "haiku"},
+		Dir:       "/work",
+		Sections:  agent.SystemText("Be brief."),
+		Mode:      agent.ModePlan,
+		Allow:     []string{"Read"},
+		Ask:       []string{"Bash(gh pr comment:*)"},
+		Deny:      []string{"WebFetch"},
+		Effort:    ai.ThinkingHigh,
+		MCP:       []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -92,8 +92,8 @@ func TestDriverRejects(t *testing.T) {
 		{
 			name: "skills",
 			config: agent.Config{
-				Session: "s1",
-				Skills:  []string{"deploy"},
+				SessionID: "s1",
+				Skills:    []string{"deploy"},
 			},
 			unsupported: true,
 			errText:     "claude: the config field Skills: unsupported operation",
@@ -101,8 +101,8 @@ func TestDriverRejects(t *testing.T) {
 		{
 			name: "tools",
 			config: agent.Config{
-				Session: "s1",
-				Tools:   []tool.Tool{tool.Func("echo", nil)},
+				SessionID: "s1",
+				Tools:     []tool.Tool{tool.Func("echo", nil)},
 			},
 			unsupported: true,
 			errText:     "claude: the config field Tools: unsupported operation",
@@ -110,8 +110,8 @@ func TestDriverRejects(t *testing.T) {
 		{
 			name: "a hook at a model call",
 			config: agent.Config{
-				Session: "s1",
-				Hooks:   []agent.Hook{stopHook{}, callHook{}},
+				SessionID: "s1",
+				Hooks:     []agent.Hook{stopHook{}, callHook{}},
 			},
 			unsupported: true,
 			errText:     "claude: agent: hook 2 (claude_test.callHook) uses BeforeCall: unsupported operation",
@@ -119,23 +119,23 @@ func TestDriverRejects(t *testing.T) {
 		{
 			name:        "a hook of the driver at a model call",
 			opts:        []claude.Option{claude.Hooks(callHook{})},
-			config:      agent.Config{Session: "s1"},
+			config:      agent.Config{SessionID: "s1"},
 			unsupported: true,
 			errText:     "claude: agent: hook 1 (claude_test.callHook) uses BeforeCall: unsupported operation",
 		},
 		{
 			name: "a hook with no point",
 			config: agent.Config{
-				Session: "s1",
-				Hooks:   []agent.Hook{agent.BaseHook{}},
+				SessionID: "s1",
+				Hooks:     []agent.Hook{agent.BaseHook{}},
 			},
 			errText: "claude: agent: hook 1 (agent.BaseHook) implements no point",
 		},
 		{
 			name: "an unknown mode",
 			config: agent.Config{
-				Session: "s1",
-				Mode:    "auto",
+				SessionID: "s1",
+				Mode:      "auto",
 			},
 			errText: `claude: agent: unknown mode "auto"`,
 		},

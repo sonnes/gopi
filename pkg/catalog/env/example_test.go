@@ -97,9 +97,9 @@ func ExampleDriverDetectors() {
 		panic(err)
 	}
 	runner, err := d.Start(ctx, agent.Config{
-		Session: "fix-login",
-		Spec:    spec,
-		Model:   model,
+		SessionID: "fix-login",
+		Spec:      spec,
+		Model:     model,
 	})
 	if err != nil {
 		panic(err)

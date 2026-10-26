@@ -9,7 +9,7 @@
 // definitions as a reader, such as a folder of package
 // github.com/sonnes/gopi/pkg/store/fs. An assembly with skills gets the
 // skill tool, which loads a skill for the model. An assembly with
-// subagents gets the task tool, which runs a subagent in a child
+// subagents gets the agent tool, which runs a subagent in a child
 // session. The permission mode and the rules of package permission
 // decide which tool calls run.
 //
@@ -32,6 +32,6 @@
 //     call that needs an approval is denied.
 //
 // The reasons are in docs/concepts/harness/harness.md,
-// docs/concepts/harness/skill.md, docs/concepts/harness/subagent.md, and
+// docs/concepts/harness/skill.md, docs/concepts/harness/agent-tool.md, and
 // docs/concepts/harness/permission.md.
 package harness

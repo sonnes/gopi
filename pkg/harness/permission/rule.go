@@ -29,7 +29,7 @@ var aliases = map[string][]string{
 	"TodoWrite":       {todowrite.Name},
 	"AskUserQuestion": {askquestion.Name},
 	"Skill":           {skillTool},
-	"Task":            {taskTool},
+	"Agent":           {agentTool},
 }
 
 // contentKind is what the content of a rule matches.

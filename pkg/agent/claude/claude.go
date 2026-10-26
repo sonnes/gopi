@@ -65,7 +65,10 @@ const (
 // CLI, turns the output into [agent.Event] values, and writes every
 // message to its [session.Log].
 type Agent struct {
-	log   *session.Log
+	log *session.Log
+	// store keeps the log and the child sessions of the subagents. It
+	// is nil for an agent of [New], whose children are unsaved too.
+	store session.Storer
 	name  string
 	cfg   config
 	state *emit.State
@@ -246,6 +249,7 @@ func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
 		return nil, err
 	}
 	a.log = log
+	a.store = store
 	a.state = emit.NewState(log)
 	return a, nil
 }
@@ -325,12 +329,7 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 		}
 		// The error of a hook belongs to the run that called it.
 		proc.hookErr = nil
-		r := &runner{
-			a:         a,
-			proc:      proc,
-			em:        em,
-			subagents: map[string]bool{},
-		}
+		r := newRunner(a, proc, em)
 		if change != nil {
 			r.reminder = transcript.Reminder(transcript.SystemText(change.Content))
 			entries = append([]session.Entry{session.NewEntry(*change)}, entries...)

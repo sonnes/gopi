@@ -16,7 +16,7 @@ import (
 // Claude Code agent, and the Codex agent. A catalog holds the driver of
 // each provider.
 type Driver interface {
-	// Start starts the agent of the session c.Session, and resumes the
+	// Start starts the agent of the session c.SessionID, and resumes the
 	// session if it exists. If the driver cannot honor a field of c, or
 	// a point of a hook, Start returns an error that wraps
 	// [errors.ErrUnsupported] and names the field or the point.
@@ -26,8 +26,8 @@ type Driver interface {
 // Config is what a host gives a [Driver] for one session. A zero field
 // keeps the default of the driver.
 type Config struct {
-	// Session is the ID of the session. It is required.
-	Session string
+	// SessionID is the ID of the session. It is required.
+	SessionID string
 	// Store keeps the session. If it is nil, the driver keeps the
 	// session in memory.
 	Store session.Storer

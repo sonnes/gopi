@@ -71,7 +71,7 @@ harness.Agents(def.Agent{
 }),
 ```
 
-The model loads a skill with the `skill` tool, and gives a task to a subagent with the `task` tool. A subagent runs in a child session of the store, and the result gives its `agent_id`, so the model can resume it. `SubagentEvents` gets the events of each child run.
+The model loads a skill with the `skill` tool, and gives a task to a subagent with the `agent` tool. A subagent runs in a child session of the store, and the result gives its `agent_id`, so the model can resume it. The run stream of the parent carries the start, each event, and the end of the child.
 
 ## Permissions
 

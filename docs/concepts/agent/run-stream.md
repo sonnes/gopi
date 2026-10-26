@@ -41,6 +41,7 @@ agent_end                         the usage, and the error if it failed
 - A failure that cuts an assistant message short sends its `message_end` with the part that arrived, without the tool calls that did not finish. Its stop reason is `error`, or `aborted` if the caller canceled. If the part has content, the log keeps it.
 - Each `tool_execution_end` comes as its call ends, and its result comes after it, so a consumer can show a call as done before the others. With calls in order, each call sends its start, its end, and its result before the next call starts.
 - `agent_end` carries the usage and no messages, because the state and the result of the stream have them.
+- A tool call that runs a subagent adds `subagent_start`, the `subagent` events of the child, and `subagent_end`, as [Subagent](subagent.md) says. A consumer that does not show subagents skips them.
 
 ## Map
 
@@ -54,5 +55,6 @@ agent_end                         the usage, and the error if it failed
 
 - [Loop](loop.md)
 - [State](state.md)
+- [Subagent](subagent.md)
 - [Log](../session/log.md)
 - [Stream](../ai/stream.md)

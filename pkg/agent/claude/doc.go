@@ -24,9 +24,13 @@
 //     let the CLI run the tools.
 //   - The text, the images, and the PDFs of the input entries go to the
 //     CLI. Each other file becomes a text note.
-//   - The log holds the messages of the main agent. The messages of a
-//     subagent of the CLI are part of its tool call, and the log does
-//     not hold them.
+//   - The log holds the messages of the main agent. A subagent of the
+//     CLI, which an Agent call starts, keeps its messages in a child
+//     session. The stream of the run carries its start, its events,
+//     and its end. Without [Store], the children are unsaved.
+//   - The CLI runs with no background tasks, so that each task ends in
+//     the run that started it.
 //
-// The reasons are in docs/concepts/agent/cli-agent.md.
+// The reasons are in docs/concepts/agent/cli-agent.md and
+// docs/concepts/agent/subagent.md.
 package claude

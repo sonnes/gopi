@@ -22,31 +22,14 @@ import (
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// Parent is the session value of a child session that names its
-// parent. A UI reads it to find the children of a session. The harness
-// writes it when it creates the child; a caller does not.
-var Parent = session.Value[ParentRef]{
-	Namespace: "gopi.harness",
-	Key:       "parent",
-}
-
-// ParentRef names the session and the task call that started a child
-// session.
-type ParentRef struct {
-	// Session is the ID of the parent session.
-	Session string `json:"session"`
-	// ToolCallID is the ID of the call of the task tool.
-	ToolCallID string `json:"tool_call_id"`
-}
-
 // childCall is the subagent of a child call of the harness.
 type childCall struct {
 	sub    def.Agent
-	parent ParentRef
+	parent agent.ParentRef
 }
 
-// taskToolName is the name of the task tool.
-const taskToolName = "task"
+// agentToolName is the name of the agent tool.
+const agentToolName = "agent"
 
 // idBytes is the count of random bytes in the ID of a child session.
 // The ID shows them as hex digits.
@@ -56,28 +39,30 @@ const idBytes = 3
 // parent.
 const inheritModel = "inherit"
 
-const taskToolDescription = "Give a task to a subagent. The subagent works in its own context " +
+const agentToolDescription = "Give a task to a subagent. The subagent works in its own context " +
 	"with its own tools, and returns its last message and an agent_id. " +
 	"Give the agent_id as resume to continue the same subagent."
 
-// taskTool is the tool that runs a subagent. Each call runs a child
+// agentTool is the tool that runs a subagent. Each call runs a child
 // agent in a child session of the store, with the ID of the parent
 // session, ".", the subagent name, "-", and 6 hex digits, as in
-// [oh-my-pi]. A child keeps its parent in the [Parent] value, as a
-// Codex thread keeps parent_thread_id. The result is the last text of
-// the child, its agent_id, and its usage, as in [Claude Code].
+// [oh-my-pi]. A child keeps its parent in the [agent.Parent] value, as
+// a Codex thread keeps parent_thread_id. The run stream of the parent
+// carries the start, each event, and the end of the child, through
+// [agent.EmitSubagent]. The result is the last text of the child, its
+// agent_id, and its usage, as in [Claude Code].
 //
 // [oh-my-pi]: https://github.com/can1357/oh-my-pi
 // [Claude Code]: https://code.claude.com/docs/en/sub-agents
-type taskTool struct {
+type agentTool struct {
 	asm    *Assembly
 	names  []string
 	byName map[string]def.Agent
 }
 
-// newTaskTool returns the task tool for the subagents of asm.
-func newTaskTool(asm *Assembly) *taskTool {
-	t := &taskTool{
+// newAgentTool returns the agent tool for the subagents of asm.
+func newAgentTool(asm *Assembly) *agentTool {
+	t := &agentTool{
 		asm:    asm,
 		byName: make(map[string]def.Agent, len(asm.Agents)),
 	}
@@ -88,9 +73,9 @@ func newTaskTool(asm *Assembly) *taskTool {
 	return t
 }
 
-// Info returns the info of the task tool. The agent input lists the
+// Info returns the info of the agent tool. The agent input lists the
 // subagent names as an enum.
-func (t *taskTool) Info() ai.ToolInfo {
+func (t *agentTool) Info() ai.ToolInfo {
 	name := &jsonschema.Schema{
 		Type:        "string",
 		Description: "The name of the subagent.",
@@ -99,12 +84,16 @@ func (t *taskTool) Info() ai.ToolInfo {
 		name.Enum = append(name.Enum, n)
 	}
 	return ai.ToolInfo{
-		Name:        taskToolName,
-		Description: taskToolDescription,
+		Name:        agentToolName,
+		Description: agentToolDescription,
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
 			Properties: map[string]*jsonschema.Schema{
 				"agent": name,
+				"description": {
+					Type:        "string",
+					Description: "A title of the task, in 3 to 5 words. A UI shows it.",
+				},
 				"prompt": {
 					Type:        "string",
 					Description: "The task. The subagent reads only this text, so give every fact that it needs.",
@@ -119,17 +108,18 @@ func (t *taskTool) Info() ai.ToolInfo {
 	}
 }
 
-type taskInput struct {
-	Agent  string `json:"agent"`
-	Prompt string `json:"prompt"`
-	Resume string `json:"resume"`
+type agentInput struct {
+	Agent       string `json:"agent"`
+	Description string `json:"description"`
+	Prompt      string `json:"prompt"`
+	Resume      string `json:"resume"`
 }
 
 // Run runs the subagent of one call to its end. A failure of the input
 // or of the child is an error result, so the model can correct the
 // call. A canceled context stops the run of the parent.
-func (t *taskTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
-	var in taskInput
+func (t *agentTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
+	var in agentInput
 	if err := json.Unmarshal(call.Input, &in); err != nil {
 		return errorResult(fmt.Sprintf("invalid input: %s", err)), nil
 	}
@@ -146,65 +136,72 @@ func (t *taskTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, er
 	if err != nil {
 		return errorResult(err.Error()), nil
 	}
-	child, err := t.start(ctx, sub, id, call.ID)
+	spec, err := childSpec(t.asm.h.cat, t.asm.Spec, sub.Model)
 	if err != nil {
 		return errorResult(fmt.Sprintf("the subagent did not start: %s", err)), nil
 	}
-	return t.run(ctx, child, id, call.ID, in.Prompt)
+	child, err := t.start(ctx, sub, spec, id, call.ID)
+	if err != nil {
+		return errorResult(fmt.Sprintf("the subagent did not start: %s", err)), nil
+	}
+	agent.EmitSubagent(ctx, agent.EventSubagentStart{
+		SessionID: id,
+		Name:      sub.Name,
+		Title:     in.Description,
+		Prompt:    in.Prompt,
+		Model:     spec,
+	})
+	return t.run(ctx, child, id, in.Prompt)
 }
 
-// childID returns the ID of the child session: resume, or a new ID. An
+// childID returns the ID of the child sessionID: resume, or a new ID. An
 // unsaved parent has unsaved children, so it returns "".
-func (t *taskTool) childID(ctx context.Context, sub def.Agent, resume string) (string, error) {
-	parent := t.asm.session
-	if parent == "" {
-		if resume != "" {
+func (t *agentTool) childID(ctx context.Context, sub def.Agent, resumeID string) (string, error) {
+	parentID := t.asm.sessionID
+	if parentID == "" {
+		if resumeID != "" {
 			return "", errors.New("this agent keeps no session, so a subagent cannot resume")
 		}
 		return "", nil
 	}
-	if resume == "" {
-		return newChildID(parent, sub.Name)
+	if resumeID == "" {
+		return newChildID(parentID, sub.Name)
 	}
 
-	ofParent := strings.HasPrefix(resume, parent+".")
+	ofParent := strings.HasPrefix(resumeID, parentID+".")
 	if !ofParent {
-		return "", fmt.Errorf("the agent_id %q is not a subagent of this session", resume)
+		return "", fmt.Errorf("the agent_id %q is not a subagent of this session", resumeID)
 	}
-	if _, err := t.asm.h.store.Load(ctx, resume); err != nil {
-		return "", fmt.Errorf("no subagent has the agent_id %q", resume)
+	if _, err := t.asm.h.store.Load(ctx, resumeID); err != nil {
+		return "", fmt.Errorf("no subagent has the agent_id %q", resumeID)
 	}
-	return resume, nil
+	return resumeID, nil
 }
 
 // newChildID returns a new ID of a child session of parent.
-func newChildID(parent, name string) (string, error) {
+func newChildID(parentID, name string) (string, error) {
 	b := make([]byte, idBytes)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return parent + "." + name + "-" + hex.EncodeToString(b), nil
+	return parentID + "." + name + "-" + hex.EncodeToString(b), nil
 }
 
-// start returns the child agent of sub over the session id, or over an
-// unsaved log if id is "".
-func (t *taskTool) start(ctx context.Context, sub def.Agent, id, callID string) (*agent.Agent, error) {
+// start returns the child agent of sub on the model spec, over the
+// session id, or over an unsaved log if id is "".
+func (t *agentTool) start(ctx context.Context, sub def.Agent, spec, id, callID string) (*agent.Agent, error) {
 	h := t.asm.h
 	mode, err := permission.ParseMode(sub.Mode)
 	if err != nil {
 		mode = h.policy.Mode
-	}
-	spec, err := childSpec(h.cat, t.asm.Spec, sub.Model)
-	if err != nil {
-		return nil, err
 	}
 	opts := []Option{
 		func(c *Harness) {
 			c.sections = nil
 			c.child = &childCall{
 				sub: sub,
-				parent: ParentRef{
-					Session:    t.asm.session,
+				parent: agent.ParentRef{
+					SessionID:  t.asm.sessionID,
 					ToolCallID: callID,
 				},
 			}
@@ -221,7 +218,7 @@ func (t *taskTool) start(ctx context.Context, sub def.Agent, id, callID string) 
 
 // childSystem returns the base text of the prompt of a child: the prompt
 // of sub, then the body of each skill that sub preloads.
-func (t *taskTool) childSystem(sub def.Agent) string {
+func (t *agentTool) childSystem(sub def.Agent) string {
 	parts := []string{sub.Prompt}
 	for _, name := range sub.Skills {
 		s, ok := t.asm.skill(name)
@@ -232,17 +229,17 @@ func (t *taskTool) childSystem(sub def.Agent) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// run runs child with prompt, sends each event to the SubagentEvents
-// function, and returns the result of the task call.
-func (t *taskTool) run(
+// run runs child with prompt, sends each event and the end of the
+// child on the run stream of the parent, and returns the result of the
+// task call. The end comes before the call ends, also when ctx is done,
+// so the stream of the parent closes each child that it opened.
+func (t *agentTool) run(
 	ctx context.Context,
 	child *agent.Agent,
 	id string,
-	callID string,
 	prompt string,
 ) (ai.ToolResult, error) {
 	start := time.Now()
-	send := t.asm.h.subagentEvents
 	toolUses := 0
 
 	s := child.Run(ctx, session.Text(prompt))
@@ -253,17 +250,31 @@ func (t *taskTool) run(
 		if _, ok := e.(agent.EventToolExecutionEnd); ok {
 			toolUses++
 		}
-		if send != nil {
-			send(callID, e)
-		}
+		agent.EmitSubagent(ctx, agent.EventSubagent{
+			SessionID: id,
+			Event:     e,
+		})
 	}
 	msgs, err := s.Wait()
+	end := agent.EventSubagentEnd{
+		SessionID: id,
+		Status:    agent.SubagentCompleted,
+		Text:      lastText(msgs),
+	}
+	switch {
+	case ctx.Err() != nil:
+		end.Status = agent.SubagentInterrupted
+	case err != nil:
+		end.Status = agent.SubagentFailed
+		end.Text = err.Error()
+	}
+	agent.EmitSubagent(ctx, end)
 	if ctx.Err() != nil {
 		return ai.ToolResult{}, ctx.Err()
 	}
 
 	u := child.State().Usage()
-	stats := taskStats{
+	stats := agentStats{
 		id:       id,
 		tokens:   u.Input + u.Output + u.CacheRead + u.CacheWrite,
 		toolUses: toolUses,
@@ -275,8 +286,8 @@ func (t *taskTool) run(
 	return textResult(lastText(msgs) + stats.trailer()), nil
 }
 
-// taskStats is the end of a task result.
-type taskStats struct {
+// agentStats is the end of a task result.
+type agentStats struct {
 	id       string
 	tokens   int
 	toolUses int
@@ -284,11 +295,11 @@ type taskStats struct {
 }
 
 // trailer returns the agent_id line and the usage line.
-func (s taskStats) trailer() string {
+func (s agentStats) trailer() string {
 	var b strings.Builder
 	b.WriteString("\n\n")
 	if s.id != "" {
-		fmt.Fprintf(&b, "agent_id: %s (give it to task as resume to continue)\n", s.id)
+		fmt.Fprintf(&b, "agent_id: %s (give it to agent as resume to continue)\n", s.id)
 	}
 	fmt.Fprintf(
 		&b,

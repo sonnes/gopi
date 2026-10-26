@@ -35,7 +35,7 @@ func (stopHook) BeforeStop(context.Context, agent.State) ([]session.Entry, error
 // startAgent starts the session s1 with d and c, and returns its agent.
 func startAgent(t *testing.T, d agent.Driver, c agent.Config) *Agent {
 	t.Helper()
-	c.Session = "s1"
+	c.SessionID = "s1"
 	r, err := d.Start(context.Background(), c)
 	require.NoError(t, err)
 	a, ok := r.(*Agent)
@@ -189,7 +189,7 @@ func TestDriverRejects(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.config.Session = "s1"
+			tt.config.SessionID = "s1"
 			_, err := Driver().Start(context.Background(), tt.config)
 			require.EqualError(t, err, tt.errText)
 			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
@@ -201,8 +201,8 @@ func TestDriverRejectsAnOptionHook(t *testing.T) {
 	d := Driver(Hooks(turnHook{}))
 
 	_, err := d.Start(context.Background(), agent.Config{
-		Session: "s1",
-		Hooks:   []agent.Hook{stopHook{}},
+		SessionID: "s1",
+		Hooks:     []agent.Hook{stopHook{}},
 	})
 	require.ErrorIs(t, err, errors.ErrUnsupported, "Start checks the hooks of the options")
 	assert.EqualError(t, err, "codex: agent: hook 1 (codex.turnHook) uses AfterTurn: unsupported operation")

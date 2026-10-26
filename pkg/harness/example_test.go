@@ -69,6 +69,6 @@ func Example() {
 	fmt.Println(msgs[len(msgs)-1].Text())
 	// Output:
 	// tool: skill
-	// tool: task
+	// tool: agent
 	// Done.
 }

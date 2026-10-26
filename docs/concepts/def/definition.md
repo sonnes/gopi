@@ -13,7 +13,7 @@ read_when:
 A definition is a part of an agent that a person writes: an agent, a skill, or an instruction text such as `AGENTS.md`. Package `def` holds the types and a reader interface for each. A store implements the readers, and the harness takes them.
 
 ```
-  store (fs, code, ...) --ReadAgents-------> harness: "agents" section, task tool
+  store (fs, code, ...) --ReadAgents-------> harness: "agents" section, agent tool
                         --ReadSkills-------> harness: "skills" section, skill tool
                         --ReadInstructions-> harness: "instructions" section
 ```
@@ -41,5 +41,5 @@ A definition is a part of an agent that a person writes: an agent, a skill, or a
 ## Related Concepts
 
 - [Skill](../harness/skill.md)
-- [Subagent](../harness/subagent.md)
+- [Agent Tool](../harness/agent-tool.md)
 - [Harness](../harness/harness.md)

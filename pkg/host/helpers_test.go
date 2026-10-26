@@ -149,7 +149,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		}
 		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason)))
 	}
-	r, err := agent.Durable(ctx, d.lm, c.Session, opts...)
+	r, err := agent.Durable(ctx, d.lm, c.SessionID, opts...)
 	if err != nil || !d.plain {
 		return r, err
 	}

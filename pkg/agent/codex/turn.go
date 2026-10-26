@@ -22,6 +22,9 @@ const (
 	toolBash       = "bash"
 	toolApplyPatch = "apply_patch"
 	toolWebSearch  = "web_search"
+	// toolSpawnAgent is the call that starts a subagent. The CLI
+	// reports it as a subAgentActivity item.
+	toolSpawnAgent = "spawn_agent"
 )
 
 // mcpSeparator joins the server and the tool of an MCP tool call into
@@ -37,6 +40,7 @@ const unfinishedText = "the turn ended before the tool completed"
 
 // The notifications that a turn uses.
 const (
+	methodTurnStarted    = "turn/started"
 	methodTurnCompleted  = "turn/completed"
 	methodTokenUsage     = "thread/tokenUsage/updated"
 	methodItemStarted    = "item/started"
@@ -49,6 +53,7 @@ const (
 // usedMethods are the notifications that a turn decodes. It ignores
 // every other notification.
 var usedMethods = map[string]bool{
+	methodTurnStarted:    true,
 	methodTurnCompleted:  true,
 	methodTokenUsage:     true,
 	methodItemStarted:    true,
@@ -111,6 +116,16 @@ type turn struct {
 	// dead is true if the process must not serve the next run, because
 	// the server can still send notifications of this turn.
 	dead bool
+
+	// subs tracks the subagents of the run. The turn of the run and the
+	// turn of each child share it.
+	subs *subagents
+	// sessionID is the ID of the session of the emitter, or "" if it is
+	// unsaved.
+	sessionID string
+	// completed is true after the turn of the run completed while a
+	// child still ran. The run then waits for the children.
+	completed bool
 }
 
 // note is one notification of the turn.
@@ -210,7 +225,7 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 			t.early = nil
 			for _, em := range early {
 				done, err := t.dispatch(store, em, cancelled)
-				if done {
+				if t.settled(done, err) {
 					return finish(err)
 				}
 			}
@@ -221,10 +236,24 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 			continue
 		}
 		done, err := t.dispatch(store, m, cancelled)
-		if done {
+		if t.settled(done, err) {
 			return finish(err)
 		}
 	}
+}
+
+// settled reports whether the run ends after one notification. A turn
+// that completes while a child runs waits for the children, so that
+// the run reports them.
+func (t *turn) settled(done bool, err error) bool {
+	if done && err == nil && t.subs.running() {
+		t.completed = true
+		return false
+	}
+	if done {
+		return true
+	}
+	return t.completed && !t.subs.running()
 }
 
 // dispatch applies one notification of the turn. It ignores the
@@ -246,6 +275,9 @@ func (t *turn) dispatch(ctx context.Context, m message, cancelled bool) (bool, e
 		// Without turn/completed, the run has no end.
 		t.dead = true
 		return true, fmt.Errorf("codex: %s: %w", m.Method, err)
+	}
+	if p.ThreadID != "" && p.ThreadID != t.threadID {
+		return false, t.subs.route(ctx, m, p)
 	}
 	if !t.ours(p) {
 		return false, nil
@@ -284,10 +316,16 @@ func (t *turn) ours(p params) bool {
 	return turnID == "" || turnID == t.turnID
 }
 
-// interrupt asks the server to stop the turn. Before the response to
-// turn/start, the turn ID is unknown, so interrupt waits for it.
+// interrupt asks the server to stop the turn and the turn of each
+// child. Before the response to turn/start, the turn ID is unknown, so
+// interrupt waits for it.
 func (t *turn) interrupt() error {
-	if t.turnID == "" {
+	if t.subs != nil {
+		if err := t.subs.interrupt(); err != nil {
+			return err
+		}
+	}
+	if t.turnID == "" || t.completed {
 		return nil
 	}
 	_, err := t.conn.request("turn/interrupt", turnInterruptParams{
@@ -452,7 +490,13 @@ func (t *turn) itemStarted(ctx context.Context, it item) error {
 	if !ok {
 		return nil
 	}
-	return t.startTool(ctx, tc)
+	if err := t.startTool(ctx, tc); err != nil {
+		return err
+	}
+	if it.Type == itemSubAgentActivity {
+		return t.subs.open(ctx, t, it)
+	}
+	return nil
 }
 
 // itemCompleted sets the final text of a block, or ends a tool call.
@@ -685,6 +729,15 @@ func toolCall(it item) (ai.ToolCall, bool) {
 	case itemWebSearch:
 		name = toolWebSearch
 		input = map[string]string{"query": it.Query}
+	case itemCollabAgentToolCall:
+		name = collabToolName(it.Tool)
+		input = map[string][]string{"receiver_thread_ids": it.ReceiverThreadIDs}
+	case itemSubAgentActivity:
+		if it.Kind != activityStarted {
+			return ai.ToolCall{}, false
+		}
+		name = toolSpawnAgent
+		input = map[string]string{"agent_path": it.AgentPath}
 	default:
 		return ai.ToolCall{}, false
 	}
@@ -717,6 +770,12 @@ func toolResult(it item) ai.ToolResult {
 		failed = failed || it.Error != nil
 	case itemWebSearch:
 		text = it.Query
+	case itemCollabAgentToolCall:
+		if len(it.AgentsStates) > 0 && string(it.AgentsStates) != emptyObject {
+			text = string(it.AgentsStates)
+		}
+	case itemSubAgentActivity:
+		text = it.AgentThreadID
 	}
 	if text == "" {
 		text = it.Status

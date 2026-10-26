@@ -29,7 +29,7 @@ type Assembly struct {
 	Instructions []def.Instruction
 	// Tools describes the tools that the model can call, in order: the
 	// built-in tools, the tools of [Toolset], the skill tool, then the
-	// task tool. A deferred tool is not in the list, because the model
+	// agent tool. A deferred tool is not in the list, because the model
 	// cannot call it until the search of the agent loads it.
 	Tools []ai.ToolInfo
 	// Skills holds the skills of the readers, merged by qualified name. [Assembly.SkillName] gives the name that the model
@@ -43,8 +43,8 @@ type Assembly struct {
 
 	// h is the harness of the call that the assembly came from.
 	h *Harness
-	// session is the ID of the session, or "" for an unsaved agent.
-	session string
+	// sessionID is the ID of the session, or "" for an unsaved agent.
+	sessionID string
 	// names holds the name that the model sees for each skill.
 	names []string
 	// tools are the tools that go to the agent, deferred or not.
@@ -88,8 +88,8 @@ func skillText(name string, s def.Skill) string {
 	return "## Skill: " + name + "\n\n" + s.Body
 }
 
-// taskTool reports if the assembly gives the model the task tool.
-func (a *Assembly) taskTool() bool {
+// agentTool reports if the assembly gives the model the agent tool.
+func (a *Assembly) agentTool() bool {
 	return len(a.Agents) > 0 && a.h.child == nil
 }
 
@@ -116,7 +116,7 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		Instructions: instructions,
 		Dir:          dir,
 		h:            h,
-		session:      id,
+		sessionID:    id,
 	}
 	asm.Skills, err = readSkills(ctx, h.skills)
 	if err != nil {
@@ -259,7 +259,7 @@ func readAgents(ctx context.Context, readers []def.AgentsReader) ([]def.Agent, e
 }
 
 // readTools returns the tools of the assembly: the built-in tools, the
-// tools of each reader in order, the skill tool, then the task tool.
+// tools of each reader in order, the skill tool, then the agent tool.
 // In a child assembly, it keeps only the tools of the subagent.
 func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
 	out, err := a.h.builtinTools(a.Dir)
@@ -276,8 +276,8 @@ func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
 	if t := newSkillTool(a.Skills, a.names); t != nil {
 		out = append(out, t)
 	}
-	if a.taskTool() {
-		out = append(out, newTaskTool(a))
+	if a.agentTool() {
+		out = append(out, newAgentTool(a))
 	}
 	if a.h.child != nil {
 		out = keepTools(out, a.h.child.sub)

@@ -43,9 +43,9 @@ func TestStartResumesTheSession(t *testing.T) {
 	h := harness.New(base(t, p)...)
 	store := session.NewMemoryStore()
 	c := agent.Config{
-		Session: "s1",
-		Store:   store,
-		Spec:    "fake/two",
+		SessionID: "s1",
+		Store:     store,
+		Spec:      "fake/two",
 	}
 
 	run(t, start(t, h, c), "first")
@@ -64,7 +64,7 @@ func TestStartAddsTheSystemAndTheSkills(t *testing.T) {
 	)...)
 
 	a := start(t, h, agent.Config{
-		Session: "s1",
+		SessionID: "s1",
 		Sections: func(context.Context) ([]ai.Section, error) {
 			return []ai.Section{{Name: "review", Text: "Review the diff."}}, nil
 		},
@@ -86,9 +86,9 @@ func TestStartAddsTheHooksAndTheTools(t *testing.T) {
 	var names []string
 
 	a := start(t, h, agent.Config{
-		Session: "s1",
-		Hooks:   []agent.Hook{toolLog{names: &names}},
-		Tools:   []tool.Tool{echo},
+		SessionID: "s1",
+		Hooks:     []agent.Hook{toolLog{names: &names}},
+		Tools:     []tool.Tool{echo},
 	})
 	run(t, a, "hi")
 
@@ -146,7 +146,7 @@ func TestStartAddsTheRules(t *testing.T) {
 			h := harness.New(with(base(t, p), harness.Mode(tt.mode))...)
 			var asked []string
 			c := tt.config
-			c.Session = "s1"
+			c.SessionID = "s1"
 			c.Tools = []tool.Tool{echo}
 			c.Approve = func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 				asked = append(asked, req.Call.Name)
@@ -171,24 +171,24 @@ func TestStartFails(t *testing.T) {
 		{
 			name: "a hook with no point",
 			config: agent.Config{
-				Session: "s1",
-				Hooks:   []agent.Hook{agent.BaseHook{}},
+				SessionID: "s1",
+				Hooks:     []agent.Hook{agent.BaseHook{}},
 			},
 			errText: "harness: agent: hook 1 (agent.BaseHook) implements no point",
 		},
 		{
 			name: "an unknown skill",
 			config: agent.Config{
-				Session: "s1",
-				Skills:  []string{"missing"},
+				SessionID: "s1",
+				Skills:    []string{"missing"},
 			},
 			errText: `harness: preload the skill "missing": no skill has this name`,
 		},
 		{
 			name: "an unknown mode",
 			config: agent.Config{
-				Session: "s1",
-				Mode:    "auto",
+				SessionID: "s1",
+				Mode:      "auto",
 			},
 			errText: `harness: agent: unknown mode "auto"`,
 		},
@@ -210,8 +210,8 @@ func TestStartReadsTheDirs(t *testing.T) {
 	h := harness.New(base(t, p)...)
 
 	a := start(t, h, agent.Config{
-		Session: "s1",
-		Dirs:    []string{dir},
+		SessionID: "s1",
+		Dirs:      []string{dir},
 	})
 	run(t, a, "hi")
 
@@ -224,8 +224,8 @@ func TestStartSetsTheEffort(t *testing.T) {
 	h := harness.New(base(t, p)...)
 
 	a := start(t, h, agent.Config{
-		Session: "s1",
-		Effort:  ai.ThinkingHigh,
+		SessionID: "s1",
+		Effort:    ai.ThinkingHigh,
 	})
 	run(t, a, "hi")
 

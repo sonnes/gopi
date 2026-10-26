@@ -21,9 +21,11 @@ type Stream = stream.Stream[Event, []ai.Message]
 // carries.
 // The types are [EventAgentStart], [EventAgentEnd], [EventTurnStart],
 // [EventTurnEnd], [EventMessageStart], [EventMessageUpdate],
-// [EventMessageEnd], [EventToolExecutionStart], and
-// [EventToolExecutionEnd]. Each event carries what [State.Apply]
-// needs.
+// [EventMessageEnd], [EventToolExecutionStart],
+// [EventToolExecutionEnd], [EventSubagentStart], [EventSubagent], and
+// [EventSubagentEnd]. Each event carries what [State.Apply] needs.
+// [State.Apply] ignores the subagent events, because the state of a
+// child is in its own session.
 //
 // Each event type encodes to JSON with a "type" field that names the
 // event. [UnmarshalEvent] decodes an event.
@@ -153,6 +155,9 @@ const (
 	typeMessageEnd         = "message_end"
 	typeToolExecutionStart = "tool_execution_start"
 	typeToolExecutionEnd   = "tool_execution_end"
+	typeSubagentStart      = "subagent_start"
+	typeSubagent           = "subagent"
+	typeSubagentEnd        = "subagent_end"
 )
 
 // eventJSON is the wire format of every event. Type tells the events
@@ -182,6 +187,16 @@ type eventJSON struct {
 	ToolName   string          `json:"tool_name,omitempty"`
 	Args       json.RawMessage `json:"args,omitempty"`
 	Result     *ai.ToolResult  `json:"result,omitempty"`
+
+	// subagent_start, subagent, and subagent_end, with tool_call_id
+	SessionID string          `json:"session_id,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Title     string          `json:"title,omitempty"`
+	Prompt    string          `json:"prompt,omitempty"`
+	Model     string          `json:"model,omitempty"`
+	Event     json.RawMessage `json:"event,omitempty"`
+	Status    string          `json:"status,omitempty"`
+	Text      string          `json:"text,omitempty"`
 }
 
 func marshalEvent(e Event) ([]byte, error) {
@@ -231,6 +246,35 @@ func marshalEvent(e Event) ([]byte, error) {
 			ToolName:   v.ToolName,
 			Result:     &v.Result,
 		}
+	case EventSubagentStart:
+		w = eventJSON{
+			Type:       typeSubagentStart,
+			ToolCallID: v.ToolCallID,
+			SessionID:  v.SessionID,
+			Name:       v.Name,
+			Title:      v.Title,
+			Prompt:     v.Prompt,
+			Model:      v.Model,
+		}
+	case EventSubagent:
+		inner, err := json.Marshal(v.Event)
+		if err != nil {
+			return nil, err
+		}
+		w = eventJSON{
+			Type:       typeSubagent,
+			ToolCallID: v.ToolCallID,
+			SessionID:  v.SessionID,
+			Event:      inner,
+		}
+	case EventSubagentEnd:
+		w = eventJSON{
+			Type:       typeSubagentEnd,
+			ToolCallID: v.ToolCallID,
+			SessionID:  v.SessionID,
+			Status:     v.Status,
+			Text:       v.Text,
+		}
 	default:
 		return nil, fmt.Errorf("agent: unknown event type %T", e)
 	}
@@ -277,6 +321,32 @@ func UnmarshalEvent(data []byte) (Event, error) {
 			ToolCallID: w.ToolCallID,
 			ToolName:   w.ToolName,
 			Result:     deref(w.Result),
+		}, nil
+	case typeSubagentStart:
+		return EventSubagentStart{
+			ToolCallID: w.ToolCallID,
+			SessionID:  w.SessionID,
+			Name:       w.Name,
+			Title:      w.Title,
+			Prompt:     w.Prompt,
+			Model:      w.Model,
+		}, nil
+	case typeSubagent:
+		inner, err := UnmarshalEvent(w.Event)
+		if err != nil {
+			return nil, err
+		}
+		return EventSubagent{
+			ToolCallID: w.ToolCallID,
+			SessionID:  w.SessionID,
+			Event:      inner,
+		}, nil
+	case typeSubagentEnd:
+		return EventSubagentEnd{
+			ToolCallID: w.ToolCallID,
+			SessionID:  w.SessionID,
+			Status:     w.Status,
+			Text:       w.Text,
 		}, nil
 	default:
 		return nil, fmt.Errorf("agent: unknown event type %q", w.Type)

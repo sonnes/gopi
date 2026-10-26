@@ -23,8 +23,12 @@ import (
 //     AssistantEvent.
 //   - Each tool_execution_start is in a turn, outside a message, and
 //     has one tool_execution_end.
+//   - A subagent_start names a tool call that started in the run. A
+//     subagent and a subagent_end name a subagent that is open. A
+//     subagent_end can come after the end of its call, because a Codex
+//     child can outlive the call that started it.
 //   - Every event of a run that ends is closed: no open message, tool
-//     call, or turn.
+//     call, turn, or subagent.
 //
 // A test of the agent loop runs CheckEvents on the events of its runs.
 func CheckEvents(t testing.TB, events []agent.Event) {
@@ -39,6 +43,8 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 		inTurn bool
 		inMsg  bool
 		tools  = map[string]bool{}
+		called = map[string]bool{}
+		subs   = map[string]bool{}
 	)
 	for i, ev := range events {
 		switch ev := ev.(type) {
@@ -74,9 +80,23 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 			assert.NotEmpty(t, ev.ToolCallID, "event %d: tool_execution_start has a call ID", i)
 			assert.False(t, tools[ev.ToolCallID], "event %d: tool call %q started twice", i, ev.ToolCallID)
 			tools[ev.ToolCallID] = true
+			called[ev.ToolCallID] = true
 		case agent.EventToolExecutionEnd:
 			assert.True(t, tools[ev.ToolCallID], "event %d: tool call %q ended with no start", i, ev.ToolCallID)
 			delete(tools, ev.ToolCallID)
+		case agent.EventSubagentStart:
+			assert.True(t, called[ev.ToolCallID], "event %d: subagent_start of call %q, which did not start", i, ev.ToolCallID)
+			key := ev.ToolCallID + "/" + ev.SessionID
+			assert.False(t, subs[key], "event %d: subagent %q started twice", i, key)
+			subs[key] = true
+		case agent.EventSubagent:
+			key := ev.ToolCallID + "/" + ev.SessionID
+			assert.True(t, subs[key], "event %d: event of subagent %q, which is not open", i, key)
+			assert.NotNil(t, ev.Event, "event %d: subagent carries an event", i)
+		case agent.EventSubagentEnd:
+			key := ev.ToolCallID + "/" + ev.SessionID
+			assert.True(t, subs[key], "event %d: subagent_end of %q, which is not open", i, key)
+			delete(subs, key)
 		default:
 			assert.Fail(t, "unknown event type", "event %d: %T", i, ev)
 		}
@@ -84,6 +104,7 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 	assert.False(t, inTurn, "the run left a turn open")
 	assert.False(t, inMsg, "the run left a message open")
 	assert.Empty(t, tools, "the run left tool calls open")
+	assert.Empty(t, subs, "the run left subagents open")
 }
 
 // Types returns the JSON type name of each event, such as
