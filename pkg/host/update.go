@@ -26,6 +26,9 @@ func (h *Host) Update(ctx context.Context, id string, change func(*Config)) (Ses
 	if err != nil {
 		return Session{}, err
 	}
+	if err := s.writable(); err != nil {
+		return Session{}, err
+	}
 	return s.update(ctx, change)
 }
 

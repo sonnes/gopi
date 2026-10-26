@@ -53,6 +53,9 @@ type hosted struct {
 	// calls has the tool calls that wait for [Host.Confirm], the oldest
 	// first.
 	calls []*call
+	// childRuns is true while the run of the parent of a child runs the
+	// child.
+	childRuns bool
 }
 
 func newHosted(h *Host, sess Session) *hosted {
@@ -81,7 +84,7 @@ func (s *hosted) snapshot() Session {
 // mu, so the events of s reach the stream in the order of its changes.
 func (s *hosted) updateLocked() {
 	s.sess.Status = StatusIdle
-	if s.run != nil {
+	if s.run != nil || s.childRuns {
 		s.sess.Status = StatusRunning
 	}
 	if len(s.calls) > 0 {

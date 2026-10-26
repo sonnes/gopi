@@ -30,6 +30,9 @@ var (
 	ErrClosed = errors.New("host: closed")
 	// ErrInvalid reports an input that the host cannot take.
 	ErrInvalid = errors.New("host: invalid input")
+	// ErrChild reports a message, an update, or an interrupt for the
+	// session of a subagent. The run of its parent writes it.
+	ErrChild = errors.New("host: the session is a subagent")
 )
 
 // Storer keeps the sessions of a host. The host lists the store when it

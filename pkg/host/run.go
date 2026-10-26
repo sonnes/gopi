@@ -49,6 +49,9 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 	if err != nil {
 		return err
 	}
+	if err := s.writable(); err != nil {
+		return err
+	}
 	if err := s.startAgent(ctx); err != nil {
 		return err
 	}
@@ -78,6 +81,9 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 func (h *Host) Interrupt(_ context.Context, id string) error {
 	s, err := h.session(id)
 	if err != nil {
+		return err
+	}
+	if err := s.writable(); err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -119,8 +125,10 @@ func (s *hosted) execute(ctx context.Context, m Message) {
 			usage = end.Usage
 		}
 		s.agents.publish(ev)
+		s.host.relay(ctx, s.id, ev)
 	}
 	_, err = stream.Wait()
+	s.host.endChildren(ctx, s.id)
 	s.finish(ctx, usage, err)
 }
 

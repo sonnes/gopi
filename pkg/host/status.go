@@ -48,6 +48,11 @@ const (
 type Session struct {
 	ID     string `json:"id"`
 	Status Status `json:"status"`
+	// Parent is set for the session of a subagent: the session and the
+	// tool call of its parent. The run of the parent writes the child,
+	// and the host runs no agent for it, so a child is read-only. Its
+	// status follows the subagent events of the parent.
+	Parent *agent.ParentRef `json:"parent,omitempty"`
 	// Waiting are the tool calls that wait for [Host.Confirm], the
 	// oldest first. Two or more calls can wait at the same time. It is
 	// set only while Status is [StatusRequiresAction].
@@ -74,6 +79,10 @@ type Session struct {
 // clone returns a copy of i that shares no slice with i.
 func (i Session) clone() Session {
 	i.Waiting = slices.Clone(i.Waiting)
+	if i.Parent != nil {
+		p := *i.Parent
+		i.Parent = &p
+	}
 	return i
 }
 
@@ -115,6 +124,13 @@ func (h *Host) recover(ctx context.Context, snap session.Snapshot) (Session, err
 	}
 	sess.ID = id
 	sess.CreatedAt = snap.Session.CreatedAt
+	parent, isChild, err := agent.Parent.Read(snap)
+	if err != nil {
+		return Session{}, fmt.Errorf("host: session %s: read the parent: %w", id, err)
+	}
+	if isChild {
+		sess.Parent = &parent
+	}
 	sess.Model = config.Model
 	sess.Mode = config.Mode
 	sess.Effort = config.Effort

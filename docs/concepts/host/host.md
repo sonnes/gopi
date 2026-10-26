@@ -42,6 +42,7 @@ A host keeps the sessions of gopi agents for a Go program. A session is a resour
 - The host gives each agent its own approve function. A call waits for `Confirm` on a channel of its own, so two or more calls wait at the same time and end in any order. With no person, a call waits until its run ends. So a program with no person confirms from the host stream, or picks a mode that asks for no call.
 - Each event of the host stream carries the whole session. A reader then needs no history, and `State.Apply` only sets the session.
 - Each `Events` and `Stream` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. A reader that falls too far behind loses its stream, so one stalled reader cannot hold the events in memory.
+- The session of a subagent is a session of the host with a `Parent`. The run of the parent writes it, so `Send`, `Update`, and `Interrupt` fail with `ErrChild`. Its status follows the subagent events of the parent, and its stream has the events of the child without their wrapper. A reader then shows a child as it shows any session.
 - One host owns a store. Two hosts on one store must not run the same session, because their entries interleave in one log.
 
 ## Map
@@ -59,6 +60,7 @@ A host keeps the sessions of gopi agents for a Go program. A session is a resour
 | Change what Update can change                       | `pkg/host/update.go`    |
 | Change the host events or the state of a reader     | `pkg/host/event.go`     |
 | Change how a reader gets the state and the events   | `pkg/host/hub.go`       |
+| Change how the session of a subagent follows its parent | `pkg/host/child.go` |
 
 ## Related Concepts
 

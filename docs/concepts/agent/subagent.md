@@ -28,6 +28,7 @@ tool_execution_end    c1
 - The ID of a child is the parent ID, ".", the name, "-", and a suffix. A driver takes the suffix from the native ID of the subagent if it has one, so that a replay of the same output finds the same child.
 - The parent stream wraps each event of a child in a `subagent` event. A viewer of the parent then sees the child live, with no second stream. The order rules of a run apply inside each child, and not across the parent and the child.
 - A tool sends the events of its child through `EmitSubagent`, which takes only the three subagent events and fills the ID of the call. A tool then cannot break the order of the run.
+- The host makes each child a read-only session of its own, as [Host](../host/host.md) says.
 - Each `subagent_start` has one `subagent_end` in the same run. A run that stops ends each open child as `interrupted`, so a viewer never keeps a child open.
 - Claude Code marks each line of a subagent with the ID of its Agent call. Its `task_started` line comes before that call starts on the stream, so the child waits for the start of its call. The CLI does not send the last message of a subagent as a line, so the summary of its `task_notification` becomes the last message of the child.
 - Claude Code runs with no background tasks. A background task ends after the result of the run, when no run reads its lines.
