@@ -94,3 +94,22 @@ func Start(ctx context.Context, a *Agent) error {
 func SessionID(a *Agent) (string, error) {
 	return conversation.Get(a.log)
 }
+
+// SetUUIDs makes the agents of the test give the steers these IDs, in
+// order.
+func SetUUIDs(t *testing.T, ids ...string) {
+	old := newUUID
+	t.Cleanup(func() { newUUID = old })
+	var mu sync.Mutex
+	newUUID = func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		if len(ids) == 0 {
+			t.Errorf("claude: no UUID left for a steer")
+			return ""
+		}
+		id := ids[0]
+		ids = ids[1:]
+		return id
+	}
+}

@@ -70,7 +70,7 @@ err := h.Send(ctx, s.ID, host.Text("Review the diff against main."))
 | --------------------- | ------------------------------------------------------------------ |
 | `idle`                | runs at once, and the status is `running` when `Send` returns       |
 | `running`             | steers the run before its next model call                          |
-| `running`, CLI agent  | waits, and runs after the run, because a CLI agent cannot steer     |
+| `running`, Codex agent | waits, and runs after the run, because Codex cannot steer          |
 
 `h.Interrupt(ctx, id)` cancels the active run. A message that waits runs next. The run ends with the stop reason `interrupted`.
 

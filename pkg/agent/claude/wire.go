@@ -14,6 +14,10 @@ type line struct {
 	SessionID string `json:"session_id"`
 	// ParentToolUseID is set on the lines of a subagent.
 	ParentToolUseID *string `json:"parent_tool_use_id"`
+	// UUID and IsReplay are set on the echo of a user line that the agent
+	// sent. The echo of a steer has the UUID of the steer.
+	UUID     string `json:"uuid"`
+	IsReplay bool   `json:"isReplay"`
 
 	// stream_event
 	Event *streamEvent `json:"event"`
@@ -26,6 +30,9 @@ type line struct {
 	Result  string    `json:"result"`
 	Errors  []string  `json:"errors"`
 	Usage   wireUsage `json:"usage"`
+	// TerminalReason says why the segment ended, such as "completed" or
+	// "aborted_tools".
+	TerminalReason string `json:"terminal_reason"`
 
 	// control_request
 	RequestID string          `json:"request_id"`
@@ -144,6 +151,8 @@ type outRequest struct {
 
 type outRequestBody struct {
 	Subtype string `json:"subtype"`
+	// ToolUseID names the task of a background_tasks request.
+	ToolUseID string `json:"tool_use_id,omitempty"`
 	// Hooks registers the hook callbacks, in the initialize request.
 	Hooks map[string][]hookMatcher `json:"hooks,omitempty"`
 }
@@ -181,6 +190,9 @@ type outUser struct {
 	Message         outUserMessage `json:"message"`
 	ParentToolUseID *string        `json:"parent_tool_use_id"`
 	SessionID       string         `json:"session_id"`
+	// Priority and UUID are set on a steer. See [steerPriority].
+	Priority string `json:"priority,omitempty"`
+	UUID     string `json:"uuid,omitempty"`
 }
 
 type outUserMessage struct {

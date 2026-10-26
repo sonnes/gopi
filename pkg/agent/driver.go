@@ -136,7 +136,8 @@ type Runner interface {
 }
 
 // Steerer is a [Runner] that reads entries during a run, before its
-// next model call. [Agent] implements it, and the CLI agents do not.
+// next model call. [Agent] and the Claude Code agent implement it, and
+// the Codex agent does not.
 // A run can end before it reads a steer, so a caller takes the entries
 // that no run read with TakeSteer after the run.
 type Steerer interface {

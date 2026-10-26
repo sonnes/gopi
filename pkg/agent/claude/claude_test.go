@@ -623,6 +623,7 @@ func TestOptions(t *testing.T) {
 		"--verbose",
 		"--input-format", "stream-json",
 		"--include-partial-messages",
+		"--replay-user-messages",
 		"--permission-prompt-tool", "stdio",
 		"--model", "haiku",
 		"--append-system-prompt", "Be brief.",

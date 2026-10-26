@@ -41,6 +41,16 @@ type runner struct {
 	kept int
 	// interrupted is true after the runner sends the interrupt request.
 	interrupted bool
+
+	// pending are the steers that the CLI did not take yet. steered is
+	// true after the first steer. segments is the usage of the segments
+	// that a steer ended.
+	pending  []pendingSteer
+	steered  bool
+	segments ai.Usage
+	// subagents are the IDs of the subagent calls that wait for their
+	// result.
+	subagents map[string]bool
 }
 
 // apiMessage is one assistant message of the Messages API, as the
@@ -105,6 +115,11 @@ func (r *runner) run(
 
 		case <-deadline:
 			return r.fail(ctx, ctx.Err())
+
+		case <-r.a.wake:
+			if err := r.sendSteer(ctx); err != nil {
+				return r.fail(ctx, err)
+			}
 
 		case data, ok := <-r.proc.lines():
 			if !ok {
@@ -232,12 +247,19 @@ func (r *runner) handle(
 		return nil, false, r.assistant(ctx, l.Message)
 
 	case "user":
+		if l.IsReplay {
+			return nil, false, r.replayed(ctx, &l)
+		}
 		if fromSubagent || l.Message == nil {
 			return nil, false, nil
 		}
 		return nil, false, r.user(ctx, l.Message)
 
 	case "result":
+		if r.segmentEnded(&l) {
+			r.segments = r.segments.Add(usage(&l.Usage))
+			return nil, false, r.finish(ctx)
+		}
 		msgs, err := r.result(ctx, &l)
 		return msgs, true, err
 	}
@@ -479,6 +501,9 @@ func (r *runner) finish(ctx context.Context) error {
 	}
 	for _, tc := range calls {
 		r.em.ToolStart(tc)
+		if slices.Contains(subagentTools, tc.Name) {
+			r.subagents[tc.ID] = true
+		}
 	}
 	return nil
 }
@@ -531,6 +556,7 @@ func (r *runner) toolResults(ctx context.Context, m *wireMessage) error {
 		if b.Type != "tool_result" {
 			continue
 		}
+		delete(r.subagents, b.ToolUseID)
 		result := ai.ToolResult{
 			Content: toolContent(b.Content),
 			IsError: b.IsError,
@@ -567,7 +593,7 @@ func toolContent(raw json.RawMessage) []ai.Content {
 
 // result ends the run at the result line of the CLI.
 func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
-	u := usage(&l.Usage)
+	u := usage(&l.Usage).Add(r.segments)
 	if err := r.saveSession(ctx, l.SessionID); err != nil {
 		return r.abort(ctx, u, err)
 	}

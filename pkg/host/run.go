@@ -34,7 +34,7 @@ func Text(s string) Message {
 //   - On an idle session, m runs at once, and the status is running when
 //     Send returns.
 //   - On a running session, m steers the run, before its next model call.
-//   - If the agent cannot steer, such as a Claude Code or a Codex agent,
+//   - If the agent cannot steer, such as a Codex agent,
 //     the host holds m, and m runs after the run.
 //
 // If no agent runs, Send starts it from the config of the session, and the

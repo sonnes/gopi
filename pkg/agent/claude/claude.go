@@ -72,6 +72,12 @@ type Agent struct {
 	// proc is the running CLI, or nil before the first run and after a
 	// failure that stopped it.
 	proc *process
+
+	// steerMu guards steer. steer holds the entries of the steers that
+	// no run sent. wake tells the active run that a steer waits.
+	steerMu sync.Mutex
+	steer   []session.Entry
+	wake    chan struct{}
 }
 
 // config collects the options before [New] or [Durable] builds the agent.
@@ -243,6 +249,7 @@ func newAgent(opts []Option) *Agent {
 	return &Agent{
 		name: c.name,
 		cfg:  c,
+		wake: make(chan struct{}, 1),
 	}
 }
 
@@ -292,11 +299,20 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 		// The error of a hook belongs to the run that called it.
 		proc.hookErr = nil
 		r := &runner{
-			a:    a,
-			proc: proc,
-			em:   em,
+			a:         a,
+			proc:      proc,
+			em:        em,
+			subagents: map[string]bool{},
 		}
-		return r.run(ctx, entries)
+		msgs, err := r.run(ctx, entries)
+		// The CLI did not take these steers before the run ended. It
+		// must not run them after the run, so the agent stops it, and
+		// the host sends them again.
+		if lost := r.lostSteers(); len(lost) > 0 {
+			a.giveBack(lost)
+			a.drop(proc)
+		}
+		return msgs, err
 	})
 }
 
@@ -444,6 +460,7 @@ func cliArgs(c config) ([]string, error) {
 		"--verbose",
 		"--input-format", "stream-json",
 		"--include-partial-messages",
+		"--replay-user-messages",
 		"--permission-prompt-tool", "stdio",
 	}
 	if c.model != "" {

@@ -106,6 +106,8 @@ The CLI keeps the transcript that its model reads. The log is a copy of the run 
 
 `State` returns the [state](events.mdx#state) of the agent, as for `agent.Agent`. A CLI agent has no queues, so `Steer` and `FollowUp` on the state do nothing.
 
+The Claude Code agent steers a run. `a.Steer(entries...)` sends the text and the files of the entries to the CLI at once, and the CLI reads them before its next model call. A tool that runs ends first. If the run ends before the CLI reads a steer, `a.TakeSteer()` returns it. The Codex agent does not steer.
+
 ## Rules
 
 - Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream.
