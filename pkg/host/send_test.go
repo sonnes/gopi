@@ -2,110 +2,40 @@ package host_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/session"
 )
 
-// send sends the text with the policy p, and fails the test on an
-// error.
-func send(t *testing.T, s *host.Session, text string, p host.Policy) {
-	t.Helper()
-	require.NoError(t, s.Send(context.Background(), host.Text(text), p))
-}
-
-// gated returns a fixture whose model waits on a gate. close(gate) lets
-// each call go on.
-func gated(t *testing.T) (fixture, chan struct{}) {
-	t.Helper()
-	f := newFixture(t)
-	gate := make(chan struct{})
-	f.model.gate = gate
-	return f, gate
-}
-
-// inputOf matches an input event with the policy p.
-func inputOf(p host.Policy) func(host.Event) bool {
-	return func(e host.Event) bool {
-		in, ok := e.(host.EventInput)
-		return ok && in.Policy == p
-	}
-}
-
-// runEnd returns the next run_end of events.
-func runEnd(t *testing.T, events <-chan host.Event) host.EventRunEnd {
-	t.Helper()
-	return next(t, events, is[host.EventRunEnd]).(host.EventRunEnd)
-}
-
-func TestSendQueue(t *testing.T) {
+func TestSendSteersARun(t *testing.T) {
 	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
+	f.create(t, host.Config{ID: "s1"})
 	_, events := f.watch(t)
 
-	send(t, s, "a", host.Queue)
-	send(t, s, "b", "")
-	close(gate)
-
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Equal(t, []string{"a", "b"}, f.model.texts())
-}
-
-func TestSendEvents(t *testing.T) {
-	f := newFixture(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-
-	got := []host.Event{
-		next(t, events, is[host.EventInput]),
-		next(t, events, is[host.EventRunStart]),
-	}
-	end := runEnd(t, events)
-	assert.Equal(t, host.EventInput{
-		Session: "s1",
-		Entries: host.Text("a"),
-		Policy:  host.Queue,
-	}, got[0])
-	assert.Equal(t, host.EventRunStart{Session: "s1"}, got[1])
-	assert.Equal(t, 10, end.Usage.Input)
-}
-
-func TestSendSteer(t *testing.T) {
-	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	next(t, events, is[host.EventRunStart])
+	f.send(t, "s1", "a")
 	f.model.waitCalls(t, 1)
-	send(t, s, "b", host.Steer)
-	next(t, events, inputOf(host.Steer))
+	f.send(t, "s1", "b")
 	close(gate)
 
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Equal(t, []string{"a", "b"}, f.model.texts())
-	state, _ := f.h.Events(context.Background())
-	assert.Equal(t, 0, state.Sessions["s1"].Queued)
+	assert.Equal(t, host.StopEndTurn, runEnd(t, events).StopReason)
+	assert.Equal(t, []string{"a", "b"}, f.model.texts(), "one run reads both messages")
 }
 
-func TestSendSteerWithoutSteerer(t *testing.T) {
+func TestSendHoldsAMessageForAnAgentThatCannotSteer(t *testing.T) {
 	f, gate := gated(t)
 	f.driver.plain = true
-	s := f.start(t, host.Spec{ID: "s1"})
+	f.create(t, host.Config{ID: "s1"})
 	_, events := f.watch(t)
 
-	send(t, s, "a", host.Queue)
-	next(t, events, is[host.EventRunStart])
+	f.send(t, "s1", "a")
 	f.model.waitCalls(t, 1)
-	send(t, s, "b", host.Steer)
-	next(t, events, inputOf(host.Queue))
+	f.send(t, "s1", "b")
 	close(gate)
 
 	runEnd(t, events)
@@ -113,137 +43,117 @@ func TestSendSteerWithoutSteerer(t *testing.T) {
 	assert.Equal(t, []string{"a", "b"}, f.model.texts())
 }
 
-func TestSendInterrupt(t *testing.T) {
-	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	send(t, s, "c", host.Queue)
-	next(t, events, is[host.EventRunStart])
-	f.model.waitCalls(t, 1)
-	send(t, s, "b", host.Interrupt)
-
-	assert.Equal(t, host.ErrInterrupted.Error(), runEnd(t, events).Error)
-	close(gate)
-	runEnd(t, events)
-	runEnd(t, events)
-	assert.Equal(t, []string{"a", "b", "c"}, f.model.texts())
-}
-
-func TestSendReject(t *testing.T) {
-	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Reject)
-	next(t, events, is[host.EventRunStart])
-	err := s.Send(context.Background(), host.Text("b"), host.Reject)
-	close(gate)
-
-	assert.ErrorIs(t, err, host.ErrBusy)
-	runEnd(t, events)
-	require.NoError(t, s.Close())
-	for _, e := range drainUntilEnd(t, events) {
-		assert.NotEqual(t, host.EventInput{
-			Session: "s1",
-			Entries: host.Text("b"),
-			Policy:  host.Queue,
-		}, e)
-	}
-	assert.Equal(t, []string{"a"}, f.model.texts())
-}
-
-func TestSendInvalid(t *testing.T) {
+func TestSendAnEmptyMessage(t *testing.T) {
 	f := newFixture(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	ctx := context.Background()
+	f.create(t, host.Config{ID: "s1"})
 
-	err := s.Send(ctx, nil, host.Queue)
-	assert.ErrorIs(t, err, host.ErrInvalid)
-	err = s.Send(ctx, host.Text("a"), "later")
+	err := f.h.Send(context.Background(), "s1", nil)
+
 	assert.ErrorIs(t, err, host.ErrInvalid)
 }
 
-func TestSendAfterClose(t *testing.T) {
+func TestInterruptKeepsTheHeldMessages(t *testing.T) {
+	f, gate := gated(t)
+	f.driver.plain = true
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	f.model.waitCalls(t, 1)
+	f.send(t, "s1", "b")
+
+	require.NoError(t, f.h.Interrupt(context.Background(), "s1"))
+
+	assert.Equal(t, host.StopInterrupted, runEnd(t, events).StopReason)
+	close(gate)
+	assert.Equal(t, host.StopEndTurn, runEnd(t, events).StopReason)
+	assert.Equal(t, []string{"a", "b"}, f.model.texts())
+}
+
+func TestAnUnreadSteerRunsNext(t *testing.T) {
+	f, gate := gated(t)
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	f.model.waitCalls(t, 1)
+	f.send(t, "s1", "b")
+
+	require.NoError(t, f.h.Interrupt(context.Background(), "s1"))
+
+	assert.Equal(t, host.StopInterrupted, runEnd(t, events).StopReason)
+	close(gate)
+	assert.Equal(t, host.StopEndTurn, runEnd(t, events).StopReason)
+	assert.Equal(t, []string{"a", "b"}, f.model.texts(), "the steer was meant for the work")
+}
+
+func TestSendWakesAStoredSession(t *testing.T) {
 	f := newFixture(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	require.NoError(t, s.Close())
-
-	err := s.Send(context.Background(), host.Text("a"), host.Queue)
-
-	assert.ErrorIs(t, err, host.ErrClosed)
-}
-
-func TestInterruptKeepsQueue(t *testing.T) {
-	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	send(t, s, "b", host.Queue)
-	next(t, events, is[host.EventRunStart])
-	f.model.waitCalls(t, 1)
-	s.Interrupt()
-
-	assert.Equal(t, host.ErrInterrupted.Error(), runEnd(t, events).Error)
-	close(gate)
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Equal(t, []string{"a", "b"}, f.model.texts())
-}
-
-func TestUnreadSteerRunsNext(t *testing.T) {
-	f, gate := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	next(t, events, is[host.EventRunStart])
-	f.model.waitCalls(t, 1)
-	send(t, s, "b", host.Steer)
-	next(t, events, inputOf(host.Steer))
-	s.Interrupt()
-
-	runEnd(t, events)
-	requeued := next(t, events, inputOf(host.Queue)).(host.EventInput)
-	assert.Equal(t, host.Text("b"), requeued.Entries)
-	close(gate)
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Equal(t, []string{"a", "b"}, f.model.texts())
-	state, _ := f.h.Events(context.Background())
-	assert.Equal(t, 0, state.Sessions["s1"].Queued)
-	assert.Equal(t, host.StatusIdle, state.Sessions["s1"].Status())
-}
-
-func TestCloseEndsRun(t *testing.T) {
-	f, _ := gated(t)
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	send(t, s, "b", host.Queue)
-	next(t, events, is[host.EventRunStart])
-	f.model.waitCalls(t, 1)
-	require.NoError(t, s.Close())
-
-	assert.Equal(t, host.ErrClosed.Error(), runEnd(t, events).Error)
-	next(t, events, is[host.EventSessionEnd])
-	assert.Equal(t, []string{"a"}, f.model.texts())
-}
-
-// drainUntilEnd reads events up to the session_end, and returns them.
-func drainUntilEnd(t *testing.T, events <-chan host.Event) []host.Event {
-	t.Helper()
-	var out []host.Event
-	next(t, events, func(e host.Event) bool {
-		out = append(out, e)
-		return is[host.EventSessionEnd](e)
+	f.create(t, host.Config{
+		ID:     "s1",
+		Dir:    "/tmp",
+		System: "Be brief.",
 	})
-	return out
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	runEnd(t, events)
+
+	f = f.restart(t)
+	_, events = f.watch(t)
+	f.send(t, "s1", "b")
+	runEnd(t, events)
+
+	c := f.lastConfig(t)
+	assert.Equal(t, 2, f.driver.starts())
+	assert.Equal(t, "/tmp", c.Dir, "the agent starts from the config of the session")
+	assert.Equal(t, "Be brief.", c.System)
+	f.model.mu.Lock()
+	last := f.model.calls[len(f.model.calls)-1]
+	f.model.mu.Unlock()
+	assert.Subset(t, texts(last), []string{"a", "ok", "b"}, "the driver resumes the log")
 }
 
-// plainRunner hides the optional interfaces of its runner, such as
-// [agent.Steerer].
-type plainRunner struct {
-	agent.Runner
+func TestTwoMessagesStartOneAgent(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, host.Config{ID: "s1"})
+	f = f.restart(t)
+
+	var wg sync.WaitGroup
+	for _, text := range []string{"a", "b"} {
+		wg.Go(func() { f.send(t, "s1", text) })
+	}
+	wg.Wait()
+
+	assert.Equal(t, 2, f.driver.starts(), "one start at Create, and one after the restart")
+}
+
+func TestLogOfAStoredSession(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	title := session.Value[string]{Namespace: "app", Key: "title"}
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	runEnd(t, events)
+	f = f.restart(t)
+
+	log, err := f.h.Log(ctx, "s1")
+	require.NoError(t, err)
+	assert.Contains(t, texts(log.Messages()), "a")
+	require.NoError(t, title.Set(ctx, log, "first"))
+	f.send(t, "s1", "b")
+
+	log, err = f.h.Log(ctx, "s1")
+	require.NoError(t, err)
+	got, ok, err := title.Get(log)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "first", got, "the agent reads the value that the store has")
+}
+
+// texts returns the text of each message.
+func texts(msgs []ai.Message) []string {
+	var out []string
+	for _, m := range msgs {
+		out = append(out, m.Text())
+	}
+	return out
 }

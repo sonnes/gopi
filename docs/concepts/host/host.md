@@ -1,65 +1,62 @@
 ---
 title: Host
-description: How a host runs sessions of any gopi agent for a Go program, and how a host stream and a stream for each session report what happens.
+description: How a host keeps the sessions of any gopi agent for a Go program, as resources with an ID, a config, and a status that survive a restart.
 package: pkg/host
 read_when:
   - You run sessions of agents in a Go program
-  - A reader of a stream misses an event
+  - A session shows a wrong status after a restart
+  - A tool call waits and no one answers it
 ---
 
 # Host
 
-A host runs sessions of gopi agents for a Go program. The caller gives a `Spec` to `Start`, and the catalog resolves its model spec to a [driver](../agent/driver.md). The host stream reports the state of each session. Each session has its own stream of agent events.
+A host keeps the sessions of gopi agents for a Go program. A session is a resource with an ID. The program creates it with a `Config`, and then sends it user events by its ID: a message, an interrupt, or a confirmation. The host starts the agent of a session through the [driver](../agent/driver.md) of its model spec, and reports each change of its status.
 
 ```
-  Spec ---> Start: Catalog.Driver, then Driver.Start
-              |
-              v
-  Session --- worker, one run at a time ---> Runner
-    |                                          |
-    | session, input, run,                     | agent events
-    | and approval events                      v
-    v                                     session hub
-  host hub                                     |
-    |                                          v
-    v                                Session.Events
-  Host.Events
+  Create(config) ---> store: record, gopi.host/config, gopi.host/session
+                      |
+  Send(id, m) ---> agent? no: Load, then Driver.Start(config)
+                      |
+                      v
+  hosted session ------- one run at a time -------> Runner
+    |      ^                                          |
+    |      | Confirm(id, call)                        | agent events
+    |      +--- approve waits ---+                    v
+    v                                           agent hub
+  gopi.host/session ---> host hub                     |
+                           |                          v
+                           v                    Host.Stream
+                      Host.Events
 ```
 
 ## Design
 
-- The caller gives the `Spec` at each `Start`, and the host keeps no record of it except the agent file. The host then has no agent registry and no index. The cost: after a restart, the caller gives the spec again.
-- A spec can name an agent file in its dirs. The host reads only that file, because its model picks the driver, and the driver gets the dirs for the rest. A field that the spec sets wins over the file, so a caller can change one field of an agent.
-- A new session with an agent file keeps the agent in the `gopi.host/agent` value before the driver starts, and a resume runs that agent. A crash during the start then cannot leave a session with no agent. An edit of the file then changes only the sessions that start after it, as the model of a harness session stays. A resume with another agent name fails, because one session runs one agent.
-- The host writes no entry into the session log, so the model reads the same log that the agent keeps without a host. If the store has a log with the ID of a `Spec`, the driver resumes it.
-- One host owns a session. Two hosts on one store must not run the same session, because their entries interleave in one log.
-- The host events follow the pattern of the [agent events](../agent/run-stream.md): a sealed interface, one type for each event, and a `State` that applies each event.
-- Each `Events` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. `State.Apply` changes the state in place, and the hub clones it for each new reader, because the host applies every event and a reader joins less often. A reader that falls too far behind loses its stream, so one stalled reader cannot hold the events in memory.
-- The host stream has no agent events, so a reader of the host does not get the deltas of each session.
-- The hub of a session applies each agent event to its own `agent.State`. The state of the runner can be ahead of the events that the worker read, so a copy of it would repeat an event.
-- The state of a session stream has no queues, so a reader steers only through `Send`. The host stream then reports each message.
-- The messages of a session run one at a time, and a message to a busy session queues by default. A caller names a policy for another rule: steer, interrupt, or reject.
-- `Send` returns when the session accepts the message, and `run_end` reports the end of the run. The host then needs no handle for a run.
-- A steer goes to the active run only if the runner is an `agent.Steerer`. Otherwise the message queues, so a message to a CLI agent is never lost.
-- At the end of each run, the host puts the steer that no run read at the front of the queue, after the messages with Interrupt. A steer can come after the last read of a run, or the run can fail first. An interrupt is the newest request of the caller, so it runs first.
-- The host starts and ends a session on the stream under its own lock. No event of a session then comes before its start, and a new session with the same ID comes after the end of the old one.
-- The host wraps the approve function of the spec, and the caller owns the wait. With no approve function, the agent denies each call that needs a person, so an agent with no person present fails closed.
-- The context of an approval ends when its run ends, and the run publishes the end of each approval that waits before `run_end`. The Codex agent neither ends nor waits for its approvals, so without this an approval stays open after its run. The host drops a later answer, and refuses an approval while no run is active.
-- The host gives the mode of the spec to the driver and does not read it, because only the agent knows which calls ask.
-- `Close` waits for the run, and the run waits for each approval. So an approve function or a hook that calls `Close` deadlocks.
+- A caller names a session by its ID, and holds no handle. The host knows each session of the store, also one with no agent, so a read never asks if an agent runs.
+- The user events follow the user events of [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview): `Send` is `user.message`, `Interrupt` is `user.interrupt`, and `Confirm` is `user.tool_confirmation`. The status names follow it too.
+- `Create` keeps the config in the value `gopi.host/config`, with the fields of its agent file, before the driver starts. Each start of the agent reads that value, so a session keeps its agent, its model, and its folder after a restart. The cost: an edit of an agent file reaches only a new session.
+- `Update` writes the new config, and the next run starts the agent again from it. The active run keeps its agent, because a driver reads the config only when it starts the agent. A change of the ID, the folders, the agent file, or the kind of agent fails, because the new agent cannot resume the conversation.
+- The host writes the session to `gopi.host/session` at each change. `Open` makes each session that ran or waited idle, with the stop reason `restarted`, because no agent survives a restart.
+- A failed run is idle with the stop reason `error`. A session then has three statuses, and the stop reason tells the end of the last run.
+- A message to a running session steers it, if the agent is an `agent.Steerer`. Otherwise the host holds the message, and it runs after the run. A message is then never lost.
+- The host gives each agent its own approve function. A call waits for `Confirm` on a channel of its own, so two or more calls wait at the same time and end in any order. With no person, a call waits until its run ends. So a program with no person confirms from the host stream, or picks a mode that asks for no call.
+- Each event of the host stream carries the whole session. A reader then needs no history, and `State.Apply` only sets the session.
+- Each `Events` and `Stream` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. A reader that falls too far behind loses its stream, so one stalled reader cannot hold the events in memory.
+- One host owns a store. Two hosts on one store must not run the same session, because their entries interleave in one log.
 
 ## Map
 
-| Task                                              | File                   |
-| ------------------------------------------------- | ---------------------- |
-| Change how a session starts                       | `pkg/host/host.go`     |
-| Change how an agent file fills a spec             | `pkg/host/agentfile.go` |
-| Change how a session closes, or its agent stream  | `pkg/host/session.go`  |
-| Change how a message queues or runs               | `pkg/host/run.go`      |
-| Change how an approval reaches the spec           | `pkg/host/approval.go` |
-| Change the host events or their JSON              | `pkg/host/event.go`    |
-| Change how an event changes the state             | `pkg/host/state.go`    |
-| Change how a reader gets the state and the events | `pkg/host/hub.go`      |
+| Task                                                | File                    |
+| --------------------------------------------------- | ----------------------- |
+| Change how a session is created, read, or listed    | `pkg/host/host.go`      |
+| Change the status values, or the recovery at Open   | `pkg/host/status.go`    |
+| Change how an agent file fills a config             | `pkg/host/agentfile.go` |
+| Change how the agent of a session starts or stops   | `pkg/host/session.go`   |
+| Change how the status follows the run and the calls | `pkg/host/session.go`   |
+| Change how a message steers, waits, or runs         | `pkg/host/run.go`       |
+| Change how a call waits for Confirm                 | `pkg/host/approval.go`  |
+| Change what Update can change                       | `pkg/host/update.go`    |
+| Change the host events or the state of a reader     | `pkg/host/event.go`     |
+| Change how a reader gets the state and the events   | `pkg/host/hub.go`       |
 
 ## Related Concepts
 

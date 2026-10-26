@@ -1,6 +1,7 @@
 package session
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"sync"
@@ -66,6 +67,30 @@ func (s *MemoryStore) Load(_ context.Context, id string) (Snapshot, error) {
 		Values:  values,
 	}
 	return snap, nil
+}
+
+// List returns the record and the values of each session, by ID.
+// Entries is nil in each snapshot, as in the fs store, because a caller
+// lists to find sessions and loads the one that it opens.
+func (s *MemoryStore) List(_ context.Context) ([]Snapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	out := make([]Snapshot, 0, len(s.sessions))
+	for id, rec := range s.sessions {
+		var values []StoredValue
+		for _, v := range s.values[id] {
+			values = append(values, cloneValue(v))
+		}
+		out = append(out, Snapshot{
+			Session: rec,
+			Values:  values,
+		})
+	}
+	slices.SortFunc(out, func(a, b Snapshot) int {
+		return cmp.Compare(a.Session.ID, b.Session.ID)
+	})
+	return out, nil
 }
 
 // Append implements [Storer].

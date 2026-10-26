@@ -63,7 +63,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept              | Description                                                                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [Host](host/host.md) | How a host runs sessions of any gopi agent for a Go program, and how one stream of the host reports the state of each session. |
+| [Host](host/host.md) | How a host keeps the sessions of any gopi agent for a Go program, as resources with an ID, a config, and a status that survive a restart. |
 
 ## session
 

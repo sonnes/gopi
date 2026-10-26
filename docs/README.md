@@ -53,7 +53,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
 | qualified name | The qualifier of a skill, ":", and its name, such as `ops:deploy` | full name, path name |
 | subagent      | A named agent that the model gives a task to with the task tool | worker, delegate, sub-task |
-| pinned agent  | The agent file that a session started with, which the host keeps in a session value | saved agent, agent snapshot |
+| session config | The config that a session started with, with the fields of its agent file, which the host keeps in a session value | saved agent, agent snapshot |
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
@@ -73,7 +73,9 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | hook          | A function that the loop calls at a lifecycle point          | callback                    |
 | hook point    | One point of the loop at which a hook runs, such as BeforeTool. Each point is its own interface | hook type, lifecycle event |
 | approve function | The function that decides a tool call that needs a person, the same type for each agent | permission callback, can-use-tool function |
-| host          | What runs sessions of any gopi agent for a Go program, with one stream of the state of each session | runtime, orchestrator, platform |
+| host          | What keeps the sessions of any gopi agent for a Go program, each with an ID, a session config, and a status | runtime, orchestrator, platform |
+| status        | What a host knows about a session: idle, running, or requires_action, with the stop reason of the last run | run state, phase |
+| confirmation  | The answer to a tool call that waits in a host, which `Host.Confirm` gives by the ID of the call | approval answer, tool decision |
 | driver        | What starts an agent of one kind for one session: the harness, the Claude Code agent, or the Codex agent | adapter, backend |
 | runner        | The part of an agent that a caller of a driver uses: Run, Log, and State | instance, handle, connection |
 | steer         | An entry that the agent reads before its next model call     | interrupt, injection        |

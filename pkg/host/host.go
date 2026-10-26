@@ -1,12 +1,15 @@
 package host
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"iter"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/sonnes/gopi/pkg/agent"
@@ -18,29 +21,39 @@ import (
 
 // The errors of a host. A caller tests for them with [errors.Is].
 var (
-	// ErrExists reports a session ID that the host runs.
+	// ErrExists reports a session ID that the store has.
 	ErrExists = errors.New("host: the session exists")
-	// ErrClosed reports a call to a host or a session that closed.
+	// ErrNotFound reports a session ID that the store does not have, or
+	// a tool call that does not wait.
+	ErrNotFound = errors.New("host: not found")
+	// ErrClosed reports a call to a host that closed.
 	ErrClosed = errors.New("host: closed")
-	// ErrBusy reports a message with [Reject] to a busy session.
-	ErrBusy = errors.New("host: the session is busy")
-	// ErrInvalid reports a message that the host cannot take.
+	// ErrInvalid reports an input that the host cannot take.
 	ErrInvalid = errors.New("host: invalid input")
 )
 
-// Host runs sessions of gopi agents. Create one with [New]. A Host is
+// Storer keeps the sessions of a host. The host lists the store when it
+// opens, so it knows each session, also a session with no agent. The fs
+// store of gopi and [session.MemoryStore] satisfy it.
+type Storer interface {
+	session.Storer
+	// List returns each session of the store.
+	List(ctx context.Context) ([]session.Snapshot, error)
+}
+
+// Host runs sessions of gopi agents. Create one with [Open]. A Host is
 // safe for concurrent use.
 type Host struct {
 	cat   *catalog.Catalog
-	store session.Storer
+	store Storer
 	hooks []agent.Hook
-	// hub has the state of each session, and sends each host event.
+	tools []tool.Tool
+	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
 	mu sync.Mutex
-	// sessions are the sessions that run. A nil value is an ID that a
-	// Start holds.
-	sessions map[string]*Session
+	// sessions has each session of the store, by ID.
+	sessions map[string]*hosted
 	closed   bool
 }
 
@@ -49,23 +62,38 @@ type Option func(*Host)
 
 // Store sets the store of the sessions. Without it, the sessions live
 // in memory and end with the process.
-func Store(s session.Storer) Option {
+func Store(s Storer) Option {
 	return func(h *Host) { h.store = s }
 }
 
 // Hooks adds hooks to each session. A driver that cannot call a point
-// of a hook fails the start of the session.
+// of a hook fails the start of the agent.
 func Hooks(hs ...agent.Hook) Option {
 	return func(h *Host) { h.hooks = append(h.hooks, hs...) }
 }
 
-// New returns a host that resolves the model spec of each session with
-// cat. The catalog must have a driver for each spec, or a default
-// driver.
-func New(cat *catalog.Catalog, opts ...Option) *Host {
+// Tools adds tools to each session. Only the harness takes them, and a
+// driver of a CLI agent fails the start of the agent. A tool is code, so
+// the config value of a session cannot keep it.
+func Tools(ts ...tool.Tool) Option {
+	return func(h *Host) { h.tools = append(h.tools, ts...) }
+}
+
+// Open returns a host that resolves the model spec of each session with
+// cat. The catalog must have a driver for each config, or a default
+// driver, before the agent of the config starts.
+//
+// Open reads each session of the store. No agent survives a restart, so
+// a session that ran or waited becomes idle, with [StopRestarted].
+func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, error) {
 	h := &Host{
 		cat:      cat,
-		sessions: make(map[string]*Session),
+		sessions: make(map[string]*hosted),
+		hub: newHub(
+			State{Sessions: make(map[string]Session)},
+			(*State).Apply,
+			State.Clone,
+		),
 	}
 	for _, opt := range opts {
 		opt(h)
@@ -73,213 +101,212 @@ func New(cat *catalog.Catalog, opts ...Option) *Host {
 	if h.store == nil {
 		h.store = session.NewMemoryStore()
 	}
-	h.hub = newHub(
-		State{},
-		(*State).Apply,
-		State.Clone,
-	)
-	return h
+
+	snaps, err := h.store.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("host: list the sessions: %w", err)
+	}
+	for _, snap := range snaps {
+		sess, err := h.recover(ctx, snap)
+		if err != nil {
+			return nil, err
+		}
+		h.sessions[sess.ID] = newHosted(h, sess)
+		h.hub.publish(Event{Session: sess})
+	}
+	return h, nil
 }
 
-// Spec defines the agent of a session. A zero field keeps the default
-// of the driver.
-type Spec struct {
-	// ID is the ID of the session. If it is empty, Start makes a new
-	// ID. If the store has a log with the ID, the session resumes it.
-	ID string
+// Config defines the agent of a session. A zero field keeps the default
+// of the driver. [Host.Create] keeps the config in the session, and each
+// start of the agent reads it there.
+type Config struct {
+	// ID is the ID of the session. If it is empty, Create makes a new
+	// ID.
+	ID string `json:"id,omitempty"`
 	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
 	// first. A later folder wins for a name. The host reads only the
 	// file of Agent. The driver gets Dirs.
-	Dirs []string
+	Dirs []string `json:"dirs,omitempty"`
 	// Agent names an agent file in Dirs. The file fills each empty field
 	// of Model, Mode, and Effort. Its prompt goes before System, its
-	// disallowed tools go after Deny, and its skills go after Skills. The
-	// host does not read the tools and the maxTurns keys of the file. A
-	// resumed session runs the agent that it started with, as
-	// [SessionAgent] keeps it.
-	Agent string
+	// disallowed tools go after Deny, and its skills go after Skills.
+	// The host does not read the tools and the maxTurns keys of the
+	// file. Create reads the file once, so an edit of the file changes
+	// only the sessions that start after it.
+	Agent string `json:"agent,omitempty"`
 	// Model is the model spec, such as "claude-code/claude-opus-5-5".
 	// It picks the driver. It is required if Agent gives no model.
-	Model string
+	Model string `json:"model"`
 	// Effort is the thinking level of each model call. If it is empty,
 	// the driver keeps the default of the model. A value that is not a
-	// level fails the start.
-	Effort ai.ThinkingLevel
+	// level fails Create.
+	Effort ai.ThinkingLevel `json:"effort,omitempty"`
 	// Mode is the permission mode of the agent. If it is empty, the
 	// driver keeps its own mode. A driver that cannot honor the mode
-	// fails the start.
-	Mode agent.Mode
+	// fails the start of the agent.
+	Mode agent.Mode `json:"mode,omitempty"`
 	// Dir is the working directory of the agent.
-	Dir string
+	Dir string `json:"dir,omitempty"`
 	// System is the text that the agent adds to its own prompt.
-	System string
+	System string `json:"system,omitempty"`
 	// Skills names the skills that the agent loads at the start.
-	Skills []string
+	Skills []string `json:"skills,omitempty"`
 	// Allow, Ask, and Deny are the permission rules of the agent, in
-	// the format "Tool" or "Tool(content)".
-	Allow []string
-	Ask   []string
-	Deny  []string
-	// Approve decides each tool call that needs a person. If it is nil,
-	// the agent denies each such call. Its context ends when the run
-	// ends. It must not call Close on the session or the host, because
-	// Close waits for the run, and the run waits for Approve.
-	Approve agent.ApproveFunc
-	// Tools are more tools for the agent. Only the harness takes them.
-	Tools []tool.Tool
+	// the format "Tool" or "Tool(content)". A call that the mode and the
+	// rules do not allow waits for [Host.Confirm].
+	Allow []string `json:"allow,omitempty"`
+	Ask   []string `json:"ask,omitempty"`
+	Deny  []string `json:"deny,omitempty"`
 }
 
-// Start starts the agent of spec and returns its session.
+// Create makes the session of config, keeps config in it, and starts its
+// agent. The session is idle, and [Host.Send] gives it its first
+// message.
 //
-// If the host runs a session with the ID, Start returns [ErrExists].
-// If the host closed, Start returns [ErrClosed]. If the driver fails,
-// Start returns its error, and the host keeps no session.
-func (h *Host) Start(ctx context.Context, spec Spec) (*Session, error) {
-	id := spec.ID
-	if id == "" {
-		id = newSessionID()
+// If the store has a session with the ID, Create returns [ErrExists].
+// If the host closed, Create returns [ErrClosed]. If the driver fails,
+// Create returns its error. The session then stays idle, with
+// [StopError], and the next message starts the agent again.
+func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
+	config.ID = cmp.Or(config.ID, newSessionID())
+	config, err := withAgent(ctx, config)
+	if err == nil {
+		err = checkEffort(config)
 	}
-	if err := h.reserve(id); err != nil {
-		return nil, err
+	if err == nil {
+		_, _, err = h.cat.Driver(config.Model)
 	}
-
-	s, resumed, err := h.startSession(ctx, id, spec)
 	if err != nil {
-		h.release(id)
+		return Session{}, fmt.Errorf("host: session %s: %w", config.ID, err)
+	}
+
+	s, err := h.add(ctx, config)
+	if err != nil {
+		return Session{}, err
+	}
+	err = s.startAgent(ctx)
+	return s.snapshot(), err
+}
+
+// add writes the session of config to the store, and adds it to the
+// index. It holds the lock of the host during the writes, so two calls
+// cannot add one ID.
+func (h *Host) add(ctx context.Context, config Config) (*hosted, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.closed {
+		return nil, ErrClosed
+	}
+	if _, ok := h.sessions[config.ID]; ok {
+		return nil, fmt.Errorf("host: session %s: %w", config.ID, ErrExists)
+	}
+	created := now()
+	err := h.store.Create(ctx, session.Session{
+		ID:        config.ID,
+		CreatedAt: created,
+	})
+	if errors.Is(err, session.ErrExists) {
+		return nil, fmt.Errorf("host: session %s: %w", config.ID, ErrExists)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("host: create session %s: %w", config.ID, err)
+	}
+
+	sess := Session{
+		ID:        config.ID,
+		Status:    StatusIdle,
+		Model:     config.Model,
+		Mode:      config.Mode,
+		Effort:    config.Effort,
+		CreatedAt: created,
+		UpdatedAt: created,
+	}
+	if err := setStored(ctx, h.store, config.ID, configValue, config); err != nil {
 		return nil, err
 	}
-
-	go s.work()
-
-	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
-		return nil, errors.Join(ErrClosed, s.stop())
+	if err := setStored(ctx, h.store, config.ID, sessionValue, sess); err != nil {
+		return nil, err
 	}
-	// The host publishes the start under its lock, so that no event of
-	// the session reaches the stream before it.
-	h.sessions[id] = s
-	// The spec of the session has the fields of its agent file.
-	h.hub.publish(EventSessionStart{
-		Session: id,
-		Model:   s.spec.Model,
-		Mode:    s.spec.Mode,
-		Dir:     s.spec.Dir,
-		Resumed: resumed,
-	})
-	h.mu.Unlock()
+	s := newHosted(h, sess)
+	h.sessions[config.ID] = s
+	h.hub.publish(Event{Session: sess})
 	return s, nil
 }
 
-// startSession starts the agent of the session id. It reports if the
-// store had the log of the session.
-func (h *Host) startSession(ctx context.Context, id string, spec Spec) (*Session, bool, error) {
-	store := h.store
-	snap, err := h.store.Load(ctx, id)
-	resumed := err == nil
-	if err != nil && !errors.Is(err, session.ErrNotFound) {
-		return nil, false, fmt.Errorf("host: session %s: %w", id, err)
+// session returns the session id, or [ErrNotFound].
+func (h *Host) session(id string) (*hosted, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	s, ok := h.sessions[id]
+	if !ok {
+		return nil, fmt.Errorf("host: session %s: %w", id, ErrNotFound)
 	}
-	if resumed {
-		// The driver gets the snapshot, so it does not read the log a
-		// second time.
-		store = session.Preloaded(h.store, id, snap)
-	}
-	spec, pin, err := withAgent(ctx, spec, snap, resumed)
-	if err == nil {
-		err = checkEffort(spec)
-	}
+	return s, nil
+}
+
+// all returns each session of the host.
+func (h *Host) all() []*hosted {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Collect(maps.Values(h.sessions))
+}
+
+// Get returns the session id. If the host does not know the
+// session, ok is false.
+func (h *Host) Get(id string) (Session, bool) {
+	s, err := h.session(id)
 	if err != nil {
-		return nil, false, fmt.Errorf("host: session %s: %w", id, err)
+		return Session{}, false
 	}
-	d, model, err := h.cat.Driver(spec.Model)
+	return s.snapshot(), true
+}
+
+// List returns each session, by ID.
+func (h *Host) List() []Session {
+	sessions := h.all()
+	out := make([]Session, len(sessions))
+	for i, s := range sessions {
+		out[i] = s.snapshot()
+	}
+	slices.SortFunc(out, func(a, b Session) int { return cmp.Compare(a.ID, b.ID) })
+	return out
+}
+
+// Log returns the log of the session id, to read its entries and to set
+// its values. While the agent runs, it is the log of the agent, so the
+// agent and the store agree. Otherwise it is the log in the store.
+func (h *Host) Log(ctx context.Context, id string) (session.Writer, error) {
+	s, err := h.session(id)
 	if err != nil {
-		return nil, false, fmt.Errorf("host: session %s: %w", id, err)
+		return nil, err
 	}
-	if pin != nil {
-		// The session keeps its agent before the driver starts, so a
-		// crash in the start cannot leave a session with no agent. The
-		// driver then reads the session from the store.
-		if err := keepAgent(ctx, h.store, id, *pin); err != nil {
-			return nil, false, fmt.Errorf("host: session %s: keep the agent: %w", id, err)
-		}
-		store = h.store
-	}
+	return s.log(ctx)
+}
 
-	// The session exists before its agent, so that the approve function
-	// of the agent can reach it.
-	s := newSession(h, id, spec)
-	runner, err := d.Start(ctx, agent.Config{
-		Session: id,
-		Store:   store,
-		Spec:    spec.Model,
-		Model:   model,
-		Mode:    spec.Mode,
-		Dir:     spec.Dir,
-		System:  spec.System,
-		Skills:  spec.Skills,
-		Dirs:    spec.Dirs,
-		Effort:  spec.Effort,
-		Allow:   spec.Allow,
-		Ask:     spec.Ask,
-		Deny:    spec.Deny,
-		Approve: s.approveFunc(),
-		Hooks:   h.hooks,
-		Tools:   spec.Tools,
-	})
+// Stream returns the state of the agent of the session id, and the
+// stream of its agent events after that state. The stream has the
+// events of each run, also of a run that starts after the call. A
+// reader applies each event to the state with [agent.State.Apply].
+//
+// The state is a copy for a viewer: [agent.State.Steer] on it does
+// nothing. To steer, call [Host.Send].
+//
+// The stream ends when the host closes, with the error of ctx when ctx
+// ends, or with [ErrSlowReader]. After ErrSlowReader, call Stream
+// again.
+func (h *Host) Stream(ctx context.Context, id string) (agent.State, iter.Seq2[agent.Event, error], error) {
+	s, err := h.session(id)
 	if err != nil {
-		err = fmt.Errorf("host: start session %s: %w", id, err)
-		s.cancel(err)
-		return nil, false, err
+		return agent.State{}, nil, err
 	}
-	if err := s.setRunner(runner); err != nil {
-		s.cancel(err)
-		return nil, false, errors.Join(err, closeRunner(runner))
-	}
-	return s, resumed, nil
+	state, events := s.agents.subscribe(ctx)
+	return state, events, nil
 }
 
-// reserve holds id for a session that starts.
-func (h *Host) reserve(id string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.closed {
-		return ErrClosed
-	}
-	if _, taken := h.sessions[id]; taken {
-		return fmt.Errorf("host: session %s: %w", id, ErrExists)
-	}
-	h.sessions[id] = nil
-	return nil
-}
-
-func (h *Host) release(id string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	delete(h.sessions, id)
-}
-
-// end publishes the end of the session id, and frees its ID. It does
-// both under the lock of the host, so that a new session with the ID
-// starts after the end on the stream.
-func (h *Host) end(e EventSessionEnd) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.hub.publish(e)
-	delete(h.sessions, e.Session)
-}
-
-// Session returns the session id, if the host runs it.
-func (h *Host) Session(id string) (*Session, bool) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	s := h.sessions[id]
-	return s, s != nil
-}
-
-// Events returns the state of each session of the host, and the stream
-// of the host events after that state. A reader applies each event to
-// the state with [State.Apply].
+// Events returns each session, and the stream of the
+// changes after it. Each event has the new value of one session. A
+// reader applies each event to the state with [State.Apply].
 //
 // The stream ends when the host closes, with the error of ctx when ctx
 // ends, or with [ErrSlowReader]. After ErrSlowReader, call Events
@@ -288,27 +315,22 @@ func (h *Host) Events(ctx context.Context) (State, iter.Seq2[Event, error]) {
 	return h.hub.subscribe(ctx)
 }
 
-// Close closes each session, and then ends each stream of the host. A
-// second Close does nothing. Do not call Close from an approve function
-// or a hook, because Close waits for each run.
+// Close stops the agent of each session, and then ends each stream of
+// the host. A run that Close cuts ends with [StopRestarted]. The logs
+// stay. A second Close does nothing. Do not call Close from a hook,
+// because Close waits for each run.
 func (h *Host) Close() error {
 	h.mu.Lock()
-	if h.closed {
-		h.mu.Unlock()
+	closed := h.closed
+	h.closed = true
+	h.mu.Unlock()
+	if closed {
 		return nil
 	}
-	h.closed = true
-	var sessions []*Session
-	for _, s := range h.sessions {
-		if s != nil {
-			sessions = append(sessions, s)
-		}
-	}
-	h.mu.Unlock()
 
 	var errs []error
-	for _, s := range sessions {
-		errs = append(errs, s.Close())
+	for _, s := range h.all() {
+		errs = append(errs, s.stop())
 	}
 	h.hub.close()
 	return errors.Join(errs...)
@@ -317,6 +339,7 @@ func (h *Host) Close() error {
 // sessionIDBytes is the number of random bytes in a new session ID.
 const sessionIDBytes = 8
 
+// newSessionID returns a random session ID with the prefix "s_".
 func newSessionID() string {
 	b := make([]byte, sessionIDBytes)
 	_, _ = rand.Read(b)

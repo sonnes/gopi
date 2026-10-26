@@ -1,16 +1,16 @@
 ---
 title: Host
-summary: A host runs sessions of any gopi agent for a Go program. The model spec of each session picks the harness, Claude Code, or Codex. The host stream reports the state of each session, and each session has a stream of its agent events.
+summary: A host keeps the sessions of any gopi agent for a Go program. Each session has an ID, a config, and a status that survive a restart. The model spec of each session picks the harness, Claude Code, or Codex.
 ---
 
 import LayerStack from "../../../components/figures/LayerStack.astro";
 
-An [agent](../agent/index.mdx) runs while your program holds it. A host keeps a set of sessions for you. It runs the messages of each session one at a time, and reports each change of their state. Without a host, you start each driver, and you keep the queue and the status of each session yourself.
+An [agent](../agent/index.mdx) runs while your program holds it. A host keeps a set of sessions for you, and you name each session by its ID. The host runs the messages of each session one at a time, waits for your answer to each tool call that needs a person, and reports each change of the status. Without a host, you start each driver, and you keep the status of each session yourself.
 
 <LayerStack
   alt="The layers of a host. pkg/host runs the sessions. A driver of the catalog starts each agent: the harness, Claude Code, or Codex. pkg/session keeps the log of each session."
   layers={[
-    { name: "pkg/host", job: "runs the sessions", hue: "harness" },
+    { name: "pkg/host", job: "keeps the sessions and their status", hue: "harness" },
     {
       name: "pkg/catalog",
       job: "resolves a spec to the driver of its agent",
@@ -22,9 +22,9 @@ An [agent](../agent/index.mdx) runs while your program holds it. A host keeps a 
   ]}
 />
 
-## Start a Session
+## Create a Session
 
-Read the model file. Register a driver for each CLI in the catalog, with the models of the CLI from the file. Register the harness as the default driver. Then start a session with a spec.
+Read the model file. Register a driver for each CLI in the catalog, with the models of the CLI from the file. Register the harness as the default driver. Then open a host on a store, and create a session with a config.
 
 ```go
 file, _ := catalog.ReadModelFile(ctx, "models.json")
@@ -32,9 +32,9 @@ cat := catalog.New()
 cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
-h := host.New(cat, host.Store(store))
+h, err := host.Open(ctx, cat, host.Store(store))
 defer h.Close()
-s, err := h.Start(ctx, host.Spec{
+s, err := h.Create(ctx, host.Config{
 	Model:  "claude-code/claude-opus-5-5",
 	Dir:    repoDir,
 	System: "Review the diff. Report findings. Do not push.",
@@ -42,80 +42,88 @@ s, err := h.Start(ctx, host.Spec{
 })
 ```
 
-`anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Start`. If the store has the log of `Spec.ID`, the session resumes it. `s.Close` stops the agent and keeps the log.
+`anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Create`. The session keeps its config. After a restart, the next message starts the agent again from that config, and the driver resumes the log.
 
-## Start an Agent From a Folder
+## Create an Agent From a Folder
 
 `Agent` names an agent file in the `agents/` folder of `Dirs`:
 
 ```go
-s, err := h.Start(ctx, host.Spec{
+s, err := h.Create(ctx, host.Config{
 	Dirs:  []string{teamDir, repoDir},
 	Agent: "reviewer",
 	Dir:   repoDir,
 })
 ```
 
-The model, the mode, the effort, and the prompt of the file fill the empty fields of the spec. If two dirs have the agent, the later dir wins. A resumed session runs the agent that it started with. The harness also reads the skills and the subagents of `Dirs`. Claude Code and Codex load their own.
+The model, the mode, the effort, and the prompt of the file fill the empty fields of the config. If two dirs have the agent, the later dir wins. The session keeps the agent that it started with, so an edit of the file changes only a new session. The harness also reads the skills and the subagents of `Dirs`. Claude Code and Codex load their own.
 
 ## Send a Message
 
-`Send` returns when the session accepts the message. The run ends on the host stream with `run_end`.
+`Send` returns when the session takes the message.
 
 ```go
-err := s.Send(ctx, host.Text("Review the diff against main."), host.Queue)
+err := h.Send(ctx, s.ID, host.Text("Review the diff against main."))
 ```
 
-| Policy           | A message to a busy session                                  |
-| ---------------- | ------------------------------------------------------------ |
-| `Queue`, or `""` | runs after the messages before it                            |
-| `Steer`          | goes to the active run before its next model call, or queues |
-| `Interrupt`      | cancels the active run, then runs first                      |
-| `Reject`         | fails with `ErrBusy`                                         |
+| Status of the session | The message                                                        |
+| --------------------- | ------------------------------------------------------------------ |
+| `idle`                | runs at once, and the status is `running` when `Send` returns       |
+| `running`             | steers the run before its next model call                          |
+| `running`, CLI agent  | waits, and runs after the run, because a CLI agent cannot steer     |
 
-`s.Interrupt()` cancels the active run and keeps the queue. An interrupted run ends with the error of `host.ErrInterrupted`.
+`h.Interrupt(ctx, id)` cancels the active run. A message that waits runs next. The run ends with the stop reason `interrupted`.
 
-## Answer Approvals
+## Confirm a Tool Call
 
-A tool call that needs a person goes to the `Approve` function of the spec. The function runs while the agent waits, so it must return when its context ends. The context ends when the run ends. Do not call `Close` from it, because `Close` waits for the run.
+A tool call that needs a person waits in the host. The status of the session is `requires_action`, and `Session.Waiting` has each call that waits. Answer each call by its ID:
 
 ```go
-spec := host.Spec{
-	Model: "claude-code/claude-opus-5-5",
-	Mode:  agent.ModeAcceptEdits,
-	Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-		return ask(ctx, req)
-	},
+for _, req := range s.Waiting {
+	allow := req.Call.Name == "Read"
+	err := h.Confirm(ctx, s.ID, req.Call.ID, agent.Decision{Allow: allow})
 }
 ```
 
-`ask` shows the call of the request to a person, and waits for the answer. The `agent.ApprovalRequest` also holds the reason of the CLI, and `NoAlways` if the CLI keeps no Always for the call.
+Two or more calls can wait at the same time, and you can answer them in any order. The `agent.ApprovalRequest` also holds the reason of the CLI, and `NoAlways` if the CLI keeps no Always for the call. If the run ends while a call waits, the call ends, and `Confirm` returns `host.ErrNotFound`.
 
-The `Mode` of the spec decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. Codex maps each mode to a sandbox and a policy. Its default mode is a read-only sandbox that asks before each write. An empty mode keeps the mode of the driver.
+The `Mode` of the config decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. Codex maps each mode to a sandbox and a policy. Its default mode is a read-only sandbox that asks before each write. With `agent.ModeBypass`, no call asks. A call has the tool name of the agent: `Bash` in Claude Code, and `bash` in the harness and in Codex.
 
-The host stream gets `EventApprovalStart` before the call, and `EventApprovalEnd` after it. While a call waits, the status of the session is `StatusRequiresAction`. The call has the tool name of the agent: `Bash` in Claude Code, and `bash` in the harness and in Codex. With no `Approve`, the agent denies each call that needs a person. If the run ends while a call waits, the call gets `EventApprovalEnd` before `run_end`, and the host drops a later answer.
+## Change a Session
+
+`Update` changes the model, the effort, the mode, or the rules of a session. The next run starts the agent again from the new config, and the driver resumes the log.
+
+```go
+s, err := h.Update(ctx, s.ID, func(c *host.Config) {
+	c.Model = "claude-code/claude-sonnet-5-5"
+	c.Mode = agent.ModePlan
+})
+```
+
+An active run ends with its old config. `Update` returns `host.ErrInvalid` for a model of another kind of agent, such as a Codex model in a Claude Code session, and for a change of the folders or the agent file.
 
 ## Follow the Host
 
-`Events` gives the state of each session, and then each event after that state.
+`Events` gives each session, and then each change. Each event has the whole session.
 
 ```go
-state, events := h.Events(ctx)
-for ev, err := range events {
+_, events := h.Events(ctx)
+for e, err := range events {
 	if err != nil {
 		return err
 	}
-	state.Apply(ev)
-	fmt.Println(ev.SessionID(), state.Sessions[ev.SessionID()].Status())
+	fmt.Println(e.Session.ID, e.Session.Status, e.Session.StopReason)
 }
 ```
 
+A run ends with the status `idle` and a stop reason: `end_turn`, `interrupted`, `error`, or `restarted`. A run that the end of the program cut short reads as `restarted` after the next `Open`.
+
 ## Follow a Session
 
-The host stream has no agent events. `s.Events` gives the [state](../agent/events.mdx) of the agent of one session, and then each agent event of each of its runs.
+The host stream has no agent events. `h.Stream` gives the [state](../agent/events.mdx) of the agent of one session, and then each agent event of each of its runs. It works for a session with no agent too, and gets the events of its next run.
 
 ```go
-state, events := s.Events(ctx)
+state, events, err := h.Stream(ctx, s.ID)
 for ev, err := range events {
 	if err != nil {
 		return err
@@ -125,7 +133,7 @@ for ev, err := range events {
 }
 ```
 
-If a reader of either stream falls too far behind, its stream ends with `host.ErrSlowReader`. Call `Events` again.
+If a reader of either stream falls too far behind, its stream ends with `host.ErrSlowReader`. Call `Events` or `Stream` again.
 
 Each snippet comes from the examples of the package in [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/host).
 

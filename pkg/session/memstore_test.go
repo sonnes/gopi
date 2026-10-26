@@ -76,3 +76,30 @@ func TestMemoryStoreValues(t *testing.T) {
 	assert.ErrorIs(t, store.SetValue(ctx, "nope", a), session.ErrNotFound)
 	assert.ErrorIs(t, store.DeleteValue(ctx, "nope", "app", "a"), session.ErrNotFound)
 }
+
+func TestMemoryStoreList(t *testing.T) {
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	title := session.Value[string]{Namespace: "app", Key: "title"}
+
+	for _, id := range []string{"s2", "s1"} {
+		require.NoError(t, store.Create(ctx, session.Session{ID: id}))
+	}
+	log, err := session.Open(ctx, store, "s1")
+	require.NoError(t, err)
+	require.NoError(t, title.Set(ctx, log, "first"))
+	_, err = log.Append(ctx, session.Text("hi"))
+	require.NoError(t, err)
+
+	snaps, err := store.List(ctx)
+	require.NoError(t, err)
+	require.Len(t, snaps, 2)
+	assert.Equal(t, "s1", snaps[0].Session.ID, "List orders the sessions by ID")
+	assert.Equal(t, "s2", snaps[1].Session.ID)
+	assert.Nil(t, snaps[0].Entries, "List gives no entries, as the fs store does")
+
+	got, ok, err := title.Read(snaps[0])
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "first", got)
+}

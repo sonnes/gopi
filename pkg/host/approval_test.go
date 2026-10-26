@@ -12,188 +12,156 @@ import (
 	"github.com/sonnes/gopi/pkg/host"
 )
 
-// approver is an approve function that sends each call to calls, and
-// returns the next decision of decisions.
-type approver struct {
-	calls     chan ai.ToolCall
-	decisions chan agent.Decision
-}
-
-func newApprover() approver {
-	return approver{
-		calls:     make(chan ai.ToolCall, 1),
-		decisions: make(chan agent.Decision, 1),
-	}
-}
-
-func (a approver) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-	a.calls <- req.Call
-	select {
-	case d := <-a.decisions:
-		return d, nil
-	case <-ctx.Done():
-		return agent.Decision{}, ctx.Err()
-	}
-}
-
-// approveLate is an approve function that ignores the end of its
-// context.
-func (a approver) approveLate(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-	a.calls <- req.Call
-	return <-a.decisions, nil
-}
-
-func TestApproval(t *testing.T) {
+// asking returns a fixture whose agent asks before each tool call, and
+// whose model calls echo with "hi" and then says "done".
+func asking(t *testing.T) fixture {
+	t.Helper()
 	f := newFixture(t)
+	f.driver.ask = true
 	f.model.replies = []ai.Message{
 		callTool("call_1", "echo", `{"s":"hi"}`),
 		reply("done"),
 	}
-	a := newApprover()
-	s := f.start(t, host.Spec{
-		ID:      "s1",
-		Approve: a.approve,
-	})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
-	call := <-a.calls
-	start := next(t, events, is[host.EventApprovalStart]).(host.EventApprovalStart)
-	waiting, _ := f.h.Events(context.Background())
-	a.decisions <- agent.Decision{Allow: true}
-	end := next(t, events, is[host.EventApprovalEnd]).(host.EventApprovalEnd)
-
-	assert.Equal(t, "call_1", call.ID)
-	assert.Equal(t, "call_1", start.Request.Call.ID)
-	assert.Equal(t, host.EventApprovalEnd{
-		Session:    "s1",
-		ToolCallID: "call_1",
-		Decision:   agent.Decision{Allow: true},
-	}, end)
-	assert.Empty(t, runEnd(t, events).Error)
-	assert.Equal(t, []string{"hi"}, toolResults(s))
-	assert.Equal(t, host.StatusRequiresAction, waiting.Sessions["s1"].Status())
-	assert.Empty(t, start.Request.Reason, "an agent that says nothing gives no reason")
-	idle, _ := f.h.Events(context.Background())
-	assert.Equal(t, host.StatusIdle, idle.Sessions["s1"].Status())
+	return f
 }
 
-func TestApprovalReason(t *testing.T) {
-	f := newFixture(t)
-	f.driver.reason = "the command writes"
-	f.model.replies = []ai.Message{
-		callTool("call_1", "echo", `{"s":"hi"}`),
-		reply("done"),
-	}
-	a := newApprover()
-	s := f.start(t, host.Spec{
-		ID:      "s1",
-		Approve: a.approve,
-	})
+func TestConfirmAllowsACall(t *testing.T) {
+	f := asking(t)
+	f.create(t, host.Config{ID: "s1"})
 	_, events := f.watch(t)
 
-	send(t, s, "a", host.Queue)
-	<-a.calls
-	start := next(t, events, is[host.EventApprovalStart]).(host.EventApprovalStart)
-	a.decisions <- agent.Decision{Allow: true}
+	f.send(t, "s1", "a")
+	waiting := next(t, events, status(host.StatusRequiresAction)).Session
+	require.NoError(t, f.h.Confirm(context.Background(), "s1", "call_1", agent.Decision{Allow: true}))
 
-	assert.Equal(t, "the command writes", start.Request.Reason, "the event has the reason of the agent")
-	assert.Empty(t, runEnd(t, events).Error)
+	require.Len(t, waiting.Waiting, 1)
+	assert.Equal(t, "call_1", waiting.Waiting[0].Call.ID)
+	assert.Empty(t, waiting.Waiting[0].Reason, "an agent that says nothing gives no reason")
+	running := next(t, events, func(host.Event) bool { return true }).Session
+	assert.Equal(t, host.StatusRunning, running.Status)
+	assert.Empty(t, running.Waiting)
+	assert.Equal(t, host.StopEndTurn, runEnd(t, events).StopReason)
+	assert.Equal(t, []string{"hi"}, f.toolResults(t, "s1"))
 }
 
-func TestApprovalInterrupt(t *testing.T) {
-	f := newFixture(t)
-	f.model.replies = []ai.Message{
-		callTool("call_1", "echo", `{"s":"hi"}`),
-		reply("done"),
-	}
-	a := newApprover()
-	s := f.start(t, host.Spec{
-		ID:      "s1",
-		Approve: a.approve,
-	})
+func TestConfirmDeniesACall(t *testing.T) {
+	f := asking(t)
+	f.create(t, host.Config{ID: "s1"})
 	_, events := f.watch(t)
 
-	send(t, s, "a", host.Queue)
-	<-a.calls
-	next(t, events, is[host.EventApprovalStart])
-	s.Interrupt()
+	f.send(t, "s1", "a")
+	next(t, events, status(host.StatusRequiresAction))
+	require.NoError(t, f.h.Confirm(context.Background(), "s1", "call_1", agent.Decision{Message: "not now"}))
 
-	end := next(t, events, is[host.EventApprovalEnd]).(host.EventApprovalEnd)
-	assert.NotEmpty(t, end.Error)
-	assert.Equal(t, host.ErrInterrupted.Error(), runEnd(t, events).Error)
-	assert.NotContains(t, toolResults(s), "hi")
-	state, _ := f.h.Events(context.Background())
-	assert.Empty(t, state.Sessions["s1"].Waiting)
-}
-
-func TestNoApprove(t *testing.T) {
-	f := newFixture(t)
-	f.model.replies = []ai.Message{
-		callTool("call_1", "echo", `{"s":"hi"}`),
-		reply("done"),
-	}
-	s := f.start(t, host.Spec{ID: "s1"})
-	_, events := f.watch(t)
-
-	send(t, s, "a", host.Queue)
 	runEnd(t, events)
-	require.NoError(t, s.Close())
+	results := f.toolResults(t, "s1")
+	require.Len(t, results, 1)
+	assert.Contains(t, results[0], "not now")
+}
 
-	assert.Nil(t, f.driver.configs[0].Approve)
-	for _, e := range drainUntilEnd(t, events) {
-		assert.False(t, is[host.EventApprovalStart](e))
+func TestTheReasonOfACall(t *testing.T) {
+	f := asking(t)
+	f.driver.reason = "the command writes"
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+
+	f.send(t, "s1", "a")
+	waiting := next(t, events, status(host.StatusRequiresAction)).Session
+	require.NoError(t, f.h.Confirm(context.Background(), "s1", "call_1", agent.Decision{Allow: true}))
+
+	assert.Equal(t, "the command writes", waiting.Waiting[0].Reason)
+	runEnd(t, events)
+}
+
+func TestTwoCallsWaitTogether(t *testing.T) {
+	f, gate := gated(t)
+	ctx := context.Background()
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	f.model.waitCalls(t, 1)
+
+	// The loop of the fake agent asks one call at a time, so the test
+	// calls the approve function twice, as a CLI agent does for two
+	// subagents.
+	approve := f.lastConfig(t).Approve
+	decisions := make(map[string]chan agent.Decision)
+	for _, id := range []string{"call_1", "call_2"} {
+		ch := make(chan agent.Decision, 1)
+		decisions[id] = ch
+		go func() {
+			d, err := approve(ctx, agent.ApprovalRequest{Call: ai.ToolCall{ID: id, Name: "echo"}})
+			assert.NoError(t, err)
+			ch <- d
+		}()
+	}
+	next(t, events, func(e host.Event) bool { return len(e.Session.Waiting) == 2 })
+
+	require.NoError(t, f.h.Confirm(ctx, "s1", "call_2", agent.Decision{Allow: true}))
+	one := next(t, events, func(host.Event) bool { return true }).Session
+	assert.Equal(t, host.StatusRequiresAction, one.Status, "the first call still waits")
+	require.Len(t, one.Waiting, 1)
+	assert.Equal(t, "call_1", one.Waiting[0].Call.ID)
+	assert.True(t, (<-decisions["call_2"]).Allow)
+
+	require.NoError(t, f.h.Confirm(ctx, "s1", "call_1", agent.Decision{Message: "no"}))
+	none := next(t, events, func(host.Event) bool { return true }).Session
+	assert.Equal(t, host.StatusRunning, none.Status)
+	assert.Equal(t, "no", (<-decisions["call_1"]).Message)
+	close(gate)
+	runEnd(t, events)
+}
+
+func TestConfirmACallThatDoesNotWait(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, host.Config{ID: "s1"})
+
+	err := f.h.Confirm(context.Background(), "s1", "call_1", agent.Decision{Allow: true})
+
+	assert.ErrorIs(t, err, host.ErrNotFound)
+}
+
+func TestInterruptEndsEachCallThatWaits(t *testing.T) {
+	tests := []struct {
+		name string
+		// detached calls the approve function with a context that the
+		// run does not end, and abandons the wait, as the Codex agent
+		// does.
+		detached bool
+	}{
+		{name: "harness"},
+		{name: "detached", detached: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := asking(t)
+			f.driver.detached = tt.detached
+			f.driver.abandon = tt.detached
+			ctx := context.Background()
+			f.create(t, host.Config{ID: "s1"})
+			_, events := f.watch(t)
+			f.send(t, "s1", "a")
+			next(t, events, status(host.StatusRequiresAction))
+
+			require.NoError(t, f.h.Interrupt(ctx, "s1"))
+
+			end := runEnd(t, events)
+			assert.Equal(t, host.StopInterrupted, end.StopReason)
+			assert.Empty(t, end.Waiting)
+			assert.ErrorIs(t, f.h.Confirm(ctx, "s1", "call_1", agent.Decision{Allow: true}), host.ErrNotFound)
+			assert.NotContains(t, f.toolResults(t, "s1"), "hi")
+		})
 	}
 }
 
-func TestApprovalEndsWithItsRun(t *testing.T) {
+func TestAnApprovalWithNoRun(t *testing.T) {
 	f := newFixture(t)
-	f.driver.detached = true
-	f.driver.abandon = true
-	f.model.replies = []ai.Message{
-		callTool("call_1", "echo", `{"s":"hi"}`),
-		reply("done"),
-	}
-	a := newApprover()
-	s := f.start(t, host.Spec{
-		ID:      "s1",
-		Approve: a.approveLate,
-	})
-	_, events := f.watch(t)
+	f.create(t, host.Config{ID: "s1"})
 
-	send(t, s, "a", host.Queue)
-	<-a.calls
-	next(t, events, is[host.EventApprovalStart])
-	s.Interrupt()
-
-	end := next(t, events, is[host.EventApprovalEnd]).(host.EventApprovalEnd)
-	assert.Equal(t, host.ErrInterrupted.Error(), end.Error)
-	assert.Equal(t, host.ErrInterrupted.Error(), runEnd(t, events).Error)
-	state, _ := f.h.Events(context.Background())
-	assert.Equal(t, host.StatusIdle, state.Sessions["s1"].Status())
-
-	a.decisions <- agent.Decision{Allow: true}
-	require.NoError(t, s.Close())
-	for _, e := range drainUntilEnd(t, events) {
-		assert.False(t, is[host.EventApprovalEnd](e), "a late answer has no event")
-	}
-}
-
-func TestApprovalWithNoRun(t *testing.T) {
-	f := newFixture(t)
-	a := newApprover()
-	s := f.start(t, host.Spec{
-		ID:      "s1",
-		Approve: a.approve,
-	})
-	_, events := f.watch(t)
-
-	_, err := f.driver.configs[0].Approve(context.Background(), agent.ApprovalRequest{Call: testCall})
+	_, err := f.lastConfig(t).Approve(context.Background(), agent.ApprovalRequest{Call: ai.ToolCall{ID: "call_1"}})
 
 	assert.ErrorIs(t, err, host.ErrNoRun)
-	assert.Empty(t, a.calls, "the approve function of the spec did not run")
-	require.NoError(t, s.Close())
-	for _, e := range drainUntilEnd(t, events) {
-		assert.False(t, is[host.EventApprovalStart](e))
-	}
+	got, _ := f.h.Get("s1")
+	assert.Equal(t, host.StatusIdle, got.Status)
+	assert.Empty(t, got.Waiting)
 }

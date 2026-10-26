@@ -11,13 +11,12 @@ import (
 	"github.com/sonnes/gopi/pkg/session"
 )
 
-// ErrInterrupted is the cause of a run that [Interrupt] or
-// [Session.Interrupt] ended.
+// ErrInterrupted is the cause of a run that [Host.Interrupt] ended.
 var ErrInterrupted = errors.New("host: the run was interrupted")
 
 // ErrNoRun is the error of an approval that an agent asks for while the
-// session runs no message. The host does not pass such an approval to
-// the approve function of the spec, because no run can take its answer.
+// session runs no message. The host does not wait for a Confirm of such
+// an approval, because no run can take its answer.
 var ErrNoRun = errors.New("host: no run is active")
 
 // Message is the input of one message to a session.
@@ -28,56 +27,30 @@ func Text(s string) Message {
 	return Message{session.Text(s)}
 }
 
-// Policy says what a session does with a message while it is busy. A
-// session is busy while a run is active or a message waits.
-type Policy string
-
-// The policies of a message. The empty policy is [Queue].
-const (
-	// Queue puts the message at the end of the queue.
-	Queue Policy = "queue"
-	// Steer gives the message to the active run, before its next model
-	// call. If no run is active, or the agent is not an
-	// [agent.Steerer], the message queues.
-	Steer Policy = "steer"
-	// Interrupt puts the message at the front of the queue, and cancels
-	// the active run.
-	Interrupt Policy = "interrupt"
-	// Reject refuses the message with [ErrBusy] if the session is busy.
-	// Otherwise the message queues.
-	Reject Policy = "reject"
-)
-
-// queued is a message that waits for a run.
-type queued struct {
-	m Message
-	// interrupt is set for a message with [Interrupt].
-	interrupt bool
-}
-
-var policies = []Policy{
-	Queue,
-	Steer,
-	Interrupt,
-	Reject,
-}
-
-// Send gives m to the session with the policy p, and returns when the
-// session accepts m. It does not wait for the run. The host stream gets
-// [EventInput] for each message that the session accepts.
+// Send gives m to the session id, and returns when the session takes m.
+// It does not wait for the run. It is the user.message event of Claude
+// Managed Agents.
 //
-// If m is empty or p is unknown, Send returns [ErrInvalid]. If the
-// session closed, Send returns [ErrClosed]. A message with [Reject] to
-// a busy session gets [ErrBusy].
-func (s *Session) Send(_ context.Context, m Message, p Policy) error {
+//   - On an idle session, m runs at once, and the status is running when
+//     Send returns.
+//   - On a running session, m steers the run, before its next model call.
+//   - If the agent cannot steer, such as a Claude Code or a Codex agent,
+//     the host holds m, and m runs after the run.
+//
+// If no agent runs, Send starts it from the config of the session, and the
+// driver resumes the log. If m is empty, Send returns [ErrInvalid]. If
+// the host does not know the session, Send returns [ErrNotFound]. If the
+// host closed, Send returns [ErrClosed].
+func (h *Host) Send(ctx context.Context, id string, m Message) error {
 	if len(m) == 0 {
 		return fmt.Errorf("host: the message has no entries: %w", ErrInvalid)
 	}
-	if p == "" {
-		p = Queue
+	s, err := h.session(id)
+	if err != nil {
+		return err
 	}
-	if !slices.Contains(policies, p) {
-		return fmt.Errorf("host: the policy %q is not queue, steer, interrupt, or reject: %w", p, ErrInvalid)
+	if err := s.startAgent(ctx); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -85,98 +58,58 @@ func (s *Session) Send(_ context.Context, m Message, p Policy) error {
 	if s.closing {
 		return fmt.Errorf("host: session %s: %w", s.id, ErrClosed)
 	}
-	busy := s.active != nil || len(s.queue) > 0
-	switch p {
-	case Reject:
-		if busy {
-			return fmt.Errorf("host: session %s: %w", s.id, ErrBusy)
-		}
-		p = Queue
-	case Steer:
-		steerer, ok := s.runner.(agent.Steerer)
-		if ok && s.active != nil {
-			steerer.Steer(m...)
-			s.publishLocked(EventInput{
-				Session: s.id,
-				Entries: m,
-				Policy:  Steer,
-			})
-			return nil
-		}
-		p = Queue
+	steerer, canSteer := s.runner.(agent.Steerer)
+	switch {
+	case s.run == nil:
+		s.startRunLocked(m)
+	case canSteer:
+		steerer.Steer(m...)
+	default:
+		s.queue = append(s.queue, m)
 	}
-
-	if p == Interrupt {
-		s.queue = slices.Insert(s.queue, 0, queued{m: m, interrupt: true})
-		if s.active != nil {
-			s.active(ErrInterrupted)
-		}
-	} else {
-		s.queue = append(s.queue, queued{m: m})
-	}
-	s.publishLocked(EventInput{
-		Session: s.id,
-		Entries: m,
-		Policy:  p,
-	})
-	s.signal()
 	return nil
 }
 
-// Interrupt cancels the active run. The log keeps its entries, and the
-// next queued message runs. If no run is active, Interrupt does
-// nothing.
-func (s *Session) Interrupt() {
+// Interrupt cancels the active run of the session id. The log keeps its
+// entries, and a held message runs next. If no run is active, Interrupt
+// does nothing. It is the user.interrupt event of Claude Managed Agents.
+// If the host does not know the session, Interrupt returns
+// [ErrNotFound].
+func (h *Host) Interrupt(_ context.Context, id string) error {
+	s, err := h.session(id)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.active != nil {
-		s.active(ErrInterrupted)
+	if s.cancelRun != nil {
+		s.cancelRun(ErrInterrupted)
 	}
+	return nil
 }
 
-// work runs the queued messages, one at a time, until the session
-// stops.
-func (s *Session) work() {
-	defer close(s.done)
-	for {
-		ctx, m, ok := s.next()
-		if !ok {
-			return
-		}
-		s.execute(ctx, m)
-	}
+// startRunLocked sets the session running, and runs m in a new
+// goroutine. The context of the run exists when it returns, so an
+// Interrupt right after Send stops the run.
+func (s *hosted) startRunLocked(m Message) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	s.run = ctx
+	s.cancelRun = cancel
+	s.sess.StopReason = ""
+	s.sess.Error = ""
+	s.updateLocked()
+	s.runs.Go(func() { s.execute(ctx, m) })
 }
 
-// next waits for a queued message and starts its run. It reports false
-// when the session stops.
-func (s *Session) next() (context.Context, Message, bool) {
-	for {
-		s.mu.Lock()
-		if s.ctx.Err() != nil {
-			s.mu.Unlock()
-			return nil, nil, false
-		}
-		if len(s.queue) > 0 {
-			m := s.queue[0].m
-			s.queue = s.queue[1:]
-			ctx, cancel := context.WithCancelCause(s.ctx)
-			s.active = cancel
-			s.runCtx = ctx
-			s.publishLocked(EventRunStart{Session: s.id})
-			s.mu.Unlock()
-			return ctx, m, true
-		}
-		s.mu.Unlock()
-		select {
-		case <-s.wake:
-		case <-s.ctx.Done():
-		}
+// execute runs the agent on m, and sends each agent event to the agent
+// stream. Then it ends the run.
+func (s *hosted) execute(ctx context.Context, m Message) {
+	runner, err := s.freshRunner(ctx)
+	if err != nil {
+		s.finish(ctx, ai.Usage{}, err)
+		return
 	}
-}
-
-// execute runs the agent on m, and ends the run.
-func (s *Session) execute(ctx context.Context, m Message) {
-	stream := s.runner.Run(ctx, m...)
+	stream := runner.Run(ctx, m...)
 	var usage ai.Usage
 	for ev, err := range stream.Events() {
 		if err != nil {
@@ -187,75 +120,62 @@ func (s *Session) execute(ctx context.Context, m Message) {
 		}
 		s.agents.publish(ev)
 	}
-	_, err := stream.Wait()
+	_, err = stream.Wait()
 	s.finish(ctx, usage, err)
 }
 
-// finish ends the active run, and queues the steer that the run did
-// not read.
-func (s *Session) finish(ctx context.Context, usage ai.Usage, err error) {
+// finish ends the active run, and starts the run of the next held
+// message.
+func (s *hosted) finish(ctx context.Context, usage ai.Usage, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cause := context.Cause(ctx)
-	s.active(nil)
-	s.active = nil
-	s.runCtx = nil
-	s.endPendingLocked(cause)
-
-	end := EventRunEnd{
-		Session: s.id,
-		Usage:   usage,
+	reason, msg := stopOf(context.Cause(ctx), err)
+	s.cancelRun(nil)
+	s.run = nil
+	s.cancelRun = nil
+	// A call that waits ends with its run. Its approve function sees the
+	// end of the run in its context.
+	s.calls = nil
+	s.sess.StopReason = reason
+	s.sess.Error = msg
+	s.sess.Usage = usage
+	s.updateLocked()
+	if s.closing {
+		return
 	}
-	// A run that a caller canceled reports the cause, such as
-	// ErrInterrupted, and not context.Canceled.
+
+	// The agent keeps a steer that the run did not read, because the
+	// steer came after the last read, or the run failed first. The steer
+	// was meant for the work, so it runs next, also after an interrupt.
+	if steerer, ok := s.runner.(agent.Steerer); ok {
+		unread := steerer.TakeSteer()
+		if len(unread) > 0 {
+			s.queue = slices.Insert(s.queue, 0, Message(unread))
+		}
+	}
+	if len(s.queue) == 0 {
+		return
+	}
+	next := s.queue[0]
+	s.queue = s.queue[1:]
+	s.startRunLocked(next)
+}
+
+// stopOf returns the stop reason and the error of a run that ended with
+// err. A run that a caller canceled reports the cause, such as
+// [ErrInterrupted], and not context.Canceled.
+func stopOf(cause, err error) (StopReason, string) {
+	canceled := cause != nil && errors.Is(err, context.Canceled)
 	switch {
 	case err == nil:
-	case cause != nil && errors.Is(err, context.Canceled):
-		end.Error = cause.Error()
+		return StopEndTurn, ""
+	case canceled && errors.Is(cause, ErrInterrupted):
+		return StopInterrupted, ""
+	case canceled && errors.Is(cause, ErrClosed):
+		return StopRestarted, ""
+	case canceled:
+		return StopError, cause.Error()
 	default:
-		end.Error = err.Error()
-	}
-	s.publishLocked(end)
-	s.queueUnreadSteerLocked()
-}
-
-// queueUnreadSteerLocked puts the steer that the run did not read at
-// the front of the queue, after the messages with [Interrupt]. A steer
-// can come after the last read of a run, or the run can fail first. The
-// agent keeps such a steer until TakeSteer.
-func (s *Session) queueUnreadSteerLocked() {
-	steerer, ok := s.runner.(agent.Steerer)
-	if !ok || s.closing {
-		return
-	}
-	unread := steerer.TakeSteer()
-	if len(unread) == 0 {
-		return
-	}
-	m := Message(unread)
-	at := 0
-	for at < len(s.queue) && s.queue[at].interrupt {
-		at++
-	}
-	s.queue = slices.Insert(s.queue, at, queued{m: m})
-	s.publishLocked(EventInput{
-		Session: s.id,
-		Entries: m,
-		Policy:  Queue,
-	})
-	s.signal()
-}
-
-// publishLocked sends e to the host stream. The session holds its lock,
-// so its events reach the stream in the order of its changes.
-func (s *Session) publishLocked(e Event) {
-	s.host.hub.publish(e)
-}
-
-// signal tells the worker to look at the queue.
-func (s *Session) signal() {
-	select {
-	case s.wake <- struct{}{}:
-	default:
+		return StopError, err.Error()
 	}
 }

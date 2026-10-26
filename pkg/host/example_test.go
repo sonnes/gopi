@@ -12,9 +12,10 @@ import (
 	"github.com/sonnes/gopi/pkg/session"
 )
 
-// A host starts a session of Claude Code. The same spec with the model
-// "anthropic/claude-opus-5-5" runs the model in the harness.
-func ExampleHost_Start() {
+// A host creates a session of Claude Code, and sends it a message. The
+// same config with the model "anthropic/claude-opus-5-5" runs the model in
+// the harness.
+func ExampleHost_Create() {
 	ctx := context.Background()
 	store := session.NewMemoryStore() // a store that outlives the process
 	repoDir := "."
@@ -24,9 +25,12 @@ func ExampleHost_Start() {
 	cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 	cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
-	h := host.New(cat, host.Store(store))
+	h, err := host.Open(ctx, cat, host.Store(store))
+	if err != nil {
+		return
+	}
 	defer h.Close()
-	s, err := h.Start(ctx, host.Spec{
+	s, err := h.Create(ctx, host.Config{
 		Model:  "claude-code/claude-opus-5-5",
 		Dir:    repoDir,
 		System: "Review the diff. Report findings. Do not push.",
@@ -35,43 +39,56 @@ func ExampleHost_Start() {
 	if err != nil {
 		return
 	}
-	_ = s
+	_ = h.Send(ctx, s.ID, host.Text("Review the diff against main."))
 }
 
-// A message queues behind the messages before it. Send returns when the
-// session accepts the message, and run_end on the host stream ends its
-// run.
-func ExampleSession_Send() {
+// A program changes the model and the mode of a session. The next run
+// starts the agent again with them.
+func ExampleHost_Update() {
 	ctx := context.Background()
-	var s *host.Session // a session from Host.Start
+	var h *host.Host // a host from Open
+	var s host.Session
 
-	err := s.Send(ctx, host.Text("Review the diff against main."), host.Queue)
-	_ = err
+	s, err := h.Update(ctx, s.ID, func(c *host.Config) {
+		c.Model = "claude-code/claude-sonnet-5-5"
+		c.Mode = agent.ModePlan
+	})
+	if err != nil {
+		return
+	}
+	fmt.Println(s.Model, s.Mode)
 }
 
-// A reader of the host applies each event to the state, and shows the
-// status of each session.
-func ExampleHost_Events() {
+// A reader of the host shows the status of each session, and confirms
+// each tool call that waits. The mode of the config decides the calls
+// that wait.
+func ExampleHost_Confirm() {
 	ctx := context.Background()
-	var h *host.Host // a host from New
+	var h *host.Host // a host from Open
 
-	state, events := h.Events(ctx)
-	for ev, err := range events {
+	_, events := h.Events(ctx)
+	for e, err := range events {
 		if err != nil {
 			return
 		}
-		state.Apply(ev)
-		fmt.Println(ev.SessionID(), state.Sessions[ev.SessionID()].Status())
+		fmt.Println(e.Session.ID, e.Session.Status, e.Session.StopReason)
+		for _, req := range e.Session.Waiting {
+			allow := req.Call.Name == "Read"
+			_ = h.Confirm(ctx, e.Session.ID, req.Call.ID, agent.Decision{Allow: allow})
+		}
 	}
 }
 
 // A reader of a session applies each agent event to the state of the
 // agent, and shows the partial message and the messages.
-func ExampleSession_Events() {
+func ExampleHost_Stream() {
 	ctx := context.Background()
-	var s *host.Session // a session from Host.Start
+	var h *host.Host // a host from Open
 
-	state, events := s.Events(ctx)
+	state, events, err := h.Stream(ctx, "s_1")
+	if err != nil {
+		return
+	}
 	for ev, err := range events {
 		if err != nil {
 			return
@@ -79,24 +96,4 @@ func ExampleSession_Events() {
 		state.Apply(ev)
 		fmt.Println(state.Streaming(), len(state.Messages()))
 	}
-}
-
-// The approve function of a spec asks a person about each tool call
-// that needs one. The mode of the spec decides the calls that need one.
-// The function returns when its context ends, because the run ends that
-// context.
-func ExampleSpec_approve() {
-	// ask shows the call to a person, and waits for the answer.
-	ask := func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-		return agent.Decision{Allow: req.Call.Name == "Read"}, nil
-	}
-
-	spec := host.Spec{
-		Model: "claude-code/claude-opus-5-5",
-		Mode:  agent.ModeAcceptEdits,
-		Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-			return ask(ctx, req)
-		},
-	}
-	_ = spec
 }

@@ -98,11 +98,13 @@ func reply(text string) ai.Message {
 }
 
 // fakeDriver starts a loop agent over its model, with the echo tool,
-// and records each config. With an approve function in the config, it
-// asks before each tool call, as a permission policy does.
+// and records each config. With ask, it asks the approve function of
+// the config before each tool call, as a permission policy does.
 type fakeDriver struct {
 	lm  ai.LanguageModel
 	err error
+	// ask asks before each tool call.
+	ask bool
 	// plain hides the optional interfaces of the runner.
 	plain bool
 	// detached calls the approve function with a context that the run
@@ -122,16 +124,17 @@ type fakeDriver struct {
 func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	d.mu.Lock()
 	d.configs = append(d.configs, c)
+	err := d.err
 	d.mu.Unlock()
-	if d.err != nil {
-		return nil, d.err
+	if err != nil {
+		return nil, err
 	}
 	opts := []agent.Option{
 		agent.Store(c.Store),
 		agent.Toolset(append([]tool.Tool{echo}, c.Tools...)...),
 		agent.Hooks(c.Hooks...),
 	}
-	if c.Approve != nil {
+	if d.ask {
 		approve := c.Approve
 		if d.detached {
 			approve = func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
@@ -217,10 +220,36 @@ func callTool(id, name, input string) ai.Message {
 	return m
 }
 
-// toolResults returns the text of each tool result of s.
-func toolResults(s *host.Session) []string {
+// setErr sets the error of each later start.
+func (d *fakeDriver) setErr(err error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.err = err
+}
+
+// starts returns the number of starts of the driver.
+func (d *fakeDriver) starts() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return len(d.configs)
+}
+
+// lastConfig returns the config of the last start of the driver.
+func (f fixture) lastConfig(t *testing.T) agent.Config {
+	t.Helper()
+	f.driver.mu.Lock()
+	defer f.driver.mu.Unlock()
+	require.NotEmpty(t, f.driver.configs)
+	return f.driver.configs[len(f.driver.configs)-1]
+}
+
+// toolResults returns the text of each tool result of the session id.
+func (f fixture) toolResults(t *testing.T, id string) []string {
+	t.Helper()
+	log, err := f.h.Log(context.Background(), id)
+	require.NoError(t, err)
 	var out []string
-	for _, m := range s.Log().Messages() {
+	for _, m := range log.Messages() {
 		if m.Role == ai.RoleToolResult {
 			out = append(out, m.Text())
 		}
@@ -231,6 +260,7 @@ func toolResults(s *host.Session) []string {
 // fixture is a host on the fake model "fake/m".
 type fixture struct {
 	h      *host.Host
+	cat    *catalog.Catalog
 	model  *fakeModel
 	driver *fakeDriver
 	store  *session.MemoryStore
@@ -241,29 +271,51 @@ func newFixture(t *testing.T, opts ...host.Option) fixture {
 	f := fixture{
 		model: &fakeModel{},
 		store: session.NewMemoryStore(),
+		cat:   catalog.New(),
 	}
-	cat := catalog.New()
-	cat.RegisterTextProvider("fake", f.model, ai.Model{ID: "m"})
-	lm, err := cat.LanguageModel("fake/m")
+	f.cat.RegisterTextProvider("fake", f.model, ai.Model{ID: "m"})
+	lm, err := f.cat.LanguageModel("fake/m")
 	require.NoError(t, err)
 	f.driver = &fakeDriver{lm: lm}
-	cat.DefaultDriver(f.driver)
-
-	opts = append([]host.Option{host.Store(f.store)}, opts...)
-	f.h = host.New(cat, opts...)
-	t.Cleanup(func() { require.NoError(t, f.h.Close()) })
+	f.cat.DefaultDriver(f.driver)
+	f.h = f.open(t, opts...)
 	return f
 }
 
-// start starts a session on the fake model.
-func (f fixture) start(t *testing.T, spec host.Spec) *host.Session {
+// open opens a host on the store, the catalog, and the driver of f.
+func (f fixture) open(t *testing.T, opts ...host.Option) *host.Host {
 	t.Helper()
-	if spec.Model == "" {
-		spec.Model = "fake/m"
-	}
-	s, err := f.h.Start(context.Background(), spec)
+	opts = append([]host.Option{host.Store(f.store)}, opts...)
+	h, err := host.Open(context.Background(), f.cat, opts...)
 	require.NoError(t, err)
-	return s
+	t.Cleanup(func() { require.NoError(t, h.Close()) })
+	return h
+}
+
+// restart closes the host of f, and returns f with a new host on the
+// same store, as after a restart of the program.
+func (f fixture) restart(t *testing.T) fixture {
+	t.Helper()
+	require.NoError(t, f.h.Close())
+	f.h = f.open(t)
+	return f
+}
+
+// create creates a session on the fake model.
+func (f fixture) create(t *testing.T, config host.Config) host.Session {
+	t.Helper()
+	if config.Model == "" {
+		config.Model = "fake/m"
+	}
+	sess, err := f.h.Create(context.Background(), config)
+	require.NoError(t, err)
+	return sess
+}
+
+// send sends text to the session id, and fails the test on an error.
+func (f fixture) send(t *testing.T, id, text string) {
+	t.Helper()
+	require.NoError(t, f.h.Send(context.Background(), id, host.Text(text)))
 }
 
 // watch follows the host stream of f until the test ends. It returns
@@ -284,6 +336,51 @@ func (f fixture) watch(t *testing.T) (host.State, <-chan host.Event) {
 		}
 	}()
 	return state, ch
+}
+
+// follow reads the agent stream of the session id until the test ends.
+// It returns the state at the start, and a channel of the events.
+func (f fixture) follow(t *testing.T, id string) (agent.State, <-chan agent.Event) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	state, events, err := f.h.Stream(ctx, id)
+	require.NoError(t, err)
+	ch := make(chan agent.Event, 100)
+	go func() {
+		defer close(ch)
+		for e, err := range events {
+			if err != nil {
+				return
+			}
+			ch <- e
+		}
+	}()
+	return state, ch
+}
+
+// gated returns a fixture whose model waits on a gate. close(gate) lets
+// each call go on.
+func gated(t *testing.T) (fixture, chan struct{}) {
+	t.Helper()
+	f := newFixture(t)
+	gate := make(chan struct{})
+	f.model.gate = gate
+	return f, gate
+}
+
+// status matches an event of a session with the status st.
+func status(st host.Status) func(host.Event) bool {
+	return func(e host.Event) bool { return e.Session.Status == st }
+}
+
+// runEnd returns the session at the next end of a run on events.
+func runEnd(t *testing.T, events <-chan host.Event) host.Session {
+	t.Helper()
+	e := next(t, events, func(e host.Event) bool {
+		return e.Session.Status == host.StatusIdle && e.Session.StopReason != ""
+	})
+	return e.Session
 }
 
 // next returns the next event of ch that matches. It fails the test if
@@ -326,4 +423,10 @@ func drain[E any](t *testing.T, ch <-chan E) []E {
 			require.FailNow(t, "the stream did not end")
 		}
 	}
+}
+
+// plainRunner hides the optional interfaces of its runner, such as
+// [agent.Steerer], as a CLI agent does.
+type plainRunner struct {
+	agent.Runner
 }

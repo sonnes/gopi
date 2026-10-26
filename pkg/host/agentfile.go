@@ -3,142 +3,58 @@ package host
 import (
 	"cmp"
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
-	"github.com/sonnes/gopi/pkg/session"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 // inheritModel is the model of an agent file that uses the model of
-// the spec.
+// the config.
 const inheritModel = "inherit"
 
-// SessionAgent is the session value that keeps the agent file that a
-// session started with. [Host.Start] writes it once, when it starts a
-// session with [Spec.Agent]. A resume reads the value and not the file,
-// so an edit of the file changes only the sessions that start after it.
-var SessionAgent = session.Value[PinnedAgent]{
-	Namespace: "gopi.host",
-	Key:       "agent",
-}
-
-// PinnedAgent is the part of an agent file that a session keeps. The
-// dirs, the rules, and the approve function come from the [Spec] on
-// each start.
-type PinnedAgent struct {
-	// Name is the name of the agent.
-	Name string `json:"name"`
-	// Path is the place of the file that won.
-	Path string `json:"path,omitempty"`
-	// Model is the model spec of the file, or "" for the model of the
-	// spec.
-	Model string `json:"model,omitempty"`
-	// Effort is the thinking level of the file.
-	Effort ai.ThinkingLevel `json:"effort,omitempty"`
-	// Mode is the permission mode of the file.
-	Mode string `json:"mode,omitempty"`
-	// Prompt is the text of the file after the frontmatter.
-	Prompt string `json:"prompt,omitempty"`
-	// Disallowed lists the tools that the agent cannot use.
-	Disallowed []string `json:"disallowed,omitempty"`
-	// Skills names the skills that the agent loads at the start.
-	Skills []string `json:"skills,omitempty"`
-}
-
-// checkEffort returns an error if the effort of spec is not a thinking
+// checkEffort returns an error if the effort of config is not a thinking
 // level, so that a typo in an agent file fails the start and not the
 // first model call.
-func checkEffort(spec Spec) error {
-	if spec.Effort == "" {
+func checkEffort(config Config) error {
+	if config.Effort == "" {
 		return nil
 	}
-	_, err := ai.ParseThinking(string(spec.Effort))
+	_, err := ai.ParseThinking(string(config.Effort))
 	return err
 }
 
-// withAgent fills spec from its agent. A resumed session with a
-// [SessionAgent] value runs that agent, and withAgent returns no new
-// pin. Otherwise withAgent reads the file of spec.Agent from the dirs,
-// and returns the pin that the session must keep. A spec with no agent
-// stays as it is.
-func withAgent(
-	ctx context.Context,
-	spec Spec,
-	snap session.Snapshot,
-	resumed bool,
-) (Spec, *PinnedAgent, error) {
-	if resumed {
-		pinned, ok, err := SessionAgent.Read(snap)
-		if err != nil {
-			return spec, nil, err
-		}
-		if ok {
-			isOther := spec.Agent != "" && spec.Agent != pinned.Name
-			if isOther {
-				return spec, nil, fmt.Errorf("the session started with the agent %q, not %q", pinned.Name, spec.Agent)
-			}
-			return pinned.apply(spec), nil, nil
-		}
-	}
-	if spec.Agent == "" {
-		return spec, nil, nil
+// withAgent fills config from the file of config.Agent in the dirs. A field
+// that the config sets wins over the file. A config with no agent stays as
+// it is.
+func withAgent(ctx context.Context, config Config) (Config, error) {
+	if config.Agent == "" {
+		return config, nil
 	}
 
-	readers := make([]def.AgentsReader, len(spec.Dirs))
-	for i, d := range spec.Dirs {
+	readers := make([]def.AgentsReader, len(config.Dirs))
+	for i, d := range config.Dirs {
 		readers[i] = storefs.Dir(d)
 	}
-	a, err := def.FindAgent(ctx, spec.Agent, readers...)
+	a, err := def.FindAgent(ctx, config.Agent, readers...)
 	if err != nil {
-		return spec, nil, err
+		return config, err
 	}
-	pinned := pin(a)
-	return pinned.apply(spec), &pinned, nil
-}
 
-// keepAgent writes p as the [SessionAgent] value of the session id. If
-// the store does not have the session, keepAgent creates it.
-func keepAgent(ctx context.Context, store session.Storer, id string, p PinnedAgent) error {
-	log, err := session.Open(ctx, store, id)
-	if err != nil {
-		return err
-	}
-	return SessionAgent.Set(ctx, log, p)
-}
-
-// pin returns the part of a that a session keeps.
-func pin(a def.Agent) PinnedAgent {
 	model := a.Model
 	if strings.EqualFold(model, inheritModel) {
 		model = ""
 	}
-	return PinnedAgent{
-		Name:       a.Name,
-		Path:       a.Path,
-		Model:      model,
-		Effort:     a.Effort,
-		Mode:       a.Mode,
-		Prompt:     a.Prompt,
-		Disallowed: a.Disallowed,
-		Skills:     a.Skills,
-	}
-}
-
-// apply returns spec with the fields of p. A field that the spec sets
-// wins over the file.
-func (p PinnedAgent) apply(spec Spec) Spec {
-	spec.Model = cmp.Or(spec.Model, p.Model)
-	spec.Mode = cmp.Or(spec.Mode, agent.Mode(p.Mode))
-	spec.Effort = cmp.Or(spec.Effort, p.Effort)
-	spec.System = joinText(p.Prompt, spec.System)
-	spec.Deny = append(slices.Clip(spec.Deny), p.Disallowed...)
-	spec.Skills = append(slices.Clip(spec.Skills), p.Skills...)
-	return spec
+	config.Model = cmp.Or(config.Model, model)
+	config.Mode = cmp.Or(config.Mode, agent.Mode(a.Mode))
+	config.Effort = cmp.Or(config.Effort, a.Effort)
+	config.System = joinText(a.Prompt, config.System)
+	config.Deny = append(slices.Clip(config.Deny), a.Disallowed...)
+	config.Skills = append(slices.Clip(config.Skills), a.Skills...)
+	return config, nil
 }
 
 // joinText returns the texts that are not empty, joined by a blank
