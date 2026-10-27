@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -192,4 +193,79 @@ func TestCancelInterruptsTheChild(t *testing.T) {
 	require.Len(t, ends, 1)
 	assert.Equal(t, agent.SubagentInterrupted, ends[0].Status, "the cancel stops the child too")
 	emittest.CheckEvents(t, inner[ends[0].SessionID])
+}
+
+// subagentPrompt is the prompt of the recorded subagent traces.
+const subagentPrompt = "Spawn exactly one subagent with spawn_agent. Its task: read the file word.txt " +
+	"and reply with the word in it. Wait for the subagent, then reply with that word only."
+
+// newSubagentAgent returns the agent of the hand-written subagent traces.
+func newSubagentAgent(t *testing.T, trace string) *Agent {
+	t.Helper()
+	useTraces(t, []string{trace})
+	a := New(
+		Dir(workDir),
+		Sandbox(SandboxReadOnly),
+		Policy(ApprovalNever),
+		Thinking(ai.ThinkingLow),
+	)
+	t.Cleanup(func() { a.Close() })
+	return a
+}
+
+func TestChildThatFailsFailsTheRun(t *testing.T) {
+	a := newSubagentAgent(t, "subagent_bad_item.trace")
+
+	events, _, err := collect(a.Run(context.Background(), session.Text(subagentPrompt)))
+	require.ErrorContains(t, err, "item/completed", "an error of a child is an error of the run")
+	emittest.CheckEvents(t, events)
+	_, ends, _ := subagentEvents(events)
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentInterrupted, ends[0].Status)
+}
+
+func TestFailedTurnInterruptsItsChildren(t *testing.T) {
+	a := newSubagentAgent(t, "subagent_root_failed.trace")
+
+	events, _, err := collect(a.Run(context.Background(), session.Text(subagentPrompt)))
+	require.Error(t, err)
+	emittest.CheckEvents(t, events)
+	_, ends, _ := subagentEvents(events)
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentInterrupted, ends[0].Status, "the trace has the turn/interrupt of the child")
+	assert.Nil(t, a.conn, "a child can still run on the server, so the next run starts a new process")
+}
+
+func TestCancelBeforeTheChildTurnStartsInterruptsIt(t *testing.T) {
+	a := newSubagentAgent(t, "subagent_cancel_early.trace")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	s := a.Run(ctx, session.Text(subagentPrompt))
+	var events []agent.Event
+	start := time.Now()
+	for ev, err := range s.Events() {
+		if err != nil {
+			break
+		}
+		events = append(events, ev)
+		if _, ok := ev.(agent.EventSubagentStart); ok {
+			cancel()
+		}
+	}
+	_, err := s.Wait()
+	require.ErrorIs(t, err, context.Canceled)
+	emittest.CheckEvents(t, events)
+	assert.Less(t, time.Since(start), interruptTimeout, "the child that starts after the cancel stops at once")
+}
+
+func TestReportTurnTakesNotificationsBeforeItsResponse(t *testing.T) {
+	a := newSubagentAgent(t, "subagent_report_early.trace")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	events, msgs, err := collect(a.Run(ctx, session.Text(subagentPrompt)))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	assert.Equal(t, "The subagent found banana.", msgs[len(msgs)-1].Text())
 }

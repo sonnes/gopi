@@ -128,12 +128,15 @@ func (h *Host) recover(ctx context.Context, snap session.Snapshot) (Session, err
 	if err != nil {
 		return Session{}, fmt.Errorf("host: session %s: read the parent: %w", id, err)
 	}
+	// A child has no config: its model is the one that its start named,
+	// which the stored session keeps.
 	if isChild {
 		sess.Parent = &parent
+	} else {
+		sess.Model = config.Model
+		sess.Mode = config.Mode
+		sess.Effort = config.Effort
 	}
-	sess.Model = config.Model
-	sess.Mode = config.Mode
-	sess.Effort = config.Effort
 	stopped := !ok || sess.Status == StatusIdle
 	sess.Status = StatusIdle
 	if stopped {

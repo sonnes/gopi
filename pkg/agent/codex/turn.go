@@ -277,7 +277,13 @@ func (t *turn) dispatch(ctx context.Context, m message, cancelled bool) (bool, e
 		return true, fmt.Errorf("codex: %s: %w", m.Method, err)
 	}
 	if p.ThreadID != "" && p.ThreadID != t.threadID {
-		return false, t.subs.route(ctx, m, p)
+		// A child that fails fails the run, and the server can still
+		// send notifications of the child.
+		if err := t.subs.route(ctx, m, p); err != nil {
+			t.dead = true
+			return true, err
+		}
+		return false, nil
 	}
 	if !t.ours(p) {
 		return false, nil

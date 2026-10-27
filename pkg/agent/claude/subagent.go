@@ -1,8 +1,12 @@
 package claude
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"maps"
+	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
@@ -136,7 +140,9 @@ func (r *runner) openChild(ctx context.Context, l *line) error {
 	}
 	id := agent.ChildID(c.owner.sessionID, name, l.TaskID)
 
-	log, err := r.childLog(ctx, id)
+	// The CLI goes on after an interrupt, so the child keeps its lines.
+	store := context.WithoutCancel(ctx)
+	log, err := r.childLog(store, id)
 	if err != nil {
 		return err
 	}
@@ -145,7 +151,7 @@ func (r *runner) openChild(ctx context.Context, l *line) error {
 			SessionID:  c.owner.sessionID,
 			ToolCallID: l.ToolUseID,
 		}
-		if err := agent.Parent.Set(ctx, log.Writer(), ref); err != nil {
+		if err := agent.Parent.Set(store, log.Writer(), ref); err != nil {
 			return err
 		}
 	}
@@ -169,12 +175,16 @@ func (r *runner) openChild(ctx context.Context, l *line) error {
 		Model:      in.Model,
 	})
 	if err := em.Start(); err != nil {
-		return err
-	}
-	if err := em.Input(ctx, []session.Entry{session.Text(l.Prompt)}); err != nil {
+		owner.Subagent(agent.EventSubagentEnd{
+			ToolCallID: callID,
+			SessionID:  id,
+			Status:     agent.SubagentFailed,
+			Text:       err.Error(),
+		})
 		return err
 	}
 
+	// The child is open from its start, so each exit ends it.
 	run := &runner{
 		a:         r.a,
 		em:        em,
@@ -187,6 +197,9 @@ func (r *runner) openChild(ctx context.Context, l *line) error {
 		owner:     c.owner,
 		run:       run,
 		sessionID: id,
+	}
+	if err := em.Input(store, []session.Entry{session.Text(l.Prompt)}); err != nil {
+		return err
 	}
 	waiting := r.tasks.waiting[callID]
 	delete(r.tasks.waiting, callID)
@@ -247,7 +260,9 @@ func (r *runner) taskEnded(ctx context.Context, l *line) error {
 }
 
 // callEnded ends the child of a call whose result came before its
-// task_notification line.
+// task_notification line. The result is not the text of the child: the
+// CLI wraps the report of the child in a frame for the parent. So the
+// child ends with no last message.
 func (r *runner) callEnded(ctx context.Context, id string, result ai.ToolResult) error {
 	c, ok := r.tasks.open[id]
 	if !ok {
@@ -257,44 +272,48 @@ func (r *runner) callEnded(ctx context.Context, id string, result ai.ToolResult)
 	if result.IsError {
 		status = agent.SubagentFailed
 	}
-	text := ai.Message{Content: result.Content}.Text()
-	return r.endChild(ctx, c, status, text)
+	return r.endChild(ctx, c, status, "")
 }
 
 // endChild ends the run of c and sends its end on the stream of its
-// owner. Each open child of c ends first, so that the stream of c
-// closes before its end. The CLI does not send the last message of a
-// subagent as a line, so a completed child gets text as its last
-// assistant message.
+// owner. Each open child of c ends first, so that the stream of c closes
+// before its end. The CLI does not send the last message of a subagent as
+// a line, so a completed child gets text as its last assistant message.
+// A failed write of the log does not stop the end: the child still ends,
+// as failed, and endChild returns the error.
 func (r *runner) endChild(ctx context.Context, c *child, status, text string) error {
-	for _, inner := range r.tasks.open {
+	var errs []error
+	for _, inner := range r.openChildren() {
 		if inner.owner == c.run {
-			if err := r.endChild(ctx, inner, agent.SubagentInterrupted, ""); err != nil {
-				return err
-			}
+			errs = append(errs, r.endChild(ctx, inner, agent.SubagentInterrupted, ""))
 		}
 	}
 	delete(r.tasks.open, c.callID)
 
+	store := context.WithoutCancel(ctx)
 	run := c.run
-	if err := run.finish(ctx); err != nil {
-		return err
-	}
+	errs = append(errs, run.finish(store))
 	if status == agent.SubagentCompleted && text != "" {
 		final := ai.Message{
 			Role:       ai.RoleAssistant,
 			Content:    []ai.Content{ai.Text{Text: text}},
 			StopReason: ai.StopReasonStop,
 		}
-		if err := run.em.End(ctx, final); err != nil {
-			return err
-		}
+		errs = append(errs, run.em.End(store, final))
 	}
+	failed := errors.Join(errs...)
+	if failed != nil {
+		status = agent.SubagentFailed
+		text = failed.Error()
+	}
+
 	var runErr error
 	if status != agent.SubagentCompleted {
 		runErr = subagentError(status)
 	}
-	_, _ = run.em.Finish(ctx, run.em.Usage(), runErr)
+	if _, err := run.em.Finish(store, run.em.Usage(), runErr); err != nil && !errors.Is(err, runErr) {
+		errs = append(errs, err)
+	}
 
 	c.owner.em.Subagent(agent.EventSubagentEnd{
 		ToolCallID: c.callID,
@@ -302,17 +321,26 @@ func (r *runner) endChild(ctx context.Context, c *child, status, text string) er
 		Status:     status,
 		Text:       text,
 	})
-	return nil
+	return errors.Join(errs...)
 }
 
-// endChildren ends each open child as interrupted, at the end of a run.
-func (r *runner) endChildren(ctx context.Context) {
+// endChildren ends each open child as interrupted, at the end of a run,
+// and returns the errors of their logs.
+func (r *runner) endChildren(ctx context.Context) error {
+	var errs []error
 	for len(r.tasks.open) > 0 {
-		for _, c := range r.tasks.open {
-			_ = r.endChild(ctx, c, agent.SubagentInterrupted, "")
-			break
-		}
+		c := r.openChildren()[0]
+		errs = append(errs, r.endChild(ctx, c, agent.SubagentInterrupted, ""))
 	}
+	return errors.Join(errs...)
+}
+
+// openChildren returns the open children, by the ID of their call, so
+// that they end in the same order on each run.
+func (r *runner) openChildren() []*child {
+	out := slices.Collect(maps.Values(r.tasks.open))
+	slices.SortFunc(out, func(a, b *child) int { return cmp.Compare(a.callID, b.callID) })
+	return out
 }
 
 // subagentError is the error of the run of a child that did not

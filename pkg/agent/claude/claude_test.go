@@ -961,3 +961,35 @@ func TestSubagentOpenAtTheResultEndsInterrupted(t *testing.T) {
 	emittest.CheckEvents(t, inner)
 	checkLog(t, a)
 }
+
+// childFailStore is a store whose appends to a child session fail.
+type childFailStore struct {
+	*session.MemoryStore
+}
+
+func (s childFailStore) Append(ctx context.Context, id string, entries ...session.Entry) error {
+	if strings.Contains(id, ".") {
+		return errors.New("disk full")
+	}
+	return s.MemoryStore.Append(ctx, id, entries...)
+}
+
+func TestSubagentWithAFailedLogStillEnds(t *testing.T) {
+	ctx := context.Background()
+	claude.Replay(t, nil, "testdata/subagent_open_at_result.trace")
+	a, err := claude.Durable(ctx, "s1", claude.Store(childFailStore{session.NewMemoryStore()}))
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	events, _, err := run(ctx, a, "Use the Agent tool once.")
+	require.ErrorContains(t, err, "disk full", "the run reports the failure of the child log")
+	emittest.CheckEvents(t, events)
+
+	var ends int
+	for _, e := range events {
+		if _, ok := e.(agent.EventSubagentEnd); ok {
+			ends++
+		}
+	}
+	assert.Equal(t, 1, ends, "the child that started also ends")
+}

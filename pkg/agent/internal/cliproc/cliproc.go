@@ -85,9 +85,10 @@ func Start(cmd *exec.Cmd) (Pipes, error) {
 type Proc struct {
 	pipes Pipes
 	lines chan []byte
-	// readErr is the error that ended stdout. It is set before lines is
-	// closed.
-	readErr error
+	// readErr is the error that ended stdout. It is set before readDone
+	// and lines close.
+	readErr  error
+	readDone chan struct{}
 
 	stopOnce sync.Once
 	stopErr  error
@@ -96,8 +97,9 @@ type Proc struct {
 // Open starts the reader of p.
 func Open(p Pipes) *Proc {
 	pr := &Proc{
-		pipes: p,
-		lines: make(chan []byte),
+		pipes:    p,
+		lines:    make(chan []byte),
+		readDone: make(chan struct{}),
 	}
 	go pr.read()
 	return pr
@@ -113,6 +115,7 @@ func (pr *Proc) read() {
 		pr.lines <- append([]byte(nil), sc.Bytes()...)
 	}
 	pr.readErr = sc.Err()
+	close(pr.readDone)
 	close(pr.lines)
 	io.Copy(io.Discard, pr.pipes.Stdout)
 }
@@ -122,8 +125,16 @@ func (pr *Proc) read() {
 func (pr *Proc) Lines() <-chan []byte { return pr.lines }
 
 // ReadErr returns the error that ended stdout, or nil if stdout ended
-// at EOF. Call it only after Lines closes.
-func (pr *Proc) ReadErr() error { return pr.readErr }
+// at EOF. Before stdout ends, it returns nil, so that a failed write can
+// call it at once.
+func (pr *Proc) ReadErr() error {
+	select {
+	case <-pr.readDone:
+		return pr.readErr
+	default:
+		return nil
+	}
+}
 
 // Stderr returns the end of the stderr of the CLI, or "" if there is
 // none.

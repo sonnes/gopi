@@ -1,10 +1,14 @@
 package codex
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -46,9 +50,12 @@ type subagents struct {
 	// by thread ID. A child thread can report before its spawn item
 	// reaches the turn.
 	early map[string][]message
-	// late holds each child that ended after the turn of the run
+	// late holds each direct child that ended after the turn of the run
 	// completed. The model did not see its result.
 	late []*child
+	// stopping is set by an interrupt. A child whose turn starts after
+	// it stops at once.
+	stopping bool
 }
 
 // child is one subagent of the CLI.
@@ -59,7 +66,8 @@ type child struct {
 	sessionID string
 	owner     *turn
 	turn      *turn
-	// running is true while a turn of the child runs.
+	// running is true from the spawn of the child, or the start of a
+	// later turn, to the end of its turn.
 	running bool
 	// status and text are the status and the last text of the last run
 	// of the child.
@@ -174,6 +182,8 @@ func (c *child) start() error {
 	c.running = true
 	c.turn.started = map[string]bool{}
 	c.turn.done = map[string]bool{}
+	// Each run of a child reports the usage of its own turn.
+	c.turn.usage = ai.Usage{}
 	return c.turn.emitter.Start()
 }
 
@@ -205,7 +215,7 @@ func (s *subagents) route(ctx context.Context, m message, p params) error {
 	if len(p.Item) > 0 {
 		n.item = &item{}
 		if err := json.Unmarshal(p.Item, n.item); err != nil {
-			return err
+			return fmt.Errorf("codex: %s: %w", m.Method, err)
 		}
 	}
 	return c.turn.handle(ctx, n)
@@ -220,6 +230,13 @@ func (c *child) begin(turnID string) error {
 		}
 	}
 	c.turn.turnID = turnID
+	if c.turn.subs.stopping {
+		_, err := c.turn.conn.request("turn/interrupt", turnInterruptParams{
+			ThreadID: c.turn.threadID,
+			TurnID:   turnID,
+		})
+		return err
+	}
 	return nil
 }
 
@@ -266,6 +283,14 @@ func (s *subagents) finish(ctx context.Context, c *child, status string, err err
 	})
 }
 
+// children returns each child, by its thread ID, so that the children
+// end and stop in the same order on each run.
+func (s *subagents) children() []*child {
+	out := slices.Collect(maps.Values(s.byThread))
+	slices.SortFunc(out, func(a, b *child) int { return cmp.Compare(a.turn.threadID, b.turn.threadID) })
+	return out
+}
+
 // running reports whether a child runs.
 func (s *subagents) running() bool {
 	if s == nil {
@@ -281,8 +306,9 @@ func (s *subagents) running() bool {
 
 // interrupt asks the server to stop the turn of each child that runs.
 func (s *subagents) interrupt() error {
+	s.stopping = true
 	var errs []error
-	for _, c := range s.byThread {
+	for _, c := range s.children() {
 		if !c.running || c.turn.turnID == "" {
 			continue
 		}
@@ -300,7 +326,7 @@ func (s *subagents) interrupt() error {
 // that the stream of the owner closes after it.
 func (s *subagents) endAll(ctx context.Context) {
 	for s.running() {
-		for _, c := range s.byThread {
+		for _, c := range s.children() {
 			if c.running && !s.owner(c) {
 				s.finish(ctx, c, agent.SubagentInterrupted, errRunEnded)
 				break

@@ -24,7 +24,7 @@ var reviewer = def.Agent{
 
 var agentID = regexp.MustCompile(`agent_id: (\S+)`)
 
-// childID returns the agent id in the text of a task result.
+// childID returns the agent id in the text of the result of an agent call.
 func childID(t *testing.T, m ai.Message) string {
 	t.Helper()
 	match := agentID.FindStringSubmatch(m.Text())

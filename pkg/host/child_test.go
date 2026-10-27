@@ -164,5 +164,40 @@ func TestChildSurvivesARestart(t *testing.T) {
 	got, ok := f.h.Get(childID)
 	require.True(t, ok)
 	assert.Equal(t, &agent.ParentRef{SessionID: "s1", ToolCallID: "c1"}, got.Parent)
+	assert.Equal(t, "fake/m", got.Model, "a child keeps its model, though it has no config")
 	assert.ErrorIs(t, f.h.Send(context.Background(), childID, host.Text("hi")), host.ErrChild)
+}
+
+func TestChildExistsWhenItsStartIsOnTheParentStream(t *testing.T) {
+	f := childFixture(t, nil, true)
+	_, events := f.follow(t, "s1")
+
+	f.send(t, "s1", "go")
+	next(t, events, func(e agent.Event) bool {
+		_, ok := e.(agent.EventSubagentStart)
+		return ok
+	})
+	_, ok := f.h.Get(childID)
+	assert.True(t, ok, "a reader can open the child as soon as the parent shows its start")
+}
+
+func TestChildOfAClosedHostIsNotKept(t *testing.T) {
+	f := newFixture(t)
+	started := make(chan struct{})
+	late := tool.Func("late", func(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
+		close(started)
+		<-ctx.Done()
+		agent.EmitSubagent(ctx, agent.EventSubagentStart{SessionID: childID})
+		return ai.ToolResult{}, nil
+	})
+	f.h = f.open(t, host.Tools(late))
+	f.model.replies = []ai.Message{callTool("c1", "late", `{}`)}
+	f.create(t, host.Config{ID: "s1"})
+
+	f.send(t, "s1", "go")
+	<-started
+	require.NoError(t, f.h.Close())
+
+	_, ok := f.h.Get(childID)
+	assert.False(t, ok, "a host that closed takes no new child")
 }

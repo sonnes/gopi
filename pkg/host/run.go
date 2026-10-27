@@ -124,11 +124,18 @@ func (s *hosted) execute(ctx context.Context, m Message) {
 		if end, ok := ev.(agent.EventAgentEnd); ok {
 			usage = end.Usage
 		}
+		// The child exists before a reader of the parent sees its start.
+		s.host.relay(s.id, ev)
 		s.agents.publish(ev)
-		s.host.relay(ctx, s.id, ev)
 	}
 	_, err = stream.Wait()
-	s.host.endChildren(ctx, s.id)
+	// A child that the run left open ends as the run did: restarted when
+	// Close cut it, and interrupted otherwise.
+	reason := StopInterrupted
+	if errors.Is(context.Cause(ctx), ErrClosed) {
+		reason = StopRestarted
+	}
+	s.host.endChildren(s.id, reason)
 	s.finish(ctx, usage, err)
 }
 

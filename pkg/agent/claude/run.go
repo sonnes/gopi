@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -213,14 +214,14 @@ func fileBlock(f ai.File) outBlock {
 // is the usage of the run.
 func (r *runner) fail(ctx context.Context, err error) ([]ai.Message, error) {
 	r.a.drop(r.proc)
-	r.endChildren(ctx)
+	err = errors.Join(err, r.endChildren(ctx))
 	return r.em.Finish(ctx, r.em.Usage(), err)
 }
 
 // abort ends a run with an error, and the CLI keeps running. The
 // messages that the run stored are still its result.
 func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
-	r.endChildren(ctx)
+	err = errors.Join(err, r.endChildren(ctx))
 	return r.em.Finish(ctx, u, err)
 }
 
@@ -630,7 +631,9 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if err := r.finish(ctx); err != nil {
 		return r.abort(ctx, u, err)
 	}
-	r.endChildren(ctx)
+	if err := r.endChildren(ctx); err != nil {
+		return r.abort(ctx, u, err)
+	}
 	if r.interrupted {
 		return r.abort(ctx, u, ctx.Err())
 	}

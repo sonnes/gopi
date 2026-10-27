@@ -100,7 +100,7 @@ func (t *agentTool) Info() ai.ToolInfo {
 				},
 				"resume": {
 					Type:        "string",
-					Description: "The agent_id of an earlier task call, to continue that subagent.",
+					Description: "The agent_id of an earlier agent call, to continue that subagent.",
 				},
 			},
 			Required: []string{"agent", "prompt"},
@@ -231,7 +231,7 @@ func (t *agentTool) childSystem(sub def.Agent) string {
 
 // run runs child with prompt, sends each event and the end of the
 // child on the run stream of the parent, and returns the result of the
-// task call. The end comes before the call ends, also when ctx is done,
+// agent call. The end comes before the call ends, also when ctx is done,
 // so the stream of the parent closes each child that it opened.
 func (t *agentTool) run(
 	ctx context.Context,
@@ -286,7 +286,7 @@ func (t *agentTool) run(
 	return textResult(lastText(msgs) + stats.trailer()), nil
 }
 
-// agentStats is the end of a task result.
+// agentStats is the end of the result of an agent call.
 type agentStats struct {
 	id       string
 	tokens   int

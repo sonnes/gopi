@@ -59,7 +59,10 @@ type Host struct {
 	mu sync.Mutex
 	// sessions has each session of the store, by ID.
 	sessions map[string]*hosted
-	closed   bool
+	// running has the children that run, by the ID of their parent, so
+	// the end of a run finds its children with no scan of the sessions.
+	running map[string]map[string]*hosted
+	closed  bool
 }
 
 // Option configures a [Host].
@@ -298,7 +301,10 @@ func (h *Host) List() []Session {
 
 // Log returns the log of the session id, to read its entries and to set
 // its values. While the agent runs, it is the log of the agent, so the
-// agent and the store agree. Otherwise it is the log in the store.
+// agent and the store agree. Otherwise it is the log in the store. The
+// session of a subagent has no agent in the host: the run of its parent
+// writes it, so Log gives a copy of the store to read, and a caller does
+// not write to it.
 func (h *Host) Log(ctx context.Context, id string) (session.Writer, error) {
 	s, err := h.session(id)
 	if err != nil {

@@ -23,8 +23,10 @@
 // A subagent of the CLI, which a spawn_agent call starts, keeps its
 // messages in a child session. The stream of the run carries its
 // start, its events, and its end. A run waits for each subagent that
-// still runs when the turn completes. If one ends after the turn, the
-// run starts one more turn that gives the model its result. Without
+// still runs when the turn completes. If a direct subagent ends after the
+// turn, the run starts one more turn that gives the model its result. A
+// run that ends with a subagent that runs, such as a turn that failed,
+// stops the subagent, and the next run starts a new process. Without
 // [Store], the children are unsaved.
 //
 // The reasons are in docs/concepts/agent/cli-agent.md and
@@ -395,7 +397,16 @@ func (a *Agent) run(
 			break
 		}
 		t.completed = false
+		t.turnID = ""
+		t.early = nil
 		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry})))
+	}
+	// A run that ends with a child that runs, such as a turn that failed,
+	// stops the child on the server. The server can still send its
+	// notifications, so the process does not serve the next run.
+	if t.subs.running() {
+		_ = t.subs.interrupt()
+		t.dead = true
 	}
 	t.subs.endAll(context.WithoutCancel(ctx))
 	c.bindHooks(nil)
