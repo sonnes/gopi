@@ -54,8 +54,15 @@ type hosted struct {
 	// first.
 	calls []*call
 	// childRuns is true while the run of the parent of a child runs the
-	// child.
-	childRuns bool
+	// child. inBackground is true while the child runs after the run of
+	// its parent.
+	childRuns    bool
+	inBackground bool
+	// unwatch stops the watch of the wakes of the agent. wakePending is
+	// true when the agent woke during a run, so a run of the turn of the
+	// agent follows the run.
+	unwatch     chan struct{}
+	wakePending bool
 }
 
 func newHosted(h *Host, sess Session) *hosted {
@@ -152,6 +159,7 @@ func (s *hosted) startAgent(ctx context.Context) error {
 	}
 	s.runner = runner
 	s.agents.reset(state)
+	s.watchLocked(runner)
 	return nil
 }
 
@@ -193,6 +201,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Deny:      config.Deny,
 		MCP:       config.MCP,
 		Approve:   s.approve,
+		Idle:      s.idle,
 		Hooks:     h.hooks,
 		Tools:     h.tools,
 	})
@@ -239,11 +248,14 @@ func (s *hosted) stop() error {
 	s.runs.Wait()
 	s.mu.Lock()
 	runner := s.runner
+	s.unwatchLocked()
 	s.mu.Unlock()
 	var err error
 	if runner != nil {
 		err = closeRunner(runner)
 	}
+	// No child outlives the agent that runs it.
+	s.host.endChildren(s.id, StopRestarted, true)
 	s.agents.close()
 
 	s.mu.Lock()
@@ -270,6 +282,7 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	}
 	s.runner = nil
 	s.stale = false
+	s.unwatchLocked()
 	s.mu.Unlock()
 
 	if err := closeRunner(old); err != nil {
@@ -284,7 +297,54 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	defer s.mu.Unlock()
 	s.runner = runner
 	s.agents.reset(state)
+	s.watchLocked(runner)
 	return runner, nil
+}
+
+// watchLocked starts the watch of the wakes of r, if r is an
+// [agent.Waker]. The caller holds mu.
+func (s *hosted) watchLocked(r agent.Runner) {
+	w, ok := r.(agent.Waker)
+	if !ok {
+		return
+	}
+	quit := make(chan struct{})
+	s.unwatch = quit
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			case <-w.Wakes():
+				s.woke(r)
+			}
+		}
+	}()
+}
+
+// unwatchLocked stops the watch of the wakes of the agent. The caller
+// holds mu.
+func (s *hosted) unwatchLocked() {
+	if s.unwatch == nil {
+		return
+	}
+	close(s.unwatch)
+	s.unwatch = nil
+}
+
+// woke runs the turn that the agent r started on its own. During a run,
+// the turn runs after the run.
+func (s *hosted) woke(r agent.Runner) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closing || s.runner != r {
+		return
+	}
+	if s.run != nil {
+		s.wakePending = true
+		return
+	}
+	s.startRunLocked(nil)
 }
 
 // closeRunner stops the process of an agent that has one.

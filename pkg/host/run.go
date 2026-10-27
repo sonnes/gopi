@@ -96,8 +96,13 @@ func (h *Host) Interrupt(_ context.Context, id string) error {
 
 // startRunLocked sets the session running, and runs m in a new
 // goroutine. The context of the run exists when it returns, so an
-// Interrupt right after Send stops the run.
+// Interrupt right after Send stops the run. With no m, the run is the
+// turn that the agent started on its own. A run with m reads that turn
+// first, so a wake that waits goes.
 func (s *hosted) startRunLocked(m Message) {
+	if m != nil {
+		s.wakePending = false
+	}
 	ctx, cancel := context.WithCancelCause(context.Background())
 	s.run = ctx
 	s.cancelRun = cancel
@@ -108,14 +113,15 @@ func (s *hosted) startRunLocked(m Message) {
 }
 
 // execute runs the agent on m, and sends each agent event to the agent
-// stream. Then it ends the run.
+// stream. Then it ends the run. With no m, it continues the turn that
+// the agent started on its own.
 func (s *hosted) execute(ctx context.Context, m Message) {
 	runner, err := s.freshRunner(ctx)
 	if err != nil {
 		s.finish(ctx, ai.Usage{}, err)
 		return
 	}
-	stream := runner.Run(ctx, m...)
+	stream := s.stream(ctx, runner, m)
 	var usage ai.Usage
 	for ev, err := range stream.Events() {
 		if err != nil {
@@ -130,13 +136,25 @@ func (s *hosted) execute(ctx context.Context, m Message) {
 	}
 	_, err = stream.Wait()
 	// A child that the run left open ends as the run did: restarted when
-	// Close cut it, and interrupted otherwise.
+	// Close cut it, and interrupted otherwise. A child in the background
+	// goes on, unless Close cut the run.
 	reason := StopInterrupted
-	if errors.Is(context.Cause(ctx), ErrClosed) {
+	closed := errors.Is(context.Cause(ctx), ErrClosed)
+	if closed {
 		reason = StopRestarted
 	}
-	s.host.endChildren(s.id, reason)
+	s.host.endChildren(s.id, reason, closed)
 	s.finish(ctx, usage, err)
+}
+
+// stream starts the run of m on runner. With no m, it continues the
+// turn of an [agent.Waker]. A runner that is not a Waker does not wake,
+// so it never gets a run with no m.
+func (s *hosted) stream(ctx context.Context, runner agent.Runner, m Message) *agent.Stream {
+	if w, ok := runner.(agent.Waker); ok && m == nil {
+		return w.Continue(ctx)
+	}
+	return runner.Run(ctx, m...)
 }
 
 // finish ends the active run, and starts the run of the next held
@@ -169,6 +187,10 @@ func (s *hosted) finish(ctx context.Context, usage ai.Usage, err error) {
 		}
 	}
 	if len(s.queue) == 0 {
+		if s.wakePending {
+			s.wakePending = false
+			s.startRunLocked(nil)
+		}
 		return
 	}
 	next := s.queue[0]

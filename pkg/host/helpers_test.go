@@ -116,6 +116,10 @@ type fakeDriver struct {
 	// reason goes with each call to the approve function, as an agent
 	// says why a call asks.
 	reason string
+	// wakes gives each runner Wakes and Continue, as the Claude Code
+	// agent has. The runner of the last start is in wake.
+	wakes bool
+	wake  *wakeRunner
 
 	mu      sync.Mutex
 	configs []agent.Config
@@ -150,10 +154,48 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason)))
 	}
 	r, err := agent.Durable(ctx, d.lm, c.SessionID, opts...)
-	if err != nil || !d.plain {
-		return r, err
+	if err != nil {
+		return nil, err
 	}
-	return plainRunner{Runner: r}, nil
+	if d.wakes {
+		w := &wakeRunner{
+			Runner: r,
+			wakes:  make(chan struct{}, 1),
+			idle:   c.Idle,
+		}
+		d.mu.Lock()
+		d.wake = w
+		d.mu.Unlock()
+		return w, nil
+	}
+	if d.plain {
+		return plainRunner{Runner: r}, nil
+	}
+	return r, nil
+}
+
+// wakeRunner is a runner that wakes, as the Claude Code agent does. Its
+// Continue runs a turn with the text "continue". idle is the Idle
+// function of its config.
+type wakeRunner struct {
+	agent.Runner
+	wakes chan struct{}
+	idle  func(agent.Event)
+}
+
+func (w *wakeRunner) Wakes() <-chan struct{} { return w.wakes }
+
+func (w *wakeRunner) Continue(ctx context.Context) *agent.Stream {
+	return w.Run(ctx, session.Text("continue"))
+}
+
+// waker returns the runner of the last start of the driver.
+func (d *fakeDriver) waker(t *testing.T) *wakeRunner {
+	t.Helper()
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	require.NotNil(t, d.wake, "the driver started no runner that wakes")
+	return d.wake
 }
 
 // abandoned returns an approve function that calls approve in its own
