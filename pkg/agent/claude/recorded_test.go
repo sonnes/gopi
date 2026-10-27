@@ -471,3 +471,80 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	assert.Positive(t, wake, "the log marks where the agent went on by itself")
 	checkLog(t, a)
 }
+
+// TestRecordedSteerSubagent runs the real CLI. Record it with
+// `make record-cli AGENT=claude RUN=TestRecordedSteerSubagent`.
+func TestRecordedSteerSubagent(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	home, _ := os.UserHomeDir()
+	require.NoError(t, os.WriteFile(dir+"/word.txt", []byte("banana\n"), 0o600))
+	claude.Replay(t, []stdiorr.Scrub{
+		scrubLine,
+		scrubDir("/private"+dir, "/work"),
+		scrubDir(dir, "/work"),
+		scrubDir(home, "/home/me"),
+	}, "testdata/TestRecordedSteerSubagent.trace")
+	claude.SetUUIDs(t, "steer-1")
+
+	idle := &idleSink{}
+	store := session.NewMemoryStore()
+	a, err := claude.Durable(ctx, "s1",
+		claude.Dir(dir),
+		claude.Model("haiku"),
+		claude.PermissionMode(claude.PermissionBypass),
+		claude.Store(store),
+		claude.IdleEvents(idle.add),
+	)
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	prompt := "Use the Agent tool exactly once, with subagent_type general-purpose and " +
+		"run_in_background set to false. Its task: run the shell command sleep 15, then read " +
+		"word.txt and reply with the word. Then reply with that word only."
+	s := a.Run(ctx, session.Text(prompt))
+	var events []agent.Event
+	for ev, err := range s.Events() {
+		if err != nil {
+			break
+		}
+		events = append(events, ev)
+		if _, ok := ev.(agent.EventSubagentStart); ok {
+			a.Steer(session.Text("Do not wait for the subagent. Reply with the text STEERED now."))
+		}
+	}
+	msgs, err := s.Wait()
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	require.NotEmpty(t, msgs)
+	assert.Contains(t, msgs[len(msgs)-1].Text(), "STEERED")
+
+	var ends []agent.EventSubagentEnd
+	for _, e := range events {
+		if e, ok := e.(agent.EventSubagentEnd); ok {
+			ends = append(ends, e)
+		}
+	}
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentBackground, ends[0].Status, "the steer moves the child to the background, and does not stop it")
+
+	select {
+	case <-a.Wakes():
+	case <-time.After(wakeWait):
+		require.FailNow(t, "the CLI started no turn after the child ended")
+	}
+	var idleEnd *agent.EventSubagentEnd
+	for _, e := range idle.all() {
+		if e, ok := e.(agent.EventSubagentEnd); ok {
+			idleEnd = &e
+		}
+	}
+	require.NotNil(t, idleEnd, "the child ends between runs")
+	assert.Equal(t, agent.SubagentCompleted, idleEnd.Status)
+	assert.Contains(t, strings.ToLower(idleEnd.Text), "banana")
+
+	events, _, err = collectRun(a.Continue(ctx))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	checkLog(t, a)
+}

@@ -304,19 +304,17 @@ func (r *runner) taskEnded(ctx context.Context, l *line) error {
 	return r.endChild(ctx, c, status, l.Summary)
 }
 
-// asyncMarks are the texts of an Agent result that says that the child
-// runs in the background: the result of a call with run_in_background,
-// and the result of a move to the background before a steer.
-var asyncMarks = []string{
-	"Async agent launched successfully",
-	"runs in the background",
-}
+// asyncMark starts the text of an Agent result that says that the child
+// runs in the background. The CLI gives it to a call that runs in the
+// background from its start, and to a call that a move before a steer
+// sent to the background.
+const asyncMark = "Async agent launched successfully"
 
 // launchedAsync reports whether result says that the child of the call
 // runs in the background.
 func launchedAsync(result ai.ToolResult) bool {
 	text := ai.Message{Content: result.Content}.Text()
-	return slices.ContainsFunc(asyncMarks, func(m string) bool { return strings.Contains(text, m) })
+	return strings.HasPrefix(text, asyncMark)
 }
 
 // callEnded ends the child of a call whose result came before its
