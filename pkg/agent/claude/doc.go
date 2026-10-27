@@ -30,9 +30,9 @@
 //     and its end. Without [Store], the children are unsaved.
 //   - A subagent can run in the background, after the result of the
 //     run that started it. Between runs, the agent reads the CLI, and
-//     [IdleEvents] gets the events of the child. When the CLI starts a
-//     turn on its own, [Agent.Wakes] sends a value. Call
-//     [Agent.Continue] to run that turn.
+//     [Idle] gets the events of the child. When the CLI starts a turn
+//     on its own, the agent calls [Wake]. Call [Agent.Continue] to run
+//     that turn.
 //
 // The reasons are in docs/concepts/agent/cli-agent.md and
 // docs/concepts/agent/subagent.md.

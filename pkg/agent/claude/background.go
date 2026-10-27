@@ -1,12 +1,8 @@
 package claude
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"maps"
 	"slices"
 
 	"github.com/sonnes/gopi/internal/transcript"
@@ -25,7 +21,7 @@ import (
 //	result            the run ends; a child in the background goes on
 //	user, assistant   lines of the child  -> its log, and the Idle events
 //	task_notification the child ends      -> the Idle events
-//	system init       the CLI starts a turn by itself -> kept, and Wakes
+//	system init       the CLI starts a turn by itself -> kept, and Wake
 //	assistant, result the lines of that turn -> kept
 //
 // Continue runs that turn: it applies the kept lines, then reads the CLI
@@ -37,10 +33,6 @@ type idleReader struct {
 	stop chan struct{}
 	done chan struct{}
 }
-
-// Wakes implements [agent.Waker]. It sends one value when the CLI starts
-// a turn between runs.
-func (a *Agent) Wakes() <-chan struct{} { return a.wakes }
 
 // Continue implements [agent.Waker]. It runs the turn that the CLI
 // started between runs: it sends no input, and it ends at the result of
@@ -82,7 +74,7 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 	// no input that the CLI never got.
 	proc, err := a.ensure(ctx)
 	if err != nil {
-		a.endBackground(agent.SubagentInterrupted)
+		a.endBackground()
 		return em.Finish(ctx, ai.Usage{}, err)
 	}
 	// The error of a hook belongs to the run that called it.
@@ -92,9 +84,7 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 		r.reminder = transcript.Reminder(transcript.SystemText(change.Content))
 		entries = append([]session.Entry{session.NewEntry(*change)}, entries...)
 	}
-	if err := r.adoptBackground(ctx); err != nil {
-		return r.fail(ctx, err)
-	}
+	a.subs.carry(em.Subagent)
 	msgs, err := r.run(ctx, entries, kept)
 	// The CLI did not take these steers before the run ended. It
 	// must not run them after the run, so the agent stops it, and
@@ -107,129 +97,105 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 	return msgs, err
 }
 
-// adoptBackground carries each child in the background in the run of r:
-// it sends a new start of the child, and its lines go to the run.
-func (r *runner) adoptBackground(ctx context.Context) error {
-	var errs []error
-	for _, c := range r.a.takeBackground() {
-		errs = append(errs, r.attach(ctx, c, r, r.em.Subagent, false))
-	}
-	return errors.Join(errs...)
-}
-
 // resumeIdle starts the idle reader on proc, if proc is still the CLI
 // of the agent.
 func (a *Agent) resumeIdle(proc *process) {
-	a.mu.Lock()
-	alive := a.proc == proc
-	a.mu.Unlock()
-	if !alive {
-		a.endBackground(agent.SubagentInterrupted)
-		return
-	}
 	ir := &idleReader{
 		stop: make(chan struct{}),
 		done: make(chan struct{}),
 	}
-	a.idleMu.Lock()
-	a.idle = ir
-	a.idleMu.Unlock()
-	r := &runner{
-		a:         a,
-		proc:      proc,
-		sessionID: a.sessionID(),
-		subagents: map[string]bool{},
-		tasks:     newTasks(),
+	a.mu.Lock()
+	alive := a.proc == proc
+	if alive {
+		a.idle = ir
 	}
-	go a.readIdle(r, ir)
+	a.mu.Unlock()
+	if !alive {
+		a.endBackground()
+		return
+	}
+	go a.readIdle(proc, ir)
 }
 
 // pauseIdle stops the idle reader, and returns the lines that it kept.
-// A wake that no run took goes too, because the run now reads the turn.
-func (a *Agent) pauseIdle() [][]byte {
-	a.idleMu.Lock()
+// The reader owns the tracker and the kept lines until it is done, so
+// they need no lock.
+func (a *Agent) pauseIdle() []*line {
+	a.mu.Lock()
 	ir := a.idle
 	a.idle = nil
-	a.idleMu.Unlock()
+	a.mu.Unlock()
 	if ir != nil {
 		close(ir.stop)
 		<-ir.done
 	}
-	a.idleMu.Lock()
 	kept := a.kept
 	a.kept = nil
-	a.idleMu.Unlock()
-	select {
-	case <-a.wakes:
-	default:
-	}
 	return kept
 }
 
-// readIdle reads the lines of the CLI until a run stops it, or until the
+// readIdle reads the lines of proc until a run stops it, or until the
 // CLI exits. The children in the background go on, with their events on
 // the Idle function of the agent.
-func (a *Agent) readIdle(r *runner, ir *idleReader) {
+func (a *Agent) readIdle(proc *process, ir *idleReader) {
 	defer close(ir.done)
 	ctx := context.Background()
-	for _, c := range a.takeBackground() {
-		_ = r.attach(ctx, c, r, a.sendIdle, false)
-	}
+	a.subs.carry(a.sendIdle)
 	woke := false
 	for {
 		select {
 		case <-ir.stop:
-			_ = r.endChildren(ctx, true)
+			a.releaseIdle(ctx, true)
 			return
-		case data, ok := <-r.proc.lines():
+		case data, ok := <-proc.lines():
 			if !ok {
-				_ = r.endChildren(ctx, false)
+				a.releaseIdle(ctx, false)
 				return
 			}
-			starts := a.idleLine(ctx, r, data)
-			if starts && !woke {
+			l := parseLine(data)
+			if l == nil {
+				continue
+			}
+			if a.idleLine(ctx, l) && !woke {
 				woke = true
-				select {
-				case a.wakes <- struct{}{}:
-				default:
-				}
+				a.signalWake()
 			}
 		}
 	}
 }
 
+// releaseIdle gives back the children at the end of the idle reader.
+// No run reads the error: each child that ends carries the error of its
+// log in its end.
+func (a *Agent) releaseIdle(ctx context.Context, keep bool) {
+	_ = a.subs.release(ctx, keep)
+}
+
 // idleLine applies one line between runs. A line of a child goes to the
 // child. A line of the parent is kept for the next run. It reports
-// whether the line starts a turn of the parent.
-func (a *Agent) idleLine(ctx context.Context, r *runner, data []byte) bool {
-	var l line
-	if err := json.Unmarshal(data, &l); err != nil {
-		return false
-	}
+// whether the line starts a turn of the parent. An error ends the child
+// of the line as failed.
+func (a *Agent) idleLine(ctx context.Context, l *line) bool {
+	s := a.subs
 	if l.ParentToolUseID != nil {
+		id := *l.ParentToolUseID
 		// A child that a kept turn started opens when a run applies
 		// that turn, so its lines are kept with the turn.
-		if _, open := r.tasks.open[*l.ParentToolUseID]; !open {
-			a.keepLine(data)
+		if _, open := s.open[id]; !open {
+			a.kept = append(a.kept, l)
 			return false
 		}
-		_ = r.childLine(ctx, *l.ParentToolUseID, &l)
+		s.fail(ctx, id, s.line(ctx, id, l))
 		return false
 	}
-	if l.Type == "system" {
-		_, isCall := r.tasks.calls[l.ToolUseID]
-		_, isOpen := r.tasks.open[l.ToolUseID]
-		switch {
-		case l.Subtype == "task_started" && isCall:
-			_ = r.taskStarted(ctx, &l)
-			return false
-		case l.Subtype == "task_notification" && isOpen:
-			_ = r.taskEnded(ctx, &l)
-			return false
-		}
+	_, open := s.open[l.ToolUseID]
+	ends := l.Type == "system" && l.Subtype == "task_notification" && open
+	if ends {
+		s.fail(ctx, l.ToolUseID, s.taskEnded(ctx, l))
+		return false
 	}
-	a.keepLine(data)
-	return rootLine(&l)
+	a.kept = append(a.kept, l)
+	return rootLine(l)
 }
 
 // rootLine reports whether l is a line of a turn of the parent: the
@@ -250,38 +216,36 @@ func rootLine(l *line) bool {
 	return false
 }
 
-// rootData reports whether the line data is a line of a turn of the
-// parent.
-func rootData(data []byte) bool {
-	var l line
-	if err := json.Unmarshal(data, &l); err != nil {
-		return false
+// turnOpen reports whether lines leave a turn of the parent open: a turn
+// starts, and its result is not in lines. A request of the CLI is not a
+// turn, because a child in the background can ask for a permission.
+func turnOpen(lines []*line) bool {
+	open := false
+	for _, l := range lines {
+		if rootLine(l) && l.Type != "control_request" {
+			open = l.Type != "result"
+		}
 	}
-	return rootLine(&l)
+	return open
 }
 
 // requeue puts lines that a run did not apply before the kept lines,
-// for the next run. If they start a turn, Wakes sends a value.
-func (a *Agent) requeue(lines [][]byte) {
+// for the next run. If they start a turn, the agent calls Wake.
+func (a *Agent) requeue(lines []*line) {
 	if len(lines) == 0 {
 		return
 	}
-	a.idleMu.Lock()
 	a.kept = append(slices.Clone(lines), a.kept...)
-	a.idleMu.Unlock()
-	if slices.ContainsFunc(lines, rootData) {
-		select {
-		case a.wakes <- struct{}{}:
-		default:
-		}
+	if slices.ContainsFunc(lines, rootLine) {
+		a.signalWake()
 	}
 }
 
-// keepLine keeps a line of the parent for the next run.
-func (a *Agent) keepLine(data []byte) {
-	a.idleMu.Lock()
-	defer a.idleMu.Unlock()
-	a.kept = append(a.kept, data)
+// signalWake calls the Wake function, if the agent has one.
+func (a *Agent) signalWake() {
+	if a.cfg.wake != nil {
+		a.cfg.wake()
+	}
 }
 
 // sendIdle sends an event between runs to the Idle function.
@@ -291,49 +255,11 @@ func (a *Agent) sendIdle(ev agent.Event) {
 	}
 }
 
-// keep gives a child in the background to the agent, for the next run.
-func (a *Agent) keep(c *child) {
-	a.idleMu.Lock()
-	defer a.idleMu.Unlock()
-	a.background[c.callID] = c
-}
-
-// forget removes a child that ended.
-func (a *Agent) forget(callID string) {
-	a.idleMu.Lock()
-	defer a.idleMu.Unlock()
-	delete(a.background, callID)
-}
-
-// takeBackground removes and returns the children in the background, by
-// the ID of their call.
-func (a *Agent) takeBackground() []*child {
-	a.idleMu.Lock()
-	defer a.idleMu.Unlock()
-	out := slices.Collect(maps.Values(a.background))
-	clear(a.background)
-	slices.SortFunc(out, func(x, y *child) int { return cmp.Compare(x.callID, y.callID) })
-	return out
-}
-
-// endBackground ends each child in the background with status, on the
-// Idle function: the CLI that ran them is gone.
-func (a *Agent) endBackground(status string) {
-	for _, c := range a.takeBackground() {
-		a.sendIdle(agent.EventSubagentStart{
-			ToolCallID: c.callID,
-			SessionID:  c.sessionID,
-			Name:       c.name,
-			Title:      c.title,
-			Prompt:     c.prompt,
-			Model:      c.model,
-		})
-		a.sendIdle(agent.EventSubagentEnd{
-			ToolCallID: c.callID,
-			SessionID:  c.sessionID,
-			Status:     status,
-		})
-	}
+// endBackground ends each child in the background as interrupted, on
+// the Idle function: the CLI that ran them is gone.
+func (a *Agent) endBackground() {
+	a.subs.carry(a.sendIdle)
+	a.releaseIdle(context.Background(), false)
 }
 
 // sessionID returns the ID of the session of a, or "" if it is unsaved.

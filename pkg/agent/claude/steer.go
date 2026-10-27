@@ -17,11 +17,6 @@ import (
 // runs in the foreground ends first.
 const steerPriority = "now"
 
-// subagentTools are the tools that start a subagent. A steer cancels a
-// subagent that runs in the foreground, so the agent moves it to the
-// background first, and the subagent ends its work.
-var subagentTools = []string{"Agent", "Task"}
-
 // moveTimeout is how long a steer waits, from its request, for the moves
 // of its subagents to the background. The CLI can leave a move with no
 // answer, so the steer then goes at once.
@@ -54,7 +49,7 @@ func (a *Agent) Steer(entries ...session.Entry) {
 	a.steerMu.Unlock()
 
 	select {
-	case a.wake <- struct{}{}:
+	case a.steerReady <- struct{}{}:
 	default:
 	}
 }
@@ -102,7 +97,7 @@ func (r *runner) sendSteer(ctx context.Context) error {
 		r.held = append(r.held, entries...)
 		return nil
 	}
-	ids := r.openSubagents()
+	ids := r.subs.foreground()
 	if len(ids) == 0 {
 		return r.sendNow(entries)
 	}
@@ -125,7 +120,7 @@ func (r *runner) sendSteer(ctx context.Context) error {
 
 // moved applies the answer to a move. When each move has an answer, the
 // steers that waited go to the CLI.
-func (r *runner) moved(ctx context.Context, l *line) error {
+func (r *runner) moved(l *line) error {
 	if l.Response == nil || !r.moves[l.Response.RequestID] {
 		return nil
 	}
@@ -133,11 +128,11 @@ func (r *runner) moved(ctx context.Context, l *line) error {
 	if len(r.moves) > 0 {
 		return nil
 	}
-	return r.sendHeld(ctx)
+	return r.sendHeld()
 }
 
 // sendHeld sends the steers that waited for the moves.
-func (r *runner) sendHeld(_ context.Context) error {
+func (r *runner) sendHeld() error {
 	entries := r.held
 	r.moves = nil
 	r.held = nil
@@ -199,17 +194,6 @@ func (r *runner) segmentEnded(l *line) bool {
 	}
 	cutBySteer := r.steered && slices.Contains(abortedReasons, l.TerminalReason)
 	return len(r.pending) > 0 || cutBySteer
-}
-
-// openSubagents returns the IDs of the subagent calls that wait for
-// their result, in order.
-func (r *runner) openSubagents() []string {
-	var ids []string
-	for id := range r.subagents {
-		ids = append(ids, id)
-	}
-	slices.Sort(ids)
-	return ids
 }
 
 // lostSteers returns the entries of the steers that the CLI did not take.

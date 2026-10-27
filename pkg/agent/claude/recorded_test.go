@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -396,13 +398,15 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	}, "testdata/TestRecordedBackgroundSubagent.trace")
 
 	idle := &idleSink{}
+	woke := newWakeSink()
 	store := session.NewMemoryStore()
 	a, err := claude.Durable(ctx, "s1",
 		claude.Dir(dir),
 		claude.Model("haiku"),
 		claude.PermissionMode(claude.PermissionBypass),
 		claude.Store(store),
-		claude.IdleEvents(idle.add),
+		claude.Idle(idle.add),
+		claude.Wake(woke.signal),
 	)
 	require.NoError(t, err)
 	defer closeAgent(t, a)
@@ -434,7 +438,7 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	assert.Equal(t, agent.SubagentBackground, ends[0].Status, "the run ends with the child in the background")
 
 	select {
-	case <-a.Wakes():
+	case <-woke:
 	case <-time.After(wakeWait):
 		require.FailNow(t, "the CLI started no turn after the child ended")
 	}
@@ -449,6 +453,15 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	assert.Equal(t, start.SessionID, idleEnd.SessionID)
 	assert.Equal(t, agent.SubagentCompleted, idleEnd.Status)
 	assert.Contains(t, strings.ToLower(idleEnd.Text), "banana")
+
+	// The child runs once, from the run into the time between runs.
+	var inner []agent.Event
+	for _, e := range append(events, idle.all()...) {
+		if e, ok := e.(agent.EventSubagent); ok {
+			inner = append(inner, e.Event)
+		}
+	}
+	emittest.CheckEvents(t, inner)
 
 	snap, err := store.Load(ctx, start.SessionID)
 	require.NoError(t, err)
@@ -472,6 +485,72 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	checkLog(t, a)
 }
 
+// laterFailStore fails each append to a child session after fail is set.
+type laterFailStore struct {
+	*session.MemoryStore
+	fail atomic.Bool
+}
+
+func (s *laterFailStore) Append(ctx context.Context, id string, entries ...session.Entry) error {
+	if s.fail.Load() && strings.Contains(id, ".") {
+		return errors.New("disk full")
+	}
+	return s.MemoryStore.Append(ctx, id, entries...)
+}
+
+func TestBackgroundSubagentWithAFailedLogEndsBetweenRuns(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	home, _ := os.UserHomeDir()
+	require.NoError(t, os.WriteFile(dir+"/word.txt", []byte("banana\n"), 0o600))
+	claude.Replay(t, []stdiorr.Scrub{
+		scrubLine,
+		scrubDir("/private"+dir, "/work"),
+		scrubDir(dir, "/work"),
+		scrubDir(home, "/home/me"),
+	}, "testdata/TestRecordedBackgroundSubagent.trace")
+
+	idle := &idleSink{}
+	woke := newWakeSink()
+	store := &laterFailStore{MemoryStore: session.NewMemoryStore()}
+	a, err := claude.Durable(ctx, "s1",
+		claude.Dir(dir),
+		claude.Model("haiku"),
+		claude.PermissionMode(claude.PermissionBypass),
+		claude.Store(store),
+		claude.Idle(idle.add),
+		claude.Wake(woke.signal),
+	)
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	prompt := "Start exactly one subagent with the Agent tool, with run_in_background set to true " +
+		"and subagent_type general-purpose. Its task: run the shell command sleep 10, then read " +
+		"word.txt and reply with the word. After you start it, end your turn at once with the " +
+		"text STARTED. Do not wait for it."
+	_, _, err = run(ctx, a, prompt)
+	require.NoError(t, err)
+	store.fail.Store(true)
+
+	select {
+	case <-woke:
+	case <-time.After(wakeWait):
+		require.FailNow(t, "the CLI started no turn after the child ended")
+	}
+	var ends []agent.EventSubagentEnd
+	for _, e := range idle.all() {
+		if e, ok := e.(agent.EventSubagentEnd); ok {
+			ends = append(ends, e)
+		}
+	}
+	require.Len(t, ends, 1, "the child ends once between runs")
+	assert.Equal(t, agent.SubagentFailed, ends[0].Status)
+	assert.Contains(t, ends[0].Text, "disk full")
+
+	_, _, err = collectRun(a.Continue(ctx))
+	require.NoError(t, err)
+}
+
 // TestRecordedSteerSubagent runs the real CLI. Record it with
 // `make record-cli AGENT=claude RUN=TestRecordedSteerSubagent`.
 func TestRecordedSteerSubagent(t *testing.T) {
@@ -488,13 +567,15 @@ func TestRecordedSteerSubagent(t *testing.T) {
 	claude.SetUUIDs(t, "steer-1")
 
 	idle := &idleSink{}
+	woke := newWakeSink()
 	store := session.NewMemoryStore()
 	a, err := claude.Durable(ctx, "s1",
 		claude.Dir(dir),
 		claude.Model("haiku"),
 		claude.PermissionMode(claude.PermissionBypass),
 		claude.Store(store),
-		claude.IdleEvents(idle.add),
+		claude.Idle(idle.add),
+		claude.Wake(woke.signal),
 	)
 	require.NoError(t, err)
 	defer closeAgent(t, a)
@@ -529,7 +610,7 @@ func TestRecordedSteerSubagent(t *testing.T) {
 	assert.Equal(t, agent.SubagentBackground, ends[0].Status, "the steer moves the child to the background, and does not stop it")
 
 	select {
-	case <-a.Wakes():
+	case <-woke:
 	case <-time.After(wakeWait):
 		require.FailNow(t, "the CLI started no turn after the child ended")
 	}

@@ -952,6 +952,28 @@ func TestSubagentOpenAtTheResultEndsInterrupted(t *testing.T) {
 	checkLog(t, a)
 }
 
+func TestSubagentWhoseResultComesFirstEndsWithItsText(t *testing.T) {
+	ctx := context.Background()
+	claude.Replay(t, nil, "testdata/subagent_result_first.trace")
+	a, err := claude.Durable(ctx, "s1", claude.Store(session.NewMemoryStore()))
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	events, _, err := run(ctx, a, "Use the Agent tool once.")
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	var ends []agent.EventSubagentEnd
+	for _, e := range events {
+		if end, ok := e.(agent.EventSubagentEnd); ok {
+			ends = append(ends, end)
+		}
+	}
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentCompleted, ends[0].Status)
+	assert.Equal(t, "banana", ends[0].Text, "the child ends at its task_notification, with the summary")
+}
+
 // childFailStore is a store whose appends to a child session fail.
 type childFailStore struct {
 	*session.MemoryStore
@@ -990,12 +1012,16 @@ func TestInputWaitsForTheTurnThatTheCLIStarted(t *testing.T) {
 	allow := func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		return agent.Decision{Allow: true}, nil
 	}
-	a := claude.New(claude.Approve(allow))
+	woke := newWakeSink()
+	a := claude.New(
+		claude.Approve(allow),
+		claude.Wake(woke.signal),
+	)
 	defer closeAgent(t, a)
 
 	_, _, err := run(ctx, a, "Start a helper in the background.")
 	require.NoError(t, err)
-	<-a.Wakes()
+	<-woke
 
 	// The turn of the CLI waits for the answer to its request, so it is
 	// still open when the run starts. The trace fails the run if the
@@ -1025,4 +1051,17 @@ func TestContinueWithNoTurnEndsAtOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, msgs)
 	assert.Len(t, a.Log().Entries(), before, "a run with no turn stores nothing")
+}
+
+// wakeSink is a channel that gets one value for each wake of the agent
+// that no test read yet.
+type wakeSink chan struct{}
+
+func newWakeSink() wakeSink { return make(wakeSink, 1) }
+
+func (w wakeSink) signal() {
+	select {
+	case w <- struct{}{}:
+	default:
+	}
 }

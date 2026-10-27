@@ -17,7 +17,7 @@ import (
 // The driver maps Model to the ID of the model, Dir, System, Effort to
 // [Thinking], Mode to [PermissionMode], Allow to [AllowedTools], Ask to
 // [AskTools], Deny to [DisallowedTools], MCP to [MCP], Idle to
-// [IdleEvents], and Approve. It rejects Skills
+// [Idle], Wake to [Wake], and Approve. It rejects Skills
 // and Tools, because the CLI loads its own skills and runs only its own
 // tools. It skips Dirs: the caller gives the CLI its skills and agents. It runs the hooks at the points of
 // [Hooks]. Start rejects a hook at a model call, in the options of the
@@ -97,7 +97,10 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Approve(c.Approve))
 	}
 	if c.Idle != nil {
-		opts = append(opts, IdleEvents(c.Idle))
+		opts = append(opts, Idle(c.Idle))
+	}
+	if c.Wake != nil {
+		opts = append(opts, Wake(c.Wake))
 	}
 	if len(c.Hooks) > 0 {
 		opts = append(opts, Hooks(c.Hooks...))

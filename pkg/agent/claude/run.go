@@ -38,9 +38,9 @@ type runner struct {
 	reminder string
 	// sessionID is the ID of the session of em, or "" if it is unsaved.
 	sessionID string
-	// tasks tracks the subagents of the run. The runner of the run and
-	// the runner of each child share it.
-	tasks *tasks
+	// subs tracks the subagents. The runner of the run and the runner of
+	// each child share it.
+	subs *subagents
 
 	// cur is the API message in flight. The CLI sends one assistant
 	// line per content block, so the runner collects the blocks until
@@ -61,18 +61,10 @@ type runner struct {
 	pending  []pendingSteer
 	steered  bool
 	segments ai.Usage
-	// subagents are the IDs of the subagent calls that wait for their
-	// result.
-	subagents map[string]bool
 
-	// replaying is true while the runner applies the lines that the
-	// reader between runs kept for a run with input: the result of that
-	// turn ends only a segment. turnOpen is true from the first line of
-	// a turn of the parent to its result. input is the input of a run
-	// that waits for the end of the turn that the CLI started by itself.
-	replaying bool
-	turnOpen  bool
-	input     []session.Entry
+	// input is the input of a run that waits for the end of the turn
+	// that the CLI started by itself.
+	input []session.Entry
 	// moves are the requests that move a subagent to the background
 	// before a steer, by request ID. held are the steers that wait for
 	// them, until moveDeadline.
@@ -80,6 +72,10 @@ type runner struct {
 	held         []session.Entry
 	moveDeadline <-chan time.Time
 }
+
+// isChild reports whether r is the runner of a child. The runner of a
+// child has no process.
+func (r *runner) isChild() bool { return r.proc == nil }
 
 // apiMessage is one assistant message of the Messages API, as the
 // assistant lines of the CLI build it.
@@ -120,11 +116,10 @@ type block struct {
 func (r *runner) run(
 	ctx context.Context,
 	entries []session.Entry,
-	kept [][]byte,
+	kept []*line,
 ) ([]ai.Message, error) {
-	cont := len(entries) == 0
-	if cont {
-		if !slices.ContainsFunc(kept, rootData) {
+	if len(entries) == 0 {
+		if !slices.ContainsFunc(kept, rootLine) {
 			return r.abort(ctx, ai.Usage{}, nil)
 		}
 		wake, err := session.Custom(agent.KindWake, nil)
@@ -134,23 +129,24 @@ func (r *runner) run(
 		if err != nil {
 			return r.abort(ctx, ai.Usage{}, err)
 		}
-	}
-	r.replaying = !cont
-	for i, data := range kept {
-		msgs, end, err := r.handle(ctx, data)
-		if end {
-			// The lines after the result are for the next run.
-			r.a.requeue(kept[i+1:])
-			return msgs, err
+		for i, l := range kept {
+			msgs, end, err := r.handle(ctx, l)
+			if end {
+				// The lines after the result are for the next run.
+				r.a.requeue(kept[i+1:])
+				return msgs, err
+			}
+			if err != nil {
+				return r.fail(ctx, err)
+			}
 		}
-		if err != nil {
-			return r.fail(ctx, err)
+	} else {
+		for _, l := range kept {
+			if err := r.replay(ctx, l); err != nil {
+				return r.fail(ctx, err)
+			}
 		}
-	}
-	r.replaying = false
-
-	if !cont {
-		if r.turnOpen {
+		if turnOpen(kept) {
 			r.input = entries
 		} else if err := r.sendInput(ctx, entries); err != nil {
 			return r.fail(ctx, err)
@@ -177,11 +173,11 @@ func (r *runner) run(
 			return r.fail(ctx, ctx.Err())
 
 		case <-r.moveDeadline:
-			if err := r.sendHeld(ctx); err != nil {
+			if err := r.sendHeld(); err != nil {
 				return r.fail(ctx, err)
 			}
 
-		case <-r.a.wake:
+		case <-r.a.steerReady:
 			if err := r.sendSteer(ctx); err != nil {
 				return r.fail(ctx, err)
 			}
@@ -194,7 +190,11 @@ func (r *runner) run(
 				}
 				return r.fail(ctx, err)
 			}
-			msgs, end, err := r.handle(ctx, data)
+			l := parseLine(data)
+			if l == nil {
+				continue
+			}
+			msgs, end, err := r.handle(ctx, l)
 			if end {
 				return msgs, err
 			}
@@ -281,15 +281,42 @@ func fileBlock(f ai.File) outBlock {
 // is the usage of the run.
 func (r *runner) fail(ctx context.Context, err error) ([]ai.Message, error) {
 	r.a.drop(r.proc)
-	err = errors.Join(err, r.endChildren(ctx, false))
+	err = errors.Join(err, r.subs.release(ctx, false))
 	return r.em.Finish(ctx, r.em.Usage(), err)
 }
 
 // abort ends a run with an error, and the CLI keeps running. The
 // messages that the run stored are still its result.
 func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
-	err = errors.Join(err, r.endChildren(ctx, true))
+	err = errors.Join(err, r.subs.release(ctx, true))
 	return r.em.Finish(ctx, u, err)
+}
+
+// parseLine returns the line of data, or nil if data is not a line.
+func parseLine(data []byte) *line {
+	var l line
+	if err := json.Unmarshal(data, &l); err != nil {
+		return nil
+	}
+	return &l
+}
+
+// replay applies a line that the reader between runs kept, in a run
+// with input. The kept lines are turns that the CLI started by itself,
+// so the result of each one ends only a segment.
+func (r *runner) replay(ctx context.Context, l *line) error {
+	if l.Type == "result" {
+		return r.endSegment(ctx, l)
+	}
+	_, _, err := r.handle(ctx, l)
+	return err
+}
+
+// endSegment ends a segment of the run at a result line that does not
+// end the run.
+func (r *runner) endSegment(ctx context.Context, l *line) error {
+	r.segments = r.segments.Add(usage(&l.Usage))
+	return r.finish(ctx)
 }
 
 // handle applies one line. It reports end at the result of the run,
@@ -300,39 +327,29 @@ func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message
 // without the cancel of ctx.
 func (r *runner) handle(
 	ctx context.Context,
-	data []byte,
+	l *line,
 ) (msgs []ai.Message, end bool, err error) {
-	var l line
-	if err := json.Unmarshal(data, &l); err != nil {
-		return nil, false, nil
-	}
 	// A line with a parent tool call is from a subagent. Its lines go
 	// to the log of the child, and never to the log of the run.
 	if l.ParentToolUseID != nil {
-		return nil, false, r.childLine(ctx, *l.ParentToolUseID, &l)
-	}
-
-	// A request of the CLI is not a turn: a child in the background can
-	// ask for a permission.
-	if rootLine(&l) && l.Type != "control_request" {
-		r.turnOpen = l.Type != "result"
+		return nil, false, r.subs.line(ctx, *l.ParentToolUseID, l)
 	}
 
 	switch l.Type {
 	case "control_request":
-		return nil, false, r.proc.answer(ctx, &l)
+		return nil, false, r.proc.answer(ctx, l)
 
 	case "control_response":
-		return nil, false, r.moved(ctx, &l)
+		return nil, false, r.moved(l)
 
 	case "system":
 		switch l.Subtype {
 		case "init":
 			return nil, false, r.saveSession(ctx, l.SessionID)
 		case "task_started":
-			return nil, false, r.taskStarted(ctx, &l)
+			return nil, false, r.subs.taskStarted(ctx, l)
 		case "task_notification":
-			return nil, false, r.taskEnded(ctx, &l)
+			return nil, false, r.subs.taskEnded(ctx, l)
 		}
 
 	case "stream_event":
@@ -349,7 +366,7 @@ func (r *runner) handle(
 
 	case "user":
 		if l.IsReplay {
-			return nil, false, r.replayed(ctx, &l)
+			return nil, false, r.replayed(ctx, l)
 		}
 		if l.Message == nil {
 			return nil, false, nil
@@ -359,10 +376,8 @@ func (r *runner) handle(
 	case "result":
 		// The turn that the CLI started by itself ends before the
 		// input of the run goes.
-		wakeEnded := r.replaying || r.input != nil
-		if wakeEnded || r.segmentEnded(&l) {
-			r.segments = r.segments.Add(usage(&l.Usage))
-			if err := r.finish(ctx); err != nil {
+		if r.input != nil || r.segmentEnded(l) {
+			if err := r.endSegment(ctx, l); err != nil {
 				return nil, false, err
 			}
 			if r.input == nil {
@@ -372,7 +387,7 @@ func (r *runner) handle(
 			r.input = nil
 			return nil, false, r.sendInput(ctx, entries)
 		}
-		msgs, err := r.result(ctx, &l)
+		msgs, err := r.result(ctx, l)
 		return msgs, true, err
 	}
 	return nil, false, nil
@@ -613,10 +628,7 @@ func (r *runner) finish(ctx context.Context) error {
 	}
 	for _, tc := range calls {
 		r.em.ToolStart(tc)
-		if slices.Contains(subagentTools, tc.Name) {
-			r.subagents[tc.ID] = true
-		}
-		if err := r.callStarted(ctx, tc); err != nil {
+		if err := r.subs.callStarted(ctx, r, tc); err != nil {
 			return err
 		}
 	}
@@ -671,14 +683,11 @@ func (r *runner) toolResults(ctx context.Context, m *wireMessage) error {
 		if b.Type != "tool_result" {
 			continue
 		}
-		delete(r.subagents, b.ToolUseID)
 		result := ai.ToolResult{
 			Content: toolContent(b.Content),
 			IsError: b.IsError,
 		}
-		if err := r.callEnded(ctx, b.ToolUseID, result); err != nil {
-			return err
-		}
+		r.subs.callEnded(b.ToolUseID, result)
 		if _, err := r.em.ToolEnd(ctx, b.ToolUseID, result); err != nil {
 			return err
 		}
@@ -718,7 +727,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if err := r.finish(ctx); err != nil {
 		return r.abort(ctx, u, err)
 	}
-	if err := r.endChildren(ctx, true); err != nil {
+	if err := r.subs.release(ctx, true); err != nil {
 		return r.abort(ctx, u, err)
 	}
 	if r.interrupted {

@@ -23,13 +23,16 @@ const taskTypeAgent = "local_agent"
 // subagent_type.
 const defaultChildName = "agent"
 
+// subagentTools are the tools that start a subagent.
+var subagentTools = []string{"Agent", "Task"}
+
 // The status values of task_notification.
 const (
 	taskCompleted = "completed"
 	taskFailed    = "failed"
 )
 
-// tasks tracks the subagents of one run. The CLI sends a subagent as
+// subagents tracks the subagents of the CLI. The CLI sends a subagent as
 // task lines, and as assistant and user lines that name the Agent call
 // in parent_tool_use_id:
 //
@@ -44,9 +47,20 @@ const (
 // ends, so before the call starts on the run stream. The child waits
 // for the start of its call. A line of a child that is not open yet
 // waits too.
-type tasks struct {
-	// calls are the tool calls that started in the run, by ID, with the
-	// runner that started them.
+//
+// A child in the background outlives the run that started it, so the
+// agent keeps one tracker. Its carrier is the run, or the reader between
+// runs. Each carrier sends a new start of each child in the background,
+// and gives the children back at its end, so that the stream of each
+// run is balanced. The carriers take turns, so the tracker has no lock.
+type subagents struct {
+	a *Agent
+	// send is the sink of the carrier. A child of a call of the parent
+	// sends its start, its events, and its end to it. It is nil between
+	// carriers.
+	send func(agent.Event)
+	// calls are the tool calls that started under the carrier, by ID,
+	// with the runner that started them.
 	calls map[string]call
 	// started are the task_started lines whose call did not start yet,
 	// by the ID of the call.
@@ -54,22 +68,23 @@ type tasks struct {
 	// waiting are the lines of a child that is not open yet, by the ID
 	// of its call.
 	waiting map[string][]*line
-	// open are the children that run, by the ID of their call.
+	// open are the children that run, by the ID of their call. A child
+	// in the background stays open between runs.
 	open map[string]*child
-	// async are the Agent calls whose result said that the child runs in
-	// the background, before the child opened.
-	async map[string]bool
 }
 
-// call is one tool call of the run, and the runner that started it.
+// call is one tool call of the carrier, and the runner that started it.
 type call struct {
 	owner *runner
 	tc    ai.ToolCall
+	// result is the status that the result of the call gave its child:
+	// completed, failed, or background. It is "" before the result.
+	result string
 }
 
-// child is one subagent of the CLI. A child in the background outlives
-// the run that started it: the agent keeps it, and each later run, or
-// the reader between runs, carries it.
+// child is one subagent of the CLI. Its runner and its emitter last from
+// its start to its end, also across runs, so the stream of the child has
+// one agent_start and one agent_end.
 type child struct {
 	callID    string
 	sessionID string
@@ -78,13 +93,11 @@ type child struct {
 	prompt    string
 	model     string
 	log       *session.Log
-	// owner is the runner whose call started the child, in the run that
-	// carries it. It is nil between runs.
+	// run maps the lines of the child to its log.
+	run *runner
+	// owner is the runner of the child whose call started this child.
+	// It is nil for a child of a call of the parent.
 	owner *runner
-	// run maps the lines of the child to its log. send takes the start,
-	// each event, and the end of the child, for the run that carries it.
-	run  *runner
-	send func(agent.Event)
 	// background is true after the CLI moved the child to the background.
 	background bool
 }
@@ -98,131 +111,141 @@ type agentInput struct {
 
 // newRunner returns the runner of one run of a.
 func newRunner(a *Agent, proc *process, em *emit.Emitter) *runner {
-	id := ""
-	if a.store != nil {
-		id = a.log.Session().ID
-	}
 	return &runner{
 		a:         a,
 		proc:      proc,
 		em:        em,
-		sessionID: id,
-		subagents: map[string]bool{},
-		tasks:     newTasks(),
+		sessionID: a.sessionID(),
+		subs:      a.subs,
 	}
 }
 
-// newTasks returns the tracker of the subagents of one run.
-func newTasks() *tasks {
-	return &tasks{
-		calls:   map[string]call{},
-		started: map[string]*line{},
-		waiting: map[string][]*line{},
-		open:    map[string]*child{},
-		async:   map[string]bool{},
+// newSubagents returns the tracker of the subagents of a.
+func newSubagents(a *Agent) *subagents {
+	return &subagents{
+		a:    a,
+		open: map[string]*child{},
 	}
 }
 
-// callStarted records a tool call that r started. If its task_started
-// line came first, the child opens now.
-func (r *runner) callStarted(ctx context.Context, tc ai.ToolCall) error {
-	r.tasks.calls[tc.ID] = call{
-		owner: r,
+// carry makes send the sink of a new carrier, and sends a new start of
+// each child in the background to it.
+func (s *subagents) carry(send func(agent.Event)) {
+	s.send = send
+	s.calls = map[string]call{}
+	s.started = map[string]*line{}
+	s.waiting = map[string][]*line{}
+	for _, c := range s.top() {
+		send(c.start())
+	}
+}
+
+// release gives back the children of the carrier at its end, and
+// returns the errors of their logs. If keep is true, the CLI goes on, so
+// a child in the background goes on too: it gets an end with the status
+// background, and stays open for the next carrier. A child whose call
+// has a result ends with the status of that result. Each other child
+// ends as interrupted. A second release of the same carrier does
+// nothing.
+func (s *subagents) release(ctx context.Context, keep bool) error {
+	if s.send == nil {
+		return nil
+	}
+	defer func() { s.send = nil }()
+	var errs []error
+	for _, c := range s.top() {
+		result := s.calls[c.callID].result
+		ended := result == agent.SubagentCompleted || result == agent.SubagentFailed
+		switch {
+		case keep && c.background:
+			s.send(agent.EventSubagentEnd{
+				ToolCallID: c.callID,
+				SessionID:  c.sessionID,
+				Status:     agent.SubagentBackground,
+				Text:       agent.LastText(c.log.Messages()),
+			})
+		case ended:
+			errs = append(errs, s.end(ctx, c, result, ""))
+		default:
+			errs = append(errs, s.end(ctx, c, agent.SubagentInterrupted, ""))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// callStarted records a tool call that owner started. If its
+// task_started line came first, the child opens now.
+func (s *subagents) callStarted(ctx context.Context, owner *runner, tc ai.ToolCall) error {
+	s.calls[tc.ID] = call{
+		owner: owner,
 		tc:    tc,
 	}
-	l, ok := r.tasks.started[tc.ID]
+	l, ok := s.started[tc.ID]
 	if !ok {
 		return nil
 	}
-	delete(r.tasks.started, tc.ID)
-	return r.openChild(ctx, l)
+	delete(s.started, tc.ID)
+	return s.openChild(ctx, l)
 }
 
 // taskStarted opens the child of a task_started line, or keeps the line
 // until its call starts. A task that is not a subagent opens nothing.
-func (r *runner) taskStarted(ctx context.Context, l *line) error {
+func (s *subagents) taskStarted(ctx context.Context, l *line) error {
 	if l.TaskType != taskTypeAgent || l.ToolUseID == "" {
 		return nil
 	}
-	if _, ok := r.tasks.calls[l.ToolUseID]; !ok {
-		r.tasks.started[l.ToolUseID] = l
+	if _, ok := s.calls[l.ToolUseID]; !ok {
+		s.started[l.ToolUseID] = l
 		return nil
 	}
-	return r.openChild(ctx, l)
+	return s.openChild(ctx, l)
 }
 
-// openChild opens the session of the child of l, sends its start on
-// the stream of its owner, stores its prompt, and applies the lines
-// that waited for it.
-func (r *runner) openChild(ctx context.Context, l *line) error {
-	c := r.tasks.calls[l.ToolUseID]
+// openChild opens the session of the child of l, sends its start,
+// stores its prompt, and applies the lines that waited for it.
+func (s *subagents) openChild(ctx context.Context, l *line) error {
+	c := s.calls[l.ToolUseID]
 	var in agentInput
 	_ = json.Unmarshal(c.tc.Input, &in)
-	name := in.SubagentType
-	if name == "" {
-		name = defaultChildName
-	}
+	name := cmp.Or(in.SubagentType, defaultChildName)
 	id := agent.ChildID(c.owner.sessionID, name, l.TaskID)
+	ref := agent.ParentRef{
+		SessionID:  c.owner.sessionID,
+		ToolCallID: l.ToolUseID,
+	}
 
 	// The CLI goes on after an interrupt, so the child keeps its lines.
 	store := context.WithoutCancel(ctx)
-	log, err := r.childLog(store, id)
+	log, err := emit.OpenChild(store, s.a.store, id, ref)
 	if err != nil {
 		return err
 	}
-	if len(log.Entries()) == 0 {
-		ref := agent.ParentRef{
-			SessionID:  c.owner.sessionID,
-			ToolCallID: l.ToolUseID,
-		}
-		if err := agent.Parent.Set(store, log.Writer(), ref); err != nil {
-			return err
-		}
-	}
 
 	ch := &child{
-		callID:    l.ToolUseID,
-		sessionID: id,
-		name:      name,
-		title:     l.Description,
-		prompt:    l.Prompt,
-		model:     in.Model,
-		log:       log,
+		callID:     l.ToolUseID,
+		sessionID:  id,
+		name:       name,
+		title:      l.Description,
+		prompt:     l.Prompt,
+		model:      in.Model,
+		log:        log,
+		background: c.result == agent.SubagentBackground,
 	}
-	if r.tasks.async[l.ToolUseID] {
-		delete(r.tasks.async, l.ToolUseID)
-		ch.background = true
+	if c.owner.isChild() {
+		ch.owner = c.owner
 	}
-	return r.attach(ctx, ch, c.owner, c.owner.em.Subagent, true)
-}
-
-// attach opens ch in the run of r, under owner, and sends its start to
-// send. A new child stores its prompt. A child in the background that an
-// earlier run started comes back with a new start, so that the stream
-// of each run is balanced. Then attach applies the lines that waited.
-func (r *runner) attach(ctx context.Context, ch *child, owner *runner, send func(agent.Event), isNew bool) error {
-	store := context.WithoutCancel(ctx)
-	callID := ch.callID
-	id := ch.sessionID
 	push := func(ev agent.Event) {
-		send(agent.EventSubagent{
-			ToolCallID: callID,
+		s.sink(ch)(agent.EventSubagent{
+			ToolCallID: ch.callID,
 			SessionID:  id,
 			Event:      ev,
 		})
 	}
-	em := emit.New(ch.log, r.a.name, emit.NewState(ch.log), push)
-	send(agent.EventSubagentStart{
-		ToolCallID: callID,
-		SessionID:  id,
-		Name:       ch.name,
-		Title:      ch.title,
-		Prompt:     ch.prompt,
-		Model:      ch.model,
-	})
+	em := emit.New(log, s.a.name, emit.NewState(log), push)
+	s.sink(ch)(ch.start())
 	if err := em.Start(); err != nil {
-		send(agent.EventSubagentEnd{
-			ToolCallID: callID,
+		s.sink(ch)(agent.EventSubagentEnd{
+			ToolCallID: ch.callID,
 			SessionID:  id,
 			Status:     agent.SubagentFailed,
 			Text:       err.Error(),
@@ -231,48 +254,59 @@ func (r *runner) attach(ctx context.Context, ch *child, owner *runner, send func
 	}
 
 	// The child is open from its start, so each exit ends it.
-	ch.owner = owner
-	ch.send = send
 	ch.run = &runner{
-		a:         r.a,
+		a:         s.a,
 		em:        em,
 		sessionID: id,
-		subagents: map[string]bool{},
-		tasks:     r.tasks,
+		subs:      s,
 	}
-	r.tasks.open[callID] = ch
-	if isNew {
-		if err := em.Input(store, []session.Entry{session.Text(ch.prompt)}); err != nil {
-			return err
-		}
+	s.open[ch.callID] = ch
+	if err := em.Input(store, []session.Entry{session.Text(ch.prompt)}); err != nil {
+		return err
 	}
-	waiting := r.tasks.waiting[callID]
-	delete(r.tasks.waiting, callID)
+	waiting := s.waiting[ch.callID]
+	delete(s.waiting, ch.callID)
 	for _, wl := range waiting {
-		if err := r.childLine(ctx, callID, wl); err != nil {
+		if err := s.line(ctx, ch.callID, wl); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// childLog returns the log of the child id. A child of an unsaved
-// agent has an unsaved log.
-func (r *runner) childLog(ctx context.Context, id string) (*session.Log, error) {
-	if id == "" {
-		return session.New(), nil
+// start returns the start event of c.
+func (c *child) start() agent.EventSubagentStart {
+	return agent.EventSubagentStart{
+		ToolCallID: c.callID,
+		SessionID:  c.sessionID,
+		Name:       c.name,
+		Title:      c.title,
+		Prompt:     c.prompt,
+		Model:      c.model,
 	}
-	return session.Open(ctx, r.a.store, id)
 }
 
-// childLine applies one line of the child of the call callID. A line of
-// a child that is not open waits. The child keeps its assistant
-// messages and its tool results. Its streamed events are not applied,
-// because the assistant lines carry the same blocks.
-func (r *runner) childLine(ctx context.Context, callID string, l *line) error {
-	c, ok := r.tasks.open[callID]
+// sink returns the function that takes the start, the events, and the
+// end of c: the emitter of the child that owns c, or the sink of the
+// carrier. Between carriers, it drops the events.
+func (s *subagents) sink(c *child) func(agent.Event) {
+	if c.owner != nil {
+		return c.owner.em.Subagent
+	}
+	if s.send == nil {
+		return func(agent.Event) {}
+	}
+	return s.send
+}
+
+// line applies one line of the child of the call callID. A line of a
+// child that is not open waits. The child keeps its assistant messages
+// and its tool results. Its streamed events are not applied, because
+// the assistant lines carry the same blocks.
+func (s *subagents) line(ctx context.Context, callID string, l *line) error {
+	c, ok := s.open[callID]
 	if !ok {
-		r.tasks.waiting[callID] = append(r.tasks.waiting[callID], l)
+		s.waiting[callID] = append(s.waiting[callID], l)
 		return nil
 	}
 	if l.Message == nil {
@@ -289,8 +323,8 @@ func (r *runner) childLine(ctx context.Context, callID string, l *line) error {
 
 // taskEnded ends the child of a task_notification line. The summary is
 // the last text of the child.
-func (r *runner) taskEnded(ctx context.Context, l *line) error {
-	c, ok := r.tasks.open[l.ToolUseID]
+func (s *subagents) taskEnded(ctx context.Context, l *line) error {
+	c, ok := s.open[l.ToolUseID]
 	if !ok {
 		return nil
 	}
@@ -301,7 +335,7 @@ func (r *runner) taskEnded(ctx context.Context, l *line) error {
 	case taskFailed:
 		status = agent.SubagentFailed
 	}
-	return r.endChild(ctx, c, status, l.Summary)
+	return s.end(ctx, c, status, l.Summary)
 }
 
 // asyncMark starts the text of an Agent result that says that the child
@@ -317,63 +351,64 @@ func launchedAsync(result ai.ToolResult) bool {
 	return strings.HasPrefix(text, asyncMark)
 }
 
-// callEnded ends the child of a call whose result came before its
-// task_notification line. The result is not the text of the child: the
-// CLI wraps the report of the child in a frame for the parent. So the
-// child ends with no last message. A result that says that the child
-// runs in the background ends nothing: only task_notification ends a
-// child in the background.
-func (r *runner) callEnded(ctx context.Context, id string, result ai.ToolResult) error {
-	async := !result.IsError && launchedAsync(result)
-	c, ok := r.tasks.open[id]
+// callEnded keeps the status that the result of the call id gives its
+// child. The result is not the text of the child: the CLI wraps the
+// report of the child in a frame for the parent. So the child waits for
+// its task_notification, whose summary is its last text. A result that
+// says that the child runs in the background marks the child.
+func (s *subagents) callEnded(id string, result ai.ToolResult) {
+	cl, ok := s.calls[id]
 	if !ok {
-		if async {
-			r.tasks.async[id] = true
-		}
-		return nil
+		return
 	}
-	if async {
+	switch {
+	case result.IsError:
+		cl.result = agent.SubagentFailed
+	case launchedAsync(result):
+		cl.result = agent.SubagentBackground
+	default:
+		cl.result = agent.SubagentCompleted
+	}
+	s.calls[id] = cl
+	if c, open := s.open[id]; open && cl.result == agent.SubagentBackground {
 		c.background = true
-		return nil
 	}
-	status := agent.SubagentCompleted
-	if result.IsError {
-		status = agent.SubagentFailed
-	}
-	return r.endChild(ctx, c, status, "")
 }
 
-// endChild ends the run of c and sends its end. Each open child of c
-// ends first, so that the stream of c closes before its end. The CLI
-// does not send the last message of a foreground subagent as a line, so
-// a completed child gets text as its last assistant message, unless its
-// log already ends with it. A failed write of the log does not stop the
-// end: the child still ends, as failed, and endChild returns the error.
-func (r *runner) endChild(ctx context.Context, c *child, status, text string) error {
+// end ends the run of c and sends its end. Each open child of c ends
+// first, so that the stream of c closes before its end. The CLI does
+// not send the last message of a foreground subagent as a line, so a
+// completed child gets summary as its last assistant message, unless
+// its log already ends with it. The text of the end is the last text of
+// the child, or the error of a failed child. A failed write of the log
+// does not stop the end: the child still ends, as failed, and end
+// returns the error.
+func (s *subagents) end(ctx context.Context, c *child, status, summary string) error {
 	var errs []error
-	for _, inner := range r.openChildren() {
+	for _, inner := range s.children() {
 		if inner.owner == c.run {
-			errs = append(errs, r.endChild(ctx, inner, agent.SubagentInterrupted, ""))
+			errs = append(errs, s.end(ctx, inner, agent.SubagentInterrupted, ""))
 		}
 	}
-	delete(r.tasks.open, c.callID)
-	r.a.forget(c.callID)
+	delete(s.open, c.callID)
 
 	store := context.WithoutCancel(ctx)
 	run := c.run
 	errs = append(errs, run.finish(store))
-	if status == agent.SubagentCompleted && text != "" && lastText(c.log) != text {
+	addSummary := status == agent.SubagentCompleted &&
+		summary != "" &&
+		agent.LastText(c.log.Messages()) != summary
+	if addSummary {
 		final := ai.Message{
 			Role:       ai.RoleAssistant,
-			Content:    []ai.Content{ai.Text{Text: text}},
+			Content:    []ai.Content{ai.Text{Text: summary}},
 			StopReason: ai.StopReasonStop,
 		}
 		errs = append(errs, run.em.End(store, final))
 	}
-	failed := errors.Join(errs...)
-	if failed != nil {
+	writeErr := errors.Join(errs...)
+	if writeErr != nil {
 		status = agent.SubagentFailed
-		text = failed.Error()
 	}
 
 	var runErr error
@@ -384,7 +419,14 @@ func (r *runner) endChild(ctx context.Context, c *child, status, text string) er
 		errs = append(errs, err)
 	}
 
-	c.send(agent.EventSubagentEnd{
+	text := agent.LastText(c.log.Messages())
+	if status == agent.SubagentFailed {
+		text = cmp.Or(summary, runErr.Error())
+		if writeErr != nil {
+			text = writeErr.Error()
+		}
+	}
+	s.sink(c)(agent.EventSubagentEnd{
 		ToolCallID: c.callID,
 		SessionID:  c.sessionID,
 		Status:     status,
@@ -393,56 +435,52 @@ func (r *runner) endChild(ctx context.Context, c *child, status, text string) er
 	return errors.Join(errs...)
 }
 
-// lastText returns the text of the last message of log, or "".
-func lastText(log *session.Log) string {
-	msgs := log.Messages()
-	if len(msgs) == 0 {
-		return ""
+// fail ends the open child of the call callID as failed with err. The
+// reader between runs calls it, because no run there can fail. A child
+// that already ended carries its error in its end.
+func (s *subagents) fail(ctx context.Context, callID string, err error) {
+	c, ok := s.open[callID]
+	if err == nil || !ok {
+		return
 	}
-	return strings.TrimSpace(msgs[len(msgs)-1].Text())
+	// The end carries the error of each write that fails in it too.
+	_ = s.end(ctx, c, agent.SubagentFailed, err.Error())
 }
 
-// detach ends the part of c that the run of r carries, and the agent
-// keeps c: its run ends, and its end has the status background. The
-// next run, or the reader between runs, carries it again.
-func (r *runner) detach(ctx context.Context, c *child) error {
-	delete(r.tasks.open, c.callID)
-	store := context.WithoutCancel(ctx)
-	err := c.run.finish(store)
-	_, ferr := c.run.em.Finish(store, c.run.em.Usage(), nil)
-	c.send(agent.EventSubagentEnd{
-		ToolCallID: c.callID,
-		SessionID:  c.sessionID,
-		Status:     agent.SubagentBackground,
-	})
-	c.owner = nil
-	c.run = nil
-	c.send = nil
-	r.a.keep(c)
-	return errors.Join(err, ferr)
-}
-
-// endChildren ends each open child at the end of a run, and returns the
-// errors of their logs. If keep is true, the CLI goes on, so a child in
-// the background goes on too: detach gives it to the agent. Each other
-// child ends as interrupted.
-func (r *runner) endChildren(ctx context.Context, keep bool) error {
-	var errs []error
-	for len(r.tasks.open) > 0 {
-		c := r.openChildren()[0]
-		if keep && c.background {
-			errs = append(errs, r.detach(ctx, c))
-			continue
+// foreground returns the IDs of the subagent calls of the parent that
+// wait for their result, in order. A steer cancels the child of such a
+// call, so the steer moves it to the background first, and the child
+// ends its work.
+func (s *subagents) foreground() []string {
+	var ids []string
+	for id, cl := range s.calls {
+		waits := cl.result == "" &&
+			!cl.owner.isChild() &&
+			slices.Contains(subagentTools, cl.tc.Name)
+		if waits {
+			ids = append(ids, id)
 		}
-		errs = append(errs, r.endChild(ctx, c, agent.SubagentInterrupted, ""))
 	}
-	return errors.Join(errs...)
+	slices.Sort(ids)
+	return ids
 }
 
-// openChildren returns the open children, by the ID of their call, so
-// that they end in the same order on each run.
-func (r *runner) openChildren() []*child {
-	out := slices.Collect(maps.Values(r.tasks.open))
+// top returns the open children of calls of the parent, by the ID of
+// their call.
+func (s *subagents) top() []*child {
+	var out []*child
+	for _, c := range s.children() {
+		if c.owner == nil {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// children returns the open children, by the ID of their call, so that
+// they end in the same order on each run.
+func (s *subagents) children() []*child {
+	out := slices.Collect(maps.Values(s.open))
 	slices.SortFunc(out, func(a, b *child) int { return cmp.Compare(a.callID, b.callID) })
 	return out
 }

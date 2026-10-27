@@ -72,27 +72,24 @@ type Agent struct {
 	cfg   config
 	state *emit.State
 
-	mu sync.Mutex
-	// proc is the running CLI, or nil before the first run and after a
-	// failure that stopped it.
+	// mu guards proc and idle. proc is the running CLI, or nil before
+	// the first run and after a failure that stopped it. idle is the
+	// reader of the CLI between runs, or nil during a run.
+	mu   sync.Mutex
 	proc *process
+	idle *idleReader
 
 	// steerMu guards steer. steer holds the entries of the steers that
-	// no run sent. wake tells the active run that a steer waits.
-	steerMu sync.Mutex
-	steer   []session.Entry
-	wake    chan struct{}
+	// no run sent. steerReady tells the active run that a steer waits.
+	steerMu    sync.Mutex
+	steer      []session.Entry
+	steerReady chan struct{}
 
-	// idleMu guards idle, kept, and background. idle is the reader of the
-	// CLI between runs, or nil during a run. kept are the lines of a turn
-	// that the CLI started between runs. background are the children in
-	// the background that no run carries, by the ID of their call. wakes
-	// sends one value when the CLI starts a turn between runs.
-	idleMu     sync.Mutex
-	idle       *idleReader
-	kept       [][]byte
-	background map[string]*child
-	wakes      chan struct{}
+	// subs tracks the subagents, and kept are the lines of a turn that
+	// the CLI started between runs. A run and the idle reader take turns
+	// with them: [Agent.pauseIdle] waits for the reader to stop.
+	subs *subagents
+	kept []*line
 }
 
 // config collects the options before [New] or [Durable] builds the agent.
@@ -113,6 +110,7 @@ type config struct {
 	hooks      []agent.Hook
 	mcp        []agent.MCPServer
 	idle       func(agent.Event)
+	wake       func()
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -229,12 +227,17 @@ func MCP(servers ...agent.MCPServer) Option {
 	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
 
-// IdleEvents sets the function that gets the events between runs: the
-// events of a subagent in the background, wrapped as in a run. Without
-// it, the agent drops them, and the log of each child still gets its
-// messages.
-func IdleEvents(fn func(agent.Event)) Option {
+// Idle sets the function that gets the events between runs: the events
+// of a subagent in the background, wrapped as in a run. Without it, the
+// agent drops them, and the log of each child still gets its messages.
+func Idle(fn func(agent.Event)) Option {
 	return func(c *config) { c.idle = fn }
+}
+
+// Wake sets the function that the agent calls when the CLI starts a turn
+// between runs. [Agent.Continue] runs that turn.
+func Wake(fn func()) Option {
+	return func(c *config) { c.wake = fn }
 }
 
 // PermissionMode sets the permission mode of the CLI. Without it, the
@@ -285,13 +288,13 @@ func newConfig(opts []Option) config {
 // newAgent applies opts and returns an agent with no log.
 func newAgent(opts []Option) *Agent {
 	c := newConfig(opts)
-	return &Agent{
+	a := &Agent{
 		name:       c.name,
 		cfg:        c,
-		wake:       make(chan struct{}, 1),
-		wakes:      make(chan struct{}, 1),
-		background: map[string]*child{},
+		steerReady: make(chan struct{}, 1),
 	}
+	a.subs = newSubagents(a)
+	return a
 }
 
 // Log returns the log that the agent writes to.
@@ -341,7 +344,7 @@ func (a *Agent) Close() error {
 	a.proc = nil
 	a.mu.Unlock()
 	// No child in the background outlives its CLI.
-	a.endBackground(agent.SubagentInterrupted)
+	a.endBackground()
 	if proc == nil {
 		return nil
 	}
