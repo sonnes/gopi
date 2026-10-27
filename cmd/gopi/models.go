@@ -13,7 +13,6 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/sonnes/gopi/pkg/catalog"
-	"github.com/sonnes/gopi/pkg/catalog/env"
 )
 
 // modelsCommand returns the "gopi models" command. It lists the spec of
@@ -26,7 +25,7 @@ func modelsCommand() *cli.Command {
 		ArgsUsage: "[provider...]",
 		Action: func(ctx context.Context, c *cli.Command) error {
 			set := loadModels(ctx, c.Root().ErrWriter, os.Getenv)
-			return printModels(ctx, c.Root().Writer, c.Root().ErrWriter, env.Detectors(set), c.Args().Slice())
+			return printModels(ctx, c.Root().Writer, c.Root().ErrWriter, homeDetectors(set), c.Args().Slice())
 		},
 	}
 }

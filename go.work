@@ -6,6 +6,7 @@ use (
 	./cmd/modelsync
 	./examples
 	./pkg/ai/anthropic
+	./pkg/ai/chatgpt
 	./pkg/ai/fireworks
 	./pkg/ai/openai
 	./pkg/ai/openaichat

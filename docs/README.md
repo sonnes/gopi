@@ -26,6 +26,8 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | provider      | One backend that answers a model call                        | vendor, service, client     |
 | model         | One named model that a provider serves                       | engine, LLM                 |
 | host provider | A provider for one server that copies an OpenAI API. It sends its calls through the provider of that API, and lists the models of the server | pseudo provider, gateway, wrapper |
+| plan route    | The Responses API of api.openai.com with an OAuth token of Sign in with ChatGPT. A call there uses the ChatGPT plan of the user | subscription API, Codex backend |
+| login file    | The JSON file of the signed-in accounts of gopi, one key for each provider. `gopi login` writes it | credentials file, token store |
 | message       | What one role adds to a conversation, with its content       | turn, entry                 |
 | content block | One part of a message: text, thinking, a tool call, or a file | part, chunk, segment        |
 | tool          | One function that a model can call                           | function, action, skill     |

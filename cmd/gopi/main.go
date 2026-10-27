@@ -25,7 +25,13 @@
 //
 // gopi finds the providers from ANTHROPIC_API_KEY, OPENAI_API_KEY,
 // OPENROUTER_API_KEY, and FIREWORKS_API_KEY, with the detectors of
-// package catalog/env.
+// package catalog/env. Before those, it finds the chatgpt provider if
+// $GOPI_HOME/auth.json, or ~/.gopi/auth.json, has a signed-in account.
+//
+// "gopi login chatgpt" signs in with a ChatGPT account in the browser,
+// and saves the account to that file. Then the chatgpt provider runs on
+// the ChatGPT plan of the account, with no API key. "gopi logout
+// chatgpt" revokes the token and removes it from the file.
 // --model names the model by its spec, such as
 // anthropic/claude-opus-5-5. If --model is unset, gopi uses the first
 // model of the first provider that it finds. If no provider registered
@@ -70,7 +76,6 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
-	"github.com/sonnes/gopi/pkg/catalog/env"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
@@ -226,6 +231,8 @@ func main() {
 		Commands: []*cli.Command{
 			modelsCommand(),
 			hookCommand(),
+			loginCommand(),
+			logoutCommand(),
 		},
 		Action: func(ctx context.Context, c *cli.Command) error {
 			opts := options{
@@ -277,7 +284,7 @@ func run(ctx context.Context, o options, args []string) error {
 		return err
 	}
 	set := loadModels(ctx, os.Stderr, os.Getenv)
-	cat, spec, err := newCatalog(ctx, modelSpec(o, stored), env.Detectors(set))
+	cat, spec, err := newCatalog(ctx, modelSpec(o, stored), homeDetectors(set))
 	if err != nil {
 		return err
 	}

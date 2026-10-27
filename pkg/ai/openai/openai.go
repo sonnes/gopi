@@ -63,6 +63,7 @@ var PromptCacheKey = ai.NewOption[string]()
 // Provider calls the OpenAI Responses API. Create one with [New].
 type Provider struct {
 	client sdk.Client
+	plan   bool
 }
 
 // Option configures [New].
@@ -73,6 +74,7 @@ type config struct {
 	apiKeySet  bool
 	baseURL    string
 	httpClient *http.Client
+	plan       bool
 }
 
 // APIKey sets the API key. If it is unset, the SDK reads
@@ -119,7 +121,10 @@ func New(opts ...Option) *Provider {
 		clientOpts = append(clientOpts, option.WithHTTPClient(c.httpClient))
 	}
 
-	return &Provider{client: sdk.NewClient(clientOpts...)}
+	return &Provider{
+		client: sdk.NewClient(clientOpts...),
+		plan:   c.plan,
+	}
 }
 
 // OnPayload sets a hook that reads or changes the request of a stream
@@ -197,6 +202,9 @@ func (p *Provider) StreamText(
 	if err != nil {
 		return ai.ErrStream(err)
 	}
+	if p.plan {
+		toPlan(&params)
+	}
 	if err := applyHook(&params, opts); err != nil {
 		return ai.ErrStream(err)
 	}
@@ -259,6 +267,8 @@ type streamState struct {
 	started bool
 	next    int
 	blocks  map[blockKey]*block
+	// items are the output items of the done events, in order.
+	items []responses.ResponseOutputItemUnion
 }
 
 func newStreamState(push func(ai.Event)) *streamState {
@@ -341,10 +351,17 @@ func (s *streamState) handle(ev responses.ResponseStreamEventUnion) (responses.R
 		s.push(ai.Event{Type: ai.EventToolDelta, ContentIndex: b.index, Delta: ev.Delta})
 
 	case "response.output_item.done":
+		s.items = append(s.items, ev.Item)
 		s.itemDone(ev.OutputIndex, ev.Item)
 
 	case "response.completed", "response.incomplete":
-		return ev.Response, true, nil
+		// The route of the ChatGPT plan sends the terminal event with
+		// an empty output. The items then come from the done events.
+		resp := ev.Response
+		if len(resp.Output) == 0 {
+			resp.Output = s.items
+		}
+		return resp, true, nil
 
 	case "response.failed":
 		apiErr := ev.Response.Error
@@ -417,17 +434,16 @@ func (p *Provider) GenerateObject(
 	if err != nil {
 		return nil, err
 	}
+	if p.plan {
+		toPlan(&params)
+	}
 	if err := applyHook(&params, opts); err != nil {
 		return nil, err
 	}
 
-	reqOpts := requestOptions(opts)
-	send := func() (*responses.Response, error) {
-		return p.client.Responses.New(ctx, params, reqOpts...)
-	}
-	resp, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
+	resp, err := p.objectResponse(ctx, params, opts)
 	if err != nil {
-		return nil, fmt.Errorf("openai: %w", err)
+		return nil, err
 	}
 
 	raw := resp.OutputText()
@@ -441,14 +457,70 @@ func (p *Provider) GenerateObject(
 	}, nil
 }
 
+// objectResponse sends the request of an object call. With
+// [ChatGPTPlan], it reads the response from a stream, because the
+// route of the plan accepts only a stream.
+func (p *Provider) objectResponse(
+	ctx context.Context,
+	params responses.ResponseNewParams,
+	opts ai.Options,
+) (*responses.Response, error) {
+	if p.plan {
+		return p.streamedResponse(ctx, params, opts)
+	}
+
+	reqOpts := requestOptions(opts)
+	send := func() (*responses.Response, error) {
+		return p.client.Responses.New(ctx, params, reqOpts...)
+	}
+	resp, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
+	if err != nil {
+		return nil, fmt.Errorf("openai: %w", err)
+	}
+	return resp, nil
+}
+
+// streamedResponse streams the request and returns the response of its
+// terminal event, with the output items of the stream.
+func (p *Provider) streamedResponse(
+	ctx context.Context,
+	params responses.ResponseNewParams,
+	opts ai.Options,
+) (*responses.Response, error) {
+	stream, err := p.openStream(ctx, params, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer stream.Close()
+
+	s := newStreamState(func(ai.Event) {})
+	for stream.Next() {
+		resp, done, err := s.handle(stream.Current())
+		if err != nil {
+			return nil, err
+		}
+		if done {
+			return &resp, nil
+		}
+	}
+	if err := stream.Err(); err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("openai: %w", err)
+	}
+	return nil, errors.New("openai: stream ended before the response completed")
+}
+
 // CountTokens counts the input tokens of a call. It sends the same
-// input, tools, and reasoning config as a call.
+// input, tools, and reasoning config as a call. With [ChatGPTPlan], it
+// returns [ErrNotOnPlan].
 func (p *Provider) CountTokens(
 	ctx context.Context,
 	model ai.Model,
 	messages []ai.Message,
 	opts ai.Options,
 ) (*ai.TokenCount, error) {
+	if p.plan {
+		return nil, ErrNotOnPlan
+	}
 	params, err := buildCountTokensParams(model, messages, opts)
 	if err != nil {
 		return nil, err

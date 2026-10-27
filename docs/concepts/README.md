@@ -16,6 +16,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Provider](ai/provider.md)   | How a provider serves a model call, and how the Anthropic provider builds its requests. |
 | [OpenAI Providers](ai/openai.md) | How the two OpenAI providers build their requests, keep reasoning between calls, and serve compatible servers. |
 | [Host Provider](ai/host-provider.md) | How a provider for a server that copies an OpenAI API sends its calls through the provider of that API, and lists the models of the server with their limits and prices. |
+| [ChatGPT Plan](ai/chatgpt.md) | How gopi signs in with a ChatGPT account, keeps its rotating tokens, and calls the Responses API on the plan of the user. |
 
 ## catalog
 

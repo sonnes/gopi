@@ -5,6 +5,7 @@ go 1.27
 replace (
 	github.com/sonnes/gopi => ../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../pkg/ai/anthropic
+	github.com/sonnes/gopi/pkg/ai/chatgpt => ../../pkg/ai/chatgpt
 	github.com/sonnes/gopi/pkg/ai/fireworks => ../../pkg/ai/fireworks
 	github.com/sonnes/gopi/pkg/ai/openai => ../../pkg/ai/openai
 	github.com/sonnes/gopi/pkg/ai/openaichat => ../../pkg/ai/openaichat
@@ -16,6 +17,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/sonnes/gopi v0.0.0
 	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.0
+	github.com/sonnes/gopi/pkg/ai/chatgpt v0.0.0
 	github.com/sonnes/gopi/pkg/ai/openai v0.0.0
 	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0
 	github.com/sonnes/gopi/pkg/catalog/env v0.0.0

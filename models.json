@@ -161,6 +161,30 @@
       }
     ]
   },
+  "chatgpt": {
+    "kind": "provider",
+    "default": "gpt-6.1-sol",
+    "models": [
+      {
+        "id": "gpt-6.1-sol",
+        "name": "GPT-6.1-Sol",
+        "context_window": 500000,
+        "input": [
+          "text",
+          "image"
+        ],
+        "reasoning": true,
+        "thinking_levels": [
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "note": "The default model of the plan. The models of an account come from the list of the plan."
+      }
+    ]
+  },
   "claude-code": {
     "kind": "driver",
     "default": "default",
