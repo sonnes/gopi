@@ -9,6 +9,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/hooktext"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // The hook events of the CLI at the points of a gopi hook. The agent
@@ -163,7 +164,7 @@ func (pr *process) callHook(ctx context.Context, req *controlRequest) (hookOutpu
 func (pr *process) beforeTool(ctx context.Context, in hookInput) hookOutput {
 	orig := ai.ToolCall{
 		ID:    in.ToolUseID,
-		Name:  in.ToolName,
+		Name:  tool.Canonical(in.ToolName),
 		Input: in.ToolInput,
 	}
 	call := orig
@@ -247,7 +248,7 @@ func (pr *process) runAfterTool(
 ) (ai.ToolResult, error) {
 	call := ai.ToolCall{
 		ID:    in.ToolUseID,
-		Name:  in.ToolName,
+		Name:  tool.Canonical(in.ToolName),
 		Input: in.ToolInput,
 	}
 	for _, h := range pr.hooks {

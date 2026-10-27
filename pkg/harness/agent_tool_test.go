@@ -182,6 +182,34 @@ func TestTaskGivesTheChildOnlyItsTools(t *testing.T) {
 	assert.Equal(t, []string{"echo"}, toolNames(child))
 }
 
+func TestTaskKeepsAToolWithContent(t *testing.T) {
+	other := tool.New("other", func(_ context.Context, in echoInput) (string, error) {
+		return in.S, nil
+	}, tool.Description("Another tool."))
+	limited := reviewer
+	limited.Tools = []string{"echo(hi *)", "other"}
+	limited.Disallowed = []string{"other"}
+	p := &script{responses: []ai.Message{
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
+		reply("done"),
+		reply("ok"),
+	}}
+	store := session.NewMemoryStore()
+	h := harness.New(with(base(t, p),
+		harness.Store(store),
+		harness.Agents(limited),
+		harness.Toolset(harness.Tools(echo, other)),
+	)...)
+
+	a, err := h.Durable(context.Background(), "s1")
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	child, err := h.Durable(context.Background(), childID(t, toolResult(t, a)))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"echo"}, toolNames(child))
+}
+
 func TestTaskRunsTheChildOnItsModel(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -334,4 +362,62 @@ func TestTaskOfAnUnsavedAgentCannotResume(t *testing.T) {
 	assert.False(t, results[0].IsError)
 	assert.Contains(t, results[0].Text(), "done")
 	assert.True(t, results[1].IsError)
+}
+
+func TestASubagentStartsUnderOnly(t *testing.T) {
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	p := &script{responses: []ai.Message{
+		callTool("c1", "agent", `{"agent":"echoer","prompt":"go"}`),
+		reply("echoed"),
+		reply("done"),
+	}}
+	echoer := def.Agent{
+		Name:        "echoer",
+		Description: "Echo.",
+		Tools:       []string{"echo"},
+	}
+	h := harness.New(with(base(t, p),
+		harness.Store(store),
+		harness.Agents(echoer),
+		harness.Toolset(harness.Tools(echo, otherTool)),
+		harness.Only("echo", "other", "agent"),
+	)...)
+
+	a, err := h.Durable(ctx, "s1")
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	result := toolResult(t, a)
+	assert.False(t, result.IsError, result.Text())
+	assert.Contains(t, result.Text(), "echoed")
+}
+
+var otherTool = tool.Func("other", func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+	return ai.ToolResult{}, nil
+})
+
+func TestASubagentFileWithAnUnknownToolFails(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		callTool("c1", "agent", `{"agent":"echoer","prompt":"go"}`),
+		reply("done"),
+	}}
+	echoer := def.Agent{
+		Name:        "echoer",
+		Description: "Echo.",
+		Tools:       []string{"echo", "ech0"},
+	}
+	h := harness.New(with(base(t, p),
+		harness.Store(session.NewMemoryStore()),
+		harness.Agents(echoer),
+		harness.Toolset(harness.Tools(echo)),
+	)...)
+
+	a, err := h.Durable(context.Background(), "s1")
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	result := toolResult(t, a)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Text(), `"ech0" is not in the tool list`)
 }

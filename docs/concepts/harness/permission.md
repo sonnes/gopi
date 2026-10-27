@@ -27,10 +27,12 @@ flowchart TD
 
 ## Design
 
-- The order of the checks, the rule format, the tool aliases, and the match rules for commands and paths come from [Claude Code](https://web.archive.org/web/20261028144314/https://code.claude.com/docs/en/permissions). A rule from a Claude Code settings file then works in gopi as it is.
+- The order of the checks, the rule format, and the match rules for commands and paths come from [Claude Code](https://web.archive.org/web/20261028144314/https://code.claude.com/docs/en/permissions). The parser reads a Claude Code name, such as `Read`, as the group of gopi tools that Claude Code applies it to, plus a tool with that literal name. A rule from a Claude Code settings file then works as written, as [Tool Name](../tool/name.md) describes.
+- The content of an `apply_patch` rule matches each path that the patch changes. A Deny rule or an Ask rule matches if one path matches, and an Allow rule needs each path, so a patch cannot hide one file behind another.
 - The permission policy is one `BeforeTool` hook over `agent.Deny`. The loop stays one model with tools, and the model gets the reason of each denial as a tool result, so it can try another way.
 - A Deny rule and an Ask rule apply in every mode, also in `bypassPermissions`. A person can then let an agent run freely and still block one command.
-- A tool that the permission policy does not know has the tool kind `Other`. A new tool then needs an approval or a rule before it runs.
+- A tool that the permission policy does not know has the tool kind `tool.KindOther`. A new tool then needs an approval or a rule before it runs.
+- The kind and the rule content of a well-known tool are in the registry of `pkg/tool`, with its names. One entry then gives a new well-known tool its names, its kind, and its rule content.
 - Without `Approve`, each call that needs an approval is denied, so an agent with no person present fails closed.
 - An `Always` decision keeps an allow rule in the hook, and a new hook starts with no kept rules. An approval then lasts as long as one agent and does not reach the next session.
 - If a decision edits the input, the edited input runs. The Deny rules check it, and an `Always` rule is for it, because the person approved the edited call and not the call of the model.
@@ -43,8 +45,8 @@ flowchart TD
 | Task                                         | File                                |
 | -------------------------------------------- | ----------------------------------- |
 | Change the order of the checks               | `pkg/harness/permission/policy.go`  |
-| Change the kind of a built-in tool           | `pkg/harness/permission/kind.go`    |
-| Change how a rule is parsed, or a tool alias | `pkg/harness/permission/rule.go`    |
+| Change the kind of a built-in tool           | `pkg/tool/name.go`                  |
+| Change how a rule is parsed                  | `pkg/harness/permission/rule.go`    |
 | Change how a command rule matches            | `pkg/harness/permission/shell.go`   |
 | Change how a path rule matches               | `pkg/harness/permission/path.go`    |
 | Change how the CLI asks a person             | `cmd/gopi/ask.go`                   |

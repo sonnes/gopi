@@ -16,7 +16,7 @@ import (
 )
 
 // searchToolName is the name of the search tool.
-const searchToolName = "tool_search"
+const searchToolName = tool.ToolSearch
 
 // defaultMaxResults is the number of tools that a keyword query loads
 // when the call gives no max_results.

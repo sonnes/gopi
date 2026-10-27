@@ -31,7 +31,7 @@ sequenceDiagram
 - The name of a skill is the name of its folder, so the frontmatter cannot give two folders one name. The folder name and the qualified name come from [Claude Code](https://web.archive.org/web/20261028144715/https://code.claude.com/docs/en/skills).
 - Skills merge by qualified name, so a skill of a later folder replaces a skill of an earlier folder with the same name. The caller sets the qualifier, and a reader of files leaves it empty.
 - One skill gets the bare name: the last one in the order of the readers. The others keep their qualified names, so no skill is lost on a clash.
-- The harness adds the skill tool only to an assembly with a skill that the model can call. A tool with nothing to load only makes the model call it for no result.
+- The caller lists the skill tool with `SkillTool`. It binds only in an assembly with a skill that the model can call, because a tool with nothing to load only makes the model call it for no result.
 - A skill that the model cannot call stays in the assembly, so a caller such as a slash command can still run it.
 - The support files of a skill are an `fs.FS`, and the skill tool reads them. A skill from an `embed.FS` then works as a skill on disk does, with no sandbox path.
 - The reader keeps each frontmatter key that the harness does not use as an extra key. A file in the format of Claude Code or Codex then loads, and a caller reads the key with `Extra.Read`.

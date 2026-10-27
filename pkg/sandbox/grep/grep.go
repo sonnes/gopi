@@ -55,7 +55,7 @@ func (in grepInput) limit() int {
 }
 
 // Name is the name of the tool.
-const Name = "grep"
+const Name = tool.Grep
 
 // description is the text that the model reads for the tool.
 //

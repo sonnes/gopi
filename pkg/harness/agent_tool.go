@@ -28,7 +28,7 @@ type childCall struct {
 }
 
 // agentToolName is the name of the agent tool.
-const agentToolName = "agent"
+const agentToolName = tool.Agent
 
 // idBytes is the count of random bytes in the ID of a child session.
 // The ID shows them as hex digits.
@@ -337,26 +337,12 @@ func childSpec(cat *catalog.Catalog, parent, file string) (string, error) {
 	return file, nil
 }
 
-// toolAliases maps the tool names of a Claude Code subagent file to the
-// names of the gopi tools.
-var toolAliases = map[string][]string{
-	"Read":      {"read_file"},
-	"Write":     {"write_file"},
-	"Edit":      {"edit_file"},
-	"MultiEdit": {"edit_file"},
-	"Bash":      {"bash"},
-	"Grep":      {"grep"},
-	"Glob":      {"find"},
-	"TodoWrite": {"todo_write"},
-	"Skill":     {"skill"},
-}
-
 // keepTools returns the tools that sub can call: the tools of its tools
 // key, or all of them if it has none, without the tools of its
 // disallowedTools key.
 func keepTools(tools []tool.Tool, sub def.Agent) []tool.Tool {
-	allowed := toolNames(sub.Tools)
-	denied := toolNames(sub.Disallowed)
+	allowed := names(tool.ListNames(sub.Tools))
+	denied := names(ruleNames(sub.Disallowed))
 	var out []tool.Tool
 	for _, t := range tools {
 		name := t.Info().Name
@@ -371,14 +357,23 @@ func keepTools(tools []tool.Tool, sub def.Agent) []tool.Tool {
 	return out
 }
 
-// toolNames returns the gopi names of the tool names of a subagent file.
-func toolNames(names []string) map[string]bool {
-	out := make(map[string]bool, len(names))
-	for _, n := range names {
+// ruleNames returns the tool names that the rules of a
+// disallowedTools list cover, as [tool.RuleNames] gives them. A rule
+// with content, such as "Bash(git push *)", removes the whole tool.
+func ruleNames(rules []string) []string {
+	var out []string
+	for _, r := range rules {
+		name, _ := tool.SplitRule(r)
+		out = append(out, tool.RuleNames(name)...)
+	}
+	return out
+}
+
+// names returns a set of the names.
+func names(list []string) map[string]bool {
+	out := make(map[string]bool, len(list))
+	for _, n := range list {
 		out[n] = true
-		for _, alias := range toolAliases[n] {
-			out[alias] = true
-		}
 	}
 	return out
 }

@@ -24,7 +24,7 @@ An [agent](../agent/index.mdx) runs while your program holds it. A host runs the
 
 ## Create a Session
 
-Register a driver for each CLI in the catalog, and the harness as the default driver. Then open a host on a store, and create a session with a config. One host owns each store.
+Register a driver for each CLI in the catalog, and the harness as the default driver. Then open a host on a store with its tool list, and create a session with a config. One host owns each store.
 
 ```go
 file, _ := catalog.ReadModelFile(ctx, "models.json")
@@ -32,7 +32,13 @@ cat := catalog.New()
 cat.RegisterDriver("claude-code", claude.Driver(), file.Of("claude-code")...)
 cat.DefaultDriver(harness.New(harness.Catalog(cat)))
 
-h, err := host.Open(ctx, cat, host.Store(store), host.Sections(review))
+h, err := host.Open(ctx, cat,
+	host.Store(store),
+	host.Sections(review),
+	host.Tools(harness.Coding()...),
+	host.Tools(harness.SkillTool(), harness.AgentTool()),
+	host.Tools(claude.Tools()...),
+)
 defer h.Close()
 s, err := h.Create(ctx, host.Config{
 	Model: "claude-code/claude-opus-5-5",
@@ -41,7 +47,13 @@ s, err := h.Create(ctx, host.Config{
 })
 ```
 
-The host calls `review` before each run for the [sections](../agent/sections.mdx) of a session. `anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Create`.
+The host calls `review` before each run for the [sections](../agent/sections.mdx) of a session. The tool list of the host is the full set of tools of each session, and each driver gets it. `Open` fails without `host.Tools`, and each call of `host.Tools` adds to the list. `harness.Coding` gives the tools that read files, change files, and run commands. `claude.Tools` and `codex.Tools` give each tool of the CLI by name. Claude Code and Codex read only the names, and skip a well-known tool that the CLI does not have. `tool.Named` gives the name of one tool that only a CLI runs, such as `apply_patch` of Codex. A tool of your own runs only in the harness, and a CLI skips it.
+
+The harness that is the default driver takes no `Toolset`, because the host gives the tools. Give it `harness.Sandbox` on an OS other than macOS, because the default sandbox fence runs only on macOS.
+
+`Config.ToolNames` picks a subset of the list, as the `tools` key of an agent file does. `Create` fails on a name of no tool of the list, and the error names the agent file if the name came from it. A `Deny` rule with no content, such as `WebFetch`, removes the tool. `ToolNames`, `Allow`, `Ask`, and `Deny` take a gopi name, such as `bash`, or a Claude Code name, such as `Bash`. Each driver reads both, so a rule from a Claude Code settings file works as written.
+
+`anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Create`.
 
 ## Create an Agent From a Folder
 
@@ -79,12 +91,12 @@ A tool call that needs a person makes the status `requires_action`, and `Session
 
 ```go
 for _, req := range s.Waiting {
-	allow := req.Call.Name == "Read"
+	allow := req.Call.Name == "read_file"
 	err := h.Confirm(ctx, s.ID, req.Call.ID, agent.Decision{Allow: allow})
 }
 ```
 
-A call waits until `Confirm` or the end of its run, and after the run `Confirm` returns `host.ErrNotFound`. A call has the tool name of its agent, such as `Bash` in Claude Code and `bash` in the harness.
+A call waits until `Confirm` or the end of its run, and after the run `Confirm` returns `host.ErrNotFound`. A call has the gopi name of its tool, such as `bash`, on each driver.
 
 The `Mode` of the config decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. With `agent.ModeBypass`, no call asks. If no person answers, confirm from `Events`, or pick a mode that asks for no call.
 

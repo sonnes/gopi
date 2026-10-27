@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/sandbox/bash"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // Policy holds the permission mode and the rules of a harness. Each
@@ -47,13 +48,27 @@ type Policy struct {
 	// the text of the error is the error result.
 	Approve agent.ApproveFunc
 	// Kinds gives the kind of a tool, for a custom tool or to change the
-	// kind of a built-in tool. A tool that is not in Kinds and is not a
-	// built-in tool is [Other].
-	Kinds map[string]Kind
+	// kind of a built-in tool. A tool that is not in Kinds gets its kind
+	// from the registry of [tool.Lookup], and a tool that is in
+	// neither is [tool.KindOther].
+	Kinds map[string]tool.Kind
 	// Dir is the working directory for the path rules and for a
 	// relative path in the input of a tool. The default is the working
 	// directory of the process when [Policy.Hook] is called.
 	Dir string
+}
+
+// Allows reports if an Allow rule of p matches c, as the hook of
+// [Policy.Hook] checks it. It ignores the mode, the Ask rules, and the
+// Deny rules. A driver whose agent asks on its own uses it to answer
+// the requests that an Allow rule covers. A policy that is not valid
+// allows no call.
+func (p Policy) Allows(c ai.ToolCall) bool {
+	h, ok := p.Hook().(*hook)
+	if !ok || h.err != nil {
+		return false
+	}
+	return h.allowed(c.Name, decodeInput(c.Input))
 }
 
 // Validate returns an error for an unknown mode and for each rule that
@@ -119,7 +134,7 @@ func (p Policy) Hook() agent.Hook {
 	// match no path.
 	home, _ := os.UserHomeDir()
 
-	kinds := make(map[string]Kind, len(p.Kinds))
+	kinds := make(map[string]tool.Kind, len(p.Kinds))
 	for name, k := range p.Kinds {
 		kinds[name] = k
 	}
@@ -153,7 +168,7 @@ type hook struct {
 	// err blocks each call if it is set.
 	err     error
 	approve agent.ApproveFunc
-	kinds   map[string]Kind
+	kinds   map[string]tool.Kind
 	dir     string
 	home    string
 
@@ -168,6 +183,40 @@ type toolInput struct {
 	ok      bool
 	Command string `json:"command"`
 	Path    string `json:"path"`
+	// Changes are the file changes of an apply_patch call, as the Codex
+	// agent gives them.
+	Changes []struct {
+		Path string `json:"path"`
+	} `json:"changes"`
+}
+
+// The headers of the patch text of apply_patch that name a path.
+var patchHeaders = []string{
+	"*** Add File: ",
+	"*** Update File: ",
+	"*** Delete File: ",
+	"*** Move to: ",
+}
+
+// paths returns the paths that a call of the tool name reads or
+// changes. An apply_patch call has a path for each file of its changes
+// or of its patch text. Each other tool has its "path" input.
+func (in toolInput) paths(name string) []string {
+	if name != tool.ApplyPatch {
+		return []string{in.Path}
+	}
+	var out []string
+	for _, c := range in.Changes {
+		out = append(out, c.Path)
+	}
+	for _, line := range strings.Split(in.Command, "\n") {
+		for _, h := range patchHeaders {
+			if p, ok := strings.CutPrefix(line, h); ok {
+				out = append(out, strings.TrimSpace(p))
+			}
+		}
+	}
+	return out
 }
 
 func decodeInput(raw json.RawMessage) toolInput {
@@ -205,7 +254,7 @@ func (h *hook) BeforeTool(
 
 	kind := kindOf(c.Name, h.kinds)
 	switch {
-	case kind == Read || h.mode == Bypass:
+	case kind == tool.KindRead || h.mode == Bypass:
 		return c, nil
 	case h.mode == Plan:
 		reason := fmt.Sprintf(
@@ -213,7 +262,7 @@ func (h *hook) BeforeTool(
 			c.Name,
 		)
 		return c, agent.Deny(reason)
-	case h.mode == AcceptEdits && kind == Edit:
+	case h.mode == AcceptEdits && kind == tool.KindEdit:
 		return c, nil
 	}
 	return h.requestApproval(ctx, c, in)
@@ -306,12 +355,41 @@ func (h *hook) firstMatch(rules []rule, name string, in toolInput) *rule {
 	return nil
 }
 
+// contentMatches reports if the content of r matches the input of the
+// call. A path rule matches a call with several paths if it matches one
+// path, and a call with no path. So a Deny rule and an Ask rule cannot
+// miss a path. [hook.allowed] needs each path instead.
 func (h *hook) contentMatches(r *rule, name string, in toolInput) bool {
-	if contentKinds[name] == commandContent {
+	if contentOf(name) == tool.ContentCommand {
 		return commandMatches(in.Command, r.command)
 	}
-	abs := resolvePath(in.Path, h.dir, h.home)
-	return r.path.matches(abs, h.dir, h.home)
+	paths := in.paths(name)
+	if len(paths) == 0 {
+		return true
+	}
+	for _, p := range paths {
+		abs := resolvePath(p, h.dir, h.home)
+		if r.path.matches(abs, h.dir, h.home) {
+			return true
+		}
+	}
+	return false
+}
+
+// eachPathMatches reports if the content of r matches each path of the
+// input. A call with no path matches no Allow rule.
+func (h *hook) eachPathMatches(r *rule, name string, in toolInput) bool {
+	paths := in.paths(name)
+	if len(paths) == 0 {
+		return false
+	}
+	for _, p := range paths {
+		abs := resolvePath(p, h.dir, h.home)
+		if !r.path.matches(abs, h.dir, h.home) {
+			return false
+		}
+	}
+	return true
 }
 
 // allowed reports if the Allow rules or the kept rules match the call.
@@ -335,11 +413,11 @@ func (h *hook) allowed(name string, in toolInput) bool {
 		if !in.ok {
 			continue
 		}
-		if contentKinds[name] == commandContent {
+		if contentOf(name) == tool.ContentCommand {
 			commands = append(commands, r.command)
 			continue
 		}
-		if h.contentMatches(r, name, in) {
+		if h.eachPathMatches(r, name, in) {
 			return true
 		}
 	}

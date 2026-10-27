@@ -93,14 +93,14 @@ func newCatalog(p *script) *catalog.Catalog {
 }
 
 // base returns the options of a harness for a test: the catalog of p,
-// the model fake/one, no built-in tools, no seed, and a work folder in
-// an empty temporary folder.
+// the model fake/one, the skill tool and the agent tool, no seed, and a
+// work folder in an empty temporary folder.
 func base(t *testing.T, p *script) []harness.Option {
 	t.Helper()
 	return []harness.Option{
 		harness.Catalog(newCatalog(p)),
 		harness.Model("fake/one"),
-		harness.Builtin(harness.NoBuiltins),
+		harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool())),
 		harness.Seed(harness.NoSeed),
 		harness.Dir(t.TempDir()),
 	}

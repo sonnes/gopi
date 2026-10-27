@@ -1,17 +1,18 @@
 // Package harness assembles a coding agent, an [agent.Agent], from
 // options. A [Harness] holds the builders: the catalog and the model
 // spec, the readers of [Defs], [Instructions], [Skillset], [Agents],
-// and [Toolset], the built-in tools, the permission rules, a [PromptBuilder], and the
+// and [Toolset], the permission rules, a [PromptBuilder], and the
 // seeders. [Harness.New] and [Harness.Durable] assemble an agent from
 // them on each call.
 //
-// The harness reads no file on its own. The caller gives each folder of
-// definitions as a reader, such as a folder of package
-// github.com/sonnes/gopi/pkg/store/fs. An assembly with skills gets the
-// skill tool, which loads a skill for the model. An assembly with
-// subagents gets the agent tool, which runs a subagent in a child
-// session. The permission mode and the rules of package permission
-// decide which tool calls run.
+// The harness reads no file on its own, and adds no tool on its own.
+// The caller gives each folder of definitions as a reader, such as a
+// folder of package github.com/sonnes/gopi/pkg/store/fs, and each tool
+// with [Toolset]. A [Binder] binds to each assembly: [SkillTool] loads a
+// skill for the model, [AgentTool] runs a subagent in a child session,
+// and a tool of [Sandboxed] runs in the sandbox of the assembly. The
+// permission mode and the rules of package permission decide which tool
+// calls run.
 //
 // A caller must obey these rules:
 //

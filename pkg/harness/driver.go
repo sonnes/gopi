@@ -66,6 +66,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	if len(c.Tools) > 0 {
 		opts = append(opts, Toolset(Tools(c.Tools...)))
 	}
+	if c.ToolNames != nil {
+		opts = append(opts, Only(c.ToolNames...))
+	}
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}

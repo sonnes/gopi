@@ -10,6 +10,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // interruptTimeout is how long a cancelled run waits for the turn to
@@ -17,19 +18,15 @@ import (
 // next Run starts a new one.
 const interruptTimeout = 5 * time.Second
 
-// The names of the tools that stand for the tool items of the CLI.
+// The gopi names of the tools that stand for the tool items of the CLI.
 const (
-	toolBash       = "bash"
-	toolApplyPatch = "apply_patch"
-	toolWebSearch  = "web_search"
+	toolBash       = tool.Bash
+	toolApplyPatch = tool.ApplyPatch
+	toolWebSearch  = tool.WebSearch
 	// toolSpawnAgent is the call that starts a subagent. The CLI
 	// reports it as a subAgentActivity item.
 	toolSpawnAgent = "spawn_agent"
 )
-
-// mcpSeparator joins the server and the tool of an MCP tool call into
-// one tool name.
-const mcpSeparator = "__"
 
 // reasoningSeparator joins the parts of a reasoning item.
 const reasoningSeparator = "\n\n"
@@ -743,7 +740,7 @@ func toolCall(it item) (ai.ToolCall, bool) {
 		name = toolApplyPatch
 		input = map[string]json.RawMessage{"changes": orNull(it.Changes)}
 	case itemMcpToolCall:
-		name = it.Server + mcpSeparator + it.Tool
+		name = tool.MCPName(it.Server, it.Tool)
 		input = orEmptyObject(it.Arguments)
 	case itemWebSearch:
 		name = toolWebSearch

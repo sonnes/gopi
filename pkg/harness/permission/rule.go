@@ -5,59 +5,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/sonnes/gopi/pkg/sandbox/bash"
-	"github.com/sonnes/gopi/pkg/sandbox/edit"
-	"github.com/sonnes/gopi/pkg/sandbox/find"
-	"github.com/sonnes/gopi/pkg/sandbox/grep"
-	"github.com/sonnes/gopi/pkg/sandbox/read"
-	"github.com/sonnes/gopi/pkg/sandbox/write"
-	"github.com/sonnes/gopi/pkg/tool/askquestion"
-	"github.com/sonnes/gopi/pkg/tool/todowrite"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// aliases maps each Claude Code tool name to the gopi tools that it
-// names in a rule. A rule of Claude Code, such as a disallowedTools
-// list of an agent file, then works on the tools of gopi.
-var aliases = map[string][]string{
-	"Bash":            {bash.Name},
-	"Read":            {read.Name, grep.Name, find.Name},
-	"Edit":            {edit.Name, write.Name},
-	"Write":           {write.Name},
-	"Grep":            {grep.Name},
-	"Glob":            {find.Name},
-	"MultiEdit":       {edit.Name},
-	"TodoWrite":       {todowrite.Name},
-	"AskUserQuestion": {askquestion.Name},
-	"Skill":           {skillTool},
-	"Agent":           {agentTool},
-}
-
-// contentKind is what the content of a rule matches.
-type contentKind int
-
 const (
-	// noContent is a tool that accepts no content in a rule.
-	noContent contentKind = iota
-	// commandContent is the command of the bash tool.
-	commandContent
-	// pathContent is the "path" input of a file tool.
-	pathContent
-)
-
-// contentKinds gives the kind of content that each tool accepts. A
-// tool that is not in the map accepts no content.
-var contentKinds = map[string]contentKind{
-	bash.Name:  commandContent,
-	read.Name:  pathContent,
-	write.Name: pathContent,
-	edit.Name:  pathContent,
-	grep.Name:  pathContent,
-	find.Name:  pathContent,
-}
-
-const (
-	// mcpPrefix starts the name of each MCP tool.
-	mcpPrefix = "mcp__"
 	// mcpSeparator divides the server and the tool in the name of an
 	// MCP tool.
 	mcpSeparator = "__"
@@ -133,10 +84,8 @@ func parseRuleText(text string) (rule, error) {
 		r.names = []string{name}
 		r.hasPrefix = true
 		r.prefix = name + mcpSeparator
-	case aliases[name] != nil:
-		r.names = aliases[name]
 	default:
-		r.names = []string{name}
+		r.names = tool.RuleNames(name)
 	}
 
 	if content == "" {
@@ -147,10 +96,10 @@ func parseRuleText(text string) (rule, error) {
 	}
 
 	r.hasContent = true
-	switch contentKinds[r.names[0]] {
-	case commandContent:
+	switch contentOf(r.names[0]) {
+	case tool.ContentCommand:
 		r.command = parseShellRule(content)
-	case pathContent:
+	case tool.ContentPath:
 		r.path, err = parsePathRule(content)
 		if err != nil {
 			return rule{}, err
@@ -205,7 +154,7 @@ func checkName(name string) error {
 
 // isMCPServer reports if name is "mcp__server", with no tool part.
 func isMCPServer(name string) bool {
-	server, ok := strings.CutPrefix(name, mcpPrefix)
+	server, ok := strings.CutPrefix(name, tool.MCPPrefix)
 	if !ok || server == "" {
 		return false
 	}

@@ -45,9 +45,9 @@ func TestDriverStart(t *testing.T) {
 		Dir:       "/work",
 		Sections:  agent.SystemText("Be brief."),
 		Mode:      agent.ModePlan,
-		Allow:     []string{"Read"},
-		Ask:       []string{"Bash(gh pr comment:*)"},
-		Deny:      []string{"WebFetch"},
+		Allow:     []string{"read_file"},
+		Ask:       []string{"bash(gh pr comment:*)"},
+		Deny:      []string{"web_fetch"},
 		Effort:    ai.ThinkingHigh,
 		MCP:       []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
@@ -99,13 +99,22 @@ func TestDriverRejects(t *testing.T) {
 			errText:     "claude: the config field Skills: unsupported operation",
 		},
 		{
-			name: "tools",
+			name: "a tool of the caller that ToolNames names",
 			config: agent.Config{
 				SessionID: "s1",
-				Tools:     []tool.Tool{tool.Func("echo", nil)},
+				Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Func("echo", nil)},
+				ToolNames: []string{"bash", "echo"},
 			},
-			unsupported: true,
-			errText:     "claude: the config field Tools: unsupported operation",
+			errText: `claude: tool: unknown tool: "echo" is not a tool of claude-code`,
+		},
+		{
+			name: "a name outside the tools",
+			config: agent.Config{
+				SessionID: "s1",
+				Tools:     []tool.Tool{tool.Named(tool.Bash)},
+				ToolNames: []string{"Read"},
+			},
+			errText: `claude: tool: unknown tool: "Read" is not in the tool list`,
 		},
 		{
 			name: "a hook at a model call",
@@ -147,4 +156,116 @@ func TestDriverRejects(t *testing.T) {
 			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
 		})
 	}
+}
+
+func TestDriverToolNames(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/only_tools_mcp.trace")
+	d := claude.Driver()
+
+	r, err := d.Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Tools:     []tool.Tool{tool.Named(tool.ReadFile), tool.Named(tool.Bash)},
+		ToolNames: []string{"read_file", "bash(git diff *)", "mcp__lw__threads_get"},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok, "the driver starts a *claude.Agent")
+	defer closeAgent(t, a)
+
+	_, msgs, err := run(context.Background(), a, "Send it")
+	require.NoError(t, err, "the hook denies the MCP tool that ToolNames does not name")
+
+	args := strings.Join(starts.Cmds()[0].Args, " ")
+	assert.Contains(t, args, "--tools Read,Bash,ToolSearch", "--tools lists the built-in tools only")
+	require.Len(t, msgs, 3)
+	assert.Equal(t, "mcp__lw__threads_send", msgs[0].Content[0].(ai.ToolCall).Name)
+	assert.True(t, msgs[1].IsError)
+}
+
+func TestDriverTools(t *testing.T) {
+	tools := []tool.Tool{
+		tool.Named(tool.Bash),
+		tool.Named(tool.ReadFile),
+		tool.Named(tool.ApplyPatch),
+		tool.Named(tool.Skill),
+	}
+	tests := []struct {
+		name   string
+		config agent.Config
+		want   string
+	}{
+		{
+			name:   "no tools",
+			config: agent.Config{},
+			want:   "--tools ToolSearch",
+		},
+		{
+			name:   "each tool of the list that Claude Code has",
+			config: agent.Config{Tools: tools},
+			want:   "--tools Bash,Read,Skill,ToolSearch",
+		},
+		{
+			name:   "a named tool that the registry does not hold",
+			config: agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash), tool.Named("DesignSync")}},
+			want:   "--tools Bash,DesignSync,ToolSearch",
+		},
+		{
+			name:   "a tool of the caller is skipped",
+			config: agent.Config{Tools: append([]tool.Tool{tool.Func("lookup", nil)}, tools...)},
+			want:   "--tools Bash,Read,Skill,ToolSearch",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			starts := claude.Replay(t, nil, "testdata/text.trace")
+			config := tt.config
+			config.SessionID = "s1"
+			config.Store = session.NewMemoryStore()
+
+			r, err := claude.Driver().Start(context.Background(), config)
+			require.NoError(t, err)
+			a, ok := r.(*claude.Agent)
+			require.True(t, ok)
+			defer closeAgent(t, a)
+			_, _, err = run(context.Background(), a, "Say hello")
+			require.NoError(t, err)
+
+			args := strings.Join(starts.Cmds()[0].Args, " ")
+			assert.Contains(t, args+" ", tt.want+" ")
+		})
+	}
+}
+
+func TestDriverOnlyToolsLimitsTheList(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	d := claude.Driver(claude.OnlyTools("Read", "Grep"))
+
+	r, err := d.Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ReadFile)},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+	defer closeAgent(t, a)
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	args := strings.Join(starts.Cmds()[0].Args, " ") + " "
+	assert.Contains(t, args, "--tools Read,ToolSearch ", "the option of the driver limits the list of the config")
+}
+
+func TestToolsIsEachToolOfClaudeCode(t *testing.T) {
+	var names []string
+	for _, tl := range claude.Tools() {
+		assert.True(t, tool.IsNamed(tl))
+		names = append(names, tl.Info().Name)
+	}
+
+	for _, want := range []string{tool.Bash, tool.ReadFile, tool.AskUserQuestion, tool.ExitPlanMode, tool.NotebookEdit} {
+		assert.Contains(t, names, want)
+	}
+	assert.NotContains(t, names, tool.ApplyPatch, "Claude Code has no apply_patch")
 }

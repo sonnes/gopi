@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // taskTypeAgent is the task type of a subagent. The CLI also reports a
@@ -23,8 +24,9 @@ const taskTypeAgent = "local_agent"
 // subagent_type.
 const defaultChildName = "agent"
 
-// subagentTools are the tools that start a subagent.
-var subagentTools = []string{"Agent", "Task"}
+// subagentTools are the gopi names of the tools that start a subagent.
+// The agent reads each call with its gopi name.
+var subagentTools = []string{tool.Agent}
 
 // The status values of task_notification.
 const (

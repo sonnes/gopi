@@ -33,7 +33,7 @@ func TestNewAssemblesTheAgent(t *testing.T) {
 	assert.Equal(t, ai.Section{Name: harness.SystemSection, Text: "You are a test agent."}, sections[0])
 	assert.Equal(t, "skills", sections[1].Name)
 	assert.Contains(t, sections[1].Text, "- deploy: Deploy the service.")
-	assert.Equal(t, []string{"echo", "skill"}, toolNames(a))
+	assert.Equal(t, []string{"skill", "echo"}, toolNames(a), "the order of the tool list")
 	assert.Equal(t, []string{"one"}, p.called())
 }
 
@@ -132,7 +132,7 @@ func TestNewNeedsAModel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := with(tt.opts, harness.Builtin(harness.NoBuiltins))
+			opts := tt.opts
 			_, err := harness.New(opts...).New(context.Background())
 			assert.ErrorContains(t, err, tt.want)
 		})
@@ -281,37 +281,4 @@ func TestDurableLoadsTheSessionOnce(t *testing.T) {
 	spec, _, err := harness.SessionModel.Get(a.Log())
 	require.NoError(t, err)
 	assert.Equal(t, "fake/two", spec)
-}
-
-func TestTheDefaultBuiltinsAreTheCodingTools(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("the fence of the default sandbox runs only on macOS")
-	}
-	tests := []struct {
-		name string
-		opt  harness.Option
-		want []string
-	}{
-		{"default", func(*harness.Harness) {}, []string{"read_file", "write_file", "edit_file", "bash", "grep", "find", "todo_write"}},
-		{"read only", harness.Builtin(harness.ReadOnly), []string{"read_file", "grep", "find", "todo_write"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			opts := []harness.Option{
-				harness.Catalog(newCatalog(&script{})),
-				harness.Model("fake/one"),
-				harness.Seed(harness.NoSeed),
-				harness.Dir(t.TempDir()),
-				tt.opt,
-			}
-
-			asm := assemblyOf(t, opts)
-
-			var names []string
-			for _, info := range asm.Tools {
-				names = append(names, info.Name)
-			}
-			assert.Equal(t, tt.want, names)
-		})
-	}
 }

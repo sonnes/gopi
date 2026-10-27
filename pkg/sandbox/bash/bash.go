@@ -56,7 +56,7 @@ func (in bashInput) timeout() time.Duration {
 }
 
 // Name is the name of the tool.
-const Name = "bash"
+const Name = tool.Bash
 
 // description is the text that the model reads for the tool.
 //

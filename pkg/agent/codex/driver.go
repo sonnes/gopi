@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 )
 
 // Driver returns an [agent.Driver] that starts a Codex agent for each
@@ -30,12 +32,32 @@ import (
 //     So the mode asks less than the accept edits mode of Claude Code.
 //   - The bypass mode is [SandboxDangerFullAccess] with [ApprovalNever].
 //
-// The driver rejects Skills and Tools, because the CLI loads its own
-// skills and runs only its own tools. It skips Dirs: the caller gives
-// the CLI its skills and agents. It rejects Allow, Ask, and Deny,
-// because Codex has no rules for each tool. It runs the hooks at the
-// points of [Hooks]. Start rejects a hook at another point, from the
-// config or from an option.
+// Codex has no rules for each tool, so the driver applies the rules of
+// the config itself, as the harness reads them:
+//
+//   - An Allow rule accepts an approval request of the CLI that it
+//     matches. The approve function does not get the request.
+//   - A Deny rule blocks a call in a hook of the CLI at PreToolUse. An
+//     Ask rule asks the approve function in that hook.
+//   - bash or apply_patch gets a Deny rule if Tools or ToolNames leaves
+//     it out. The hooks of the CLI do not see web_search and agent, so
+//     the agent keeps them. ToolNames also blocks a call of each other
+//     tool, such as an MCP tool, in that hook. The model still sees the
+//     tool.
+//
+// The driver skips a well-known tool of Tools that Codex does not have,
+// such as read_file, and a tool of the caller, because the CLI runs
+// only its own tools. A tool of the caller that ToolNames names fails
+// the start.
+//
+// A Deny rule, an Ask rule, a left-out tool, or ToolNames needs the
+// hook command of [HookCommand]. An Allow rule needs no hook.
+//
+// The driver rejects Skills, because the CLI loads its own skills. It
+// skips Dirs: the caller gives
+// the CLI its skills and agents. It runs the hooks at the points of
+// [Hooks]. Start rejects a hook at another point, from the config or
+// from an option.
 func Driver(opts ...Option) agent.Driver {
 	return driver{opts: opts}
 }
@@ -60,19 +82,20 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		set   bool
 	}{
 		{"Skills", len(c.Skills) > 0},
-		{"Tools", len(c.Tools) > 0},
-		{"Allow", len(c.Allow) > 0},
-		{"Ask", len(c.Ask) > 0},
-		{"Deny", len(c.Deny) > 0},
 	}
 	for _, r := range rejected {
 		if r.set {
 			return nil, unsupported(r.field)
 		}
 	}
+	rules, err := ruleHooks(c)
+	if err != nil {
+		return nil, fmt.Errorf("codex: %w", err)
+	}
+	configHooks := append(slices.Clip(c.Hooks), rules...)
 	// The hooks of the options come before the hooks of the config, as
 	// in the agent.
-	hooks := append(newConfig(d.opts).hooks, c.Hooks...)
+	hooks := append(newConfig(d.opts).hooks, configHooks...)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
@@ -104,13 +127,71 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
-	if c.Approve != nil {
-		opts = append(opts, Approve(c.Approve))
+	if approve := allowFirst(c); approve != nil {
+		opts = append(opts, Approve(approve))
 	}
-	if len(c.Hooks) > 0 {
-		opts = append(opts, Hooks(c.Hooks...))
+	if len(configHooks) > 0 {
+		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
+}
+
+// ruleHooks returns the hooks that apply the Deny rules, the Ask rules,
+// and the tools of c. A tool of the CLI that c leaves out gets a Deny
+// rule, as [leftOutTools] gives it. It returns no hook for a config with
+// none, so that the CLI needs no hook command. It returns an error for
+// a rule of c that does not parse, also for an Allow rule, and for a
+// tool that the CLI does not have.
+func ruleHooks(c agent.Config) ([]agent.Hook, error) {
+	left, err := leftOutTools(c)
+	if err != nil {
+		return nil, err
+	}
+	policy := permission.Policy{
+		// The CLI decides the calls that no rule matches.
+		Mode:    permission.Bypass,
+		Allow:   c.Allow,
+		Ask:     c.Ask,
+		Deny:    append(slices.Clip(c.Deny), left...),
+		Approve: c.Approve,
+		Dir:     c.Dir,
+	}
+	if err := policy.Validate(); err != nil {
+		return nil, err
+	}
+
+	var hooks []agent.Hook
+	if len(policy.Ask) > 0 || len(policy.Deny) > 0 {
+		hooks = append(hooks, policy.Hook())
+	}
+	if c.ToolNames != nil {
+		hooks = append(hooks, agent.OnlyTools(c.ToolNames))
+	}
+	return hooks, nil
+}
+
+// allowFirst returns the approve function of c, with the Allow rules of
+// c first: a request that an Allow rule matches is accepted, and the
+// approve function does not get it. Without an Allow rule, it returns
+// c.Approve. Without an approve function, a request that no Allow rule
+// matches is declined.
+func allowFirst(c agent.Config) agent.ApproveFunc {
+	if len(c.Allow) == 0 {
+		return c.Approve
+	}
+	policy := permission.Policy{
+		Allow: c.Allow,
+		Dir:   c.Dir,
+	}
+	return func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		if policy.Allows(req.Call) {
+			return agent.Decision{Allow: true}, nil
+		}
+		if c.Approve == nil {
+			return agent.Decision{}, nil
+		}
+		return c.Approve(ctx, req)
+	}
 }
 
 // modeOptions returns the policy and the sandbox of the mode m. The doc

@@ -17,6 +17,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/hooktext"
 	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // The hook events of the CLI at the points of a gopi hook.
@@ -43,13 +44,6 @@ const (
 	renameText      = "codex: a hook cannot rename a tool call of Codex"
 	commandText     = "codex: a hook must give Bash and apply_patch an input with a string command"
 	unreachableText = "the gopi host of the hook is not reachable"
-)
-
-// The names that the tool calls of a hook have in the CLI, and the
-// prefix of an MCP tool.
-const (
-	hookBash      = "Bash"
-	hookMCPPrefix = "mcp__"
 )
 
 // Hooks adds hooks that the CLI calls at its own hook events. Codex has
@@ -395,15 +389,10 @@ func (s *hookServer) answer(ctx context.Context, in hookInput) hookOutput {
 	return hookOutput{}
 }
 
-// toolName returns the name of a tool of a hook as the log names it.
+// toolName returns the gopi name of a tool of a hook, as the log names
+// it. The hooks of Codex name the shell "Bash", as Claude Code does.
 func toolName(name string) string {
-	if name == hookBash {
-		return toolBash
-	}
-	if rest, ok := strings.CutPrefix(name, hookMCPPrefix); ok {
-		return rest
-	}
-	return name
+	return tool.Canonical(name)
 }
 
 func (s *hookServer) beforeTool(ctx context.Context, orig ai.ToolCall) hookOutput {

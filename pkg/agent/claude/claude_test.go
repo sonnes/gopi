@@ -200,7 +200,7 @@ func TestRunToolCall(t *testing.T) {
 			require.Len(t, msgs, 3, "the tool call, its result, and the answer")
 			call := ai.ToolCall{
 				ID:    "toolu_1",
-				Name:  "Bash",
+				Name:  "bash",
 				Input: []byte(`{"command":"echo hi"}`),
 			}
 			assert.Equal(t, []ai.Content{ai.Text{Text: "Running it."}, call}, msgs[0].Content)
@@ -227,7 +227,7 @@ func TestRunToolCall(t *testing.T) {
 			}
 			require.NotNil(t, start)
 			require.NotNil(t, end)
-			assert.Equal(t, "Bash", start.ToolName)
+			assert.Equal(t, "bash", start.ToolName)
 			assert.JSONEq(t, `{"command":"echo hi"}`, string(start.Args))
 			assert.Equal(t, tt.isError, end.Result.IsError)
 
@@ -601,9 +601,10 @@ func TestOptions(t *testing.T) {
 		claude.System("Be brief."),
 		claude.Thinking(ai.ThinkingHigh),
 		claude.PermissionMode(claude.PermissionAcceptEdits),
-		claude.AllowedTools("Read", "Bash(git:*)"),
-		claude.DisallowedTools("WebFetch"),
-		claude.AskTools("Bash(gh pr comment:*)"),
+		claude.AllowedTools("read_file", "bash(git:*)", "mcp__lw__threads_get"),
+		claude.DisallowedTools("web_fetch"),
+		claude.AskTools("bash(gh pr comment:*)"),
+		claude.OnlyTools("read_file", "find", "ExitPlanMode", "mcp__lw__threads_get"),
 		claude.MCP(agent.MCPServer{
 			Name:    "lw",
 			Type:    agent.MCPHTTP,
@@ -633,9 +634,10 @@ func TestOptions(t *testing.T) {
 		"--append-system-prompt", "Be brief.",
 		"--effort", "high",
 		"--permission-mode", "acceptEdits",
-		"--allowedTools", "Read,Bash(git:*)",
+		"--allowedTools", "Read,Bash(git:*),mcp__lw__threads_get",
 		"--disallowedTools", "WebFetch",
 		"--settings", `{"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
+		"--tools", "Read,Glob,ExitPlanMode",
 		"--mcp-config", `{"mcpServers":{"lw":{"type":"http","url":"http://127.0.0.1:1/mcp","headers":{"Authorization":"Bearer t"}}}}`,
 	}, cmd.Args)
 	assert.Equal(t, "/work", cmd.Dir)
@@ -714,7 +716,7 @@ func TestApprove(t *testing.T) {
 
 			require.Len(t, got, 1)
 			assert.Equal(t, "toolu_1", got[0].ID)
-			assert.Equal(t, "Bash", got[0].Name)
+			assert.Equal(t, "bash", got[0].Name)
 			assert.JSONEq(t, `{"command":"rm a.txt"}`, string(got[0].Input))
 
 			require.Len(t, msgs, 3)
@@ -1064,4 +1066,18 @@ func (w wakeSink) signal() {
 	case w <- struct{}{}:
 	default:
 	}
+}
+
+func TestOnlyToolsWithNoNameDisablesEachTool(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	a := claude.New(claude.OnlyTools())
+	defer closeAgent(t, a)
+
+	_, _, err := run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	args := starts.Cmds()[0].Args
+	i := slices.Index(args, "--tools")
+	require.GreaterOrEqual(t, i, 0)
+	assert.Equal(t, "", args[i+1])
 }

@@ -91,6 +91,9 @@ func withAgent(ctx context.Context, config Config) (Config, error) {
 	config.Model = cmp.Or(config.Model, model)
 	config.Mode = cmp.Or(config.Mode, agent.Mode(a.Mode))
 	config.Effort = cmp.Or(config.Effort, a.Effort)
+	if config.ToolNames == nil {
+		config.ToolNames = a.Tools
+	}
 	config.Deny = append(slices.Clip(config.Deny), a.Disallowed...)
 	config.Skills = append(slices.Clip(config.Skills), a.Skills...)
 	return config, nil

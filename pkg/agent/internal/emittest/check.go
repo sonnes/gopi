@@ -10,6 +10,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // CheckEvents fails t if events break the event order of a run:
@@ -22,7 +23,9 @@ import (
 //     turns is the exception. A message_update is in an open message and has an
 //     AssistantEvent.
 //   - Each tool_execution_start is in a turn, outside a message, and
-//     has one tool_execution_end.
+//     has one tool_execution_end. Its tool name is not another name of
+//     a well-known tool, so a test of a driver fails if the driver
+//     gives the name of its CLI for such a tool.
 //   - A subagent_start names a tool call that started in the run. A
 //     subagent and a subagent_end name a subagent that is open. A
 //     subagent_end can come after the end of its call, because a Codex
@@ -78,6 +81,7 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 			assert.True(t, inTurn, "event %d: tool_execution_start outside a turn", i)
 			assert.False(t, inMsg, "event %d: tool_execution_start in a message", i)
 			assert.NotEmpty(t, ev.ToolCallID, "event %d: tool_execution_start has a call ID", i)
+			assert.Equal(t, tool.Canonical(ev.ToolName), ev.ToolName, "event %d: tool_execution_start has the gopi name of a well-known tool", i)
 			assert.False(t, tools[ev.ToolCallID], "event %d: tool call %q started twice", i, ev.ToolCallID)
 			tools[ev.ToolCallID] = true
 			called[ev.ToolCallID] = true

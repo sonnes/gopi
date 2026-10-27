@@ -31,6 +31,8 @@ h := harness.New(
 	harness.Catalog(cat),
 	harness.Model("fake/one"),
 	harness.Dir(dir),
+	harness.Toolset(harness.Tools(harness.Coding()...)),
+	harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool())),
 	harness.Mode(permission.AcceptEdits),
 	harness.Deny("bash(git push *)"),
 )
@@ -38,6 +40,8 @@ h := harness.New(
 a, err := h.Durable(ctx, "fix-login")
 msgs, err := a.Run(ctx, session.Text("Fix the login test.")).Wait()
 ```
+
+`Toolset` gives each tool of the agent. The harness adds no tool of its own. `Coding` gives the tools that read files, change files, and run commands. A tool of `Sandboxed` runs in the sandbox of each session, and `SkillTool` and `AgentTool` bind to the skills and the subagents of each session.
 
 `Durable` returns an `*agent.Agent`, so you read its events and its log as for any agent. A call can add its own options, such as the `Dir` of another repository. A resumed session keeps its model spec. A `Model` on the call changes it.
 
@@ -71,11 +75,11 @@ harness.Agents(def.Agent{
 }),
 ```
 
-The model loads a skill with the `skill` tool, and gives a task to a subagent with the `agent` tool. A subagent runs in a child session of the store, and the result gives its `agent_id`, so the model can resume it. The run stream of the parent carries the start, each event, and the end of the child.
+The model loads a skill with the `skill` tool, and gives a task to a subagent with the `agent` tool. Give both tools in `Toolset`. A subagent runs in a child session of the store, and the result gives its `agent_id`, so the model can resume it. The run stream of the parent carries the start, each event, and the end of the child.
 
 ## Tools
 
-The agent gets the built-in tools of `Coding`, then the tools of `Toolset`. `harness.Tools` makes a reader of tools in code. `MCP` connects to each server on each call of `New` or `Durable`, and the agent gets its tools as deferred tools named `mcp__<server>__<tool>`.
+The agent gets the tools of `Toolset`. `harness.Tools` makes a reader of tools in code. `MCP` connects to each server on each call of `New` or `Durable`, and the agent gets its tools as deferred tools named `mcp__<server>__<tool>`.
 
 ```go
 harness.MCP(github),
@@ -95,7 +99,7 @@ If a server does not connect, `New` and `Durable` fail. `Close` on the agent clo
 
 A `Deny` rule wins over every mode. Then an `Ask` rule, then an `Allow` rule. The rules have the format of Claude Code settings. `Approve` asks a person. Without it, each call that needs an approval is denied.
 
-The built-in tools run in a local sandbox with the workspace fence, so a command cannot write outside `Dir`. The fence runs only on macOS. On another OS, give a sandbox with `Sandbox`, or an assembly with built-in tools fails.
+A tool of `Sandboxed` runs in a local sandbox with the workspace fence, so a command cannot write outside `Dir`. The fence runs only on macOS. On another OS, give a sandbox with `Sandbox`, or an assembly with a tool of `Sandboxed` fails.
 
 ## Agent Options and the First Entries
 

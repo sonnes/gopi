@@ -300,7 +300,16 @@ func (f fixture) toolResults(t *testing.T, id string) []string {
 	return out
 }
 
-// fixture is a host on the fake model "fake/m".
+// fixtureTools is the tool list of the host of a fixture.
+var fixtureTools = []tool.Tool{
+	tool.Named(tool.Bash),
+	tool.Named(tool.ReadFile),
+	tool.Named(tool.Grep),
+	tool.Named(tool.Find),
+	tool.Func("lookup_order", nil),
+}
+
+// fixture is a host on the fake model "fake/m", with [fixtureTools].
 type fixture struct {
 	h      *host.Host
 	cat    *catalog.Catalog
@@ -328,7 +337,7 @@ func newFixture(t *testing.T, opts ...host.Option) fixture {
 // open opens a host on the store, the catalog, and the driver of f.
 func (f fixture) open(t *testing.T, opts ...host.Option) *host.Host {
 	t.Helper()
-	opts = append([]host.Option{host.Store(f.store)}, opts...)
+	opts = append([]host.Option{host.Store(f.store), host.Tools(fixtureTools...)}, opts...)
 	h, err := host.Open(context.Background(), f.cat, opts...)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, h.Close()) })

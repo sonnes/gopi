@@ -10,6 +10,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -27,9 +28,8 @@ type Assembly struct {
 	// Instructions holds the instruction texts of the readers of
 	// [Instructions] and [Defs], in order.
 	Instructions []def.Instruction
-	// Tools describes the tools that the model can call, in order: the
-	// built-in tools, the tools of [Toolset], the skill tool, then the
-	// agent tool. A deferred tool is not in the list, because the model
+	// Tools describes the tools that the model can call, in the order of
+	// [Toolset]. A deferred tool is not in the list, because the model
 	// cannot call it until the search of the agent loads it.
 	Tools []ai.ToolInfo
 	// Skills holds the skills of the readers, merged by qualified name. [Assembly.SkillName] gives the name that the model
@@ -49,6 +49,9 @@ type Assembly struct {
 	names []string
 	// tools are the tools that go to the agent, deferred or not.
 	tools []tool.Tool
+	// box is the sandbox of the tools of [Sandboxed]. It is nil until
+	// the first of them binds.
+	box sandbox.Sandbox
 }
 
 // SkillName returns the name that the model gives for skill i. It is
@@ -258,34 +261,81 @@ func readAgents(ctx context.Context, readers []def.AgentsReader) ([]def.Agent, e
 	return out, nil
 }
 
-// readTools returns the tools of the assembly: the built-in tools, the
-// tools of each reader in order, the skill tool, then the agent tool.
-// In a child assembly, it keeps only the tools of the subagent.
+// readTools returns the tools of the assembly: the tools of each reader
+// of [Toolset] in order, each bound to the assembly. In a child
+// assembly, it keeps only the tools of the subagent. With [Only], it
+// keeps only the named tools.
+//
+// It picks the tools by name before it binds them. A name of the list
+// then passes [Only] also when its tool binds to nothing, such as the
+// skill tool in a folder with no skill, and a tool that Only leaves out
+// makes no sandbox.
 func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
-	out, err := a.h.builtinTools(a.Dir)
-	if err != nil {
-		return nil, err
-	}
+	var read []tool.Tool
 	for i, r := range a.h.tools {
 		tools, err := r.ReadTools(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("harness: tools reader %d (%T): %w", i, r, err)
 		}
-		out = append(out, tools...)
+		read = append(read, tools...)
 	}
-	if t := newSkillTool(a.Skills, a.names); t != nil {
-		out = append(out, t)
+	read, err := a.pick(read)
+	if err != nil {
+		return nil, err
 	}
-	if a.agentTool() {
-		out = append(out, newAgentTool(a))
-	}
-	if a.h.child != nil {
-		out = keepTools(out, a.h.child.sub)
+	out, err := a.bindTools(read)
+	if err != nil {
+		return nil, err
 	}
 	if err := uniqueNames(out); err != nil {
 		return nil, err
 	}
 	return out, nil
+}
+
+// pick returns the tools of tools that [Only] keeps, without each tool
+// that a [Deny] rule with no content names, and in a child assembly
+// the tools of the subagent. A name of Only or of the file of the
+// subagent that names no tool fails with [tool.ErrUnknownTool], so a
+// typo does not remove a tool silently. A child narrows the names of
+// Only with no check: the start of its parent checked them, and the
+// file of the subagent removes some of them, such as the agent tool.
+func (a *Assembly) pick(tools []tool.Tool) ([]tool.Tool, error) {
+	if c := a.h.child; c != nil {
+		if _, err := tool.Select(tools, c.sub.Tools); err != nil {
+			return nil, fmt.Errorf("harness: subagent %q: %w", c.sub.Name, err)
+		}
+		tools = keepTools(tools, c.sub)
+		if a.h.only != nil {
+			tools = keepTools(tools, def.Agent{Tools: a.h.only})
+		}
+		return withoutDenied(tools, a.h.policy.Deny), nil
+	}
+	if a.h.only != nil {
+		kept, err := tool.Select(tools, a.h.only)
+		if err != nil {
+			return nil, fmt.Errorf("harness: %w", err)
+		}
+		tools = kept
+	}
+	return withoutDenied(tools, a.h.policy.Deny), nil
+}
+
+// withoutDenied returns the tools without each tool that a deny rule
+// with no content names, as Claude Code removes it. A rule with
+// content, such as "bash(git push *)", keeps the tool, and the policy
+// denies the calls that the rule matches.
+func withoutDenied(tools []tool.Tool, rules []string) []tool.Tool {
+	var whole []string
+	for _, r := range rules {
+		if _, content := tool.SplitRule(r); content == "" {
+			whole = append(whole, r)
+		}
+	}
+	if len(whole) == 0 {
+		return tools
+	}
+	return keepTools(tools, def.Agent{Disallowed: whole})
 }
 
 // uniqueNames returns an error if two tools have one name. The

@@ -478,7 +478,6 @@ func TestStoredSpec(t *testing.T) {
 	cat.RegisterTextProvider("fake", &openaichat.Provider{}, ai.Model{ID: "one"}, ai.Model{ID: "two"})
 	opts := []harness.Option{
 		harness.Catalog(cat),
-		harness.Builtin(harness.NoBuiltins),
 	}
 
 	none, err := storedSpec(t.Context(), dir, "")
@@ -509,7 +508,6 @@ func TestNewAgentKeepsASession(t *testing.T) {
 	opts := []harness.Option{
 		harness.Catalog(cat),
 		harness.Model("fake/test"),
-		harness.Builtin(harness.NoBuiltins),
 	}
 
 	a, err := newAgent(t.Context(), opts, "fake/test", "ada", dir)
@@ -616,7 +614,7 @@ func TestWithAgent(t *testing.T) {
 		Effort:     ai.ThinkingHigh,
 		Mode:       "acceptEdits",
 		Prompt:     "You review.",
-		Disallowed: []string{"Bash"},
+		Disallowed: []string{"bash"},
 		Skills:     []string{"deploy"},
 	}
 	tests := []struct {
@@ -634,7 +632,7 @@ func TestWithAgent(t *testing.T) {
 				thinking:   "high",
 				mode:       "acceptEdits",
 				system:     "You review.",
-				deny:       []string{"write_file", "Bash"},
+				deny:       []string{"write_file", "bash"},
 				skills:     []string{"deploy"},
 			},
 		},
@@ -652,7 +650,7 @@ func TestWithAgent(t *testing.T) {
 				thinking:   "low",
 				mode:       "plan",
 				system:     "You review.",
-				deny:       []string{"Bash"},
+				deny:       []string{"bash"},
 				skills:     []string{"deploy"},
 			},
 		},

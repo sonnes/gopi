@@ -41,7 +41,7 @@ func (in findInput) limit() int {
 }
 
 // Name is the name of the tool.
-const Name = "find"
+const Name = tool.Find
 
 // description is the text that the model reads for the tool.
 //

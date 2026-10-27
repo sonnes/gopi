@@ -39,8 +39,8 @@ func Store(s session.Storer) Option {
 	return func(h *Harness) { h.store = s }
 }
 
-// Dir sets the folder that the agent works in. The built-in tools start
-// in it. Without Dir, the harness uses the working directory of the
+// Dir sets the folder that the agent works in. The tools of [Sandboxed]
+// start in it. Without Dir, the harness uses the working directory of the
 // process. The harness reads no file of Dir: give the definitions with
 // [Defs].
 func Dir(path string) Option {
@@ -92,15 +92,28 @@ func Agents(readers ...def.AgentsReader) Option {
 	return func(h *Harness) { h.agents = append(h.agents, readers...) }
 }
 
-// Toolset adds readers of the tools that the model can call, after the
-// tools of [Builtin]. An assembly reads them in order. Give tools with
-// [Tools]. Two tools with one name make the assembly fail. The skill
-// tool has the name "skill", and the agent tool has the name "agent".
+// Toolset adds readers of the tools that the model can call. The tools
+// of Toolset are each tool of the agent: the harness adds no tool of its
+// own. An assembly reads them in order. Give tools with [Tools]. Two
+// tools with one name make the assembly fail.
+//
+// The assembly binds each [Binder], such as [SkillTool], [AgentTool],
+// and a tool of [Sandboxed], and skips each tool of [tool.Named].
 //
 // A deferred tool, from [tool.Deferred] or [tool.Defer], goes to the
 // agent with the others. See [agent.Toolset].
 func Toolset(readers ...ToolsReader) Option {
 	return func(h *Harness) { h.tools = append(h.tools, readers...) }
+}
+
+// Only keeps only the named tools of the agent. A name can be a gopi
+// name or a Claude Code name, and can have content, such as
+// "bash(git diff *)". [tool.Select] reads the names. It applies to each
+// tool of [Toolset] and each MCP tool. Only with no names keeps no tool,
+// and a name of no tool fails the assembly with [tool.ErrUnknownTool].
+// Without Only, the agent keeps each tool.
+func Only(names ...string) Option {
+	return func(h *Harness) { h.only = append([]string{}, names...) }
 }
 
 // MCP adds the MCP servers servers. [Harness.New] and [Harness.Durable]
@@ -113,16 +126,10 @@ func MCP(servers ...agent.MCPServer) Option {
 	return func(h *Harness) { h.mcp = append(h.mcp, servers...) }
 }
 
-// Builtin sets the built-in tools. Without Builtin, the agent gets
-// [Coding].
-func Builtin(b Builtins) Option {
-	return func(h *Harness) { h.builtin = b }
-}
-
-// Sandbox sets the sandbox of the built-in tools. Without Sandbox, the
-// harness makes a [sandbox.Local] in [Dir] with the
+// Sandbox sets the sandbox of the tools of [Sandboxed]. Without Sandbox,
+// each assembly makes a [sandbox.Local] in its [Dir] with the
 // [fence.Workspace] policy. The fence runs only on macOS, so on another
-// OS an assembly with built-in tools fails until a caller gives a
+// OS an assembly with a tool of Sandboxed fails until a caller gives a
 // sandbox.
 func Sandbox(box sandbox.Sandbox) Option {
 	return func(h *Harness) { h.box = box }
@@ -184,7 +191,9 @@ func Ask(rules ...string) Option {
 	return func(h *Harness) { h.policy.Ask = append(h.policy.Ask, rules...) }
 }
 
-// Deny adds rules for the tool calls that never run, in any mode.
+// Deny adds rules for the tool calls that never run, in any mode. A
+// rule with no content, such as "WebFetch", also removes the tool from
+// the agent, as Claude Code does, so the model does not see it.
 func Deny(rules ...string) Option {
 	return func(h *Harness) { h.policy.Deny = append(h.policy.Deny, rules...) }
 }

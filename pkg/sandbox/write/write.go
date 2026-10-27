@@ -20,7 +20,7 @@ type writeInput struct {
 }
 
 // Name is the name of the tool.
-const Name = "write_file"
+const Name = tool.WriteFile
 
 // description is the text that the model reads for the tool.
 //

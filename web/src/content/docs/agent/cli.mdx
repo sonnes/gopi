@@ -63,15 +63,15 @@ msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 
 ## Tools and Approvals
 
-The log keeps each call of a CLI tool as a tool call and a tool result. Claude Code uses its own tool names, such as `Bash`. Codex names a command `bash` and a file change `apply_patch`.
+The log keeps each call of a CLI tool as a tool call and a tool result. Claude Code reports the gopi name of each well-known tool, such as `bash` for `Bash`. A tool of the CLI that is not well known keeps its name, such as `ExitPlanMode`. Codex names a command `bash`, a file change `apply_patch`, and an MCP tool call `mcp__<server>__<tool>`.
 
 `Approve` takes the `agent.ApproveFunc` of the harness. The CLI waits for the answer, so the function must return when its context ends.
 
 ```go
 a := claude.New(
-	claude.AllowedTools("Read", "Grep"),
+	claude.AllowedTools("read_file", "grep"),
 	claude.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-		if req.Call.Name == "Bash" && !confirm(req.Call.Input) {
+		if req.Call.Name == "bash" && !confirm(req.Call.Input) {
 			return agent.Decision{Message: "The user refused the command."}, nil
 		}
 		return agent.Decision{Allow: true}, nil

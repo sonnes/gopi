@@ -168,7 +168,7 @@ func TestRecordedHooks(t *testing.T) {
 	emittest.CheckEvents(t, events)
 
 	require.NotEmpty(t, seen, "the CLI calls the PreToolUse hook")
-	assert.Equal(t, "Bash", seen[0].Name)
+	assert.Equal(t, "bash", seen[0].Name)
 	var results []string
 	for _, m := range msgs {
 		if m.Role == ai.RoleToolResult {
@@ -256,7 +256,7 @@ func TestRecordedToolEdits(t *testing.T) {
 		claude.Dir(dir),
 		claude.Model("haiku"),
 		claude.PermissionMode(claude.PermissionDontAsk),
-		claude.AllowedTools("Bash"),
+		claude.AllowedTools("bash"),
 		claude.Hooks(guard, outputEditor{results: &results}),
 	)
 	defer closeAgent(t, a)

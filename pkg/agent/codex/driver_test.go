@@ -32,10 +32,23 @@ func (stopHook) BeforeStop(context.Context, agent.State) ([]session.Entry, error
 	return nil, nil
 }
 
+// allTools are the tools of the CLI, so a config with them needs no
+// hook that removes a tool.
+var allTools = []tool.Tool{
+	tool.Named(tool.Bash),
+	tool.Named(tool.ApplyPatch),
+	tool.Named(tool.WebSearch),
+	tool.Named(tool.Agent),
+}
+
 // startAgent starts the session s1 with d and c, and returns its agent.
+// A config with no tools gets [allTools].
 func startAgent(t *testing.T, d agent.Driver, c agent.Config) *Agent {
 	t.Helper()
 	c.SessionID = "s1"
+	if c.Tools == nil {
+		c.Tools = allTools
+	}
 	r, err := d.Start(context.Background(), c)
 	require.NoError(t, err)
 	a, ok := r.(*Agent)
@@ -133,6 +146,23 @@ func TestDriverMode(t *testing.T) {
 	}
 }
 
+func TestDriverAllowAnswersAnApproval(t *testing.T) {
+	useTraces(t, []string{"approval_accept.trace"})
+	var asked []string
+	a := startAgent(t, Driver(), agent.Config{
+		Dir:   workDir,
+		Allow: []string{"bash(rm *)"},
+		Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			asked = append(asked, req.Call.Name)
+			return agent.Decision{}, nil
+		},
+	})
+
+	_, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
+	require.NoError(t, err, "the agent accepts the request that the Allow rule covers")
+	assert.Empty(t, asked, "the approve function does not get the request")
+}
+
 func TestDriverRejects(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -147,28 +177,22 @@ func TestDriverRejects(t *testing.T) {
 			errText:     "codex: the config field Skills: unsupported operation",
 		},
 		{
-			name:        "tools",
-			config:      agent.Config{Tools: []tool.Tool{tool.Func("echo", nil)}},
-			unsupported: true,
-			errText:     "codex: the config field Tools: unsupported operation",
+			name: "a tool of the caller that ToolNames names",
+			config: agent.Config{
+				Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Func("echo", nil)},
+				ToolNames: []string{"bash", "echo"},
+			},
+			errText: `codex: tool: unknown tool: "echo" is not a tool of codex`,
 		},
 		{
-			name:        "allow rules",
-			config:      agent.Config{Allow: []string{"Read"}},
-			unsupported: true,
-			errText:     "codex: the config field Allow: unsupported operation",
+			name:    "a name outside the tools",
+			config:  agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash)}, ToolNames: []string{"apply_patch"}},
+			errText: `codex: tool: unknown tool: "apply_patch" is not in the tool list`,
 		},
 		{
-			name:        "ask rules",
-			config:      agent.Config{Ask: []string{"Bash(git push:*)"}},
-			unsupported: true,
-			errText:     "codex: the config field Ask: unsupported operation",
-		},
-		{
-			name:        "deny rules",
-			config:      agent.Config{Deny: []string{"Bash(rm:*)"}},
-			unsupported: true,
-			errText:     "codex: the config field Deny: unsupported operation",
+			name:    "a rule that does not parse",
+			config:  agent.Config{Deny: []string{"bash(rm *"}},
+			errText: `codex: permission: rule "bash(rm *": the content has no closing parenthesis`,
 		},
 		{
 			name:        "a hook after a turn",
@@ -193,6 +217,57 @@ func TestDriverRejects(t *testing.T) {
 			_, err := Driver().Start(context.Background(), tt.config)
 			require.EqualError(t, err, tt.errText)
 			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
+		})
+	}
+}
+
+func TestLeftOutTools(t *testing.T) {
+	tests := []struct {
+		name   string
+		config agent.Config
+		want   []string
+	}{
+		{name: "each tool of the CLI", config: agent.Config{Tools: allTools}, want: nil},
+		{
+			name:   "a tool of the caller is skipped",
+			config: agent.Config{Tools: append([]tool.Tool{tool.Func("lookup", nil)}, allTools...)},
+			want:   nil,
+		},
+		{
+			name:   "a well-known tool that the CLI does not have",
+			config: agent.Config{Tools: append([]tool.Tool{tool.Named(tool.ReadFile)}, allTools...)},
+			want:   nil,
+		},
+		{
+			name:   "a short list",
+			config: agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ReadFile)}},
+			want:   []string{tool.ApplyPatch},
+		},
+		{
+			name:   "ToolNames keeps one tool",
+			config: agent.Config{Tools: allTools, ToolNames: []string{"Bash"}},
+			want:   []string{tool.ApplyPatch},
+		},
+		{name: "no tools", config: agent.Config{}, want: []string{tool.Bash, tool.ApplyPatch}},
+		{
+			name: "a named tool of another CLI",
+			config: agent.Config{
+				Tools:     append([]tool.Tool{tool.Named("DesignSync")}, allTools...),
+				ToolNames: []string{"bash", "apply_patch", "DesignSync"},
+			},
+			want: nil,
+		},
+		{
+			name:   "web_search and agent are not removed",
+			config: agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ApplyPatch)}},
+			want:   nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := leftOutTools(tt.config)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -366,4 +441,14 @@ func TestDriverMCP(t *testing.T) {
 		assert.Equal(t, wantServers, p.Config["mcp_servers"])
 		assert.Contains(t, p.Config, "hooks")
 	})
+}
+
+func TestToolsIsEachToolOfCodex(t *testing.T) {
+	var names []string
+	for _, tl := range Tools() {
+		assert.True(t, tool.IsNamed(tl))
+		names = append(names, tl.Info().Name)
+	}
+
+	assert.Equal(t, []string{tool.Bash, tool.ApplyPatch, tool.WebSearch, tool.Agent}, names)
 }

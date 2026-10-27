@@ -59,8 +59,16 @@ type Config struct {
 	// Mode is the permission mode of the agent. If it is empty, the
 	// driver keeps its own mode.
 	Mode Mode
+	// ToolNames limits the agent to the named tools of Tools. A name can
+	// be a gopi name or a Claude Code name, such as "Glob", and can have
+	// content, such as "bash(git diff *)". [tool.Select] reads it. If it
+	// is nil, the agent keeps each tool of Tools. A name of no tool of
+	// Tools fails the start with [tool.ErrUnknownTool].
+	ToolNames []string
 	// Allow, Ask, and Deny are the permission rules of the agent, in
-	// the format "Tool" or "Tool(content)".
+	// the format "Tool" or "Tool(content)". A rule can use a gopi name
+	// or a Claude Code name. [tool.RuleNames] gives the tools of a
+	// rule, so a rule on "Read" also covers grep and find.
 	Allow []string
 	Ask   []string
 	Deny  []string
@@ -68,7 +76,12 @@ type Config struct {
 	Approve ApproveFunc
 	// Hooks change the loop of the agent.
 	Hooks []Hook
-	// Tools are more tools for the agent.
+	// Tools is the full set of tools of the agent. Without Tools, the
+	// agent has no tool. A driver of a CLI reads only the name of each
+	// tool: it maps a well-known name to a tool of its CLI, and skips a
+	// well-known tool that its CLI does not have and a tool of the
+	// caller. A tool of the caller that ToolNames names fails the start
+	// with [tool.ErrUnknownTool].
 	Tools []tool.Tool
 	// MCP are the MCP servers of the agent. The agent gets the tools
 	// of each server.

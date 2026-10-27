@@ -106,6 +106,7 @@ type config struct {
 	allowed    []string
 	disallowed []string
 	ask        []string
+	only       []string
 	approve    agent.ApproveFunc
 	hooks      []agent.Hook
 	mcp        []agent.MCPServer
@@ -178,24 +179,33 @@ func Env(kv ...string) Option {
 }
 
 // AllowedTools lets the CLI run the named tools without a prompt. A
-// name can hold a rule, such as "Bash(git:*)". Without it, the settings
-// of the CLI decide.
+// name is a gopi name or a Claude Code name, and it can hold a rule,
+// such as "bash(git:*)". The agent gives the CLI the Claude Code names. Without it, the
+// settings of the CLI decide.
 func AllowedTools(names ...string) Option {
 	return func(c *config) { c.allowed = append(c.allowed, names...) }
 }
 
-// DisallowedTools removes the named tools from the CLI. A name can hold
-// a rule, as in [AllowedTools].
+// DisallowedTools removes the named tools from the CLI. A name is as
+// in [AllowedTools].
 func DisallowedTools(names ...string) Option {
 	return func(c *config) { c.disallowed = append(c.disallowed, names...) }
 }
 
 // AskTools makes the CLI ask before it runs the named tools, also when
-// [AllowedTools] allows them. A name can hold a rule, as in
-// AllowedTools. The agent gives the rules to the CLI as settings, and
+// [AllowedTools] allows them. A name is as in AllowedTools. The agent gives the rules to the CLI as settings, and
 // the CLI adds them to the ask rules of its own settings.
 func AskTools(names ...string) Option {
 	return func(c *config) { c.ask = append(c.ask, names...) }
+}
+
+// OnlyTools gives the CLI only the named built-in tools, with the
+// --tools flag. A name is a gopi name or a Claude Code name. The flag
+// does not list an MCP
+// tool, so OnlyTools skips each MCP name. OnlyTools with no names gives
+// the CLI no built-in tool. Without it, the CLI has its default tools.
+func OnlyTools(names ...string) Option {
+	return func(c *config) { c.only = append([]string{}, names...) }
 }
 
 // Approve sets the function that answers each permission prompt of the
@@ -504,17 +514,22 @@ func cliArgs(c config, system string) ([]string, error) {
 		args = append(args, "--permission-mode", string(c.permission))
 	}
 	if len(c.allowed) > 0 {
-		args = append(args, "--allowedTools", strings.Join(c.allowed, ","))
+		rules := claudeRules(c.allowed)
+		args = append(args, "--allowedTools", strings.Join(rules, ","))
 	}
 	if len(c.disallowed) > 0 {
-		args = append(args, "--disallowedTools", strings.Join(c.disallowed, ","))
+		rules := claudeRules(c.disallowed)
+		args = append(args, "--disallowedTools", strings.Join(rules, ","))
 	}
 	if len(c.ask) > 0 {
-		settings, err := askSettings(c.ask)
+		settings, err := askSettings(claudeRules(c.ask))
 		if err != nil {
 			return nil, err
 		}
 		args = append(args, "--settings", settings)
+	}
+	if c.only != nil {
+		args = append(args, "--tools", strings.Join(builtinTools(c.only), ","))
 	}
 	if len(c.mcp) > 0 {
 		servers, err := mcpConfig(c.mcp)

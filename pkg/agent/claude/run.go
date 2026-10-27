@@ -14,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // interruptTimeout is how long a cancelled run waits for the result of
@@ -457,7 +458,7 @@ func (r *runner) blockStart(ev *streamEvent) {
 		kind:  ev.ContentBlock.Type,
 		index: r.kept,
 		id:    ev.ContentBlock.ID,
-		name:  ev.ContentBlock.Name,
+		name:  tool.Canonical(ev.ContentBlock.Name),
 	}
 	r.kept++
 	r.blocks[ev.Index] = b
@@ -581,7 +582,7 @@ func content(b wireBlock) ai.Content {
 		}
 		return ai.ToolCall{
 			ID:    b.ID,
-			Name:  b.Name,
+			Name:  tool.Canonical(b.Name),
 			Input: input,
 		}
 	}

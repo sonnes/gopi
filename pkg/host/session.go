@@ -193,6 +193,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Skills:    config.Skills,
 		Dirs:      config.Dirs,
 		Effort:    config.Effort,
+		ToolNames: config.ToolNames,
 		Allow:     config.Allow,
 		Ask:       config.Ask,
 		Deny:      config.Deny,

@@ -23,7 +23,7 @@ import (
 var Description string
 
 // Name is the name of the tool.
-const Name = "todo_write"
+const Name = tool.TodoWrite
 
 // Status is the state of one todo item.
 type Status string

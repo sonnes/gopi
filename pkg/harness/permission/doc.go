@@ -8,29 +8,32 @@
 //  1. If a Deny rule matches the call, the hook blocks the call.
 //  2. If an Ask rule matches the call, the hook asks [Policy.Approve].
 //  3. If an Allow rule matches the call, the call runs.
-//  4. The mode and the [Kind] of the tool decide. The result is to run
+//  4. The mode and the [tool.Kind] of the tool decide. The result is to run
 //     the call, to ask, or to block the call.
 //
 // A Deny rule and an Ask rule apply in every mode, also in [Bypass].
 //
 // A rule has the format of the permission rules in the settings of
-// Claude Code: "Tool" or "Tool(content)". The rule format, the tool
-// aliases, and the match rules for commands and paths come from Claude
-// Code (utils/permissions/permissionRuleParser.ts,
+// Claude Code: "Tool" or "Tool(content)". The rule format and the match
+// rules for commands and paths come from Claude Code
+// (utils/permissions/permissionRuleParser.ts,
 // utils/permissions/shellRuleMatching.ts,
 // tools/BashTool/bashPermissions.ts, and
 // utils/permissions/filesystem.ts). A tool name is one of these:
 //
-//   - The name of a tool, such as "bash" or "mcp__github__create_issue".
-//   - A Claude Code name: "Bash" is bash. "Read" is read_file, grep, and
-//     find. "Edit" is edit_file and write_file. "Write" is write_file.
+//   - The name of a tool, such as "bash", "lookup_order", or
+//     "mcp__github__create_issue". A Claude Code name, such as "Read",
+//     names the tools that [tool.RuleNames] gives: read_file, grep,
+//     find, and a tool named "Read".
 //   - A prefix that ends in "*", such as "mcp__github__*".
 //   - "mcp__server", which is each tool of the MCP server "server".
 //
 // Only the bash tool and the file tools accept content. For bash, the
 // content is a pattern for the command. For read_file, write_file,
 // edit_file, grep, and find, the content is a glob for the "path"
-// input. [Policy.Validate] gives an error for content on another tool.
+// input. For apply_patch, the content is a glob for each path that the
+// patch changes. [Policy.Validate] gives an error for content on
+// another tool.
 //
 // The command rules match text, not the parsed shell program. So a
 // command rule is not a security boundary:

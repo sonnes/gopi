@@ -39,16 +39,18 @@ type Harness struct {
 	skills       []def.SkillsReader
 	agents       []def.AgentsReader
 	tools        []ToolsReader
-	builtin      Builtins
-	box          sandbox.Sandbox
-	system       string
-	preload      []string
-	prompt       PromptBuilder
-	sections     agent.SystemFunc
-	seeds        []Seeder
-	agentOpts    []agent.Option
-	policy       permission.Policy
-	mcp          []agent.MCPServer
+	// only names the tools that the agent keeps. If it is nil, the
+	// agent keeps each tool.
+	only      []string
+	box       sandbox.Sandbox
+	system    string
+	preload   []string
+	prompt    PromptBuilder
+	sections  agent.SystemFunc
+	seeds     []Seeder
+	agentOpts []agent.Option
+	policy    permission.Policy
+	mcp       []agent.MCPServer
 
 	// child is the subagent of a call that the agent tool makes. It is
 	// nil in the call of a caller.

@@ -28,6 +28,7 @@ description: Review a diff.
 model: fake/m
 effort: high
 permissionMode: acceptEdits
+tools: [Read, Grep]
 disallowedTools: [Bash]
 skills: [deploy]
 ---
@@ -65,7 +66,7 @@ func TestStartWithAnAgentFillsTheSpec(t *testing.T) {
 		ID:     "s1",
 		Dirs:   []string{dir},
 		Agent:  "reviewer",
-		Deny:   []string{"Write"},
+		Deny:   []string{"write_file"},
 		Skills: []string{"lint"},
 	})
 	require.NoError(t, err)
@@ -74,7 +75,8 @@ func TestStartWithAnAgentFillsTheSpec(t *testing.T) {
 	assert.Equal(t, "fake/m", c.Spec)
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
 	assert.Equal(t, agent.Mode("acceptEdits"), c.Mode)
-	assert.Equal(t, []string{"Write", "Bash"}, c.Deny)
+	assert.Equal(t, []string{"write_file", "Bash"}, c.Deny)
+	assert.Equal(t, []string{"Read", "Grep"}, c.ToolNames)
 	assert.Equal(t, []string{"lint", "deploy"}, c.Skills)
 	assert.Equal(t, []string{dir}, c.Dirs)
 }
@@ -195,4 +197,20 @@ func TestTheSessionKeepsItsSpecBeforeTheDriverStarts(t *testing.T) {
 	f = f.restart(t)
 	f.send(t, "s1", "a")
 	assert.Equal(t, "You review.", agentPrompt(t, f.lastConfig(t)))
+}
+
+func TestTheToolsOfTheSpecWinOverTheAgentFile(t *testing.T) {
+	f := newFixture(t)
+	dir := t.TempDir()
+	writeAgent(t, dir, "reviewer", reviewer)
+
+	_, err := f.h.Create(context.Background(), host.Config{
+		ID:        "s1",
+		Dirs:      []string{dir},
+		Agent:     "reviewer",
+		ToolNames: []string{"bash"},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"bash"}, f.lastConfig(t).ToolNames)
 }

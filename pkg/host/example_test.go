@@ -34,7 +34,14 @@ func ExampleHost_Create() {
 			Text: "Review the diff. Report findings. Do not push.",
 		}}, nil
 	}
-	h, err := host.Open(ctx, cat, host.Store(store), host.Sections(review))
+	// The tool list goes to each driver. Claude Code reads the names,
+	// and the harness runs the tools.
+	h, err := host.Open(ctx, cat,
+		host.Store(store),
+		host.Sections(review),
+		host.Tools(harness.Coding()...),
+		host.Tools(harness.SkillTool(), harness.AgentTool()),
+	)
 	if err != nil {
 		return
 	}
@@ -81,7 +88,7 @@ func ExampleHost_Confirm() {
 		}
 		fmt.Println(e.Session.ID, e.Session.Status, e.Session.StopReason)
 		for _, req := range e.Session.Waiting {
-			allow := req.Call.Name == "Read"
+			allow := req.Call.Name == "read_file"
 			_ = h.Confirm(ctx, e.Session.ID, req.Call.ID, agent.Decision{Allow: allow})
 		}
 	}

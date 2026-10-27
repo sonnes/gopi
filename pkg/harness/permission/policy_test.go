@@ -12,6 +12,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 func TestModeByKind(t *testing.T) {
@@ -80,7 +81,11 @@ func TestBuiltinKinds(t *testing.T) {
 		{name: "write_file", want: asked},
 		{name: "edit_file", want: asked},
 		{name: "bash", want: asked},
+		{name: "apply_patch", want: asked},
 		{name: "deploy", want: asked},
+		// An alias is the name of a tool of the caller, and not a
+		// built-in tool.
+		{name: "Grep", want: asked},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,13 +96,66 @@ func TestBuiltinKinds(t *testing.T) {
 	}
 }
 
+// TestARuleOnAClaudeCodeNameMatchesTheLiteralName checks that a rule
+// on "Grep" also matches a tool of the caller with that name.
+func TestARuleOnAClaudeCodeNameMatchesTheLiteralName(t *testing.T) {
+	p := &permission.Policy{Mode: permission.Default, Allow: []string{"Grep"}}
+
+	assert.Equal(t, ran, decide(t, p, call(t, "Grep", map[string]any{})))
+}
+
+// TestClaudeCodeRules checks that a rule with a Claude Code name covers
+// the gopi tools of its group, as in Claude Code.
+func TestClaudeCodeRules(t *testing.T) {
+	tests := []struct {
+		name  string
+		rule  string
+		call  ai.ToolCall
+		match bool
+	}{
+		{
+			name:  "Bash with content",
+			rule:  "Bash(git push *)",
+			call:  call(t, "bash", map[string]any{"command": "git push origin"}),
+			match: true,
+		},
+		{
+			name:  "Read covers grep",
+			rule:  "Read(src/**)",
+			call:  call(t, "grep", map[string]any{"pattern": "x", "path": "src/a.go"}),
+			match: true,
+		},
+		{
+			name:  "Read does not cover bash",
+			rule:  "Read",
+			call:  call(t, "bash", map[string]any{"command": "ls"}),
+			match: false,
+		},
+		{
+			name:  "Edit covers apply_patch",
+			rule:  "Edit",
+			call:  call(t, "apply_patch", map[string]any{}),
+			match: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &permission.Policy{Mode: permission.Default, Dir: t.TempDir(), Deny: []string{tt.rule}}
+
+			got := decide(t, p, tt.call)
+
+			assert.Equal(t, tt.match, got == denied, "outcome %s", got)
+		})
+	}
+}
+
 func TestKindsOverride(t *testing.T) {
 	p := &permission.Policy{
 		Mode: permission.AcceptEdits,
-		Kinds: map[string]permission.Kind{
-			"lookup": permission.Read,
-			"patch":  permission.Edit,
-			"bash":   permission.Read,
+		Kinds: map[string]tool.Kind{
+			"lookup": tool.KindRead,
+			"patch":  tool.KindEdit,
+			"bash":   tool.KindRead,
 		},
 	}
 	assert.Equal(t, ran, decide(t, p, call(t, "lookup", map[string]any{})))
@@ -119,7 +177,7 @@ func TestRuleOrder(t *testing.T) {
 			name: "deny beats allow",
 			policy: &permission.Policy{
 				Allow: []string{"bash"},
-				Deny:  []string{"Bash(rm:*)"},
+				Deny:  []string{"bash(rm:*)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "rm -rf build") },
 			want: denied,
@@ -128,8 +186,8 @@ func TestRuleOrder(t *testing.T) {
 			name: "ask beats allow",
 			policy: &permission.Policy{
 				Mode:  permission.Bypass,
-				Allow: []string{"Bash(git:*)"},
-				Ask:   []string{"Bash(git push:*)"},
+				Allow: []string{"bash(git:*)"},
+				Ask:   []string{"bash(git push:*)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "git push origin") },
 			want: asked,
@@ -145,7 +203,7 @@ func TestRuleOrder(t *testing.T) {
 		},
 		{
 			name:   "allow beats the mode",
-			policy: &permission.Policy{Allow: []string{"Bash(go test:*)"}},
+			policy: &permission.Policy{Allow: []string{"bash(go test:*)"}},
 			call:   func(t *testing.T) ai.ToolCall { return bashCall(t, "go test ./...") },
 			want:   ran,
 		},
@@ -153,7 +211,7 @@ func TestRuleOrder(t *testing.T) {
 			name: "allow beats plan",
 			policy: &permission.Policy{
 				Mode:  permission.Plan,
-				Allow: []string{"Bash(go test:*)"},
+				Allow: []string{"bash(go test:*)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "go test ./...") },
 			want: ran,
@@ -162,7 +220,7 @@ func TestRuleOrder(t *testing.T) {
 			name: "deny in bypass",
 			policy: &permission.Policy{
 				Mode: permission.Bypass,
-				Deny: []string{"Bash(rm:*)"},
+				Deny: []string{"bash(rm:*)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "rm -rf /") },
 			want: denied,
@@ -179,7 +237,7 @@ func TestRuleOrder(t *testing.T) {
 		{
 			name: "deny a read tool",
 			policy: &permission.Policy{
-				Deny: []string{"Read(.env)"},
+				Deny: []string{"read_file(.env)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return pathCall(t, "read_file", ".env") },
 			want: denied,
@@ -188,7 +246,7 @@ func TestRuleOrder(t *testing.T) {
 			name: "no match falls to the mode",
 			policy: &permission.Policy{
 				Mode: permission.Bypass,
-				Deny: []string{"Bash(rm:*)"},
+				Deny: []string{"bash(rm:*)"},
 			},
 			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "ls") },
 			want: ran,
@@ -204,10 +262,10 @@ func TestRuleOrder(t *testing.T) {
 func TestDenyReasonNamesTheRule(t *testing.T) {
 	p := &permission.Policy{
 		Mode: permission.Bypass,
-		Deny: []string{"Read", "Bash(rm:*)"},
+		Deny: []string{"read_file", "bash(rm:*)"},
 	}
 	reason := denyReason(t, p, bashCall(t, "rm -rf /"))
-	assert.Contains(t, reason, `"Bash(rm:*)"`)
+	assert.Contains(t, reason, `"bash(rm:*)"`)
 }
 
 func TestToolNames(t *testing.T) {
@@ -217,24 +275,9 @@ func TestToolNames(t *testing.T) {
 		want bool
 	}{
 		{rule: "bash", tool: "bash", want: true},
-		{rule: "Bash", tool: "bash", want: true},
-		{rule: "Read", tool: "read_file", want: true},
-		{rule: "Read", tool: "grep", want: true},
-		{rule: "Read", tool: "find", want: true},
-		{rule: "Read", tool: "edit_file", want: false},
-		{rule: "Edit", tool: "edit_file", want: true},
-		{rule: "Edit", tool: "write_file", want: true},
-		{rule: "Write", tool: "write_file", want: true},
-		{rule: "Write", tool: "edit_file", want: false},
-		{rule: "Grep", tool: "grep", want: true},
-		{rule: "Grep", tool: "find", want: false},
-		{rule: "Glob", tool: "find", want: true},
-		{rule: "MultiEdit", tool: "edit_file", want: true},
-		{rule: "TodoWrite", tool: "todo_write", want: true},
-		{rule: "AskUserQuestion", tool: "ask_user_question", want: true},
-		{rule: "Skill", tool: "skill", want: true},
-		{rule: "Agent", tool: "agent", want: true},
+		{rule: "read_file", tool: "read_file", want: true},
 		{rule: "read_file", tool: "grep", want: false},
+		{rule: "write_file", tool: "edit_file", want: false},
 		{rule: "deploy", tool: "deploy", want: true},
 		{rule: "deploy", tool: "deploy_all", want: false},
 		{rule: "mcp__github__*", tool: "mcp__github__create_issue", want: true},
@@ -293,7 +336,7 @@ func TestAlwaysDoesNotBeatDeny(t *testing.T) {
 	a := &approver{decision: allowAlways}
 	p := permission.Policy{
 		Approve: a.approve,
-		Deny:    []string{"Bash(rm:*)"},
+		Deny:    []string{"bash(rm:*)"},
 	}
 	h := p.Hook()
 	assert.Equal(t, ran, runOn(t, h, call(t, "deploy", map[string]any{})))
@@ -382,7 +425,7 @@ func TestDenyChecksTheEditedInput(t *testing.T) {
 	}}
 	p := permission.Policy{
 		Approve: a.approve,
-		Deny:    []string{"Bash(rm:*)"},
+		Deny:    []string{"bash(rm:*)"},
 	}
 	h := p.Hook()
 
@@ -422,15 +465,14 @@ func TestPlanReason(t *testing.T) {
 func TestValidate(t *testing.T) {
 	valid := []string{
 		"bash",
-		"Bash",
-		"Bash()",
-		"Bash(*)",
-		"Bash(git push:*)",
-		"Bash(npm run *)",
-		`Bash(python -c "print\(1\)")`,
-		"Read(src/**)",
-		"Edit(//tmp/**)",
-		"Write(~/notes/*.md)",
+		"bash()",
+		"bash(*)",
+		"bash(git push:*)",
+		"bash(npm run *)",
+		`bash(python -c "print\(1\)")`,
+		"read_file(src/**)",
+		"edit_file(//tmp/**)",
+		"write_file(~/notes/*.md)",
 		"grep(/docs)",
 		"find(./web)",
 		"read_file(*.env)",
@@ -449,14 +491,14 @@ func TestValidate(t *testing.T) {
 	invalid := []string{
 		"",
 		"(ls)",
-		"Bash(ls",
-		"Bash(ls)x",
-		"Bash ls",
+		"bash(ls",
+		"bash(ls)x",
+		"bash ls",
 		"de*ploy",
 		"deploy(prod)",
 		"mcp__github(x)",
 		"mcp__github__*(x)",
-		"Read([a)",
+		"read_file([a)",
 		"todo_write(x)",
 	}
 	for _, rule := range invalid {
@@ -479,8 +521,8 @@ func TestValidateMode(t *testing.T) {
 func TestHookOfInvalidPolicyDenies(t *testing.T) {
 	p := &permission.Policy{
 		Mode:  permission.Bypass,
-		Allow: []string{"Bash(ls"},
+		Allow: []string{"bash(ls"},
 	}
 	reason := denyReason(t, p, pathCall(t, "read_file", "a.txt"))
-	assert.Contains(t, reason, "Bash(ls")
+	assert.Contains(t, reason, "bash(ls")
 }

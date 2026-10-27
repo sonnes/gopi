@@ -33,11 +33,12 @@ sequenceDiagram
 - The ID of a child is the parent ID, ".", the name, "-", and random hex. A store that takes no "/" in an ID then keeps it, and the ID shows its parent. The "." after the parent ID comes from [oh-my-pi](https://github.com/can1357/oh-my-pi/blob/06aecdd51f07e689e970ceaa180abe2be0c14bbb/packages/coding-agent/src/task/output-manager.ts#L86).
 - The result has the usage and the `agent_id`, so the model knows what the task cost and how to continue it. The `agent_id` comes from [Claude Code](https://web.archive.org/web/20261024135648/https://code.claude.com/docs/en/sub-agents).
 - The `resume` input takes only a child of the current session, so the model cannot open another session of the store.
+- The caller lists the agent tool with `AgentTool`. It binds only in an assembly with a subagent.
 - A child gets no agent tool, so the depth is one, and a task tree cannot grow without a bound. The depth of one comes from the default of [Codex](https://github.com/openai/codex/blob/8270a7c74d73ace00d93cdc5939a06c6cb811b1c/codex-rs/core/src/config/mod.rs#L281).
 - The tool runs the child to its end before it returns, so the end of the child always comes before the end of the call.
 - A child runs in the stricter mode of the parent and its file, with the rules of the parent. A subagent file then cannot widen what a person approved.
 - A model that the catalog does not know, such as the alias `opus`, gives the spec of the parent, so an agent file from Claude Code runs. A model that two providers serve fails the task, so the child does not run on a model that its file did not name.
-- The `tools` key takes the tool names of Claude Code as aliases, so an agent file from Claude Code keeps its tools.
+- The `tools` key holds Claude Code names or gopi names, and the harness reads both, so an agent file from Claude Code keeps its tools.
 
 ## Map
 

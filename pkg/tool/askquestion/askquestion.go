@@ -26,7 +26,7 @@ import (
 var Description string
 
 // Name is the name of the tool.
-const Name = "ask_user_question"
+const Name = tool.AskUserQuestion
 
 // HeaderMaxLen is the maximum length of a question header in bytes.
 const HeaderMaxLen = 20

@@ -134,7 +134,7 @@ func TestHookBeforeTool(t *testing.T) {
 
 			require.Len(t, seen, 1)
 			assert.Equal(t, "toolu_1", seen[0].ID)
-			assert.Equal(t, "Bash", seen[0].Name)
+			assert.Equal(t, "bash", seen[0].Name)
 			assert.JSONEq(t, `{"command":"rm a.txt"}`, string(seen[0].Input))
 			require.Len(t, msgs, 3)
 			assert.Equal(t, tt.result, msgs[1].Text())

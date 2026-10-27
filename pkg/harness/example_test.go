@@ -10,6 +10,9 @@ import (
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/bash"
+	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/session"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
@@ -33,13 +36,23 @@ func Example() {
 	cat.RegisterTextProvider("fake", done{}, ai.Model{ID: "one"})
 	dir, _ := os.MkdirTemp("", "project")
 	defer os.RemoveAll(dir)
+	box, err := sandbox.Local(dir)
+	if err != nil {
+		panic(err)
+	}
 
 	h := harness.New(
 		harness.Catalog(cat),
 		harness.Model("fake/one"),
 		harness.Dir(dir),
 		harness.Defs(storefs.Dir(dir)),
-		harness.Builtin(harness.NoBuiltins),
+		harness.Toolset(harness.Tools(
+			harness.Sandboxed(bash.New),
+			harness.Sandboxed(read.New),
+			harness.SkillTool(),
+			harness.AgentTool(),
+		)),
+		harness.Sandbox(box),
 		harness.Skillset(def.Skill{
 			Name:        "deploy",
 			Description: "Deploy the service.",
@@ -68,6 +81,8 @@ func Example() {
 	}
 	fmt.Println(msgs[len(msgs)-1].Text())
 	// Output:
+	// tool: bash
+	// tool: read_file
 	// tool: skill
 	// tool: agent
 	// Done.

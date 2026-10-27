@@ -33,8 +33,11 @@
 //     [Idle] gets the events of the child. When the CLI starts a turn
 //     on its own, the agent calls [Wake]. Call [Agent.Continue] to run
 //     that turn.
+//   - A tool name of an event, an approval request, or a hook is a gopi
+//     name, such as bash for Bash. An option takes a gopi name or a
+//     Claude Code name. The agent maps each name in both directions.
 //
 // The reasons are in docs/concepts/agent/cli-agent.md,
 // docs/concepts/agent/cli-steer.md, docs/concepts/agent/cli-request.md,
-// and docs/concepts/agent/subagent.md.
+// docs/concepts/agent/subagent.md, and docs/concepts/tool/name.md.
 package claude

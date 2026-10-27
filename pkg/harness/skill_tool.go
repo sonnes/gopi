@@ -11,10 +11,11 @@ import (
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // skillToolName is the name of the skill tool.
-const skillToolName = "skill"
+const skillToolName = tool.Skill
 
 // skillFile is the file that defines a skill. The skill tool does not
 // list it as a support file, because its body is the result.

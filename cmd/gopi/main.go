@@ -301,6 +301,9 @@ func run(ctx context.Context, o options, args []string) error {
 	if err != nil {
 		return fenceError(err)
 	}
+	// The skill tool and the agent tool bind to the skills and the
+	// subagents of the session, so each run gets them.
+	tools = append(tools, harness.SkillTool(), harness.AgentTool())
 	if o.mcp != "" {
 		mcpTools, closeMCP, err := loadMCP(ctx, o.mcp, os.Environ(), os.Stderr)
 		if err != nil {
@@ -318,7 +321,6 @@ func run(ctx context.Context, o options, args []string) error {
 		harness.Catalog(cat),
 		harness.Model(spec),
 		harness.Dir(o.root),
-		harness.Builtin(harness.NoBuiltins),
 		harness.Toolset(harness.Tools(tools...)),
 		harness.Mode(mode),
 		harness.Allow(o.allow...),

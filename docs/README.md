@@ -31,6 +31,10 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | message       | What one role adds to a conversation, with its content       | turn, entry                 |
 | content block | One part of a message: text, thinking, a tool call, a file, a section or its removal, or a tool change | part, chunk, segment        |
 | tool          | One function that a model can call                           | function, action, skill     |
+| gopi name     | The one name of a tool in gopi. A well-known tool has a snake case name, such as `bash`. Each other tool keeps its own name, such as `mcp__<server>__<tool>` or `DesignSync` | canonical name, tool ID |
+| well-known tool | A tool in the registry of pkg/tool, with its gopi name, its Claude Code names, its kind, and its rule content | builtin name, standard tool |
+| tool list     | The full set of tools of each session, which the caller gives to a host or a harness. A config picks a subset of it | toolset, tool registry, built-in tools |
+| binder        | A tool that the harness binds to each session before the first call, such as the skill tool | lazy tool, tool factory |
 | base          | The first message of a history, if it is a system message. It holds the first sections and the first tools | initial prompt, header |
 | section       | A named part of the system prompt. The SystemPrompt option sets it. A system message sets or removes it from its place. | prompt part, fragment, slot |
 | tool change   | A system message block that adds or removes a tool from its place | tool update, tool delta  |

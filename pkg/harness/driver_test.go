@@ -96,6 +96,54 @@ func TestStartAddsTheHooksAndTheTools(t *testing.T) {
 	assert.Equal(t, "x", toolResult(t, a).Text(), "the tool of the config runs")
 }
 
+func TestStartKeepsOnlyTheToolNames(t *testing.T) {
+	grepTool := tool.New("grep", func(_ context.Context, in echoInput) (string, error) {
+		return in.S, nil
+	}, tool.Description("A tool named grep."))
+	other := tool.New("other", func(_ context.Context, in echoInput) (string, error) {
+		return in.S, nil
+	}, tool.Description("Another tool."))
+	tests := []struct {
+		name  string
+		names []string
+		want  []string
+	}{
+		{name: "nil keeps each tool", names: nil, want: []string{"echo", "other", "grep"}},
+		{name: "a name with content", names: []string{"echo(hi *)"}, want: []string{"echo"}},
+		{name: "a Claude Code name", names: []string{"Grep"}, want: []string{"grep"}},
+		{name: "empty keeps no tool", names: []string{}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &script{responses: []ai.Message{reply("done")}}
+			h := harness.New(with(base(t, p), harness.Toolset(harness.Tools(echo, other, grepTool)))...)
+
+			a := start(t, h, agent.Config{
+				SessionID: "s1",
+				ToolNames: tt.names,
+			})
+			run(t, a, "hi")
+
+			assert.Equal(t, tt.want, toolNames(a))
+		})
+	}
+}
+
+func TestStartTakesAToolWithAnyName(t *testing.T) {
+	lookup := tool.New("LookupOrder", func(_ context.Context, in echoInput) (string, error) {
+		return in.S, nil
+	})
+	p := &script{responses: []ai.Message{reply("done")}}
+	h := harness.New(base(t, p)...)
+
+	_, err := h.Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Tools:     []tool.Tool{lookup},
+	})
+
+	require.NoError(t, err)
+}
+
 // TestStartAddsTheRules checks that each rule of the config changes
 // what a call of echo does. Without the rule, the mode of the harness
 // gives the other outcome.

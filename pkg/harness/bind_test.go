@@ -1,0 +1,203 @@
+package harness_test
+
+import (
+	"context"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/harness"
+	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/read"
+	"github.com/sonnes/gopi/pkg/tool"
+)
+
+// bare returns the options of a harness for a test with no tool.
+func bare(t *testing.T) []harness.Option {
+	t.Helper()
+	return []harness.Option{
+		harness.Catalog(newCatalog(&script{})),
+		harness.Model("fake/one"),
+		harness.Seed(harness.NoSeed),
+		harness.Dir(t.TempDir()),
+	}
+}
+
+func infoNames(asm *harness.Assembly) []string {
+	var names []string
+	for _, info := range asm.Tools {
+		names = append(names, info.Name)
+	}
+	return names
+}
+
+func TestAHarnessWithNoToolsetHasNoTool(t *testing.T) {
+	asm := assemblyOf(t, with(bare(t),
+		harness.Skillset(review),
+		harness.Agents(reviewer),
+	))
+
+	assert.Empty(t, asm.Tools)
+}
+
+func TestSkillToolAndAgentToolBindToTheSession(t *testing.T) {
+	binders := harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool()))
+	tests := []struct {
+		name string
+		opts []harness.Option
+		want []string
+	}{
+		{name: "no skill and no subagent", want: nil},
+		{name: "skills", opts: []harness.Option{harness.Skillset(review)}, want: []string{"skill"}},
+		{name: "subagents", opts: []harness.Option{harness.Agents(reviewer)}, want: []string{"agent"}},
+		{
+			name: "both",
+			opts: []harness.Option{harness.Skillset(review), harness.Agents(reviewer)},
+			want: []string{"skill", "agent"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := with(bare(t), binders)
+			asm := assemblyOf(t, with(opts, tt.opts...))
+
+			assert.Equal(t, tt.want, infoNames(asm))
+		})
+	}
+}
+
+func TestUnboundToolsHaveTheirNames(t *testing.T) {
+	assert.Equal(t, tool.Skill, harness.SkillTool().Info().Name)
+	assert.Equal(t, tool.Agent, harness.AgentTool().Info().Name)
+	assert.Equal(t, tool.ReadFile, harness.Sandboxed(read.New).Info().Name)
+}
+
+func TestSandboxedToolBindsToTheSandboxOfTheSession(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the fence of the default sandbox runs only on macOS")
+	}
+	dir := t.TempDir()
+	var boxes []sandbox.Sandbox
+	build := func(box sandbox.Sandbox) tool.Tool {
+		boxes = append(boxes, box)
+		return read.New(box)
+	}
+	opts := with(bare(t),
+		harness.Dir(dir),
+		harness.Toolset(harness.Tools(harness.Sandboxed(build))),
+	)
+
+	asm := assemblyOf(t, opts)
+
+	assert.Equal(t, []string{tool.ReadFile}, infoNames(asm))
+	require.NotEmpty(t, boxes)
+	bound := boxes[len(boxes)-1]
+	require.NotNil(t, bound)
+	want, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	got, err := filepath.EvalSymlinks(bound.Dir())
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+func TestTheHarnessSkipsANamedTool(t *testing.T) {
+	opts := with(bare(t), harness.Toolset(harness.Tools(
+		tool.Named(tool.ApplyPatch),
+		tool.Func("lookup", func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+			return ai.ToolResult{}, nil
+		}),
+	)))
+
+	asm := assemblyOf(t, opts)
+
+	assert.Equal(t, []string{"lookup"}, infoNames(asm))
+}
+
+func TestOnlyFailsOnANameOutsideTheTools(t *testing.T) {
+	opts := with(bare(t),
+		harness.Toolset(harness.Tools(tool.Func("lookup", nil))),
+		harness.Only("lookup2"),
+		harness.Seed(harness.NoSeed),
+	)
+	h := harness.New(opts...)
+
+	_, err := h.New(context.Background())
+
+	assert.ErrorIs(t, err, tool.ErrUnknownTool)
+}
+
+func TestOnlyReadsTheNamesOfTheListBeforeBinding(t *testing.T) {
+	opts := with(bare(t),
+		harness.Toolset(harness.Tools(
+			harness.SkillTool(),
+			harness.AgentTool(),
+			tool.Named(tool.WebFetch),
+			echo,
+		)),
+		harness.Only("skill", "agent", "WebFetch", "echo"),
+	)
+
+	asm := assemblyOf(t, opts)
+
+	assert.Equal(t, []string{"echo"}, infoNames(asm), "no skill, no subagent, and a named tool bind to no tool")
+}
+
+func TestOnlyBindsNoToolThatItLeavesOut(t *testing.T) {
+	var built int
+	build := func(box sandbox.Sandbox) tool.Tool {
+		if box != nil {
+			built++
+		}
+		return read.New(box)
+	}
+	opts := with(bare(t),
+		harness.Toolset(harness.Tools(harness.Sandboxed(build), echo)),
+		harness.Only("echo"),
+	)
+
+	asm := assemblyOf(t, opts)
+
+	assert.Equal(t, []string{"echo"}, infoNames(asm))
+	assert.Zero(t, built, "the harness makes no sandbox for a tool that Only leaves out")
+}
+
+func TestCodingGivesTheCodingTools(t *testing.T) {
+	var names []string
+	for _, tl := range harness.Coding() {
+		names = append(names, tl.Info().Name)
+	}
+
+	assert.Equal(t, []string{"read_file", "write_file", "edit_file", "bash", "grep", "find", "todo_write"}, names)
+}
+
+func TestADenyRuleWithNoContentRemovesTheTool(t *testing.T) {
+	tests := []struct {
+		name string
+		rule string
+		want []string
+	}{
+		{name: "no content", rule: "bash", want: []string{"other"}},
+		{name: "Claude Code name", rule: "Bash", want: []string{"other"}},
+		{name: "content", rule: "bash(git push *)", want: []string{"bash", "other"}},
+		{name: "prefix", rule: "mcp__*", want: []string{"bash", "other"}},
+	}
+	bashTool := tool.Func(tool.Bash, func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+		return ai.ToolResult{}, nil
+	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := with(bare(t),
+				harness.Toolset(harness.Tools(bashTool, otherTool)),
+				harness.Deny(tt.rule),
+			)
+
+			asm := assemblyOf(t, opts)
+
+			assert.Equal(t, tt.want, infoNames(asm))
+		})
+	}
+}

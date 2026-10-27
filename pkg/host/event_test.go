@@ -20,7 +20,7 @@ var waitingSession = host.Session{
 	Waiting: []agent.ApprovalRequest{{
 		Call: ai.ToolCall{
 			ID:    "call_1",
-			Name:  "Bash",
+			Name:  "bash",
 			Input: json.RawMessage(`{"command":"mkdir x"}`),
 		},
 		Reason:   "the command writes",

@@ -65,6 +65,17 @@ func TestCheckEventsFails(t *testing.T) {
 			},
 		},
 		{
+			name: "a tool name that is not a gopi name",
+			events: []agent.Event{
+				agent.EventAgentStart{},
+				agent.EventTurnStart{},
+				agent.EventToolExecutionStart{ToolCallID: "c1", ToolName: "Bash"},
+				agent.EventToolExecutionEnd{ToolCallID: "c1", ToolName: "Bash"},
+				agent.EventTurnEnd{},
+				agent.EventAgentEnd{},
+			},
+		},
+		{
 			name: "agent_end not last",
 			events: []agent.Event{
 				agent.EventAgentStart{},

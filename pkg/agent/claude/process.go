@@ -15,6 +15,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // start starts cmd. Tests replace it to replay a trace instead.
@@ -156,7 +157,7 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (permission,
 	ask := agent.ApprovalRequest{
 		Call: ai.ToolCall{
 			ID:    req.ToolUseID,
-			Name:  req.ToolName,
+			Name:  tool.Canonical(req.ToolName),
 			Input: req.Input,
 		},
 		Reason:   plainText(req.DecisionReason),

@@ -18,5 +18,13 @@
 //   - A middleware builds its tool with [Wrap], so the tool keeps its
 //     schema and its Deferred flag.
 //
-// The reasons are in docs/concepts/tool/tool.md.
+// Each well-known tool has one gopi name, in snake case, on each
+// driver. The registry holds the well-known tools, with their Claude
+// Code names, and the kind and the rule content that a permission
+// policy needs. [Lookup] reads it. A driver maps the names of its CLI
+// with [Canonical], and the permission policy reads the names of a rule
+// with [RuleNames]. Each other tool keeps its own name.
+//
+// The reasons are in docs/concepts/tool/tool.md and
+// docs/concepts/tool/name.md.
 package tool

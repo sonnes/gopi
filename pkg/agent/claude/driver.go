@@ -8,6 +8,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // Driver returns an [agent.Driver] that starts a Claude Code agent for
@@ -17,11 +18,20 @@ import (
 // The driver maps Model to the ID of the model, Dir, System, Effort to
 // [Thinking], Mode to [PermissionMode], Allow to [AllowedTools], Ask to
 // [AskTools], Deny to [DisallowedTools], MCP to [MCP], Idle to
-// [Idle], Wake to [Wake], and Approve. It rejects Skills
-// and Tools, because the CLI loads its own skills and runs only its own
-// tools. It skips Dirs: the caller gives the CLI its skills and agents. It runs the hooks at the points of
-// [Hooks]. Start rejects a hook at a model call, in the options of the
-// driver or in the config.
+// [Idle], Wake to [Wake], and Approve.
+//
+// The driver maps the names of the Tools that ToolNames keeps to
+// [OnlyTools], with ToolSearch, because the CLI loads the deferred MCP
+// tools with it. It skips a well-known tool that Claude Code does not
+// have, such as apply_patch, and a tool of the caller, because the CLI
+// runs only its own tools. A tool of the caller that ToolNames names
+// fails the start. With ToolNames, a hook blocks the MCP tools that
+// ToolNames does not name.
+//
+// It rejects Skills, because the CLI loads its own skills. It skips
+// Dirs: the caller gives the CLI its skills and agents. It runs the
+// hooks at the points of [Hooks]. Start rejects a hook at a model call,
+// in the options of the driver or in the config.
 func Driver(opts ...Option) agent.Driver {
 	return driver{opts: opts}
 }
@@ -45,15 +55,24 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.Skills) > 0 {
 		return nil, unsupported("Skills")
 	}
-	if len(c.Tools) > 0 {
-		return nil, unsupported("Tools")
+	tools, err := cliTools(c.Tools, c.ToolNames)
+	if err != nil {
+		return nil, fmt.Errorf("claude: %w", err)
 	}
 	// The hooks of the driver come first, as its options do.
 	var own config
 	for _, opt := range d.opts {
 		opt(&own)
 	}
-	hooks := append(slices.Clip(own.hooks), c.Hooks...)
+	configHooks := slices.Clip(c.Hooks)
+	if c.ToolNames != nil {
+		// --tools hides only the built-in tools, so the hook blocks a
+		// call of an MCP tool that ToolNames does not name. The CLI
+		// loads the MCP tools with ToolSearch, so the hook keeps it.
+		names := append(slices.Clip(c.ToolNames), tool.ToolSearch)
+		configHooks = append(configHooks, agent.OnlyTools(names))
+	}
+	hooks := append(slices.Clip(own.hooks), configHooks...)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("claude: %w", err)
 	}
@@ -90,6 +109,8 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.Deny) > 0 {
 		opts = append(opts, DisallowedTools(c.Deny...))
 	}
+	// An OnlyTools option of the driver limits the list of the config.
+	opts = append(opts, OnlyTools(limitTools(tools, own.only)...))
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
@@ -102,8 +123,8 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.Wake != nil {
 		opts = append(opts, Wake(c.Wake))
 	}
-	if len(c.Hooks) > 0 {
-		opts = append(opts, Hooks(c.Hooks...))
+	if len(configHooks) > 0 {
+		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
 }

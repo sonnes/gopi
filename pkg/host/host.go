@@ -53,6 +53,8 @@ type Host struct {
 	tools []tool.Tool
 	// sections returns the sections of a session, by ID.
 	sections SectionsFunc
+	// toolList reports a call of [Tools], also with no tools.
+	toolList bool
 	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
@@ -80,11 +82,19 @@ func Hooks(hs ...agent.Hook) Option {
 	return func(h *Host) { h.hooks = append(h.hooks, hs...) }
 }
 
-// Tools adds tools to each session. Only the harness takes them, and a
-// driver of a CLI agent fails the start of the agent. A tool is code, so
-// the config value of a session cannot keep it.
+// Tools adds tools to the list of the host. The list is the full set of
+// tools of each session, and each driver gets it: the harness runs the
+// tools, and a driver of a CLI maps each well-known name to a tool of
+// its CLI. [Config.ToolNames] and the Deny rules pick a subset. [Open]
+// needs Tools, so a host never has no tool by mistake. Tools with no
+// tools gives each session no tool. A tool is code, so the config
+// value of a session cannot keep it. A session that names a tool of an
+// earlier list fails at its next start.
 func Tools(ts ...tool.Tool) Option {
-	return func(h *Host) { h.tools = append(h.tools, ts...) }
+	return func(h *Host) {
+		h.tools = append(h.tools, ts...)
+		h.toolList = true
+	}
 }
 
 // SectionsFunc returns the sections of the prompt of the session id, in
@@ -105,6 +115,8 @@ func Sections(fn SectionsFunc) Option {
 // cat. The catalog must have a driver for each config, or a default
 // driver, before the agent of the config starts.
 //
+// Open fails with [ErrInvalid] without [Tools].
+//
 // Open reads each session of the store. No agent survives a restart, so
 // a session that ran or waited becomes idle, with [StopRestarted].
 func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, error) {
@@ -119,6 +131,9 @@ func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, err
 	}
 	for _, opt := range opts {
 		opt(h)
+	}
+	if !h.toolList {
+		return nil, fmt.Errorf("host: no tool list; give one with host.Tools: %w", ErrInvalid)
 	}
 	if h.store == nil {
 		h.store = session.NewMemoryStore()
@@ -151,13 +166,13 @@ type Config struct {
 	// file of Agent. The driver gets Dirs.
 	Dirs []string `json:"dirs,omitempty"`
 	// Agent names an agent file in Dirs. The file fills each empty field
-	// of Model, Mode, and Effort. Its disallowed tools go after Deny,
-	// and its skills go after Skills. Create reads these once, so an
-	// edit of them changes only the sessions that start after it. The
-	// prompt of the file is the section [AgentSection], before the
-	// sections of [Sections]. The host reads the prompt before each run,
-	// so an edit of the prompt reaches the next run. The host does not
-	// read the tools and the maxTurns keys of the file.
+	// of Model, Mode, Effort, and a nil ToolNames. Its disallowed tools
+	// go after Deny, and its skills go after Skills. Create reads these
+	// once, so an edit of them changes only the sessions that start
+	// after it. The prompt of the file is the section [AgentSection],
+	// before the sections of [Sections]. The host reads the prompt
+	// before each run, so an edit of the prompt reaches the next run.
+	// The host does not read the maxTurns key of the file.
 	Agent string `json:"agent,omitempty"`
 	// Model is the model spec, such as "claude-code/claude-opus-5-5".
 	// It picks the driver. It is required if Agent gives no model.
@@ -174,9 +189,18 @@ type Config struct {
 	Dir string `json:"dir,omitempty"`
 	// Skills names the skills that the agent loads at the start.
 	Skills []string `json:"skills,omitempty"`
+	// ToolNames names the tools of the host that the agent can call, as
+	// the tools key of an agent file does. A name can be a gopi name or a
+	// Claude Code name, such as "Glob". If ToolNames is nil, the agent
+	// keeps each tool of [Tools]. A name of no tool of the host fails
+	// Create and Update with [tool.ErrUnknownTool].
+	ToolNames []string `json:"tools,omitempty"`
 	// Allow, Ask, and Deny are the permission rules of the agent, in
-	// the format "Tool" or "Tool(content)". A call that the mode and the
-	// rules do not allow waits for [Host.Confirm].
+	// the format "Tool" or "Tool(content)". A rule can use a gopi name
+	// or a Claude Code name, and a rule on "Read" also covers grep and
+	// find. The host keeps the names as the caller wrote them, and the
+	// driver reads them. A call that the mode and the rules do not
+	// allow waits for [Host.Confirm].
 	Allow []string `json:"allow,omitempty"`
 	Ask   []string `json:"ask,omitempty"`
 	Deny  []string `json:"deny,omitempty"`
@@ -196,9 +220,13 @@ type Config struct {
 // [StopError], and the next message starts the agent again.
 func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
 	config.ID = cmp.Or(config.ID, newSessionID())
+	fromFile := config.ToolNames == nil && config.Agent != ""
 	config, err := withAgent(ctx, config)
 	if err == nil {
 		err = checkEffort(config)
+	}
+	if err == nil {
+		err = h.checkTools(config, fromFile)
 	}
 	if err == nil {
 		_, _, err = h.cat.Driver(config.Model)
@@ -213,6 +241,21 @@ func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
 	}
 	err = s.startAgent(ctx)
 	return s.snapshot(), err
+}
+
+// checkTools returns an error that wraps [tool.ErrUnknownTool] for a
+// name of config that names no tool of the host. fromFile reports that
+// the names came from the agent file, so the error names the file.
+func (h *Host) checkTools(config Config, fromFile bool) error {
+	_, err := tool.Select(h.tools, config.ToolNames)
+	if err == nil {
+		return nil
+	}
+	err = fmt.Errorf("%w; add the tool to host.Tools", err)
+	if fromFile {
+		return fmt.Errorf("agent file %q: %w", config.Agent, err)
+	}
+	return err
 }
 
 // add writes the session of config to the store, and adds it to the

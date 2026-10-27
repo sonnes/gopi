@@ -31,6 +31,8 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | ------------------------- | ---------------------------------------------------------------------------- |
 | [Tool](tool/tool.md)      | How a tool is defined, deferred, run, and wrapped by middleware.             |
 | [MCP](tool/mcp.md)        | How an agent gets the tools of an MCP server. A CLI agent connects to its own servers, and the harness connects with pkg/mcp. |
+| [Tool List](tool/tool-list.md) | How a caller gives the full set of tools of each session, how a config picks a subset, and how each driver reads the list. |
+| [Tool Name](tool/name.md) | How each well-known tool has one gopi name on each driver, and where a Claude Code name becomes a gopi name. |
 
 ## agent
 
