@@ -157,8 +157,7 @@ type part struct {
 // result.
 func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 	store := ctx
-	t.started = map[string]bool{}
-	t.done = map[string]bool{}
+	t.reset()
 	startID, err := t.conn.request("turn/start", turnStartParams{
 		ThreadID: t.threadID,
 		Input:    input,
@@ -240,6 +239,22 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 			return finish(err)
 		}
 	}
+}
+
+// reset clears the state of the last turn, so that t can start a new
+// turn. The usage stays, because a run reports the sum of its turns.
+func (t *turn) reset() {
+	t.turnID = ""
+	t.early = nil
+	t.active = ""
+	t.queue = nil
+	t.started = map[string]bool{}
+	t.done = map[string]bool{}
+	t.call = nil
+	t.index = nil
+	t.blocks = 0
+	t.parts = nil
+	t.completed = false
 }
 
 // settled reports whether the run ends after one notification. A turn
@@ -326,10 +341,8 @@ func (t *turn) ours(p params) bool {
 // child. Before the response to turn/start, the turn ID is unknown, so
 // interrupt waits for it.
 func (t *turn) interrupt() error {
-	if t.subs != nil {
-		if err := t.subs.interrupt(); err != nil {
-			return err
-		}
+	if err := t.subs.interrupt(); err != nil {
+		return err
 	}
 	if t.turnID == "" || t.completed {
 		return nil

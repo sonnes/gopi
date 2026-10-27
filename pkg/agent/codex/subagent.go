@@ -15,7 +15,6 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/session"
 )
 
 // emptyObject is the JSON of an empty object.
@@ -38,10 +37,9 @@ const defaultChildName = "agent"
 // the turn of that child, which writes to the log of the child. The
 // server does not send the prompt of a spawn, so a child has no input.
 type subagents struct {
-	// store keeps the child sessions. It is nil for an unsaved agent.
-	store session.Storer
-	// name is the author of every entry of a child.
-	name string
+	// a is the agent of the run. Its store keeps the child sessions, and
+	// its name is the author of every entry of a child.
+	a *Agent
 	// root is the turn of the run.
 	root *turn
 	// byThread holds each child, by its thread ID.
@@ -79,8 +77,7 @@ type child struct {
 // whose turn is root.
 func newSubagents(a *Agent, root *turn) *subagents {
 	return &subagents{
-		store:    a.store,
-		name:     a.cfg.name,
+		a:        a,
 		root:     root,
 		byThread: map[string]*child{},
 		early:    map[string][]message{},
@@ -107,19 +104,13 @@ func (s *subagents) open(ctx context.Context, t *turn, it item) error {
 		model = *it.Model
 	}
 	id := agent.ChildID(t.sessionID, name, threadID)
-
-	log, err := s.log(ctx, id)
+	ref := agent.ParentRef{
+		SessionID:  t.sessionID,
+		ToolCallID: it.ID,
+	}
+	log, err := emit.OpenChild(ctx, s.a.store, id, ref)
 	if err != nil {
 		return err
-	}
-	if len(log.Entries()) == 0 {
-		ref := agent.ParentRef{
-			SessionID:  t.sessionID,
-			ToolCallID: it.ID,
-		}
-		if err := agent.Parent.Set(ctx, log.Writer(), ref); err != nil {
-			return err
-		}
 	}
 
 	owner := t.emitter
@@ -139,7 +130,7 @@ func (s *subagents) open(ctx context.Context, t *turn, it item) error {
 		owner:     t,
 		turn: &turn{
 			conn:      t.conn,
-			emitter:   emit.New(log, s.name, emit.NewState(log), push),
+			emitter:   emit.New(log, s.a.cfg.name, emit.NewState(log), push),
 			threadID:  threadID,
 			model:     model,
 			subs:      s,
@@ -161,15 +152,6 @@ func (s *subagents) open(ctx context.Context, t *turn, it item) error {
 	return nil
 }
 
-// log returns the log of the child id. A child of an unsaved agent has
-// an unsaved log.
-func (s *subagents) log(ctx context.Context, id string) (*session.Log, error) {
-	if id == "" || s.store == nil {
-		return session.New(), nil
-	}
-	return session.Open(ctx, s.store, id)
-}
-
 // start sends the start of c on the stream of its owner, and starts the
 // run of c.
 func (c *child) start() error {
@@ -180,8 +162,7 @@ func (c *child) start() error {
 		Model:      c.model,
 	})
 	c.running = true
-	c.turn.started = map[string]bool{}
-	c.turn.done = map[string]bool{}
+	c.turn.reset()
 	// Each run of a child reports the usage of its own turn.
 	c.turn.usage = ai.Usage{}
 	return c.turn.emitter.Start()
@@ -269,12 +250,16 @@ func (s *subagents) end(ctx context.Context, c *child, p params) error {
 }
 
 // finish ends the run of c, and sends its end on the stream of its
-// owner.
+// owner. The text of the end is the last text of c, or the error of a
+// child that failed.
 func (s *subagents) finish(ctx context.Context, c *child, status string, err error) {
 	msgs, _ := c.turn.emitter.Finish(ctx, c.turn.usage, err)
 	c.running = false
 	c.status = status
-	c.text = lastText(msgs)
+	c.text = agent.LastText(msgs)
+	if status == agent.SubagentFailed && err != nil {
+		c.text = err.Error()
+	}
 	c.owner.emitter.Subagent(agent.EventSubagentEnd{
 		ToolCallID: c.callID,
 		SessionID:  c.sessionID,
@@ -293,9 +278,6 @@ func (s *subagents) children() []*child {
 
 // running reports whether a child runs.
 func (s *subagents) running() bool {
-	if s == nil {
-		return false
-	}
 	for _, c := range s.byThread {
 		if c.running {
 			return true
@@ -325,57 +307,47 @@ func (s *subagents) interrupt() error {
 // that did not wait for them. A nested child ends before its owner, so
 // that the stream of the owner closes after it.
 func (s *subagents) endAll(ctx context.Context) {
-	for s.running() {
-		for _, c := range s.children() {
-			if c.running && !s.owner(c) {
-				s.finish(ctx, c, agent.SubagentInterrupted, errRunEnded)
-				break
-			}
+	for _, c := range s.children() {
+		if c.owner == s.root {
+			s.endTree(ctx, c)
 		}
+	}
+}
+
+// endTree ends each child of c that runs, then c if it runs.
+func (s *subagents) endTree(ctx context.Context, c *child) {
+	for _, d := range s.children() {
+		if d.owner == c.turn {
+			s.endTree(ctx, d)
+		}
+	}
+	if c.running {
+		s.finish(ctx, c, agent.SubagentInterrupted, errRunEnded)
 	}
 }
 
 // errRunEnded is the error of a child that the end of the run stops.
 var errRunEnded = errors.New("codex: the run ended before the subagent")
 
-// owner reports whether c owns a child that runs.
-func (s *subagents) owner(c *child) bool {
-	for _, d := range s.byThread {
-		if d.running && d.owner == c.turn {
-			return true
-		}
-	}
-	return false
-}
-
 // report returns the text of the turn that gives the model the result
 // of each child that ended after the turn of the run, and forgets
-// them. It is "" if no child ended late.
+// them. The result of a child that failed is its error. It is "" if no
+// child ended late.
 func (s *subagents) report() string {
 	parts := make([]string, 0, len(s.late))
 	for _, c := range s.late {
+		label := "Result"
+		if c.status == agent.SubagentFailed {
+			label = "Error"
+		}
 		text := "Subagent " + c.status + ": " + c.name
 		if c.text != "" {
-			text += "\n\nResult:\n" + c.text
+			text += "\n\n" + label + ":\n" + c.text
 		}
 		parts = append(parts, text)
 	}
 	s.late = nil
 	return strings.Join(parts, "\n\n")
-}
-
-// lastText returns the text of the last assistant message with text.
-func lastText(msgs []ai.Message) string {
-	for i := len(msgs) - 1; i >= 0; i-- {
-		m := msgs[i]
-		if m.Role != ai.RoleAssistant {
-			continue
-		}
-		if text := m.Text(); text != "" {
-			return text
-		}
-	}
-	return ""
 }
 
 // collabToolName returns the name that the model sees for a collab

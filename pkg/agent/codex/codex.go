@@ -24,8 +24,10 @@
 // messages in a child session. The stream of the run carries its
 // start, its events, and its end. A run waits for each subagent that
 // still runs when the turn completes. If a direct subagent ends after the
-// turn, the run starts one more turn that gives the model its result. A
-// run that ends with a subagent that runs, such as a turn that failed,
+// turn, the run starts a report turn that gives the model its result. A
+// report turn can start more subagents, so the run sends a report turn
+// after each round of late subagents. The wait has no time limit, and a
+// cancel of the run ends it. A run that ends with a subagent that runs, such as a turn that failed,
 // stops the subagent, and the next run starts a new process. Without
 // [Store], the children are unsaved.
 //
@@ -387,6 +389,8 @@ func (a *Agent) run(
 	usage, err := t.run(ctx, userInputs(emit.Input(entries)))
 	// Codex does not start a turn when a child ends after the turn of
 	// the run completed, so the run gives the model the result itself.
+	// A report turn can start more children, so the run repeats until
+	// no child ends late.
 	for err == nil {
 		report := t.subs.report()
 		if report == "" {
@@ -396,9 +400,6 @@ func (a *Agent) run(
 		if err = e.Input(ctx, []session.Entry{entry}); err != nil {
 			break
 		}
-		t.completed = false
-		t.turnID = ""
-		t.early = nil
 		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry})))
 	}
 	// A run that ends with a child that runs, such as a turn that failed,

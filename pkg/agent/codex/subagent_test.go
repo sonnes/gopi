@@ -135,6 +135,20 @@ func TestSubagentThatEndsLateGetsAReportTurn(t *testing.T) {
 	assert.Equal(t, "The subagent found banana.", msgs[len(msgs)-1].Text())
 }
 
+func TestFailedChildEndsWithItsError(t *testing.T) {
+	a := newSubagentAgent(t, "subagent_failed.trace")
+
+	events, _, err := collect(a.Run(context.Background(), session.Text(subagentPrompt)))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	_, ends, _ := subagentEvents(events)
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentFailed, ends[0].Status)
+	assert.Equal(t, "codex: the model is overloaded", ends[0].Text,
+		"the text of a failed child is its error, not its last text")
+}
+
 func TestCollabToolName(t *testing.T) {
 	tests := []struct {
 		tool string
