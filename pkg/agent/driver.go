@@ -77,6 +77,11 @@ type Config struct {
 	// as the events of a subagent in the background. A driver that has
 	// no such events ignores it. Without it, the agent drops them.
 	Idle func(Event)
+	// Wake is called when the agent starts a turn on its own between
+	// runs, such as the Claude Code agent when background work ends.
+	// [Waker.Continue] runs that turn. The agent does not call Idle or
+	// Wake after its Close returns.
+	Wake func()
 }
 
 // Checker is a [Driver] that reports its [Status]: whether it can start
@@ -155,12 +160,11 @@ type Steerer interface {
 }
 
 // Waker is a [Runner] whose agent can start a turn on its own, such as
-// the Claude Code agent when background work ends. Wakes sends one value
-// when a turn starts outside a run. Continue runs that turn: it sends no
-// input, and it ends at the end of the turn. A caller that sees a wake
-// while a run is active does nothing, because the run reads the turn.
+// the Claude Code agent when background work ends. The agent calls
+// [Config.Wake] when a turn starts outside a run. Continue runs that
+// turn: it sends no input, and it ends at the end of the turn. If a run
+// already read the turn, Continue ends at once.
 type Waker interface {
-	Wakes() <-chan struct{}
 	Continue(ctx context.Context) *Stream
 }
 

@@ -2,7 +2,10 @@ package agent
 
 import (
 	"context"
+	"slices"
+	"strings"
 
+	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -85,11 +88,27 @@ type EventSubagent struct {
 type EventSubagentEnd struct {
 	ToolCallID string
 	SessionID  string
-	// Status is [SubagentCompleted], [SubagentFailed], or
-	// [SubagentInterrupted].
+	// Status is [SubagentCompleted], [SubagentFailed],
+	// [SubagentInterrupted], or [SubagentBackground].
 	Status string
-	// Text is the last text of the child.
+	// Text is the last text of the child, from [LastText]. For
+	// [SubagentFailed], it is the error.
 	Text string
+}
+
+// LastText returns the text of the last assistant message of msgs that
+// has text, with no space at its ends. It returns "" if no message has
+// text.
+func LastText(msgs []ai.Message) string {
+	for _, m := range slices.Backward(msgs) {
+		if m.Role != ai.RoleAssistant {
+			continue
+		}
+		if text := strings.TrimSpace(m.Text()); text != "" {
+			return text
+		}
+	}
+	return ""
 }
 
 func (EventSubagentStart) event() {}

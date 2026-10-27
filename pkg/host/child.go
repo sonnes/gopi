@@ -37,7 +37,7 @@ func (h *Host) relay(parentID string, ev agent.Event) {
 			SessionID:  parentID,
 			ToolCallID: e.ToolCallID,
 		}
-		c := h.child(e.SessionID, ref, e.Model)
+		c := h.child(e.SessionID, ref, e)
 		if c == nil {
 			return
 		}
@@ -65,11 +65,11 @@ func (h *Host) relay(parentID string, ev agent.Event) {
 	}
 }
 
-// child returns the session of the child id, and adds it to the host if
-// the host does not know it. The driver created the session in the
-// store before its start. A host that closed takes no new child, because
-// Close stops only the sessions that it knows, so it returns nil.
-func (h *Host) child(id string, ref agent.ParentRef, model string) *hosted {
+// child returns the session of the child of start, and adds it to the
+// host if the host does not know it. The driver created the session in
+// the store before its start. A host that closed takes no new child,
+// because Close stops only the sessions that it knows, so it returns nil.
+func (h *Host) child(id string, ref agent.ParentRef, start agent.EventSubagentStart) *hosted {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if s, ok := h.sessions[id]; ok {
@@ -83,7 +83,8 @@ func (h *Host) child(id string, ref agent.ParentRef, model string) *hosted {
 		ID:        id,
 		Status:    StatusIdle,
 		Parent:    &ref,
-		Model:     model,
+		Title:     cmp.Or(start.Title, start.Name),
+		Model:     start.Model,
 		CreatedAt: t,
 		UpdatedAt: t,
 	})

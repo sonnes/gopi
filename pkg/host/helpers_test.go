@@ -116,8 +116,8 @@ type fakeDriver struct {
 	// reason goes with each call to the approve function, as an agent
 	// says why a call asks.
 	reason string
-	// wakes gives each runner Wakes and Continue, as the Claude Code
-	// agent has. The runner of the last start is in wake.
+	// wakes gives each runner Continue, and the Wake function of its
+	// config, as the Claude Code agent has. The runner of the last start is in wake.
 	wakes bool
 	wake  *wakeRunner
 
@@ -160,7 +160,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 	if d.wakes {
 		w := &wakeRunner{
 			Runner: r,
-			wakes:  make(chan struct{}, 1),
+			wake:   c.Wake,
 			idle:   c.Idle,
 		}
 		d.mu.Lock()
@@ -175,15 +175,13 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 }
 
 // wakeRunner is a runner that wakes, as the Claude Code agent does. Its
-// Continue runs a turn with the text "continue". idle is the Idle
-// function of its config.
+// Continue runs a turn with the text "continue". wake and idle are the
+// Wake and Idle functions of its config.
 type wakeRunner struct {
 	agent.Runner
-	wakes chan struct{}
-	idle  func(agent.Event)
+	wake func()
+	idle func(agent.Event)
 }
-
-func (w *wakeRunner) Wakes() <-chan struct{} { return w.wakes }
 
 func (w *wakeRunner) Continue(ctx context.Context) *agent.Stream {
 	return w.Run(ctx, session.Text("continue"))

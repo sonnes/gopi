@@ -29,7 +29,7 @@ func wakeFixture(t *testing.T, opts ...host.Option) (fixture, <-chan host.Event)
 func TestWakeRunsTheTurnOfTheAgent(t *testing.T) {
 	f, events := wakeFixture(t)
 
-	f.driver.waker(t).wakes <- struct{}{}
+	f.driver.waker(t).wake()
 
 	next(t, events, func(e host.Event) bool {
 		return e.Session.ID == "s1" && e.Session.Status == host.StatusRunning
@@ -48,7 +48,7 @@ func TestWakeDuringARunRunsAfterIt(t *testing.T) {
 
 	f.send(t, "s1", "again")
 	f.model.waitCalls(t, 2)
-	f.driver.waker(t).wakes <- struct{}{}
+	f.driver.waker(t).wake()
 	close(gate)
 
 	runEnd(t, events)

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
@@ -38,6 +37,10 @@ const idBytes = 3
 // inheritModel is the model of a subagent that runs on the model of its
 // parent.
 const inheritModel = "inherit"
+
+// noText is the tool result of a subagent that ended with no text, so
+// that the model does not read an empty result as a failure.
+const noText = "(The subagent ended with no text.)"
 
 const agentToolDescription = "Give a task to a subagent. The subagent works in its own context " +
 	"with its own tools, and returns its last message and an agent_id. " +
@@ -184,7 +187,7 @@ func newChildID(parentID, name string) (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return parentID + "." + name + "-" + hex.EncodeToString(b), nil
+	return agent.ChildID(parentID, name, hex.EncodeToString(b)), nil
 }
 
 // start returns the child agent of sub on the model spec, over the
@@ -256,10 +259,11 @@ func (t *agentTool) run(
 		})
 	}
 	msgs, err := s.Wait()
+	text := agent.LastText(msgs)
 	end := agent.EventSubagentEnd{
 		SessionID: id,
 		Status:    agent.SubagentCompleted,
-		Text:      lastText(msgs),
+		Text:      text,
 	}
 	switch {
 	case ctx.Err() != nil:
@@ -283,7 +287,10 @@ func (t *agentTool) run(
 	if err != nil {
 		return errorResult(fmt.Sprintf("the subagent failed: %s", err) + stats.trailer()), nil
 	}
-	return textResult(lastText(msgs) + stats.trailer()), nil
+	if text == "" {
+		text = noText
+	}
+	return textResult(text + stats.trailer()), nil
 }
 
 // agentStats is the end of the result of an agent call.
@@ -309,19 +316,6 @@ func (s agentStats) trailer() string {
 		s.duration.Milliseconds(),
 	)
 	return b.String()
-}
-
-// lastText returns the text of the last assistant message with text.
-func lastText(msgs []ai.Message) string {
-	for _, m := range slices.Backward(msgs) {
-		if m.Role != ai.RoleAssistant {
-			continue
-		}
-		if text := m.Text(); text != "" {
-			return text
-		}
-	}
-	return "(The subagent ended with no text.)"
 }
 
 // childSpec returns the model spec of a subagent with the model key

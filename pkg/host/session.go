@@ -58,10 +58,8 @@ type hosted struct {
 	// its parent.
 	childRuns    bool
 	inBackground bool
-	// unwatch stops the watch of the wakes of the agent. wakePending is
-	// true when the agent woke during a run, so a run of the turn of the
-	// agent follows the run.
-	unwatch     chan struct{}
+	// wakePending is true when the agent woke during a run, so a run of
+	// the turn of the agent follows the run.
 	wakePending bool
 }
 
@@ -159,7 +157,6 @@ func (s *hosted) startAgent(ctx context.Context) error {
 	}
 	s.runner = runner
 	s.agents.reset(state)
-	s.watchLocked(runner)
 	return nil
 }
 
@@ -202,6 +199,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		MCP:       config.MCP,
 		Approve:   s.approve,
 		Idle:      s.idle,
+		Wake:      s.woke,
 		Hooks:     h.hooks,
 		Tools:     h.tools,
 	})
@@ -248,7 +246,6 @@ func (s *hosted) stop() error {
 	s.runs.Wait()
 	s.mu.Lock()
 	runner := s.runner
-	s.unwatchLocked()
 	s.mu.Unlock()
 	var err error
 	if runner != nil {
@@ -282,7 +279,6 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	}
 	s.runner = nil
 	s.stale = false
-	s.unwatchLocked()
 	s.mu.Unlock()
 
 	if err := closeRunner(old); err != nil {
@@ -297,47 +293,16 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	defer s.mu.Unlock()
 	s.runner = runner
 	s.agents.reset(state)
-	s.watchLocked(runner)
 	return runner, nil
 }
 
-// watchLocked starts the watch of the wakes of r, if r is an
-// [agent.Waker]. The caller holds mu.
-func (s *hosted) watchLocked(r agent.Runner) {
-	w, ok := r.(agent.Waker)
-	if !ok {
-		return
-	}
-	quit := make(chan struct{})
-	s.unwatch = quit
-	go func() {
-		for {
-			select {
-			case <-quit:
-				return
-			case <-w.Wakes():
-				s.woke(r)
-			}
-		}
-	}()
-}
-
-// unwatchLocked stops the watch of the wakes of the agent. The caller
-// holds mu.
-func (s *hosted) unwatchLocked() {
-	if s.unwatch == nil {
-		return
-	}
-	close(s.unwatch)
-	s.unwatch = nil
-}
-
-// woke runs the turn that the agent r started on its own. During a run,
-// the turn runs after the run.
-func (s *hosted) woke(r agent.Runner) {
+// woke runs the turn that the agent started on its own. During a run,
+// the turn runs after the run. A wake that comes after a run read the
+// turn starts a run that ends at once.
+func (s *hosted) woke() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closing || s.runner != r {
+	if s.closing {
 		return
 	}
 	if s.run != nil {

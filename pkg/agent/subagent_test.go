@@ -117,3 +117,38 @@ func TestParentRoundTrip(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, ref, got)
 }
+
+func TestLastText(t *testing.T) {
+	tests := []struct {
+		name string
+		msgs []ai.Message
+		want string
+	}{
+		{
+			name: "no messages",
+			want: "",
+		},
+		{
+			name: "the last assistant text, trimmed",
+			msgs: []ai.Message{
+				text("first"),
+				text("  second\n"),
+			},
+			want: "second",
+		},
+		{
+			name: "a user message and a call with no text are not the last text",
+			msgs: []ai.Message{
+				text("answer"),
+				toolCall("c1", "read", `{}`),
+				ai.UserMessage("more"),
+			},
+			want: "answer",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, agent.LastText(tt.msgs))
+		})
+	}
+}

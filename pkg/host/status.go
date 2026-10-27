@@ -53,6 +53,10 @@ type Session struct {
 	// and the host runs no agent for it, so a child is read-only. Its
 	// status follows the subagent events of the parent.
 	Parent *agent.ParentRef `json:"parent,omitempty"`
+	// Title is the title of the session of a subagent: the title of its
+	// start, or its name. The host keeps it only in memory, so it is ""
+	// for a child that the host recovered from the store.
+	Title string `json:"title,omitempty"`
 	// Waiting are the tool calls that wait for [Host.Confirm], the
 	// oldest first. Two or more calls can wait at the same time. It is
 	// set only while Status is [StatusRequiresAction].

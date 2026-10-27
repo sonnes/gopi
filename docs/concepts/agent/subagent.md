@@ -18,7 +18,7 @@ subagent_start        c1  s1.reviewer-a1b2   name, title, prompt, model
 subagent              c1  s1.reviewer-a1b2   agent_start
 subagent              c1  s1.reviewer-a1b2   ... each event of the child
 subagent              c1  s1.reviewer-a1b2   agent_end
-subagent_end          c1  s1.reviewer-a1b2   status, last text
+subagent_end          c1  s1.reviewer-a1b2   status, last text or error
 tool_execution_end    c1
 ```
 
@@ -30,13 +30,11 @@ tool_execution_end    c1
 - A tool sends the events of its child through `EmitSubagent`, which takes only the three subagent events and fills the ID of the call. A tool then cannot break the order of the run.
 - The host makes each child a read-only session of its own, as [Host](../host/host.md) says.
 - Each `subagent_start` has one `subagent_end` in the same run. A run that stops ends each open child as `interrupted`, so a viewer never keeps a child open.
-- Claude Code marks each line of a subagent with the ID of its Agent call. Its `task_started` line comes before that call starts on the stream, so the child waits for the start of its call. The CLI does not send the last message of a subagent as a line, so the summary of its `task_notification` becomes the last message of the child.
-- A Claude Code subagent can run in the background. The CLI decides which call goes there: Claude Code 2.1.309 sends each Agent call there unless the call sets `run_in_background` to false. The agent also moves each foreground subagent to the background before a steer. The run then ends the child with the status `background`.
-- Between runs, the Claude Code agent reads the CLI. The `Idle` function of the config gets the events of a background child, wrapped as in a run. Its `task_notification` ends it. A later run carries the child again, with a new `subagent_start`.
-- When a background child ends, Claude Code starts a turn on its own. The agent keeps the lines of that turn, and `Wakes` sends a value. `Continue` runs the turn, and stores a `gopi.wake` entry first.
-- A run with input can find that turn still open. It reads the turn to its result, and then sends its input. The CLI then gets no input in the middle of a turn.
-- A Codex subagent is a thread of its own in the same server, and the driver routes each notification by its thread ID. The spawn is a `spawn_agent` call, and each other collab call has the name that the model sees. The server does not send the prompt of a spawn, so a Codex child has no prompt.
-- Codex does not start a turn when a child ends after the turn of the parent. So the run waits for each child, and gives the model the result of a late child in one more turn.
+- The text of `subagent_end` is the last text of the child, from `LastText`. For a child that failed, it is the error. Each driver and the agent tool fill it the same way, so a viewer reads one field.
+- A Claude Code child can go on after the run that started it, because the CLI keeps background tasks. That run ends the child with the status `background`, and a later run sends a new `subagent_start` for it.
+- Between runs, the agent sends the events of a background child to the `Idle` function of the config. When the CLI starts a turn on its own, the agent calls `Wake`, and `Waker.Continue` runs that turn. The agent calls `Idle` and `Wake` only until its `Close` returns.
+- A Codex run waits for its children, because the Codex server starts no turn when a child ends. The run gives the model the results of the late children in a report turn, and repeats it after each round of late children.
+- The wait for a Codex child has no time limit. A child can work for a long time, and a stop of the run ends it.
 
 ## Map
 

@@ -91,6 +91,7 @@ func TestChildIsASessionWithItsParent(t *testing.T) {
 	assert.Equal(t, &agent.ParentRef{SessionID: "s1", ToolCallID: "c1"}, ended.Session.Parent)
 	assert.Equal(t, host.StopEndTurn, ended.Session.StopReason)
 	assert.Equal(t, "fake/m", ended.Session.Model)
+	assert.Equal(t, "helper", ended.Session.Title, "a start with no title gives the name")
 	got, ok := f.h.Get(childID)
 	require.True(t, ok)
 	assert.Equal(t, ended.Session.Parent, got.Parent)
