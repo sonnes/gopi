@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
@@ -63,6 +64,21 @@ type runner struct {
 	// subagents are the IDs of the subagent calls that wait for their
 	// result.
 	subagents map[string]bool
+
+	// replaying is true while the runner applies the lines that the
+	// reader between runs kept for a run with input: the result of that
+	// turn ends only a segment. turnOpen is true from the first line of
+	// a turn of the parent to its result. input is the input of a run
+	// that waits for the end of the turn that the CLI started by itself.
+	replaying bool
+	turnOpen  bool
+	input     []session.Entry
+	// moves are the requests that move a subagent to the background
+	// before a steer, by request ID. held are the steers that wait for
+	// them, until moveDeadline.
+	moves        map[string]bool
+	held         []session.Entry
+	moveDeadline <-chan time.Time
 }
 
 // apiMessage is one assistant message of the Messages API, as the
@@ -90,27 +106,55 @@ type block struct {
 	name  string
 }
 
-// run sends the input to the CLI and reads its lines until the result.
+// run applies the lines that the reader between runs kept, then sends
+// the input to the CLI, and reads its lines until the result.
+//
+// With no input, it is the run of Continue: it sends nothing, and the
+// kept lines are the turn that the CLI started by itself. The result of
+// that turn ends the run. If the kept lines have no turn, the run ends
+// at once.
+//
+// With input, the kept turn ends only a segment. If that turn is still
+// open, the input waits for its result, so that the CLI gets no input
+// in the middle of a turn.
 func (r *runner) run(
 	ctx context.Context,
 	entries []session.Entry,
+	kept [][]byte,
 ) ([]ai.Message, error) {
-	if err := r.em.Input(ctx, entries); err != nil {
-		return r.abort(ctx, ai.Usage{}, err)
+	cont := len(entries) == 0
+	if cont {
+		if !slices.ContainsFunc(kept, rootData) {
+			return r.abort(ctx, ai.Usage{}, nil)
+		}
+		wake, err := session.Custom(agent.KindWake, nil)
+		if err == nil {
+			err = r.em.Input(ctx, []session.Entry{wake})
+		}
+		if err != nil {
+			return r.abort(ctx, ai.Usage{}, err)
+		}
 	}
-	input := emit.Input(entries)
-	if r.reminder != "" {
-		input = append([]ai.Content{ai.Text{Text: r.reminder}}, input...)
+	r.replaying = !cont
+	for i, data := range kept {
+		msgs, end, err := r.handle(ctx, data)
+		if end {
+			// The lines after the result are for the next run.
+			r.a.requeue(kept[i+1:])
+			return msgs, err
+		}
+		if err != nil {
+			return r.fail(ctx, err)
+		}
 	}
-	err := r.proc.send(outUser{
-		Type: "user",
-		Message: outUserMessage{
-			Role:    "user",
-			Content: blocks(input),
-		},
-	})
-	if err != nil {
-		return r.fail(ctx, err)
+	r.replaying = false
+
+	if !cont {
+		if r.turnOpen {
+			r.input = entries
+		} else if err := r.sendInput(ctx, entries); err != nil {
+			return r.fail(ctx, err)
+		}
 	}
 
 	var (
@@ -131,6 +175,11 @@ func (r *runner) run(
 
 		case <-deadline:
 			return r.fail(ctx, ctx.Err())
+
+		case <-r.moveDeadline:
+			if err := r.sendHeld(ctx); err != nil {
+				return r.fail(ctx, err)
+			}
 
 		case <-r.a.wake:
 			if err := r.sendSteer(ctx); err != nil {
@@ -154,6 +203,24 @@ func (r *runner) run(
 			}
 		}
 	}
+}
+
+// sendInput stores the input of the run, and sends it to the CLI.
+func (r *runner) sendInput(ctx context.Context, entries []session.Entry) error {
+	if err := r.em.Input(ctx, entries); err != nil {
+		return err
+	}
+	input := emit.Input(entries)
+	if r.reminder != "" {
+		input = append([]ai.Content{ai.Text{Text: r.reminder}}, input...)
+	}
+	return r.proc.send(outUser{
+		Type: "user",
+		Message: outUserMessage{
+			Role:    "user",
+			Content: blocks(input),
+		},
+	})
 }
 
 // The media types of the files that the CLI reads. An image goes in an
@@ -214,14 +281,14 @@ func fileBlock(f ai.File) outBlock {
 // is the usage of the run.
 func (r *runner) fail(ctx context.Context, err error) ([]ai.Message, error) {
 	r.a.drop(r.proc)
-	err = errors.Join(err, r.endChildren(ctx))
+	err = errors.Join(err, r.endChildren(ctx, false))
 	return r.em.Finish(ctx, r.em.Usage(), err)
 }
 
 // abort ends a run with an error, and the CLI keeps running. The
 // messages that the run stored are still its result.
 func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
-	err = errors.Join(err, r.endChildren(ctx))
+	err = errors.Join(err, r.endChildren(ctx, true))
 	return r.em.Finish(ctx, u, err)
 }
 
@@ -245,9 +312,18 @@ func (r *runner) handle(
 		return nil, false, r.childLine(ctx, *l.ParentToolUseID, &l)
 	}
 
+	// A request of the CLI is not a turn: a child in the background can
+	// ask for a permission.
+	if rootLine(&l) && l.Type != "control_request" {
+		r.turnOpen = l.Type != "result"
+	}
+
 	switch l.Type {
 	case "control_request":
 		return nil, false, r.proc.answer(ctx, &l)
+
+	case "control_response":
+		return nil, false, r.moved(ctx, &l)
 
 	case "system":
 		switch l.Subtype {
@@ -281,9 +357,20 @@ func (r *runner) handle(
 		return nil, false, r.user(ctx, l.Message)
 
 	case "result":
-		if r.segmentEnded(&l) {
+		// The turn that the CLI started by itself ends before the
+		// input of the run goes.
+		wakeEnded := r.replaying || r.input != nil
+		if wakeEnded || r.segmentEnded(&l) {
 			r.segments = r.segments.Add(usage(&l.Usage))
-			return nil, false, r.finish(ctx)
+			if err := r.finish(ctx); err != nil {
+				return nil, false, err
+			}
+			if r.input == nil {
+				return nil, false, nil
+			}
+			entries := r.input
+			r.input = nil
+			return nil, false, r.sendInput(ctx, entries)
 		}
 		msgs, err := r.result(ctx, &l)
 		return msgs, true, err
@@ -631,7 +718,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if err := r.finish(ctx); err != nil {
 		return r.abort(ctx, u, err)
 	}
-	if err := r.endChildren(ctx); err != nil {
+	if err := r.endChildren(ctx, true); err != nil {
 		return r.abort(ctx, u, err)
 	}
 	if r.interrupted {

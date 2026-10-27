@@ -45,6 +45,12 @@ const (
 	SubagentFailed = "failed"
 	// SubagentInterrupted is a child that a stop or an interrupt ended.
 	SubagentInterrupted = "interrupted"
+	// SubagentBackground is a child that goes on after the run that
+	// carries it, such as a Claude Code subagent in the background. The
+	// next run or the idle events of the agent send a new start of the
+	// same child, and then its end. So the stream of each run stays
+	// balanced.
+	SubagentBackground = "background"
 )
 
 // EventSubagentStart marks the start of a subagent under a tool call

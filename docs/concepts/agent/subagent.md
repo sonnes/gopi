@@ -31,7 +31,10 @@ tool_execution_end    c1
 - The host makes each child a read-only session of its own, as [Host](../host/host.md) says.
 - Each `subagent_start` has one `subagent_end` in the same run. A run that stops ends each open child as `interrupted`, so a viewer never keeps a child open.
 - Claude Code marks each line of a subagent with the ID of its Agent call. Its `task_started` line comes before that call starts on the stream, so the child waits for the start of its call. The CLI does not send the last message of a subagent as a line, so the summary of its `task_notification` becomes the last message of the child.
-- Claude Code runs with no background tasks. A background task ends after the result of the run, when no run reads its lines.
+- A Claude Code subagent can run in the background. A call with `run_in_background` starts one, and the agent moves each foreground subagent to the background before a steer. The run then ends the child with the status `background`.
+- Between runs, the Claude Code agent reads the CLI. The `Idle` function of the config gets the events of a background child, wrapped as in a run. Its `task_notification` ends it. A later run carries the child again, with a new `subagent_start`.
+- When a background child ends, Claude Code starts a turn on its own. The agent keeps the lines of that turn, and `Wakes` sends a value. `Continue` runs the turn, and stores a `gopi.wake` entry first.
+- A run with input can find that turn still open. It reads the turn to its result, and then sends its input. The CLI then gets no input in the middle of a turn.
 - A Codex subagent is a thread of its own in the same server, and the driver routes each notification by its thread ID. The spawn is a `spawn_agent` call, and each other collab call has the name that the model sees. The server does not send the prompt of a spawn, so a Codex child has no prompt.
 - Codex does not start a turn when a child ends after the turn of the parent. So the run waits for each child, and gives the model the result of a late child in one more turn.
 
@@ -43,6 +46,7 @@ tool_execution_end    c1
 | Change how a tool call gets its sink       | `pkg/agent/toolcall.go`    |
 | Change the order rules that the tests check | `pkg/agent/internal/emittest/check.go` |
 | Change how Claude Code lines reach a child | `pkg/agent/claude/subagent.go` |
+| Change how Claude Code reads between runs  | `pkg/agent/claude/background.go` |
 | Change how Codex threads reach a child     | `pkg/agent/codex/subagent.go` |
 
 ## Related Concepts

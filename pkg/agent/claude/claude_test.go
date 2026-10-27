@@ -40,12 +40,16 @@ func run(ctx context.Context, a *claude.Agent, input ...string) ([]agent.Event, 
 }
 
 // checkLog fails t if a tool call in the log of a has no result, or if
-// the state of a does not hold the messages of the log.
+// the state of a does not hold the messages of the log. A custom entry
+// holds no message.
 func checkLog(t *testing.T, a *claude.Agent) {
 	t.Helper()
 	log := a.Log()
 	var entries []ai.Message
 	for _, e := range log.Entries() {
+		if e.Kind != "" {
+			continue
+		}
 		entries = append(entries, e.Message)
 	}
 	assert.Equal(t, entries, log.Messages(), "every tool call in the log has a result")
@@ -65,20 +69,6 @@ func lastEnd(t *testing.T, events []agent.Event) agent.EventAgentEnd {
 func closeAgent(t *testing.T, a *claude.Agent) {
 	t.Helper()
 	require.NoError(t, a.Close())
-}
-
-func TestCLIRunsWithNoBackgroundTasks(t *testing.T) {
-	starts := claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New(claude.Name("claude"))
-	defer closeAgent(t, a)
-
-	_, _, err := run(context.Background(), a, "Say hello")
-	require.NoError(t, err)
-
-	cmds := starts.Cmds()
-	require.Len(t, cmds, 1)
-	assert.Contains(t, cmds[0].Env, "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1",
-		"a background task ends after the result, when no run reads its lines")
 }
 
 func TestRunText(t *testing.T) {
@@ -653,7 +643,7 @@ func TestOptions(t *testing.T) {
 	for _, kv := range []string{"CLAUDECODE=1", "NODE_OPTIONS=--inspect", "DEBUG=1"} {
 		assert.NotContains(t, cmd.Env, kv)
 	}
-	assert.Equal(t, len(os.Environ())-1, len(cmd.Env), "three variables are out, and FOO and the background flag are in")
+	assert.Equal(t, len(os.Environ())-2, len(cmd.Env), "three variables are out, and FOO is in")
 }
 
 func TestThinkingOffDisablesThinking(t *testing.T) {
@@ -992,4 +982,47 @@ func TestSubagentWithAFailedLogStillEnds(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, ends, "the child that started also ends")
+}
+
+func TestInputWaitsForTheTurnThatTheCLIStarted(t *testing.T) {
+	ctx := context.Background()
+	claude.Replay(t, nil, "testdata/background_wake_input.trace")
+	allow := func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		return agent.Decision{Allow: true}, nil
+	}
+	a := claude.New(claude.Approve(allow))
+	defer closeAgent(t, a)
+
+	_, _, err := run(ctx, a, "Start a helper in the background.")
+	require.NoError(t, err)
+	<-a.Wakes()
+
+	// The turn of the CLI waits for the answer to its request, so it is
+	// still open when the run starts. The trace fails the run if the
+	// input goes before the result of that turn.
+	events, msgs, err := run(ctx, a, "What next?")
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+
+	var texts []string
+	for _, m := range msgs {
+		texts = append(texts, m.Text())
+	}
+	assert.Contains(t, texts, "The helper found banana.", "the run keeps the turn that the CLI started")
+	assert.Equal(t, "Nothing.", texts[len(texts)-1])
+	checkLog(t, a)
+}
+
+func TestContinueWithNoTurnEndsAtOnce(t *testing.T) {
+	claude.Replay(t, nil, "testdata/text.trace")
+	a := claude.New()
+	defer closeAgent(t, a)
+	_, _, err := run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+	before := len(a.Log().Entries())
+
+	_, msgs, err := collectRun(a.Continue(context.Background()))
+	require.NoError(t, err)
+	assert.Empty(t, msgs)
+	assert.Len(t, a.Log().Entries(), before, "a run with no turn stores nothing")
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/session"
@@ -20,6 +21,11 @@ const steerPriority = "now"
 // subagent that runs in the foreground, so the agent moves it to the
 // background first, and the subagent ends its work.
 var subagentTools = []string{"Agent", "Task"}
+
+// moveTimeout is how long a steer waits, from its request, for the moves
+// of its subagents to the background. The CLI can leave a move with no
+// answer, so the steer then goes at once.
+const moveTimeout = 5 * time.Second
 
 // newUUID returns the ID of a steer. The CLI echoes the ID when it takes
 // the steer, so the log keeps the steer at that point.
@@ -91,16 +97,60 @@ func (r *runner) sendSteer(ctx context.Context) error {
 		return r.em.Input(ctx, entries)
 	}
 
-	for _, id := range r.openSubagents() {
+	// While moves wait, a new steer waits with them.
+	if r.moves != nil {
+		r.held = append(r.held, entries...)
+		return nil
+	}
+	ids := r.openSubagents()
+	if len(ids) == 0 {
+		return r.sendNow(entries)
+	}
+	r.moves = map[string]bool{}
+	for _, id := range ids {
 		body := outRequestBody{
 			Subtype:   "background_tasks",
 			ToolUseID: id,
 		}
-		if _, err := r.proc.request(body); err != nil {
+		reqID, err := r.proc.request(body)
+		if err != nil {
 			return err
 		}
+		r.moves[reqID] = true
 	}
+	r.held = entries
+	r.moveDeadline = time.After(moveTimeout)
+	return nil
+}
 
+// moved applies the answer to a move. When each move has an answer, the
+// steers that waited go to the CLI.
+func (r *runner) moved(ctx context.Context, l *line) error {
+	if l.Response == nil || !r.moves[l.Response.RequestID] {
+		return nil
+	}
+	delete(r.moves, l.Response.RequestID)
+	if len(r.moves) > 0 {
+		return nil
+	}
+	return r.sendHeld(ctx)
+}
+
+// sendHeld sends the steers that waited for the moves.
+func (r *runner) sendHeld(_ context.Context) error {
+	entries := r.held
+	r.moves = nil
+	r.held = nil
+	r.moveDeadline = nil
+	if len(entries) == 0 {
+		return nil
+	}
+	return r.sendNow(entries)
+}
+
+// sendNow sends entries to the CLI as a steer with the priority now.
+func (r *runner) sendNow(entries []session.Entry) error {
+	content := blocks(emit.Input(entries))
 	id := newUUID()
 	err := r.proc.send(outUser{
 		Type: "user",
@@ -168,5 +218,5 @@ func (r *runner) lostSteers() []session.Entry {
 	for _, p := range r.pending {
 		out = append(out, p.entries...)
 	}
-	return out
+	return append(out, r.held...)
 }

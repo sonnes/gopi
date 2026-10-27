@@ -7,7 +7,9 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -353,5 +355,119 @@ func TestRecordedSubagent(t *testing.T) {
 	}
 	require.NotEmpty(t, msgs)
 	assert.Contains(t, strings.ToLower(msgs[len(msgs)-1].Text()), "banana")
+	checkLog(t, a)
+}
+
+// idleSink collects the events that an agent sends between runs.
+type idleSink struct {
+	mu     sync.Mutex
+	events []agent.Event
+}
+
+func (s *idleSink) add(e agent.Event) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, e)
+}
+
+func (s *idleSink) all() []agent.Event {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.events)
+}
+
+// wakeWait is how long the test waits for the CLI to start a turn after
+// the subagent in the background ends. The real CLI needs the time of
+// the work of the subagent.
+const wakeWait = 3 * time.Minute
+
+// TestRecordedBackgroundSubagent runs the real CLI. Record it with
+// `make record-cli AGENT=claude RUN=TestRecordedBackgroundSubagent`.
+func TestRecordedBackgroundSubagent(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	home, _ := os.UserHomeDir()
+	require.NoError(t, os.WriteFile(dir+"/word.txt", []byte("banana\n"), 0o600))
+	claude.Replay(t, []stdiorr.Scrub{
+		scrubLine,
+		scrubDir("/private"+dir, "/work"),
+		scrubDir(dir, "/work"),
+		scrubDir(home, "/home/me"),
+	}, "testdata/TestRecordedBackgroundSubagent.trace")
+
+	idle := &idleSink{}
+	store := session.NewMemoryStore()
+	a, err := claude.Durable(ctx, "s1",
+		claude.Dir(dir),
+		claude.Model("haiku"),
+		claude.PermissionMode(claude.PermissionBypass),
+		claude.Store(store),
+		claude.IdleEvents(idle.add),
+	)
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	prompt := "Start exactly one subagent with the Agent tool, with run_in_background set to true " +
+		"and subagent_type general-purpose. Its task: run the shell command sleep 10, then read " +
+		"word.txt and reply with the word. After you start it, end your turn at once with the " +
+		"text STARTED. Do not wait for it."
+	events, msgs, err := run(ctx, a, prompt)
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	require.NotEmpty(t, msgs)
+	assert.Contains(t, msgs[len(msgs)-1].Text(), "STARTED")
+
+	var (
+		start agent.EventSubagentStart
+		ends  []agent.EventSubagentEnd
+	)
+	for _, e := range events {
+		switch e := e.(type) {
+		case agent.EventSubagentStart:
+			start = e
+		case agent.EventSubagentEnd:
+			ends = append(ends, e)
+		}
+	}
+	require.NotEmpty(t, start.SessionID, "the run starts the child")
+	require.Len(t, ends, 1)
+	assert.Equal(t, agent.SubagentBackground, ends[0].Status, "the run ends with the child in the background")
+
+	select {
+	case <-a.Wakes():
+	case <-time.After(wakeWait):
+		require.FailNow(t, "the CLI started no turn after the child ended")
+	}
+
+	var idleEnd *agent.EventSubagentEnd
+	for _, e := range idle.all() {
+		if e, ok := e.(agent.EventSubagentEnd); ok {
+			idleEnd = &e
+		}
+	}
+	require.NotNil(t, idleEnd, "the child ends between runs")
+	assert.Equal(t, start.SessionID, idleEnd.SessionID)
+	assert.Equal(t, agent.SubagentCompleted, idleEnd.Status)
+	assert.Contains(t, strings.ToLower(idleEnd.Text), "banana")
+
+	snap, err := store.Load(ctx, start.SessionID)
+	require.NoError(t, err)
+	var childText []string
+	for _, e := range snap.Entries {
+		childText = append(childText, e.Message.Text())
+	}
+	assert.Contains(t, strings.ToLower(strings.Join(childText, " ")), "banana",
+		"the log of the child keeps the work that it did between runs")
+
+	events, msgs, err = collectRun(a.Continue(ctx))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	require.NotEmpty(t, msgs)
+	assert.Contains(t, strings.ToLower(msgs[len(msgs)-1].Text()), "banana",
+		"the turn that the CLI started reports the work of the child")
+
+	entries := a.Log().Entries()
+	wake := slices.IndexFunc(entries, func(e session.Entry) bool { return e.Kind == agent.KindWake })
+	assert.Positive(t, wake, "the log marks where the agent went on by itself")
 	checkLog(t, a)
 }

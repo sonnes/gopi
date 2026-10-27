@@ -1,0 +1,28 @@
+stdiorr trace v1
+# Derived from TestRecordedBackgroundSubagent.trace. A run starts a
+# subagent in the background and ends. Between runs, the child ends, and
+# the CLI starts a turn that asks for a permission. A run with input
+# answers the request, reads the turn to its result, and only then sends
+# its input.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Start a helper in the background."}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_a","name":"Agent","input":{"description":"Read the word","prompt":"Read word.txt.","subagent_type":"general-purpose","run_in_background":true}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"system","subtype":"task_started","session_id":"sess-1","task_id":"t1","tool_use_id":"toolu_a","task_type":"local_agent","description":"Read the word","prompt":"Read word.txt."}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_a","content":[{"type":"text","text":"Async agent launched successfully. (This tool result is not the output.)"}]}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_2","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"STARTED"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"STARTED","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":20,"output_tokens":10}}
+< {"type":"assistant","message":{"id":"msg_c1","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"banana"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":"toolu_a","session_id":"sess-1"}
+< {"type":"system","subtype":"task_notification","session_id":"sess-1","task_id":"t1","tool_use_id":"toolu_a","status":"completed","summary":"banana"}
+< {"type":"system","subtype":"init","session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_3","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_b","name":"Bash","input":{"command":"echo banana"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"control_request","request_id":"cli-7","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"echo banana"},"tool_use_id":"toolu_b"}}
+> {"type":"control_response","response":{"subtype":"success","request_id":"cli-7","response":{"behavior":"allow","updatedInput":{"command":"echo banana"},"toolUseID":"toolu_b"}}}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_b","content":"banana","is_error":false}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_4","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"The helper found banana."}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"The helper found banana.","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":20,"output_tokens":10}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"What next?"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_5","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"Nothing."}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"Nothing.","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":20,"output_tokens":10}}

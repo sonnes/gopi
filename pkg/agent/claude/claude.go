@@ -9,7 +9,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
@@ -83,6 +82,17 @@ type Agent struct {
 	steerMu sync.Mutex
 	steer   []session.Entry
 	wake    chan struct{}
+
+	// idleMu guards idle, kept, and background. idle is the reader of the
+	// CLI between runs, or nil during a run. kept are the lines of a turn
+	// that the CLI started between runs. background are the children in
+	// the background that no run carries, by the ID of their call. wakes
+	// sends one value when the CLI starts a turn between runs.
+	idleMu     sync.Mutex
+	idle       *idleReader
+	kept       [][]byte
+	background map[string]*child
+	wakes      chan struct{}
 }
 
 // config collects the options before [New] or [Durable] builds the agent.
@@ -102,6 +112,7 @@ type config struct {
 	approve    agent.ApproveFunc
 	hooks      []agent.Hook
 	mcp        []agent.MCPServer
+	idle       func(agent.Event)
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -218,6 +229,14 @@ func MCP(servers ...agent.MCPServer) Option {
 	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
 
+// IdleEvents sets the function that gets the events between runs: the
+// events of a subagent in the background, wrapped as in a run. Without
+// it, the agent drops them, and the log of each child still gets its
+// messages.
+func IdleEvents(fn func(agent.Event)) Option {
+	return func(c *config) { c.idle = fn }
+}
+
 // PermissionMode sets the permission mode of the CLI. Without it, the
 // settings of the CLI decide.
 func PermissionMode(mode Permission) Option {
@@ -267,9 +286,11 @@ func newConfig(opts []Option) config {
 func newAgent(opts []Option) *Agent {
 	c := newConfig(opts)
 	return &Agent{
-		name: c.name,
-		cfg:  c,
-		wake: make(chan struct{}, 1),
+		name:       c.name,
+		cfg:        c,
+		wake:       make(chan struct{}, 1),
+		wakes:      make(chan struct{}, 1),
+		background: map[string]*child{},
 	}
 }
 
@@ -306,43 +327,7 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 		if len(emit.Input(entries)) == 0 {
 			return nil, errors.New("claude: a run needs an entry with text or a file")
 		}
-		em := emit.New(a.log, a.name, a.state, push)
-		if err := em.Start(); err != nil {
-			return nil, fmt.Errorf("claude: %w", err)
-		}
-		base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages())
-		if err != nil {
-			return em.Finish(ctx, ai.Usage{}, fmt.Errorf("claude: %w", err))
-		}
-		// The base goes in the log before the CLI starts, because the
-		// CLI gets it as its system prompt.
-		if base != nil {
-			if err := em.Input(ctx, []session.Entry{session.NewEntry(*base)}); err != nil {
-				return em.Finish(ctx, ai.Usage{}, err)
-			}
-		}
-		// Start the CLI before the input, so that a failed start stores
-		// no input that the CLI never got.
-		proc, err := a.ensure(ctx)
-		if err != nil {
-			return em.Finish(ctx, ai.Usage{}, err)
-		}
-		// The error of a hook belongs to the run that called it.
-		proc.hookErr = nil
-		r := newRunner(a, proc, em)
-		if change != nil {
-			r.reminder = transcript.Reminder(transcript.SystemText(change.Content))
-			entries = append([]session.Entry{session.NewEntry(*change)}, entries...)
-		}
-		msgs, err := r.run(ctx, entries)
-		// The CLI did not take these steers before the run ended. It
-		// must not run them after the run, so the agent stops it, and
-		// the host sends them again.
-		if lost := r.lostSteers(); len(lost) > 0 {
-			a.giveBack(lost)
-			a.drop(proc)
-		}
-		return msgs, err
+		return a.runWith(ctx, push, entries)
 	})
 }
 
@@ -350,10 +335,13 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 // exit. After a timeout, it kills the CLI. Close must not overlap a
 // run. A later run starts the CLI again.
 func (a *Agent) Close() error {
+	a.pauseIdle()
 	a.mu.Lock()
 	proc := a.proc
 	a.proc = nil
 	a.mu.Unlock()
+	// No child in the background outlives its CLI.
+	a.endBackground(agent.SubagentInterrupted)
 	if proc == nil {
 		return nil
 	}

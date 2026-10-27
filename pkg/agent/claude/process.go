@@ -322,16 +322,8 @@ func (pr *process) terminate() { pr.p.Kill() }
 //     drops it too.
 var dropped = []string{"CLAUDECODE", "NODE_OPTIONS", "DEBUG"}
 
-// noBackgroundTasks turns off the background tasks of the CLI: a Bash
-// call or an Agent call with run_in_background, and a Monitor. A
-// background task ends after the result of the run, and then no run
-// reads its lines, so the agent would lose its output and its end. The
-// variable is in Claude Code 2.1.309.
-const noBackgroundTasks = "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1"
-
 // environ returns the environment of the CLI: the environment of this
-// process without the [dropped] variables, then [noBackgroundTasks],
-// then extra.
+// process without the [dropped] variables, then extra.
 func environ(extra []string) []string {
 	var env []string
 	for _, kv := range os.Environ() {
@@ -341,6 +333,5 @@ func environ(extra []string) []string {
 		}
 		env = append(env, kv)
 	}
-	env = append(env, noBackgroundTasks)
 	return append(env, extra...)
 }

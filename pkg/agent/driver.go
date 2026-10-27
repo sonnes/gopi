@@ -73,6 +73,10 @@ type Config struct {
 	// MCP are the MCP servers of the agent. The agent gets the tools
 	// of each server.
 	MCP []MCPServer
+	// Idle gets the events that the agent sends between its runs, such
+	// as the events of a subagent in the background. A driver that has
+	// no such events ignores it. Without it, the agent drops them.
+	Idle func(Event)
 }
 
 // Checker is a [Driver] that reports its [Status]: whether it can start
@@ -149,6 +153,20 @@ type Steerer interface {
 	Steer(entries ...session.Entry)
 	TakeSteer() []session.Entry
 }
+
+// Waker is a [Runner] whose agent can start a turn on its own, such as
+// the Claude Code agent when background work ends. Wakes sends one value
+// when a turn starts outside a run. Continue runs that turn: it sends no
+// input, and it ends at the end of the turn. A caller that sees a wake
+// while a run is active does nothing, because the run reads the turn.
+type Waker interface {
+	Wakes() <-chan struct{}
+	Continue(ctx context.Context) *Stream
+}
+
+// KindWake is the custom entry that a run of [Waker.Continue] adds first,
+// so that a viewer of the log shows where the agent went on by itself.
+const KindWake = "gopi.wake"
 
 // Point names a point of the loop at which a hook runs.
 type Point string
