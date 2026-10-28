@@ -13,6 +13,9 @@ import { conceptsGroup } from "./src/sidebar-concepts.mjs";
 // base to "/" and site to the domain.
 const BASE = "/gopi";
 const REPO = "https://github.com/sonnes/gopi";
+// The cover of the site, from web/design/og/og.html. Each page names it
+// as its social card, so a link to any page shows it.
+const COVER = `https://sonnes.github.io${BASE}/og.png`;
 
 // The guides import their programs from ../examples with ?raw, so the
 // dev server has to be allowed to read outside web/.
@@ -91,6 +94,9 @@ export default defineConfig({
             href: "https://fonts.googleapis.com/css2?family=Lilita+One&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans:wght@400;500;600;700;800&display=swap",
           },
         },
+        { tag: "meta", attrs: { property: "og:image", content: COVER } },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        { tag: "meta", attrs: { name: "twitter:image", content: COVER } },
       ],
       components: {
         TableOfContents: "./src/components/DocsTableOfContents.astro",

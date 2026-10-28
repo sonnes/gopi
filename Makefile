@@ -1,5 +1,5 @@
 .PHONY: test check build tidy fmt record record-cli models \
-	site-install site-dev site-build site-preview site-check site-test site-demo \
+	site-install site-dev site-build site-preview site-check site-test site-demo site-og \
 	docs-links
 
 # MODULES lists the directory of each module. go.work joins them, but
@@ -116,6 +116,12 @@ site-test:
 site-demo:
 	go build -o .bin/landing-demo ./examples/landing/demo
 	node web/scripts/record-demo.mjs .bin/landing-demo web/src/data/demo.json
+
+# Render the cover of the site, the social card and the banner of the
+# README, from web/design/og/og.html to web/public/og.png. It needs Google
+# Chrome. Run it after a change to the cover.
+site-og:
+	node web/scripts/render-og.mjs web/design/og/og.html web/public/og.png
 
 # Every internal link in the developer docs and in the site pages is a
 # relative path to a file that exists. Then it resolves on GitHub, and

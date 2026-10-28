@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>gopi: cover</title>
+<!-- The source of web/public/og.png, the social card of the site and the
+     banner of the README. `make site-og` renders it. The site never links
+     this file. -->
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Noto+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../src/styles/tokens.css">
+<style>
+  html, body { margin: 0; height: 630px; overflow: hidden; background: var(--ground); }
+  .card {
+    box-sizing: border-box;
+    width: 1200px;
+    height: 630px;
+    padding: 52px 64px 44px;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    grid-template-rows: 1fr auto;
+    column-gap: 48px;
+    overflow: hidden;
+  }
+  .words { display: flex; flex-direction: column; }
+  .label {
+    margin: 0 0 16px;
+    font: 400 16px var(--font-mono);
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+  .wordmark { display: block; width: 230px; height: auto; margin-left: -4px; }
+  h1 {
+    margin: 22px 0 0;
+    font: 600 46px/1.1 var(--font-mono);
+    letter-spacing: -0.04em;
+    color: var(--text);
+  }
+  .lede {
+    margin: 12px 0 0;
+    font: 400 22px/1.4 var(--font-sans);
+    color: var(--copy);
+    max-width: 640px;
+  }
+  .win {
+    margin-top: 26px;
+    border: 1px solid var(--line);
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+  }
+  .win .tab {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .win pre {
+    margin: 0;
+    padding: 14px 18px;
+    font-size: 18px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .st { color: var(--l-ai); }
+  .portrait { grid-row: 1 / 3; grid-column: 2; align-self: center; }
+  .portrait img { display: block; width: 100%; height: auto; }
+  .foot {
+    grid-column: 1;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+    font: 400 15px var(--font-mono);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .foot b { font-weight: 600; color: var(--primary); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="words">
+    <p class="label">GO SDK / DURABLE AGENTS</p>
+    <img class="wordmark" src="../../src/assets/agent-gopi-wordmark.png" alt="agent gopi">
+    <h1>Durable agents in Go.</h1>
+    <p class="lede">Run your own loop, Claude Code, or Codex as a session in your Go program.</p>
+    <div class="win">
+      <div class="tab">triage.go · a durable agent</div>
+<pre>a, err := agent.Durable(ctx, model, <span class="st">"triage"</span>,
+  agent.Store(store),
+)</pre>
+    </div>
+  </div>
+  <div class="portrait"><img src="../../src/assets/agent-gopi.png" alt="Agent Gopi"></div>
+  <div class="foot"><span><b>$</b> go get github.com/sonnes/gopi/pkg/ai/anthropic</span><span>sonnes.github.io/gopi</span></div>
+</div>
+</body>
+</html>

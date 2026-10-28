@@ -89,6 +89,15 @@ label in the font files of the site, from the `@fontsource` packages. If
 `tokens.css` changes a font, change the font files in `astro.config.mjs`
 too.
 
+## Cover
+
+`public/og.png` is the cover of the site, 1200 by 630. Each page names it
+as its social card, and the README of the repository shows it as its
+banner. `design/og/og.html` is its source: it reads `src/styles/tokens.css`
+and the images in `src/assets/`, so the cover follows the site. After a
+change to the source, run `make site-og`. The command renders the page with
+Google Chrome, through `scripts/render-og.mjs`.
+
 ## Design System
 
 [DESIGN.md](DESIGN.md) defines the shared rules for the landing page and the docs.

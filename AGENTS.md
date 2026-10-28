@@ -32,6 +32,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make site-check` | Type-check the site                                       |
 | `make site-test` | Run the tests of the site                                  |
 | `make site-demo` | Record the replay and the events of the landing page       |
+| `make site-og` | Render the cover of the site to `web/public/og.png`         |
 | `make site-build` | Build the site to `web/dist`                              |
 | `make docs-links` | Make sure that each link in `docs/` and the pages resolves |
 

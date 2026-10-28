@@ -12,6 +12,8 @@ interface Props {
 const { title, description } = Astro.props;
 const base = import.meta.env.BASE_URL;
 const docs = `${base.replace(/\/$/, "")}/docs/`;
+// The cover of the site, from web/design/og/og.html, as an absolute URL.
+const cover = new URL(`${base.replace(/\/$/, "")}/og.png`, Astro.site).href;
 ---
 
 <!doctype html>
@@ -21,6 +23,13 @@ const docs = `${base.replace(/\/$/, "")}/docs/`;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
+    <meta property="og:image" content={cover} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={cover} />
     <link rel="icon" type="image/svg+xml" href={mark.src} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
