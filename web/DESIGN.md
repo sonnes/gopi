@@ -21,9 +21,9 @@ content from surrounding prose or identify an input field.
 
 Mark the current sidebar page or contents heading with color and weight.
 
-The landing page uses butter yellow for its primary action. Other content stays on the page background.
+The landing page uses a solid blue button for its primary action. Other content stays on the page background.
 
-Coral identifies clickable elements. Within code blocks, it identifies keywords.
+Blue identifies clickable elements. Within code blocks, rose identifies keywords.
 
 Use the display, title, prose, label, or code type style. New sizes and weights must
 fit one of these styles.
@@ -62,9 +62,9 @@ the numbers again.
 
 ## Colour
 
-Use deep brown (`#3C3028`) on the near-white background (`#FFFEFC`). Do not use pure black.
-Butter yellow (`#F4C65D`) colors the mascot and primary action. Coral (`#DE7356`) colors accents.
-Use the darker `--link` color for readable links. The dark background is `#141110`.
+The palette is the palette of xdb.dev. Use cool grey ink (`#15171C`) on the cream background (`#FBFAF7`). Do not use pure black.
+Blue (`#2B4EE6`) colors the links, the accents, and the primary action. Butter yellow (`#F4C65D`) colors only the mascot.
+The dark background is `#121317`.
 
 | Token          | Job                                          |
 | -------------- | -------------------------------------------- |
@@ -93,7 +93,7 @@ rewrites a colour.
 
 | Hue   | Means                                            |
 | ----- | ------------------------------------------------ |
-| coral | The language - `func`, `for`, `range`, `defer`    |
+| rose  | The language - `func`, `for`, `range`, `defer`    |
 | blue  | A name from a package - a type or a function      |
 | green | Literal text                                      |
 | amber | A value the language names - a number, `nil`      |
@@ -110,7 +110,7 @@ Corner radius identifies panels.
 | `--r-lg` | A card                                          |
 | `--r-xl` | A callout, and a code block or figure in prose |
 
-The primary landing action uses a small, solid brown offset shadow. Other content in the flow casts no shadow. `--shadow` is for the things that
+No content in the flow casts a shadow, the primary landing action included. `--shadow` is for the things that
 float over the page: the search dialog, the skip link, the mobile
 contents.
 
@@ -163,8 +163,8 @@ as its stroke, and the same hue at `--l-mix` over `--code-bg` as its fill:
 | `error`     | `--err`         | tint, dashed, `--err` label             |
 
 `--primary` marks the one thing that the figure is about. Text in a figure
-is set in the mono at 11px or 12px. Coral text means a link, so a figure
-marks its subject with a coral line or a coral stroke.
+is set in the mono at 11px or 12px. Blue text means a link, so a figure
+marks its subject with a blue line or a blue stroke.
 
 A figure fits the reading column, 552px inside the panel. A wider figure
 scrolls sideways, and it fades at the edge where more is hidden. The fade
@@ -186,9 +186,11 @@ own width, scrolls sideways, and fades at the hidden edge.
 
 The layouts differ in their treatment of code blocks and fills:
 
-On the landing page, code occupies its own column without a frame. The filename
-sits on a hairline. In the docs, code interrupts prose and uses a frame with
-`--r-xl`.
+On the landing page, code sits in a window in the style of xdb.dev: a white
+sheet on a hairline, and a tab bar in the panel tint with the file name and what
+the snippet shows. The code is ink, a comment is grey, and a string is rose.
+`src/highlight.mjs` colours it. In the docs, code interrupts prose and uses a
+frame with `--r-xl`.
 
 In the docs, a long line wraps. The wrapped part keeps the indent of its line,
 plus two columns. The full program at the end of a guide stops at 32rem and
@@ -212,7 +214,7 @@ Put layout-specific rules in the stylesheet for that layout.
 ## Mascot
 
 Agent Gopi is a golden gopher with lowered sunglasses, a cream trench coat, and a coral tie.
-The landing hero uses `src/assets/agent-gopi.png`. Preserve its transparent background and full silhouette.
+The way out of the landing page uses `src/assets/agent-gopi.png`. Preserve its transparent background and full silhouette.
 The SVG face marks appear in navigation and browser tabs. Keep both theme variants consistent.
 
 ## Sidebar Illustrations

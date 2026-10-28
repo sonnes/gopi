@@ -1,6 +1,6 @@
-// Expressive Code lives in its own config file so the <Code> component
-// can be rendered outside markdown (the landing page uses it for every
-// snippet). Starlight picks this up automatically.
+// Expressive Code lives in its own config file, so the <Code> component
+// can be rendered outside markdown, as on the pages of the guides.
+// Starlight picks this up automatically.
 import { emberDark, emberLight } from "./src/shiki/ember.js";
 
 export default {
@@ -10,13 +10,10 @@ export default {
   // A long line wraps. The wrapped part keeps the indent of its line,
   // plus two columns, so it does not read as a new statement. A scrolled
   // line runs under the rounded edge of a docs panel, and the reader
-  // cannot see that it continues. The landing page turns this off in
-  // CodeFrame.astro.
+  // cannot see that it continues.
   defaultProps: { wrap: true, preserveIndent: true, hangingIndent: 2 },
   styleOverrides: {
-    // The landing page renders code through the same pipeline, so these
-    // are the shared values. The docs round further and lighten the
-    // border in starlight.css, which only that side of the site loads.
+    // The docs round further and lighten the border in starlight.css.
     borderRadius: "var(--r)",
     borderColor: "var(--line-strong)",
     codeFontFamily: "var(--font-mono)",

@@ -178,7 +178,7 @@ site-search button[data-open-modal] kbd {
 .sl-markdown-content a:hover:not(:where(.not-content *)) {
   color: var(--primary);
 }
-/* Inline code is ink, not the hue: coral means "keyword" inside a code
+/* Inline code is ink, not the hue: rose means "keyword" inside a code
    block, and the same colour in the sentence above it would be saying
    something else with it. A monospace face in a sans paragraph is
    already the whole signal. */

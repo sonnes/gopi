@@ -145,7 +145,6 @@ h2 {
 /* ---------- the label voice ---------- */
 /* The voice itself is in tokens.css, under .label. These are the other
    things on this page that speak in it. */
-.frame-path,
 .ledger th,
 .tree-head,
 .ways dt {
@@ -281,13 +280,10 @@ button.copy:hover {
 }
 
 /* ---------- artifacts ---------- */
-/* A file, a log and a table are the same object: a name on a rule, then
-   the thing itself. Hairlines divide; nothing is filled. */
-.codeframe,
+/* A table is a name on a rule, then the table. Hairlines divide. */
 .artifact {
   margin: 0;
 }
-.frame-head,
 .artifact figcaption {
   display: flex;
   align-items: baseline;
@@ -295,54 +291,53 @@ button.copy:hover {
   padding-bottom: 1rem;
   margin-bottom: 1.5rem;
   border-bottom: 1px solid var(--line);
-}
-.frame-path,
-.artifact figcaption {
   font-size: var(--label-size);
   color: var(--muted);
 }
-/* Expressive Code ships its own sheet, border and gutter. Here the code
-   sits on the work column itself. */
-.codeframe .expressive-code,
-.codeframe .expressive-code pre,
-.codeframe .expressive-code .frame {
-  background: none !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-.codeframe .expressive-code pre {
-  padding: 0 !important;
-}
-.codeframe .expressive-code pre > code,
-.codeframe .expressive-code .ec-line .code {
-  padding-inline: 0 !important;
-}
-/* Code is quieter than the prose it illustrates: one step down, and
-   tighter, so the two columns come out the same height. */
-.codeframe .expressive-code pre code {
-  font-size: 0.8rem;
-  line-height: 1.62;
-}
 
-.shell {
+/* ---------- code windows ---------- */
+/* Code and a recorded run sit in a window, in the style of xdb.dev: a
+   white sheet on a hairline, and a tab bar in the panel tint with the
+   name of the file and what it shows. The code is ink. A comment is
+   grey, and a string is rose. */
+.win {
   margin: 0;
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+.win-tab {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: pre;
+}
+.win pre {
+  margin: 0;
+  padding: 1rem 1.1rem;
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  line-height: 1.62;
+  line-height: 1.6;
   color: var(--text);
   overflow-x: auto;
+  tab-size: 2;
 }
-/* What the specimen prints, under the source that prints it: one step
-   dimmer and stepped in, so it cannot be read as a second snippet. */
-.shell--out {
-  margin-top: 1.5rem;
-  padding-top: 1.3rem;
-  border-top: 1px solid var(--line-strong);
+.win pre .cm {
   color: var(--muted);
 }
-.shell--out .p {
-  color: var(--muted);
+.win pre .st {
+  color: var(--l-ai);
+}
+.win + .win,
+.win + figure {
+  margin-top: 1.25rem;
 }
 
 /* ---------- ledgers: the session and the providers ---------- */
@@ -373,8 +368,12 @@ button.copy:hover {
 .ledger tr:last-child td {
   border-bottom: 0;
 }
-.ledger--providers tbody tr:nth-child(4) td {
+/* The providers end and the drivers begin under the sixth row. */
+.ledger--providers tbody tr:nth-child(6) td {
   border-bottom: 1px solid var(--line-strong);
+}
+.ledger a {
+  color: var(--link);
 }
 .ledger td.dim {
   color: var(--muted);
@@ -473,7 +472,7 @@ button.copy:hover {
 
 /* ---------- the way out ---------- */
 /* The page ends on the same paper it began on, with the largest line
-   after the headline and the four ways into the documentation. */
+   after the headline, Agent Gopi, and the ways into the documentation. */
 .outro {
   border-top: 1px solid var(--line);
 }
@@ -501,24 +500,19 @@ button.copy:hover {
   margin: 1.75rem 0 3.5rem;
   color: var(--copy);
 }
+/* Each way out sits on its own rule, so a second row lines up with the
+   first at any number of links. */
 .ways-out {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  column-gap: var(--gutter);
   list-style: none;
   margin: 0;
   padding: 0;
-  border-block: 1px solid var(--line);
 }
 .ways-out li {
-  padding: 1.5rem var(--gutter) 1.5rem 0;
-  border-right: 1px solid var(--line);
-}
-.ways-out li:last-child {
-  border-right: 0;
-  padding-right: 0;
-}
-.ways-out li + li {
-  padding-left: var(--gutter);
+  padding: 1.5rem 0;
+  border-top: 1px solid var(--line);
 }
 .ways-out a {
   font-family: var(--font-mono);
@@ -559,14 +553,15 @@ button.copy:hover {
     border-right: 0;
   }
   .ways-out li {
-    padding-block: 1rem 0;
+    padding-block: 1rem;
   }
   .cell--words {
     padding: var(--band) var(--shell-pad);
     border-right: 0;
   }
+  /* Stacked, the words already close the band above the code. */
   .cell--work {
-    padding: var(--band) var(--shell-pad);
+    padding: 0 var(--shell-pad) var(--band);
   }
   .index a {
     grid-template-columns: 1fr;
@@ -574,32 +569,500 @@ button.copy:hover {
   }
 }
 
-.agent-hero .row-inner { grid-template-columns: 1.15fr 1fr; align-items: center; }
-.agent-hero .cell--words { padding-block: 4rem; }
-.agent-hero h1 { font-family: var(--font-brand); font-weight: 400; font-size: clamp(3.1rem, 6.5vw, 5.5rem); line-height: 1.05; letter-spacing: -0.025em; }
-.agent-hero .hero-description { font-family: var(--font-mono); font-size: clamp(1.1rem, 2vw, 1.5rem); margin: 1.5rem 0 0; color: var(--text); }
-.agent-hero .cell--words p.lede { margin: 1rem 0 2rem; }
-.agent-portrait { margin: 0; padding: 1.5rem var(--shell-pad) 1.5rem 0; text-align: center; }
-.agent-portrait img { display: block; width: 100%; max-width: 430px; height: auto; margin: 0 auto; }
-.agent-portrait figcaption { display: flex; justify-content: space-between; border-top: 1px solid var(--line-strong); padding-top: 0.75rem; margin: 0 1.5rem; }
-.agent-portrait figcaption span:first-child { color: var(--link); }
-.agent-hero .hero-actions { display: flex; align-items: center; gap: 1.5rem; }
-.agent-hero .hero-actions .more { margin: 0; }
-.agent-hero .btn--primary { background: var(--butter); border-color: var(--brand-ink); color: var(--brand-ink); font-family: var(--font-mono); box-shadow: 3px 3px 0 var(--brand-ink); }
-.agent-hero .btn--primary:hover { background: var(--primary); }
+
+/* ---------- hero ---------- */
+/* The words and the brand at the left, the durable program and its
+   output at the right. The program is the proof of the headline. */
+.agent-hero .row-inner {
+  grid-template-columns: minmax(0, 4fr) minmax(0, 6fr);
+}
+.agent-hero .cell--words {
+  padding-block: 4rem;
+}
+.agent-hero .cell--work {
+  padding-block: 4rem;
+}
+.agent-hero h1 {
+  font-family: var(--font-brand);
+  font-weight: 400;
+  font-size: clamp(3.1rem, 6.5vw, 5.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.agent-hero .hero-description {
+  font-family: var(--font-mono);
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  margin: 1.5rem 0 0;
+  color: var(--text);
+}
+.agent-hero .cell--words p.lede {
+  margin: 1rem 0 2rem;
+}
+.agent-hero .install code {
+  font-size: 0.76rem;
+}
+.agent-hero .hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.agent-hero .hero-actions .more {
+  margin: 0;
+}
+.agent-hero .btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+  font-family: var(--font-mono);
+}
+.agent-hero .btn--primary:hover {
+  background: var(--primary-ink);
+}
+.hero-wordmark {
+  display: block;
+  width: min(100%, 340px);
+  height: auto;
+  margin-left: -0.04em;
+}
+
+/* ---------- figures under the code ---------- */
+/* A figure under a snippet sits on one strong rule, with its caption in
+   the label voice: the number at the left, the name at the right. */
+.cycle,
+.spec-fig,
+.events {
+  margin: 1.5rem 0 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--line-strong);
+}
+.cycle figcaption,
+.spec-fig figcaption,
+.events figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 0;
+}
+.spec-fig figcaption {
+  margin-top: 1.25rem;
+}
+#providers .spec-fig {
+  margin: 0 0 3rem;
+}
+
+/* ---------- the replay ---------- */
+/* The record of a real run. Without JavaScript it is a still frame of
+   the whole run; the button types it again, line by line. */
+.replay-play {
+  font: inherit;
+  color: var(--muted);
+  background: var(--code-bg);
+  border: 1px solid var(--line);
+  padding: 0.05rem 0.55rem;
+  cursor: pointer;
+}
+.replay-play:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+/* Each line is a block, so the white space of the markup between the
+   lines collapses and a line keeps its own. */
+.win pre.replay-screen {
+  white-space: normal;
+  color: var(--copy);
+}
+.replay-screen span {
+  display: block;
+  white-space: pre;
+}
+.replay-screen .is-hidden {
+  visibility: hidden;
+}
+.replay-cmd {
+  color: var(--text);
+}
+.replay-cmd b {
+  color: var(--primary);
+  font-weight: 600;
+}
+.replay-call {
+  color: var(--muted);
+}
+.replay-kill {
+  color: var(--l-ai);
+}
+.replay-out {
+  color: var(--text);
+}
+
+/* ---------- the lifecycle ---------- */
+/* fig. 1: the sessions of one host, each over its own workspace, then
+   the statuses that a session moves through. A status is a pill in the
+   hue of what it asks of the reader: green runs, amber waits for a
+   person, and grey is idle. */
+.cycle-sessions {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+.cycle-sessions th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  padding: 0 0.75rem 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.cycle-sessions td {
+  padding: 0.45rem 0.75rem 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+.cycle-sessions td:nth-child(2),
+.cycle-sessions td:nth-child(3) {
+  color: var(--muted);
+}
+.status {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 0 0.45rem;
+  border: 1px solid var(--hue);
+  color: var(--hue);
+  white-space: nowrap;
+}
+.status--running {
+  --hue: var(--l-durable);
+}
+.status--requires_action {
+  --hue: var(--l-agent);
+}
+.status--idle {
+  --hue: var(--muted);
+}
+.cycle-track {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0;
+}
+.cycle-track li {
+  display: flex;
+  align-items: center;
+}
+.cycle-via {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  padding: 0 0.5rem;
+}
+.cycle-via::after {
+  content: " ->";
+}
+.cycle-stops {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.2rem 1rem;
+  margin: 1rem 0 1.25rem;
+  font-size: 0.8rem;
+}
+.cycle-stops dt {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.cycle-stops dd {
+  margin: 0;
+  color: var(--copy);
+}
+
+/* ---------- the model spec ---------- */
+.spec {
+  display: flex;
+  justify-content: center;
+  gap: 0.2rem;
+  margin-top: 1rem;
+}
+.spec-part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 15rem;
+}
+.spec-text {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--hue, var(--muted));
+  padding: 0 0.2rem 0.3rem;
+  border-bottom: 3px solid var(--hue, transparent);
+}
+.spec-note {
+  margin-top: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: center;
+}
+.spec-note b {
+  display: block;
+  color: var(--text);
+}
+.spec-routes {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.3rem 1.25rem;
+  font-size: 0.8rem;
+}
+.spec-routes li {
+  display: contents;
+}
+.spec-routes code {
+  color: var(--text);
+}
+.spec-routes span {
+  color: var(--muted);
+}
+
+/* ---------- the events ---------- */
+/* One row for each event, indented by its depth: the run, a turn, and
+   a message or a tool call inside a turn. The hue is the kind. */
+.event-rows {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.event {
+  display: flex;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding: 0.12rem 0 0.12rem calc(var(--depth) * 1.25rem);
+  border-left: 2px solid transparent;
+  transition: opacity 0.2s;
+}
+.event code {
+  color: var(--hue);
+}
+.event span {
+  color: var(--muted);
+}
+.event--agent {
+  --hue: var(--l-agent);
+}
+.event--turn {
+  --hue: var(--muted-strong);
+}
+.event--message {
+  --hue: var(--l-ai);
+}
+.event--tool {
+  --hue: var(--l-wire);
+}
+.event.is-dim {
+  opacity: 0.15;
+}
+
+/* ---------- the stack ---------- */
+/* The layers at the left, and the note of one layer at the right. A
+   radio picks the layer, so the figure works without JavaScript; the
+   script only moves it on until the reader picks one. */
+.stack {
+  display: grid;
+  grid-template-columns: var(--split);
+  gap: var(--gutter);
+  align-items: start;
+}
+.stack-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.stack-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.stack-bar {
+  font-family: var(--font-mono);
+  font-size: 0.86rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--hue);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.stack-bar:hover {
+  color: var(--text);
+}
+.stack-note {
+  display: none;
+}
+.stack-pkg {
+  margin: 0 0 0.6rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--hue);
+}
+.stack-what {
+  margin: 0 0 1.25rem;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--text);
+  max-width: 34rem;
+}
+.stack-note dl {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.4rem 1rem;
+  margin: 0;
+  font-size: 0.92rem;
+}
+.stack-note dt {
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  color: var(--muted);
+  padding-top: 0.15rem;
+}
+.stack-note dd {
+  margin: 0;
+  color: var(--copy);
+}
+.life {
+  position: relative;
+  margin-top: 1.5rem;
+  height: 2.2rem;
+}
+.life-bar {
+  position: absolute;
+  bottom: 0.3rem;
+  left: 0;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--hue);
+}
+.life-crash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  line-height: 1;
+  left: var(--crash);
+  padding-left: 0.4rem;
+  border-left: 1px dashed var(--err);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--err);
+}
+.stack-note .more {
+  margin-top: 1.5rem;
+}
+#layer-host:checked ~ .stack-notes .stack-note--host,
+#layer-harness:checked ~ .stack-notes .stack-note--harness,
+#layer-agent:checked ~ .stack-notes .stack-note--agent,
+#layer-session:checked ~ .stack-notes .stack-note--session,
+#layer-tool:checked ~ .stack-notes .stack-note--tool,
+#layer-ai:checked ~ .stack-notes .stack-note--ai {
+  display: block;
+}
+#layer-host:checked ~ .stack-bars .stack-bar--host,
+#layer-harness:checked ~ .stack-bars .stack-bar--harness,
+#layer-agent:checked ~ .stack-bars .stack-bar--agent,
+#layer-session:checked ~ .stack-bars .stack-bar--session,
+#layer-tool:checked ~ .stack-bars .stack-bar--tool,
+#layer-ai:checked ~ .stack-bars .stack-bar--ai {
+  background: color-mix(in srgb, var(--hue) var(--l-mix), transparent);
+  color: var(--text);
+}
+#layer-host:focus-visible ~ .stack-bars .stack-bar--host,
+#layer-harness:focus-visible ~ .stack-bars .stack-bar--harness,
+#layer-agent:focus-visible ~ .stack-bars .stack-bar--agent,
+#layer-session:focus-visible ~ .stack-bars .stack-bar--session,
+#layer-tool:focus-visible ~ .stack-bars .stack-bar--tool,
+#layer-ai:focus-visible ~ .stack-bars .stack-bar--ai {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ---------- providers and drivers ---------- */
+.ledger--providers col:nth-child(1) {
+  width: 20%;
+}
+.ledger--providers col:nth-child(2) {
+  width: 15%;
+}
+.ledger--providers col:nth-child(3) {
+  width: 22%;
+}
+.ledger--providers col:nth-child(4) {
+  width: auto;
+}
+
+/* ---------- the portrait, in the way out ---------- */
+.outro-head {
+  display: grid;
+  grid-template-columns: var(--split);
+  gap: var(--gutter);
+  align-items: end;
+}
+.agent-portrait {
+  margin: 0 0 2.5rem;
+  justify-self: end;
+  width: min(100%, 280px);
+}
+.agent-portrait img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.agent-portrait figcaption {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid var(--line-strong);
+  padding-top: 0.75rem;
+}
+.agent-portrait figcaption span:first-child {
+  color: var(--link);
+}
+
+.artifact {
+  overflow-x: auto;
+}
+.ledger {
+  min-width: 42rem;
+}
+
 @media (max-width: 62rem) {
-  .agent-hero .row-inner { display: grid; grid-template-columns: 1.1fr 1fr; }
-  .agent-hero .cell--words { padding-block: 3rem; }
+  .agent-hero .cell--words {
+    padding-block: 3rem;
+  }
+  .agent-hero .cell--work {
+    padding-block: 0 3rem;
+  }
+  .stack {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .outro-head {
+    display: block;
+  }
+  .agent-portrait {
+    width: 220px;
+    margin-inline: auto;
+  }
 }
 @media (max-width: 46rem) {
-  .agent-hero .row-inner { display: flex; flex-direction: column; }
-  .agent-hero .cell--words { width: 100%; padding-bottom: 1rem; }
-  .agent-portrait { padding: 0 var(--shell-pad) 2rem; width: 100%; }
-  .agent-portrait img { max-width: 290px; }
-  .agent-hero .hero-actions { gap: 1rem; flex-wrap: wrap; }
+  .agent-hero .hero-actions {
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
 }
-
-.artifact { overflow-x: auto; }
-.ledger { min-width: 42rem; }
-
-.hero-wordmark { display: block; width: min(100%, 340px); height: auto; margin-left: -0.04em; }

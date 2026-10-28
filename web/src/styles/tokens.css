@@ -3,39 +3,40 @@
 :root {
   color-scheme: light;
 
-  /* ground + panels */
-  --ground: #fffefc;
-  --panel: #fff8e9;
-  --panel-soft: #efe2c7;
+  /* ground + panels. The palette is the palette of xdb.dev: a cream
+     ground, cool grey ink, and one blue accent. */
+  --ground: #fbfaf7;
+  --panel: #f4f3ee;
+  --panel-soft: #eae9e2;
   /* The panel under code and diagrams. src/shiki/ember.js holds the
      same value as the code background. */
   --code-bg: #ffffff;
 
-  --line: #dbccb1;
-  --line-strong: #b8a589;
+  --line: #e2e1da;
+  --line-strong: #cfcec6;
 
   /* ink */
-  --text: #3c3028;
-  --copy: #594a3e;
-  --muted: #786653;
-  --muted-soft: #78665399;
-  --muted-strong: #5d564f;
+  --text: #15171c;
+  --copy: #2f333b;
+  --muted: #5f6470;
+  --muted-soft: #5f647099;
+  --muted-strong: #4a4f5a;
 
-  /* the hue — coral */
-  --primary: #de7356;
-  --link: #a43f28;
-  --primary-ink: #6e2617;
-  --primary-sky: #f4c65d;
-  --primary-line: #de735673;
-  --primary-faint: #de735614;
-  --on-primary: #fff8e9;
+  /* the hue — blue */
+  --primary: #2b4ee6;
+  --link: #2b4ee6;
+  --primary-ink: #1f3bb3;
+  --primary-sky: #e8ecfb;
+  --primary-line: #2b4ee673;
+  --primary-faint: #2b4ee614;
+  --on-primary: #ffffff;
 
   /* signal */
-  --ok: #2e8b4e;
-  --err: #b3261e;
+  --ok: #047857;
+  --err: #be123c;
 
-  /* The dim layer under a dialog: the ink, not a cool grey. */
-  --scrim: #3c302866;
+  /* The dim layer under a dialog: the ink, not a warm grey. */
+  --scrim: #15171c66;
 
   /* type */
   --font-sans: "Noto Sans", system-ui, -apple-system, sans-serif;
@@ -63,16 +64,16 @@
      wire hue, meta the durable hue, and value the harness hue. Stroke is
      ≥ 3:1 on the panel, for lines and tints. Deep is ≥ 4.5:1 under white
      text, for the one solid cell a figure allows. */
-  --l-ai: #de7356;
-  --l-ai-deep: #a43f28;
-  --l-agent: #b98212;
-  --l-agent-deep: #8a5f00;
-  --l-durable: #3e9a62;
-  --l-durable-deep: #2a6e45;
-  --l-harness: #8b6bd6;
-  --l-harness-deep: #5e44a6;
-  --l-wire: #3f86d6;
-  --l-wire-deep: #2a5fa3;
+  --l-ai: #be123c;
+  --l-ai-deep: #9f1239;
+  --l-agent: #b45309;
+  --l-agent-deep: #92400e;
+  --l-durable: #047857;
+  --l-durable-deep: #065f46;
+  --l-harness: #7c3aed;
+  --l-harness-deep: #5b21b6;
+  --l-wire: #0369a1;
+  --l-wire-deep: #075985;
   --l-you: var(--text);
   --l-you-deep: var(--text);
   --l-outside: var(--muted);
@@ -88,7 +89,7 @@
   --r-lg: 14px;
   --r-xl: 18px;
   --shadow:
-    0 1px 0 rgba(30, 24, 20, 0.04), 0 14px 34px -18px rgba(228, 100, 75, 0.28);
+    0 1px 0 rgba(21, 23, 28, 0.04), 0 14px 34px -18px rgba(43, 78, 230, 0.22);
 
   /* layout */
   --shell: 78rem;
@@ -104,50 +105,50 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --ground: #141110;
-  --panel: #302720;
-  --panel-soft: #3c3028;
-  --code-bg: #171312;
+  --ground: #121317;
+  --panel: #1c1e24;
+  --panel-soft: #262932;
+  --code-bg: #16181d;
 
-  --line: #332c28;
-  --line-strong: #4a403a;
+  --line: #2a2d35;
+  --line-strong: #3b3f4a;
 
-  --text: #f0eae4;
-  --copy: #c9bfb6;
-  --muted: #8c8078;
-  --muted-soft: #8c807899;
-  --muted-strong: #a89c93;
+  --text: #eceef3;
+  --copy: #c3c7d0;
+  --muted: #8b909c;
+  --muted-soft: #8b909c99;
+  --muted-strong: #a3a8b3;
 
   /* The fill lifts and the link lifts further: on a dark ground the
      deeper value is the unreadable one, so the pair swaps ends. */
-  --primary: #ff8e75;
-  --link: #ffa994;
-  --primary-ink: #ffc7b8;
-  --primary-sky: #5c2a20;
-  --primary-line: #ff8e7566;
-  --primary-faint: #ff8e7522;
-  --on-primary: #251e19;
+  --primary: #7c95ff;
+  --link: #9db0ff;
+  --primary-ink: #c9d3ff;
+  --primary-sky: #1d2a66;
+  --primary-line: #7c95ff66;
+  --primary-faint: #7c95ff22;
+  --on-primary: #0f1220;
 
-  --ok: #5cc47c;
-  --err: #ff6b5a;
+  --ok: #34d399;
+  --err: #fb7185;
 
-  --scrim: #0b0908a6;
+  --scrim: #050608a6;
 
   --shadow:
     0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 32px -18px rgba(0, 0, 0, 0.6);
 
   /* Lifted, like --primary. Deep is the stroke itself here: on a dark
      ground the solid cell takes dark text, so it need not darken. */
-  --l-ai: #ff8e75;
-  --l-ai-deep: #ff8e75;
-  --l-agent: #f2b94a;
-  --l-agent-deep: #f2b94a;
-  --l-durable: #6ccb8c;
-  --l-durable-deep: #6ccb8c;
-  --l-harness: #b49cf0;
-  --l-harness-deep: #b49cf0;
-  --l-wire: #7ab0f2;
-  --l-wire-deep: #7ab0f2;
+  --l-ai: #fb7185;
+  --l-ai-deep: #fb7185;
+  --l-agent: #f59e0b;
+  --l-agent-deep: #f59e0b;
+  --l-durable: #34d399;
+  --l-durable-deep: #34d399;
+  --l-harness: #a78bfa;
+  --l-harness-deep: #a78bfa;
+  --l-wire: #38bdf8;
+  --l-wire-deep: #38bdf8;
   --l-mix: 22%;
 }
 
@@ -162,7 +163,7 @@ body {
 }
 
 /* One focus ring on both layouts: the hue, outside the element. The
-   coral is 3.1:1 on white, above the 3:1 that a focus ring needs. */
+   blue is 5.6:1 on white, above the 3:1 that a focus ring needs. */
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

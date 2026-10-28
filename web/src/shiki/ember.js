@@ -1,7 +1,7 @@
 // Ember syntax themes.
 //
 // Four hues, and each one means something:
-//   coral  the language itself — func, for, range, defer, return
+//   rose   the language itself — func, for, range, defer, return
 //   blue   a name that comes from a package — a type or a function
 //   green  literal text
 //   amber  a value the language names — a number, nil, true, false
@@ -16,26 +16,26 @@
 
 const light = {
   bg: "#ffffff", // --code-bg
-  fg: "#1e1814", // --text
-  comment: "#655d57", // --muted, deepened for the code column
-  punct: "#5f5852", // between the comment and the ink
-  keyword: "#b23f2a", // coral, deepened from --link to clear 5.5:1
-  name: "#2a5fa3", // --l-wire-deep
-  literal: "#2a6e45", // --l-durable-deep
-  constant: "#8a5f00", // --l-agent-deep
+  fg: "#15171c", // --text
+  comment: "#5f6470", // --muted
+  punct: "#4a4f5a", // --muted-strong
+  keyword: "#be123c", // --l-ai
+  name: "#075985", // --l-wire-deep
+  literal: "#065f46", // --l-durable-deep
+  constant: "#92400e", // --l-agent-deep
 };
 
 // On a dark ground the deep end is the unreadable one, so each hue takes
 // the lifted value the layer tokens already use there.
 const dark = {
-  bg: "#171312", // --code-bg
-  fg: "#f0eae4",
-  comment: "#968b84",
-  punct: "#a79b93",
-  keyword: "#ff8e75",
-  name: "#7ab0f2",
-  literal: "#6ccb8c",
-  constant: "#f2b94a",
+  bg: "#16181d", // --code-bg
+  fg: "#eceef3",
+  comment: "#8b909c",
+  punct: "#a3a8b3",
+  keyword: "#fb7185",
+  name: "#38bdf8",
+  literal: "#34d399",
+  constant: "#f59e0b",
 };
 
 function theme(name, type, c) {

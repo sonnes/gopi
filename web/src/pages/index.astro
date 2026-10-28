@@ -3,169 +3,190 @@ import wordmark from "../assets/agent-gopi-wordmark.png";
 import gopi from "../assets/agent-gopi.png";
 import Landing from "../layouts/Landing.astro";
 import CodeFrame from "../components/CodeFrame.astro";
+import { snippet } from "../snippet.mjs";
+import durableSrc from "../../../examples/landing/durable.go?raw";
+import hostSrc from "../../../examples/landing/host.go?raw";
+import customizeSrc from "../../../examples/landing/customize.go?raw";
+import demo from "../data/demo.json";
 
 const base = import.meta.env.BASE_URL;
 const docs = `${base.replace(/\/$/, "")}/docs/`;
+const godoc = "https://pkg.go.dev/github.com/sonnes/gopi";
 
-// Layout rules are documented in web/DESIGN.md.
+// Layout rules are documented in web/DESIGN.md. Each snippet comes from
+// examples/landing, which the Go toolchain builds. A band shows a preview
+// of the code and links the docs page of what it shows. The replay and
+// the events come from a real run: make site-demo records them.
 
-const firstCall = `
-model := ai.LanguageModel{
-    Model:    anthropic.Sonnet5,
-    Provider: anthropic.New(anthropic.APIKey(key)),
+// A provider module requires the root module, so one go get adds both.
+const install = "go get github.com/sonnes/gopi/pkg/ai/anthropic";
+
+const bands = [
+  {
+    id: "tools",
+    label: "pkg/tool · tools",
+    title: "A Go Function Is a Tool",
+    words: [
+      "tool.New takes a Go function and derives the JSON schema from its input type. The function gets the typed input.",
+      "The agent runs each call and gives the result to the model.",
+    ],
+    more: ["Read about tools", `${docs}tool/`],
+    path: "tools.go",
+    caption: "a Go function as a tool",
+    code: snippet(customizeSrc, "tools"),
+  },
+  {
+    id: "hooks",
+    label: "pkg/agent · hooks",
+    title: "Change the Loop With Hooks",
+    words: [
+      "A hook runs at one point of the loop. A denied call does not run, and the model reads the reason.",
+      "A BeforeStop hook keeps the run going until the work is done.",
+    ],
+    more: ["Read about hooks", `${docs}agent/hooks/`],
+    path: "hooks.go",
+    caption: "a guard and a stop check",
+    code: snippet(customizeSrc, "hooks"),
+  },
+  {
+    id: "harness",
+    label: "pkg/harness · harness",
+    title: "Turn a Repository Into a Coding Agent",
+    words: [
+      "A harness reads the folders that you give it. AGENTS.md becomes the instructions, a skill loads when the model asks for it, and a subagent runs in a child session.",
+      "It adds the coding tools, MCP servers, a sandbox, and the permission rules. It assembles the agent again at each start, so an edit reaches the next agent.",
+    ],
+    more: ["Read about the harness", `${docs}harness/`],
+    path: "harness.go",
+    caption: "a coding agent from a repository",
+    code: snippet(customizeSrc, "harness"),
+  },
+];
+
+// The sessions of one host, each over its own workspace, for fig. 1.
+const sessions = [
+  { id: "fix-login", dir: "repos/app", agent: "claude-code", status: "running" },
+  { id: "notes", dir: "repos/site", agent: "codex", status: "requires_action" },
+  { id: "nightly", dir: "repos/api", agent: "harness", status: "idle", reason: "restarted" },
+];
+
+// The lifecycle of a session: each status, and the call or the event
+// that moves it on.
+const lifecycle = [
+  { status: "idle", via: "Send" },
+  { status: "running", via: "a call waits" },
+  { status: "requires_action", via: "Confirm" },
+  { status: "running", via: "the model stops" },
+  { status: "idle" },
+];
+const stops = [
+  ["end_turn", "the model answered"],
+  ["interrupted", "Interrupt ended the run"],
+  ["error", "the run failed"],
+  ["restarted", "the process stopped, and Open recovered the session"],
+];
+
+// The two parts of a model spec, for the figure of the providers band.
+const specParts = [
+  { text: "claude-code", hue: "harness", name: "driver", note: "claude-code and codex start their CLI. A provider, such as anthropic, runs on the harness." },
+  { text: "/", hue: null },
+  { text: "claude-opus-5-5", hue: "ai", name: "model", note: "from models.json, or from the models that the CLI lists" },
+];
+const specs = [
+  ["anthropic/claude-opus-5-5", "the loop in your process"],
+  ["claude-code/claude-opus-5-5", "the Claude Code CLI"],
+  ["codex/gpt-6-astra", "the Codex CLI"],
+];
+
+// The events of the resumed run, with the deltas of one message as one
+// row. Each row has a kind for its hue and a depth for its indent.
+interface RecordedEvent {
+  type: string;
+  tool?: string;
+  role?: string;
 }
-
-messages := []ai.Message{
-    ai.UserMessage("Say hello in one sentence."),
+interface EventRow {
+  type: string;
+  kind: string;
+  depth: number;
+  detail?: string;
+  count: number;
 }
+const DEPTH: Record<string, number> = { agent: 0, turn: 1 };
 
-msg, err := model.StreamText(ctx, messages).Wait()
-
-fmt.Println(msg.Text())`;
-
-const streamCode = `
-stream := model.StreamText(ctx, messages,
-    ai.SystemPrompt([]ai.Content{ai.Text{Text: "Answer in one sentence."}}),
-    ai.Thinking(ai.ThinkingHigh),
-    ai.MaxTokens(1024),
-)
-
-for event, err := range stream.Events() {
-    switch event.Type {
-    case ai.EventTextDelta:
-        io.WriteString(w, event.Delta)
+function eventRows(events: RecordedEvent[]): EventRow[] {
+  const rows: EventRow[] = [];
+  for (const e of events) {
+    const last = rows.at(-1);
+    if (e.type === "message_update" && last?.type === "message_update") {
+      last.count++;
+      continue;
     }
+    const kind = e.type.split("_")[0];
+    const detail = e.tool ?? (e.role === "tool_result" ? "tool result" : e.role);
+    rows.push({ type: e.type, kind, depth: DEPTH[kind] ?? 2, detail, count: 1 });
+  }
+  return rows.map((r) =>
+    r.type === "message_update" ? { ...r, detail: `${r.count} deltas` } : r,
+  );
 }
+const events = eventRows(demo.events);
 
-msg, err := stream.Wait()
-fmt.Println(msg.Usage.Output, msg.StopReason)`;
+// The crash line of a lifetime bar sits at this share of its width. Only
+// the session bar crosses it.
+const crashAt = 62;
 
-const toolCode = `
-weather := tool.New(
-    "get_weather",
-    func(ctx context.Context, in WeatherIn) (WeatherOut, error) {
-        return WeatherOut{Temp: "22°C"}, nil
-    },
-    tool.Description("Get the current weather for a city"),
-)
-
-tools := ai.Tools([]ai.ToolInfo{weather.Info()})
-
-msg, err := model.StreamText(ctx, messages, tools).Wait()
-
-for _, call := range msg.ToolCalls() {
-    result, err := weather.Run(ctx, call)
-    messages = append(messages,
-        ai.ToolResultMessage(call.ID, result.Content...),
-    )
-}`;
-
-const hooksCode = `
-a := agent.New(model,
-    agent.Toolset(listIssues, readIssue, closeIssue),
-
-    // Fail a run that loops.
-    agent.BeforeCall(func(
-        ctx context.Context, s agent.State, r agent.Request,
-    ) (agent.Request, error) {
-        if s.Turn() > 20 {
-            return r, errors.New("the run used too many turns")
-        }
-        return r, nil
-    }),
-
-    // Block a call. The model reads the reason.
-    agent.BeforeTool(func(
-        ctx context.Context, s agent.State, c ai.ToolCall,
-    ) (ai.ToolCall, error) {
-        if c.Name == "close_issue" {
-            return c, agent.Deny("ask a maintainer to close issues")
-        }
-        return c, nil
-    }),
-
-    // Continue a run that stops before it posts a summary.
-    agent.BeforeStop(func(
-        ctx context.Context, s agent.State,
-    ) ([]session.Entry, error) {
-        if posted(s.Messages()) {
-            return nil, nil
-        }
-        return []session.Entry{session.Text("Post the summary first.")}, nil
-    }),
-)`;
-
-const agentCode = `
-a := agent.New(model, agent.Toolset(weather))
-
-stream := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?"))
-for event, err := range stream.Events() {
-    if err != nil {
-        log.Fatal(err)
-    }
-    switch e := event.(type) {
-    case agent.EventToolExecutionStart:
-        fmt.Println("->", e.ToolName, string(e.Args))
-    case agent.EventMessageUpdate:
-        if e.AssistantEvent.Type == ai.EventTextDelta {
-            fmt.Print(e.AssistantEvent.Delta)
-        }
-    }
-}`;
-
-const durableCode = `
-store, err := jsonl.New("sessions")
-
-a, err := agent.Durable(ctx, model, "triage",
-    agent.Store(store),
-    agent.Toolset(listIssues, readIssue),
-)
-
-// With no input, the run continues from the last message.
-var input []session.Entry
-if len(os.Args) > 1 {
-    input = append(input, session.Text(os.Args[1]))
-}
-
-stream := a.Run(ctx, input...)
-for event, err := range stream.Events() {
-    if err != nil {
-        log.Fatal(err)
-    }
-    if e, ok := event.(agent.EventToolExecutionStart); ok {
-        fmt.Println("->", e.ToolName, string(e.Args))
-    }
-}
-
-msgs, err := stream.Wait()
-fmt.Println(msgs[len(msgs)-1].Text())`;
+const layers = [
+  { id: "host", pkg: "pkg/host", page: "host/", what: "Runs the lifecycle of each session over its workspace: the status, the calls that wait for a person, and the recovery after a restart.", start: "host.Open", lives: "the program", crash: "Each session that ran is idle, with the stop reason restarted.", bar: 56, hue: "harness" },
+  { id: "harness", pkg: "pkg/harness", page: "harness/", what: "Assembles a coding agent at each start: the instructions of AGENTS.md, skills, subagents, coding tools, MCP servers, a sandbox, and the permission rules.", start: "Driver.Start", lives: "one start of an agent", crash: "Assembles the agent again from its files.", bar: 44, hue: "harness" },
+  { id: "agent", pkg: "pkg/agent", page: "agent/", what: "Runs the loop: a model call, the tool calls, and the hooks at each point, until the model stops.", start: "agent.Durable", lives: "while your program holds it", crash: "The next run continues the log.", bar: 48, hue: "agent" },
+  { id: "session", pkg: "pkg/session", page: "session/", what: "Keeps the log of a session in a store. Each message is stored before its event.", start: "session.Open", lives: "until you remove it", crash: "Loses at most the message in flight.", bar: 100, hue: "durable" },
+  { id: "tool", pkg: "pkg/tool", page: "tool/", what: "Turns a Go function into a tool with a typed input. MCP servers add more tools.", start: "tool.New", lives: "one tool call", crash: "A call that a crash cut short gets an error result.", bar: 14, hue: "wire" },
+  { id: "ai", pkg: "pkg/ai", page: "ai/", what: "Makes one model call: messages and options in, a stream of events and a message out.", start: "StreamText", lives: "one request", crash: "Gone. The caller calls again.", bar: 8, hue: "ai" },
+];
 
 const providers = [
-  ["anthropic", "http", "key", "the Messages API", "pkg/ai/anthropic"],
-  ["openai", "http", "key", "the Responses API", "pkg/ai/openai"],
-  ["openaichat", "http", "key", "the Chat Completions API", "pkg/ai/openaichat"],
+  ["anthropic", "provider", "API key", "pkg/ai/anthropic"],
+  ["openai", "provider", "API key", "pkg/ai/openai"],
+  ["openaichat", "provider", "API key", "pkg/ai/openaichat"],
+  ["chatgpt", "provider", "ChatGPT sign-in", "pkg/ai/chatgpt"],
+  ["fireworks", "provider", "API key", "pkg/ai/fireworks"],
+  ["openrouter", "provider", "API key", "pkg/ai/openrouter"],
+  ["claude-code", "driver", "CLI login", "pkg/agent/claude"],
+  ["codex", "driver", "CLI login", "pkg/agent/codex"],
+];
+
+const waysOut = [
+  ["Get Started", "start/", "install gopi and make one call"],
+  ["Sessions", "session/", "the log that an agent resumes"],
+  ["Host", "host/", "sessions of any agent by ID"],
+  ["Agents", "agent/", "the loop, hooks, and events"],
+  ["CLI Agents", "agent/cli/", "Claude Code and Codex as agents"],
+  ["Harness", "harness/", "a coding agent from its files"],
+  ["Tools", "tool/", "a Go function the model calls"],
+  ["Guides", "guides/call-a-model/", "one page for each job"],
 ];
 ---
 
 <Landing
-  title="gopi: AI agents in Go"
-  description="Build AI agents in Go with model calls, typed tools, and streamed events."
+  title="gopi: durable agents in Go"
+  description="Run your own loop, Claude Code, or Codex as a durable session in your Go program."
 >
   {/* ============ HERO ============ */}
   <header class="row hero agent-hero">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">Go SDK / AI agents</p>
+        <p class="label">Go SDK / durable agents</p>
         <h1><img class="hero-wordmark" src={wordmark.src} alt="agent gopi" width={wordmark.width} height={wordmark.height} fetchpriority="high" /></h1>
-        <p class="hero-description">Build AI agents in Go.</p>
+        <p class="hero-description">Durable agents in Go.</p>
         <p class="lede">
-          Call a model, give it Go functions as tools, and let an agent run the loop. A
-          session keeps the history, so the agent picks up where it stopped.
+          Run your own loop, Claude Code, or Codex as a session in your Go program. If
+          the process stops, the next run continues from the last stored message.
         </p>
 
         <div class="install">
           <span class="sig">$</span>
-          <code>go get github.com/sonnes/gopi</code>
+          <code>{install}</code>
           <button class="copy" data-copy aria-label="Copy the command">
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
               <rect x="5.5" y="5.5" width="8" height="8"></rect>
@@ -176,200 +197,240 @@ const providers = [
 
         <p class="hero-actions">
           <a class="btn btn--primary" href={`${docs}start/`}>Get started</a>
-          <a class="more" href="https://github.com/sonnes/gopi">View on GitHub</a>
+          <a class="more" href={`${docs}session/`}>Read about sessions</a>
         </p>
       </div>
 
-      <figure class="agent-portrait">
-        <img src={gopi.src} alt="Agent Gopi, a golden gopher in a cream trench coat, with sunglasses and a coral tie." width={gopi.width} height={gopi.height} loading="eager" fetchpriority="high" />
-        <figcaption class="label"><span>agent gopi</span><span>001 / undercover</span></figcaption>
-      </figure>
+      <div class="cell cell--work">
+        <CodeFrame path="triage.go" caption="a durable agent" code={snippet(durableSrc, "durable")} />
+        <figure class="win replay" data-replay>
+          <figcaption class="win-tab">
+            <span>shell  ·  a recorded run, killed and resumed</span>
+            <button class="replay-play" type="button" data-replay-play hidden>Replay</button>
+          </figcaption>
+          <pre class="replay-screen">{
+            demo.runs.map((r) => (
+              <>
+                <span class="replay-cmd" data-line><b>$</b> {r.cmd}</span>
+                {r.lines.map((l) => <span class={l.startsWith("->") ? "replay-call" : "replay-out"} data-line>{l}</span>)}
+                {r.end && <span class="replay-kill" data-line>{r.end}</span>}
+              </>
+            ))
+          }</pre>
+        </figure>
+      </div>
     </div>
   </header>
 
-  {/* ============ 01 · a pair ============ */}
-  <section class="row" id="session">
+  {/* ============ managed agents ============ */}
+  <section class="row" id="host">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">pkg/agent · durable</p>
-        <h2>Durable Agents in Go</h2>
+        <p class="label">pkg/host · managed agents</p>
+        <h2>Manage the Lifecycle of Agents Over Any Workspace</h2>
         <p>
-          <code>agent.Durable</code> opens a session by its ID. The log stores each message
-          before its event, so a crash loses at most the message in flight.
+          A host runs the lifecycle of each session: it starts the agent, runs one message
+          at a time, waits for a person, and recovers the session after a restart.
         </p>
         <p>
-          Each tool result is stored when its call ends. A call that a crash cut short gets
-          an error result, and the next run continues from there.
+          Each session pairs an agent with a workspace: the folder that it works in, and
+          the folders of its AGENTS.md, skills, and subagents. The model spec picks the
+          agent: the harness, Claude Code, or Codex.
         </p>
-        <a class="more" href={`${docs}guides/keep-a-session/`}>Keep a session</a>
+        <a class="more" href={`${docs}host/`}>Read about the host</a>
       </div>
       <div class="cell cell--work">
-        <CodeFrame path="triage.go" code={durableCode}>
-          <pre class="shell shell--out"><span class="p">$</span> go run ./triage.go "Triage the open issues"
-{`-> list_issues {"state":"open"}
--> read_issue {"number":41}
--> read_issue {"number":42}`}
-signal: killed
-<span class="p">$</span> go run ./triage.go
-{`-> read_issue {"number":42}`}
-Two issues are open: #41 is a bug, #42 asks for a feature.</pre>
-        </CodeFrame>
+        <CodeFrame path="host.go" caption="two sessions over two workspaces" code={snippet(hostSrc, "host")} />
+        <figure class="cycle">
+          <table class="cycle-sessions">
+            <thead><tr><th>session</th><th>workspace</th><th>agent</th><th>status</th></tr></thead>
+            <tbody>
+              {
+                sessions.map((x) => (
+                  <tr>
+                    <td>{x.id}</td>
+                    <td>{x.dir}</td>
+                    <td>{x.agent}</td>
+                    <td><span class={`status status--${x.status}`}>{x.reason ? `${x.status} · ${x.reason}` : x.status}</span></td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+          <ol class="cycle-track" aria-label="The lifecycle of a session">
+            {
+              lifecycle.map((c) => (
+                <li>
+                  <span class={`status status--${c.status}`}>{c.status}</span>
+                  {c.via && <span class="cycle-via">{c.via}</span>}
+                </li>
+              ))
+            }
+          </ol>
+          <dl class="cycle-stops">
+            {stops.map(([reason, text]) => (<><dt>idle · {reason}</dt><dd>{text}</dd></>))}
+          </dl>
+          <figcaption class="label"><span>fig. 1</span><span>sessions and their lifecycle</span></figcaption>
+        </figure>
       </div>
     </div>
   </section>
 
-  {/* ============ 02 · a pair ============ */}
-  <section class="row" id="agent">
+  {/* ============ tools, hooks, harness ============ */}
+  {
+    bands.map((b) => (
+      <section class="row" id={b.id}>
+        <div class="row-inner">
+          <div class="cell cell--words">
+            <p class="label">{b.label}</p>
+            <h2>{b.title}</h2>
+            {b.words.map((t) => <p>{t}</p>)}
+            <a class="more" href={b.more[1]}>{b.more[0]}</a>
+          </div>
+          <div class="cell cell--work">
+            <CodeFrame path={b.path} caption={b.caption} code={b.code} />
+          </div>
+        </div>
+      </section>
+    ))
+  }
+
+  {/* ============ events ============ */}
+  <section class="row" id="events">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">pkg/agent · the loop</p>
-        <h2>An Agent Runs the Loop</h2>
+        <p class="label">pkg/agent · events</p>
+        <h2>Show Each Step of a Run</h2>
         <p>
-          <code>Run</code> calls the model, runs each tool call, and calls the model again,
-          until the model answers without a tool call.
+          Each step of a run is a typed event on one stream, so a page can show the run as
+          it happens.
         </p>
-        <p>
-          Each step is a typed event on one stream, so a UI can show the run as it
-          happens.
-        </p>
-        <a class="more" href={`${docs}agent/`}>Read about agents</a>
+        <p>The harness, Claude Code, and Codex send the same events.</p>
+        <a class="more" href={`${docs}agent/events/`}>Read about events</a>
       </div>
       <div class="cell cell--work">
-        <CodeFrame path="agent.go" code={agentCode}>
-          <pre class="shell shell--out"><span class="p">$</span> go run ./agent.go
-{`-> weather {"city":"Lisbon"}
--> weather {"city":"Oslo"}`}
-Lisbon is warmer: 21 degrees against 9.</pre>
-        </CodeFrame>
+        <CodeFrame path="events.go" caption="a page that streams a run" code={snippet(customizeSrc, "events")} />
+        <figure class="events" data-events>
+          <figcaption class="label"><span>fig. 2</span><span>the events of the resumed run</span></figcaption>
+          <ol class="event-rows">
+            {
+              events.map((e) => (
+                <li class={`event event--${e.kind}`} style={`--depth: ${e.depth}`} data-event>
+                  <code>{e.type}</code>
+                  {e.detail && <span>{e.detail}</span>}
+                </li>
+              ))
+            }
+          </ol>
+        </figure>
       </div>
     </div>
   </section>
 
-  {/* ============ 03 · a pair ============ */}
-  <section class="row" id="hooks">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/agent · hooks</p>
-        <h2>Change the Loop With Hooks</h2>
-        <p>
-          A hook runs at one point of the loop: before a model call, before or after a tool
-          call, after a turn, or before the run stops. It reads a copy of the state.
-        </p>
-        <p>
-          The hooks run in the order that you add them.
-          An error from a <code>BeforeTool</code> hook blocks the call, and the model reads
-          the reason.
-        </p>
-        <a class="more" href={`${docs}agent/hooks/`}>Read about hooks</a>
+  {/* ============ layers ============ */}
+  <section class="row row--wide" id="layers">
+    <div class="wide-inner">
+      <div class="wide-head">
+        <div>
+          <p class="label">the stack</p>
+          <h2>Use Any Layer Without the Layers Above It</h2>
+        </div>
+        <div class="wide-note">
+          <p>
+            Each layer calls only the layers under it. The session is the one layer that a
+            crash does not end.
+          </p>
+        </div>
       </div>
-      <div class="cell cell--work">
-        <CodeFrame path="hooks.go" code={hooksCode} />
+
+      <div class="stack" data-stack style={`--crash: ${crashAt}%`}>
+        {
+          layers.map((l, i) => (
+            <input class="stack-radio" type="radio" name="layer" id={`layer-${l.id}`} checked={i === 0} />
+          ))
+        }
+        <div class="stack-bars">
+          {
+            layers.map((l) => (
+              <label class={`stack-bar stack-bar--${l.id}`} for={`layer-${l.id}`} style={`--hue: var(--l-${l.hue})`}>
+                {l.pkg}
+              </label>
+            ))
+          }
+        </div>
+        <div class="stack-notes">
+          {
+            layers.map((l) => (
+              <div class={`stack-note stack-note--${l.id}`} style={`--hue: var(--l-${l.hue})`}>
+                <p class="stack-pkg">{l.pkg}</p>
+                <p class="stack-what">{l.what}</p>
+                <dl>
+                  <dt>starts with</dt><dd><code>{l.start}</code></dd>
+                  <dt>lives for</dt><dd>{l.lives}</dd>
+                  <dt>after a crash</dt><dd>{l.crash}</dd>
+                </dl>
+                <div class="life" aria-hidden="true">
+                  <span class="life-bar" style={`width: ${l.bar}%`}></span>
+                  <span class="life-crash">crash</span>
+                </div>
+                <a class="more" href={`${docs}${l.page}`}>Read about {l.pkg}</a>
+              </div>
+            ))
+          }
+        </div>
       </div>
     </div>
   </section>
 
-  {/* ============ 04 · a pair ============ */}
-  <section class="row" id="tools">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/tool · tools</p>
-        <h2>A Tool Is a Go Function</h2>
-        <p>
-          <code>tool.New</code> takes a Go function and derives the JSON schema from its
-          input type. The function receives the typed input.
-        </p>
-        <p>
-          An agent runs each tool call for you.
-          Without an agent, <code>ai.Tools</code> declares the tools on one model call,
-          and your code runs the calls.
-        </p>
-        <a class="more" href={docs}>Read the documentation</a>
-      </div>
-      <div class="cell cell--work">
-        <CodeFrame path="tools.go" code={toolCode} />
-      </div>
-    </div>
-  </section>
-
-  {/* ============ 05 · a pair ============ */}
-  <section class="row" id="first-call">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/ai · one call</p>
-        <h2>Call a Model Without an Agent</h2>
-        <p>
-          Under the agent is one model call. Build a prompt, bind a model to a provider,
-          and read the answer.
-        </p>
-        <a class="more" href={`${docs}start/`}>Make your first call</a>
-      </div>
-      <div class="cell cell--work">
-        <CodeFrame path="first_call.go" code={firstCall}>
-          <pre class="shell shell--out"><span class="p">$</span> go run ./first_call.go
-Hello! How can I help you today?</pre>
-        </CodeFrame>
-      </div>
-    </div>
-  </section>
-
-  {/* ============ 06 · a pair ============ */}
-  <section class="row" id="stream">
-    <div class="row-inner">
-      <div class="cell cell--words">
-        <p class="label">pkg/ai · streams</p>
-        <h2>One Prompt, One Stream</h2>
-        <p>
-          <code>StreamText</code> returns at once. The stream yields typed events as the
-          model writes, and <code>Wait</code> returns the final message with its usage.
-        </p>
-        <p>
-          An option is a typed setter. A later value wins, and a provider reads only the
-          options that it knows. Cancel the call through its context.
-        </p>
-        <a class="more" href={docs}>Read the documentation</a>
-      </div>
-      <div class="cell cell--work">
-        <CodeFrame path="stream.go" code={streamCode} />
-      </div>
-    </div>
-  </section>
-
-  {/* ============ 07 · the width of the sheet ============ */}
+  {/* ============ providers and drivers ============ */}
   <section class="row row--wide" id="providers">
     <div class="wide-inner">
       <div class="wide-head">
         <div>
-          <p class="label">pkg/ai · providers</p>
-          <h2>The Provider Contract Is One Method</h2>
+          <p class="label">pkg/ai · pkg/agent</p>
+          <h2>Providers and Drivers</h2>
         </div>
         <div class="wide-note">
           <p>
-            <code>ai.TextProvider</code> requires one method: <code>StreamText</code>. A
-            provider that also generates objects or counts tokens implements a second
-            interface, and the binding asserts it.
+            A provider serves a model call. A driver starts an agent. A model spec names
+            one of them and a model. A spec with no driver runs on the harness.
           </p>
-          <a class="more" href={docs}>Read the documentation</a>
+          <a class="more" href={`${docs}guides/write-a-provider/`}>Write a provider</a>
         </div>
       </div>
 
+      <figure class="spec-fig">
+          <div class="spec" aria-hidden="true">
+            {
+              specParts.map((p) => (
+                <span class="spec-part" style={p.hue ? `--hue: var(--l-${p.hue})` : undefined}>
+                  <span class="spec-text">{p.text}</span>
+                  {p.name && <span class="spec-note"><b>{p.name}</b>{p.note}</span>}
+                </span>
+              ))
+            }
+          </div>
+          <ul class="spec-routes">
+            {specs.map(([spec, where]) => <li><code>{spec}</code><span>{where}</span></li>)}
+          </ul>
+          <figcaption class="label"><span>fig. 3</span><span>the model spec</span></figcaption>
+        </figure>
+
       <figure class="artifact">
-        <figcaption class="label">providers</figcaption>
-        <table class="ledger">
-          <colgroup><col /><col /><col /><col /><col /></colgroup>
+        <figcaption class="label">spec prefixes</figcaption>
+        <table class="ledger ledger--providers">
+          <colgroup><col /><col /><col /><col /></colgroup>
           <thead>
-            <tr>
-              <th>provider</th><th>transport</th><th>auth</th><th>it drives</th><th>package</th>
-            </tr>
+            <tr><th>prefix</th><th>kind</th><th>auth</th><th>package</th></tr>
           </thead>
           <tbody>
             {
-              providers.map(([id, transport, auth, upstream, pkg]) => (
+              providers.map(([id, kind, auth, pkg]) => (
                 <tr>
                   <td class="mono">{id}</td>
-                  <td class="mono dim">{transport}</td>
-                  <td class="mono dim">{auth}</td>
-                  <td class="mono dim">{upstream}</td>
-                  <td class="mono dim">{pkg}</td>
+                  <td class="mono dim">{kind}</td>
+                  <td class="dim">{auth}</td>
+                  <td class="mono"><a href={`${godoc}/${pkg}`}>{pkg}</a></td>
                 </tr>
               ))
             }
@@ -382,17 +443,73 @@ Hello! How can I help you today?</pre>
   {/* ============ THE WAY OUT ============ */}
   <section class="outro">
     <div class="outro-inner">
-      <p class="label">the documentation</p>
-      <a class="outro-link" href={docs}>Read the documentation</a>
-      <p class="outro-lede">Start with the overview, or open the guide for your job.</p>
+      <div class="outro-head">
+        <div>
+          <p class="label">the documentation</p>
+          <a class="outro-link" href={docs}>Read the documentation</a>
+          <p class="outro-lede">Start with the overview, or open the page for your job.</p>
+        </div>
+        <figure class="agent-portrait">
+          <img src={gopi.src} alt="Agent Gopi, a golden gopher in a cream trench coat, with sunglasses and a coral tie." width={gopi.width} height={gopi.height} loading="lazy" />
+          <figcaption class="label"><span>agent gopi</span><span>001 / undercover</span></figcaption>
+        </figure>
+      </div>
       <ul class="ways-out">
-        <li><a href={docs}>Overview</a><span>what gopi is</span></li>
-        <li><a href={`${docs}start/`}>Get Started</a><span>install gopi and make one call</span></li>
-        <li><a href={`${docs}ai/`}>The Layer</a><span>the types of one model call</span></li>
-        <li><a href={`${docs}agent/`}>Agents</a><span>the loop of model calls and tools</span></li>
-        <li><a href={`${docs}session/`}>Sessions</a><span>the history that an agent resumes</span></li>
-        <li><a href={`${docs}guides/call-a-model/`}>The Guides</a><span>one page for each job</span></li>
+        {
+          waysOut.map(([name, page, note]) => (
+            <li><a href={`${docs}${page}`}>{name}</a><span>{note}</span></li>
+          ))
+        }
       </ul>
     </div>
   </section>
+
+  <script is:inline>
+    // Three motions, and each one waits for the reader. The page shows
+    // the same content without JavaScript: the full replay, every event,
+    // and the first layer.
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // The replay types each line of the recorded run again.
+    const LINE_MS = 420;
+    document.querySelectorAll("[data-replay]").forEach((fig) => {
+      const play = fig.querySelector("[data-replay-play]");
+      const lines = [...fig.querySelectorAll("[data-line]")];
+      play.hidden = false;
+      play.addEventListener("click", () => {
+        if (still) return;
+        lines.forEach((l) => l.classList.add("is-hidden"));
+        lines.forEach((l, i) => setTimeout(() => l.classList.remove("is-hidden"), (i + 1) * LINE_MS));
+      });
+    });
+
+    // The events light up in order, once, when the figure comes into view.
+    const EVENT_MS = 140;
+    document.querySelectorAll("[data-events]").forEach((fig) => {
+      if (still) return;
+      const rows = [...fig.querySelectorAll("[data-event]")];
+      const seen = new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting) return;
+        seen.disconnect();
+        rows.forEach((r) => r.classList.add("is-dim"));
+        rows.forEach((r, i) => setTimeout(() => r.classList.remove("is-dim"), (i + 1) * EVENT_MS));
+      });
+      seen.observe(fig);
+    });
+
+    // The stack moves to the next layer until the reader picks one.
+    const LAYER_MS = 4000;
+    document.querySelectorAll("[data-stack]").forEach((stack) => {
+      if (still) return;
+      const radios = [...stack.querySelectorAll(".stack-radio")];
+      const timer = setInterval(() => {
+        const at = radios.findIndex((r) => r.checked);
+        radios[(at + 1) % radios.length].checked = true;
+      }, LAYER_MS);
+      const stop = () => clearInterval(timer);
+      stack.addEventListener("pointerenter", stop);
+      stack.addEventListener("focusin", stop);
+      stack.addEventListener("click", stop);
+    });
+  </script>
 </Landing>

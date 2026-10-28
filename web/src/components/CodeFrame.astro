@@ -1,22 +1,19 @@
 ---
-// A code frame: the repo path in a hairline header, then the snippet.
-// Highlighting comes from Expressive Code with the site's Ember themes,
-// so there is no syntax-colouring JavaScript on the page.
-import { Code } from "@astrojs/starlight/components";
+// A code window in the style of xdb.dev: a tab bar with the file name and
+// what the snippet shows, then the code. src/highlight.mjs colours the
+// comments and the strings, and leaves the rest as ink.
+import { highlight } from "../highlight.mjs";
 
 interface Props {
   path: string;
+  caption?: string;
   code: string;
-  lang?: string;
 }
 
-const { path, code, lang = "go" } = Astro.props;
+const { path, caption, code } = Astro.props;
 ---
 
-<div class="codeframe">
-  <div class="frame-head">
-    <span class="frame-path">{path}</span>
-  </div>
-  <Code code={code.trim()} lang={lang} frame="none" wrap={false} />
-  <slot />
+<div class="win">
+  <div class="win-tab">{caption ? `${path}  ·  ${caption}` : path}</div>
+  <pre><code set:html={highlight(code.trim())} /></pre>
 </div>

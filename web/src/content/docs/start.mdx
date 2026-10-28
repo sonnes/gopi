@@ -9,10 +9,10 @@ import hello from "../../../../examples/hello/main.go?raw";
 
 <Steps>
 
-1. Add the module. gopi needs Go 1.27 or later.
+1. Add the module and the module of the Anthropic provider. Each provider is its own module. gopi needs Go 1.27 or later.
 
    ```sh frame="none"
-   go get github.com/sonnes/gopi
+   go get github.com/sonnes/gopi github.com/sonnes/gopi/pkg/ai/anthropic
    ```
 
 2. Set the key. The Anthropic provider reads it from the environment.

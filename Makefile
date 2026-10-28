@@ -1,5 +1,5 @@
 .PHONY: test check build tidy fmt record record-cli models \
-	site-install site-dev site-build site-preview site-check site-test \
+	site-install site-dev site-build site-preview site-check site-test site-demo \
 	docs-links
 
 # MODULES lists the directory of each module. go.work joins them, but
@@ -109,6 +109,13 @@ site-check:
 
 site-test:
 	cd web && pnpm test
+
+# Record the replay of the landing page. The target builds the demo
+# program, runs it, stops it during a tool call, and runs it again. Run
+# it after a change to the demo or to the output of an agent.
+site-demo:
+	go build -o .bin/landing-demo ./examples/landing/demo
+	node web/scripts/record-demo.mjs .bin/landing-demo web/src/data/demo.json
 
 # Every internal link in the developer docs and in the site pages is a
 # relative path to a file that exists. Then it resolves on GitHub, and

@@ -1,0 +1,109 @@
+{
+  "runs": [
+    {
+      "cmd": "triage \"Triage the open issues\"",
+      "lines": [
+        "-> list_issues {\"state\":\"open\"}",
+        "-> read_issue {\"number\":41}",
+        "-> read_issue {\"number\":42}"
+      ],
+      "end": "signal: killed"
+    },
+    {
+      "cmd": "triage",
+      "lines": [
+        "-> read_issue {\"number\":42}",
+        "Two issues are open: #41 is a bug, #42 asks for a feature."
+      ]
+    }
+  ],
+  "events": [
+    {
+      "type": "agent_start"
+    },
+    {
+      "type": "turn_start"
+    },
+    {
+      "type": "message_start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "tool_start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "tool_end",
+      "role": "assistant"
+    },
+    {
+      "type": "message_end",
+      "role": "assistant"
+    },
+    {
+      "type": "tool_execution_start",
+      "tool": "read_issue"
+    },
+    {
+      "type": "tool_execution_end",
+      "tool": "read_issue"
+    },
+    {
+      "type": "message_start",
+      "role": "tool_result"
+    },
+    {
+      "type": "message_end",
+      "role": "tool_result"
+    },
+    {
+      "type": "turn_end",
+      "role": "assistant"
+    },
+    {
+      "type": "turn_start"
+    },
+    {
+      "type": "message_start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "text_start",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "text_delta",
+      "role": "assistant"
+    },
+    {
+      "type": "message_update",
+      "delta": "text_end",
+      "role": "assistant"
+    },
+    {
+      "type": "message_end",
+      "role": "assistant"
+    },
+    {
+      "type": "turn_end",
+      "role": "assistant"
+    },
+    {
+      "type": "agent_end"
+    }
+  ]
+}
