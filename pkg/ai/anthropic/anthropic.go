@@ -1,6 +1,6 @@
 // Package anthropic is the provider for the Anthropic Messages API. It
 // implements [ai.TextProvider], [ai.ObjectProvider], [ai.TokenCounter],
-// and [ai.ModelLister].
+// [ai.ModelLister], and [ai.KeyChecker].
 //
 // A caller must obey these rules:
 //

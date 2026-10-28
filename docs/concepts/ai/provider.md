@@ -45,6 +45,7 @@ SpeechModel{Model, Provider} -> SpeechProvider
 | Bind a model to a provider             | `pkg/ai/text.go`                        |
 | Add an option                          | `pkg/ai/options.go`                     |
 | Add an optional capability             | `pkg/ai/object.go`, `pkg/ai/tokens.go`  |
+| List the models or check a key         | `pkg/ai/lister.go`                      |
 | Mark what a Claude model accepts       | `pkg/ai/anthropic/compat.go`            |
 | Change the retry loop                  | `internal/retry/retry.go`               |
 | Change a rule of every provider        | `internal/transcript/transcript.go`     |

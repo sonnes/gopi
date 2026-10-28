@@ -200,3 +200,29 @@ func TestListModels_RepeatedPageToken(t *testing.T) {
 	require.EqualError(t, err, `fireworks: list models: the page token "same" repeats`)
 	assert.Len(t, *seen, 2)
 }
+
+func TestCheckKey(t *testing.T) {
+	server, seen := newServer(t, map[string]string{
+		"/v1/accounts/fireworks/models?pageSize=200": readFile(t, "testdata/models-page1.json"),
+	})
+	p := fireworks.New(fireworks.APIKey("test-key"), fireworks.BaseURL(server.URL))
+
+	got, err := p.CheckKey(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, ai.KeyInfo{}, got)
+	assert.Equal(t, []request{{
+		path:  "/v1/accounts/fireworks/models",
+		query: "pageSize=200",
+		auth:  "Bearer test-key",
+	}}, *seen, "the check reads only the first page")
+}
+
+func TestCheckKey_Error(t *testing.T) {
+	server, _ := newServer(t, nil)
+	p := fireworks.New(fireworks.APIKey("bad"), fireworks.BaseURL(server.URL))
+
+	_, err := p.CheckKey(context.Background())
+
+	require.ErrorContains(t, err, "fireworks: check key: 400 Bad Request: ")
+}

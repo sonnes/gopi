@@ -39,3 +39,15 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 	}
 	return models, nil
 }
+
+var _ ai.KeyChecker = (*Provider)(nil)
+
+// CheckKey asks for the first page of GET /models, so a refused key
+// fails and no model runs. OpenAI says nothing more about the key, so
+// the info is zero.
+func (p *Provider) CheckKey(ctx context.Context) (ai.KeyInfo, error) {
+	if _, err := p.client.Models.List(ctx); err != nil {
+		return ai.KeyInfo{}, fmt.Errorf("openai: check key: %w", err)
+	}
+	return ai.KeyInfo{}, nil
+}
