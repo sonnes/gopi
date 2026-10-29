@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/openai/openai-go/v3 v3.66.0
-	github.com/sonnes/gopi v0.0.0
+	github.com/sonnes/gopi v0.0.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -20,6 +20,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// The root module has no release yet, so the provider builds against
-// the code in this repository.
+// A replace builds this module against the code in this repository.
+// A program that requires this module ignores it.
 replace github.com/sonnes/gopi => ../../..

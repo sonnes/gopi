@@ -4,8 +4,8 @@ go 1.27
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/sonnes/gopi v0.0.0
-	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0
+	github.com/sonnes/gopi v0.0.1
+	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -14,7 +14,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/openai/openai-go/v3 v3.66.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.0 // indirect
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
@@ -22,8 +22,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// The modules have no release yet, so the provider builds against the
-// code in this repository.
+// A replace builds this module against the code in this repository.
+// A program that requires this module ignores it.
 replace (
 	github.com/sonnes/gopi => ../../..
 	github.com/sonnes/gopi/pkg/ai/openai => ../openai

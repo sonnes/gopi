@@ -3,12 +3,12 @@ module github.com/sonnes/gopi/pkg/catalog/env
 go 1.27
 
 require (
-	github.com/sonnes/gopi v0.0.0
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.0
-	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.0
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.0
-	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0
-	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.0
+	github.com/sonnes/gopi v0.0.1
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.1
+	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.1
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.1
+	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.1
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -40,8 +40,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// The root module and the providers have no release yet, so the
-// detectors build against the code in this repository.
+// A replace builds this module against the code in this repository.
+// A program that requires this module ignores it.
 replace (
 	github.com/sonnes/gopi => ../../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../ai/anthropic

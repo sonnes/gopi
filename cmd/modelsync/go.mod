@@ -2,8 +2,8 @@ module github.com/sonnes/gopi/cmd/modelsync
 
 go 1.27
 
-// The root module and the providers have no release yet, so the
-// generator builds against the code in this repository.
+// A replace builds this module against the code in this repository.
+// A program that requires this module ignores it.
 replace (
 	github.com/sonnes/gopi => ../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../pkg/ai/anthropic
@@ -15,9 +15,9 @@ replace (
 )
 
 require (
-	github.com/sonnes/gopi v0.0.0
-	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.0
-	github.com/sonnes/gopi/pkg/catalog/env v0.0.0
+	github.com/sonnes/gopi v0.0.1
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.1
+	github.com/sonnes/gopi/pkg/catalog/env v0.0.1
 	github.com/stretchr/testify v1.11.1
 )
 
@@ -32,10 +32,10 @@ require (
 	github.com/openai/openai-go/v3 v3.66.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.0 // indirect
-	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.0 // indirect
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.0 // indirect
-	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.0 // indirect
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.1 // indirect
+	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.1 // indirect
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.1 // indirect
+	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.1 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
