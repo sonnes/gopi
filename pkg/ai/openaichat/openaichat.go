@@ -5,10 +5,11 @@
 //
 // A caller must obey these rules:
 //
-//   - The package has no models. A caller uses a model from
-//     [github.com/sonnes/gopi/pkg/ai/openai], or its own [ai.Model] for
-//     another server. A model for another server sets MaxTokens,
-//     because a server such as Fireworks has a low default cap.
+//   - The package has no models. A caller uses a model of the openai
+//     entry of models.json, a model that [Provider.ListModels] returns,
+//     or its own [ai.Model]. A model for a server other than OpenAI sets
+//     MaxTokens, because a server such as Fireworks has a low default
+//     cap.
 //   - A request holds only the fields that every server accepts.
 //     [CacheBreakpoints] adds the OpenAI cache fields, which Fireworks
 //     rejects.

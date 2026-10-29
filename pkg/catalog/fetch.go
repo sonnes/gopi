@@ -208,10 +208,10 @@ func (c *Catalog) mergeModels(
 // generator of models.json for a provider. A field that the list leaves
 // zero keeps the registered value, because an API can return an ID with
 // no name or no output cap. The prices and the thinking levels of a
-// registered model stay if it has them: the price table of a provider package is the price of its
-// own API, and the Anthropic API cannot say if a model can turn
-// thinking off. A model with no registered prices keeps the listed
-// prices, such as the prices of OpenRouter.
+// registered model stay if it has them: the prices come from the model
+// file, where a person checks them, and the Anthropic API cannot say if
+// a model can turn thinking off. A model with no registered prices
+// keeps the listed prices, such as the prices of OpenRouter.
 func MergeModel(registered, listed ai.Model) ai.Model {
 	pricing := registered.Pricing
 	if !hasPrices(pricing) {

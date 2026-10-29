@@ -5,7 +5,7 @@ summary: A CLI agent runs the Codex CLI or the Claude Code CLI as a gopi agent. 
 
 import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
 
-A CLI agent starts the CLI once and sends it the input of each run. It reads the output of the CLI and turns it into the same [events](events.mdx) and log entries as an [agent](index.mdx). So the code that shows or stores a run works with all three agents.
+The [events](events.mdx) and the log entries are the same as those of an [agent](index.mdx). So the code that shows or stores a run works with all three agents.
 
 <CheckMatrix
   alt="Three agents and what each one can do. agent.Agent runs gopi tools on any provider, and a run with no entries continues the log. codex.Agent and claude.Agent run the tools of their CLI on the model of their CLI. All three send the same events, and all three resume a stored session with Durable."
@@ -41,41 +41,31 @@ defer a.Close()
 msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 ```
 
-`claude.New` takes the same shared options. Read the events of a run as you read the events of an agent. [Run an Agent](../guides/run-an-agent.mdx) shows how.
+`claude.New` takes the same shared options.
 
 ## Options
 
-| Option                             | Package | Sets                                                        |
-| ---------------------------------- | ------- | ----------------------------------------------------------- |
-| `Store(s)`, `Name(s)`              | both    | The same as for `agent.Agent`                               |
-| `Binary(path)`                     | both    | The path of the CLI. The default is `codex` or `claude` on `PATH` |
-| `Dir(path)`                        | both    | The working directory of the CLI                            |
-| `Model(name)`                      | both    | The model of the CLI                                        |
-| `System(s)`                        | both    | Instructions that the CLI adds to its own prompt            |
-| `Sections(fn)`                     | both    | The [sections](sections.mdx) that the CLI adds to its prompt, read before each run |
-| `Thinking(level)`                  | both    | The reasoning effort of the CLI. For Claude Code, `ai.ThinkingOff` turns thinking off |
-| `Env(kv...)`                       | both    | More environment variables for the CLI                      |
-| `Approve(fn)`                      | both    | The function that answers each approval request             |
-| `Hooks(hs...)`                     | both    | [Hooks](hooks.mdx#hooks-on-a-cli-agent) that the CLI calls  |
-| `HookCommand(path)`                | codex   | The `gopi` binary that relays a hook. The default is `gopi` on `PATH`. A run with hooks fails if the binary is missing |
-| `Sandbox(mode)`, `Policy(policy)`  | codex   | What a command can touch, and when the CLI asks             |
-| `PermissionMode(mode)`             | claude  | Which tools the CLI runs without a prompt                   |
-| `AllowedTools(names...)`, `DisallowedTools(names...)` | claude | The tools that the CLI runs without a prompt, and the tools that it cannot use |
+| Option                             | Package | Sets                                          | Default |
+| ---------------------------------- | ------- | --------------------------------------------- | ------- |
+| `Store(s)`, `Name(s)`              | both    | The same as for `agent.Agent`                 | |
+| `Binary(path)`                     | both    | The path of the CLI                           | `codex` or `claude` on `PATH` |
+| `Dir(path)`                        | both    | The working directory of the CLI              | The directory of the caller |
+| `Model(name)`, `Thinking(level)`   | both    | The model and the effort of the CLI           | The CLI decides |
+| `System(s)`, `Sections(fn)`        | both    | The [sections](sections.mdx) that the CLI adds to its prompt | None |
+| `Env(kv...)`, `MCP(servers...)`    | both    | More variables or MCP servers                 | None |
+| `Approve(fn)`                      | both    | The function that answers each approval request | Refuse each request |
+| `Hooks(hs...)`                     | both    | [Hooks](hooks.mdx#hooks-on-a-cli-agent) that the CLI calls | None |
+| `HookCommand(path)`                | codex   | The `gopi` binary that relays a hook          | `gopi` on `PATH` |
+| `Sandbox(mode)`                    | codex   | What a command can touch                      | The CLI decides |
+| `Policy(policy)`                   | codex   | When the CLI asks                             | `ApprovalNever` |
+| `PermissionMode(mode)`, `AllowedTools(names...)` | claude | What the CLI runs without a prompt | The CLI decides |
+| `DisallowedTools(names...)`, `AskTools(names...)` | claude | The tools that the CLI cannot use, or always asks for | None |
 
-## Tools and Prompts
+## Tools and Approvals
 
-The CLI runs its own tools. Each tool call of the CLI becomes a tool call in an assistant message, then a tool result. So `tool_execution_start` and `tool_execution_end` report it.
+The log keeps each call of a CLI tool as a tool call and a tool result. Claude Code uses its own tool names, such as `Bash`. Codex names a command `bash` and a file change `apply_patch`.
 
-| Codex item    | `ToolName`         |
-| ------------- | ------------------ |
-| command       | `bash`             |
-| file change   | `apply_patch`      |
-| MCP tool call | `<server>__<tool>` |
-| web search    | `web_search`       |
-
-Claude Code reports the names of its own tools, such as `Bash` and `Edit`.
-
-`Approve` answers each approval request of Codex and each permission prompt of Claude Code. It takes an `agent.ApproveFunc`, the same function that the harness takes. The function gets an `agent.ApprovalRequest`: the tool call, with the name in the table above, and the reason of the CLI. The CLI waits for the answer, so the function must return when its context ends. Without the function, the agent refuses each request. Codex declines a file change request that comes before its item, and the function does not see it.
+`Approve` takes the `agent.ApproveFunc` of the harness. The CLI waits for the answer, so the function must return when its context ends.
 
 ```go
 a := claude.New(
@@ -89,9 +79,12 @@ a := claude.New(
 )
 ```
 
-A `Decision` with no `Allow` denies the call. Claude Code sends its `Message` to the model, and Codex has no field for it. With `Always`, the CLI also allows the calls that it matches to this call, until the session ends. Claude Code keeps the rule for the session only and writes no settings file. A rule of Claude Code can change the mode of the session, such as to `acceptEdits` after an edit. If Claude Code offers no "allow always" for the call, the request has `NoAlways`, and `Always` allows only this call. On Claude Code, `Always` with a new `Input` allows only this call. Codex cannot change the input of an action, so a decision with an `Input` declines the action.
+A `Decision` with no `Allow` denies the call. Only Claude Code sends the `Message` to the model. With `Always`, the CLI also allows the calls that it matches to this call:
 
-To let a CLI act with no request, set `Policy(codex.ApprovalNever)` and a `Sandbox` mode for Codex. For Claude Code, set a `PermissionMode` or `AllowedTools`.
+- Codex keeps the rule until its process stops. Codex cannot change an action, so it declines a decision with an `Input`.
+- Claude Code keeps the rule for its session. `Always` allows only this call if the CLI offers no rule, if the `Input` is new, or if the request has `NoAlways`. The agent sets `NoAlways` when the rule of the CLI allows more than the call.
+
+`codex.New` uses `ApprovalNever`, so Codex acts with no request inside its `Sandbox` mode. The [Codex driver](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#Driver) uses `ApprovalUntrusted` when the config has an `Approve` function, and a mode of the config replaces both.
 
 :::caution
 Do not use `SandboxDangerFullAccess` or `PermissionBypass` outside a sandbox. With these modes, the CLI can run any command on the machine.
@@ -99,28 +92,15 @@ Do not use `SandboxDangerFullAccess` or `PermissionBypass` outside a sandbox. Wi
 
 ## Sessions
 
-`Durable` keeps the thread ID of Codex, or the session ID of Claude Code, as a [value](../session/index.mdx) of the session. A second `Durable` with the same ID and store resumes the same thread of the CLI.
+`Durable` keeps the ID of the CLI conversation as a [value](../session/index.mdx), so a second `Durable` resumes it. If the CLI cannot find it, the run fails with `ErrNoConversation`, and the next run starts a new conversation. The model reads the transcript of the CLI, not the log.
 
-If the CLI cannot find the stored thread or session, the run fails with `ErrNoConversation`. The agent then forgets the ID, and the next run starts a new conversation of the CLI. The log keeps its messages, but the model of the CLI no longer reads them.
-
-The CLI keeps the transcript that its model reads. The log is a copy of the run for display and replay.
-
-`State` returns the [state](events.mdx#state) of the agent, as for `agent.Agent`. A CLI agent has no queues, so `Steer` and `FollowUp` on the state do nothing.
-
-The Claude Code agent steers a run. `a.Steer(entries...)` sends the text and the files of the entries to the CLI at once, and the CLI reads them before its next model call. A tool that runs ends first. If the run ends before the CLI reads a steer, `a.TakeSteer()` returns it. The Codex agent does not steer.
+`Steer` and `FollowUp` on the [state](events.mdx#state) of a CLI agent do nothing. The Claude Code agent has its own `Steer` and `TakeSteer`. Between runs, [`claude.Idle`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Idle) gets the events of a subagent in the background, and [`claude.Wake`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Wake) reports a turn that `Continue` runs.
 
 ## Rules
 
-- Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream.
-- A run needs an entry with text or a file. The text and the files of the entries go to the CLI. Claude Code reads images and PDFs, and Codex reads images. Each other file becomes a note in the text, so the model knows that the file was there.
+- Runs on one agent are sequential. A second `Run` fails on its stream.
+- A run needs an entry with text or a file. A custom entry goes only to the log.
 - If the CLI is not logged in, the run fails with `ErrAuth`.
-- An ephemeral entry goes to the CLI, and the log does not keep it. The CLI keeps it in its transcript, so a later run still reads it.
-- A custom entry goes to the log, and not to the CLI.
-- Every run that starts ends with `agent_end`, which holds the error of a failed run.
-- A cancel interrupts the turn of the CLI and waits for the turn to end. If the CLI does not stop, the agent stops the process.
-- If a run fails or stops during a message, the log keeps the blocks that the CLI completed. The block that streams at that time is not kept.
-- Codex can run tools in parallel. The events show them one after the other.
-- If the CLI exits, the error of the run holds the end of its stderr.
 
 ## Related
 

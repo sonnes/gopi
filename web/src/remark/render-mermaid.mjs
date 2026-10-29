@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import { relative, sep } from "node:path";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSync } from "fontkit";
 import { render } from "pele";
@@ -28,6 +29,12 @@ import { render } from "pele";
  * each label in the font file that the page uses.
  *
  * Give each diagram an accTitle. Pele writes it as the title of the SVG.
+ *
+ * Astro renders a concept page in its content loader. The loader logs a
+ * render error, builds the page with no body, and caches that page, so the
+ * build exits 0, and so does each build after it. So failOnMermaidErrors
+ * parses each Mermaid block of the concept pages before the build, outside
+ * the cache.
  */
 
 const REPO_DIR = fileURLToPath(new URL("../../../", import.meta.url));
@@ -59,6 +66,46 @@ function fontMeasurer(fonts) {
         cache.set(key, em);
       }
       return em * size;
+    },
+  };
+}
+
+const BLOCK = /^```mermaid\n([\s\S]*?)^```/gm;
+
+/**
+ * mermaidErrors parses each Mermaid block of the Markdown files in dir and
+ * its folders. It returns one line for each block that does not parse.
+ */
+export function mermaidErrors(dir) {
+  const errors = [];
+  const files = readdirSync(dir, { recursive: true }).filter((f) => f.endsWith(".md"));
+  for (const name of files.sort()) {
+    const text = readFileSync(join(dir, name), "utf8");
+    for (const [, source] of text.matchAll(BLOCK)) {
+      try {
+        render(source, { autoDirection: false });
+      } catch (err) {
+        errors.push(`${name}: ${err.message.split("\n")[0]}`);
+      }
+    }
+  }
+  return errors;
+}
+
+/**
+ * An integration that stops the build if a Mermaid block of a concept
+ * page does not parse. Add it with renderMermaid.
+ */
+export function failOnMermaidErrors({ dir = CONCEPTS_DIR } = {}) {
+  return {
+    name: "fail-on-mermaid-errors",
+    hooks: {
+      "astro:build:start": () => {
+        const errors = mermaidErrors(dir);
+        if (errors.length > 0) {
+          throw new Error(`Mermaid blocks do not parse:\n${errors.join("\n")}`);
+        }
+      },
     },
   };
 }

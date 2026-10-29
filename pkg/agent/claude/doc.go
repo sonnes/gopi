@@ -34,6 +34,7 @@
 //     on its own, the agent calls [Wake]. Call [Agent.Continue] to run
 //     that turn.
 //
-// The reasons are in docs/concepts/agent/cli-agent.md and
-// docs/concepts/agent/subagent.md.
+// The reasons are in docs/concepts/agent/cli-agent.md,
+// docs/concepts/agent/cli-steer.md, docs/concepts/agent/cli-request.md,
+// and docs/concepts/agent/subagent.md.
 package claude

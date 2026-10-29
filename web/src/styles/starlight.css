@@ -694,7 +694,7 @@ site-search button[data-open-modal] kbd {
   padding-inline: var(--ec-codePadInl);
 }
 
-/* A guide ends with a whole program. The panel stops at about 24 lines
+/* A page can end with a whole program. The panel stops at about 24 lines
    and scrolls, so the output notes under it stay one scroll away. */
 .program .expressive-code pre {
   max-height: 32rem;

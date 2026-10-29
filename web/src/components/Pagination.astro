@@ -3,18 +3,41 @@
 // direction. Starlight prints "Previous" first and the page title under
 // it; a reader deciding whether to click cares about the title, so the
 // title goes on top and the direction becomes the caption.
+//
+// The first page of each layer has the sidebar label "Overview", so a
+// link to one of them reads as the name of its group.
 import { Icon } from "@astrojs/starlight/components";
 
-const { dir, pagination } = Astro.locals.starlightRoute;
+const { dir, pagination, sidebar } = Astro.locals.starlightRoute;
 const { prev, next } = pagination;
 const isRtl = dir === "rtl";
+
+type SidebarEntry = (typeof sidebar)[number];
+
+/** The label of the innermost group that holds the link to href. */
+function groupOf(entries: SidebarEntry[], href: string, label?: string): string | undefined {
+  for (const item of entries) {
+    if (item.type === "link") {
+      if (item.href === href) return label;
+      continue;
+    }
+    const found = groupOf(item.entries, href, item.label);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+function titleOf(link: { href: string; label: string }): string {
+  if (link.label !== "Overview") return link.label;
+  return groupOf(sidebar, link.href) ?? link.label;
+}
 ---
 
 <nav class="pagination-links print:hidden" aria-label="Pagination" dir={dir}>
   {
     prev && (
       <a href={prev.href} rel="prev">
-        <span class="link-title">{prev.label}</span>
+        <span class="link-title">{titleOf(prev)}</span>
         <span class="direction">
           <Icon name={isRtl ? "right-caret" : "left-caret"} size="0.9rem" />
           Previous
@@ -25,7 +48,7 @@ const isRtl = dir === "rtl";
   {
     next && (
       <a href={next.href} rel="next">
-        <span class="link-title">{next.label}</span>
+        <span class="link-title">{titleOf(next)}</span>
         <span class="direction">
           <Icon name={isRtl ? "left-caret" : "right-caret"} size="0.9rem" />
           Next

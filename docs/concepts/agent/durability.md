@@ -13,22 +13,22 @@ read_when:
 
 A run is durable: each message goes to the [log](../session/log.md) before its event, so a crash loses at most the message in flight. `Durable` opens a session in a store and resumes it after its last entry. `New` runs the same loop over a log in memory.
 
-```
-  one entry of a run
-    commit
-      log.Append ......... the store has it
-      state.Apply(event) . the state has it
-      push(event) ........ the stream has it
-
-  a crash
-    before the append .... the message in flight is lost
-    in the tool calls .... each finished result is kept
-                           each call with no result is repaired
+```mermaid
+sequenceDiagram
+  accTitle: The commit of one entry
+  accDescr: Under one lock, the run appends the entry to the log, applies its event to the state, and pushes the event to the run stream.
+  participant R as run
+  participant L as log
+  participant S as state
+  participant T as run stream
+  R->>L: Append: the store has it
+  R->>S: Apply(event): the state has it
+  R->>T: push(event): the stream has it
 ```
 
 ## Design
 
-- One function stores the entries of a run, applies their events to the [State](state.md), and sends the events, in that order, under one lock. A consumer that reads a `message_end` then knows that the store has the message. If the store fails, the state and the stream do not get the message, and the run fails.
+- One function commits each entry under one lock, so a consumer that reads a `message_end` knows that the store has the message. If the store fails, the state and the stream do not get the message, and the run fails.
 - The append ignores the cancel of the run, so a run that stops keeps the messages that it finished, the partial message of an aborted call included.
 - Each result of a batch is stored as its call ends, so a crash or a cancel keeps each result that finished. The cost: the results are in the order in which the calls end, not in call order.
 - A call with no result gets the error result "tool execution interrupted", because a provider rejects a call with no result. On a resume, the log repairs it when it builds the messages. In the same process, the first turn of the next run stores it with its events, so a viewer sees it.

@@ -6,6 +6,8 @@ summary: An agent is the loop that runs a model with tools until the work is don
 import LoopCycle from "../../../components/figures/LoopCycle.astro";
 import ConstructorCards from "../../../components/figures/ConstructorCards.astro";
 import TraceTable from "../../../components/figures/TraceTable.astro";
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/run-an-agent/main.go?raw";
 
 {/* A multi-line prop loses its indent in MDX, and an export keeps it. */}
 
@@ -13,7 +15,7 @@ export const runCall = `a.Run(ctx, session.Text(
     "Is it warmer in Lisbon or in Oslo?",
 ))`;
 
-An agent reads its history from a log, calls the model, and runs the tools that the model calls. Then it calls the model again with the results. Each message goes to the log when the message is complete.
+Each turn is one model call and the tool calls that it makes. The next turn calls the model with the tool results. A [steer message](steer.mdx), a follow-up, or a `BeforeStop` [hook](hooks.mdx) can also start a turn.
 
 <LoopCycle
   alt="Run adds the input to the history. The loop calls the model and asks if the message has tool calls. If yes, the loop runs the tool calls and calls the model again. If no, the run ends at agent_end. The model step and the tool step each append to the log. One turn is one model call and the tool calls that it makes."
@@ -26,8 +28,6 @@ An agent reads its history from a log, calls the model, and runs the tools that 
   turn="next turn"
   legend={["one turn: a model call and its tool calls", "append, when the message is complete"]}
 />
-
-A turn is one model call and the tool calls that it makes. A [steer message](steer.mdx), a follow-up, or a `BeforeStop` [hook](hooks.mdx) can also start the next turn.
 
 ## Create an Agent
 
@@ -65,24 +65,25 @@ a := agent.New(lm, agent.Toolset(weather))
 a, err := agent.Durable(ctx, lm, "user-42", agent.Store(store), agent.Toolset(weather))
 ```
 
-`Durable` needs a session ID. It is the one constructor that does I/O, so it is the one that takes a context and returns an error. [Sessions](../session/index.mdx) shows the log and the stores.
+`Durable` creates a new session, or resumes an existing one after its last entry. [Tool Changes](tool-changes.mdx#resume-a-session) says what a resumed session does with its tools. [Sessions](../session/index.mdx) shows the log and the stores.
 
 ## Options
 
-| Option              | Sets                                                            |
-| ------------------- | --------------------------------------------------------------- |
-| `Store(s)`          | The store of a `Durable` agent. The default is a memory store    |
-| `Name(s)`           | The author of each assistant message and tool result            |
-| `Toolset(tools...)` | The tools of the agent. Each name must be unique. A deferred tool waits for the [search](tool-changes.mdx) |
-| `System(fn)`        | The system prompt as [sections](sections.mdx), built before each model call |
-| `MaxTokens(n)`      | The maximum output tokens of every model call                    |
-| `Thinking(level)`   | The thinking level of every model call                           |
-| `Hooks(hs...)`      | [Hooks](hooks.mdx) that change the loop at six points            |
-| `BeforeCall(fn)`, `AfterCall(fn)`, `BeforeTool(fn)`, `AfterTool(fn)`, `AfterTurn(fn)`, `BeforeStop(fn)` | One hook at one point of the loop |
+| Option              | Sets                                                            | Default |
+| ------------------- | --------------------------------------------------------------- | ------- |
+| `Store(s)`          | The store of a `Durable` agent                                  | A memory store |
+| `Name(s)`           | The author of each assistant message and tool result            | Empty |
+| `Toolset(tools...)` | The tools of the agent, each with a unique name. A deferred tool waits for the [search](tool-changes.mdx) | None |
+| `System(fn)`        | The [sections](sections.mdx) of the prompt, built before each model call | The sections of the log |
+| `MaxTokens(n)`      | The maximum output tokens of every model call                   | The model decides |
+| `Thinking(level)`   | The thinking level of every model call                          | The model decides |
+| `Hooks(hs...)`      | [Hooks](hooks.mdx) that change the loop                         | None |
+| `BeforeCall(fn)` and the other points | One hook at one point of the loop             | None |
+| `OnClose(fn)`       | A function that `Close` runs once, to release what the tools hold | None |
 
 ## Run
 
-`Run` takes [entries](../session/index.mdx#entries), so you can set the author of each input and mark the ephemeral inputs. It adds them to the log and returns a stream of [events](events.mdx). `Wait` returns the messages that the run produced. The input is not in that result, because you already have it.
+`Run` takes [entries](../session/index.mdx#entries), so you can set the author of each input and mark the ephemeral inputs. It adds them to the log and returns a stream of [events](events.mdx). `Wait` returns the messages that the run produced, without the input.
 
 ```go
 stream := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?"))
@@ -115,29 +116,35 @@ With no entries, the run continues from the last message of the history. So afte
 
 ## Rules
 
-The model reads a result for each of its tool calls, and if a failure stops a call, that result is an error.
+The model reads a result for each of its tool calls. If a failure stops a call, that result is an error.
 
 - Runs on one agent are sequential. If a run is active, a second `Run` fails on its stream, with no event.
-- The tool calls of one message run at the same time. Each result goes to the log when its call finishes, so the results are in the order in which the calls finish. If a message calls a tool marked `tool.Sequential()`, every call of that message runs in order.
+- The tool calls of one message run at the same time, and each result goes to the log when its call finishes. If a message calls a tool marked `tool.Sequential()`, every call of that message runs in order.
 - The log stores each message before its `message_end` event. If the store fails, the run fails.
-- If a tool call has no result, because a run failed in its tools or the process stopped, the next run gives it the error result "tool execution interrupted".
-- A Go error from a tool, or a call to a tool that the agent does not have, goes to the model as an error result, and the run goes on. If the context of the run is canceled, the run fails.
+- If a run stops before a tool call has a result, the next run gives it the error result "tool execution interrupted".
+- A Go error from a tool, or a call to a tool that the agent does not have, goes to the model as an error result. If the context of the run is canceled, the run fails.
 - If two tools have the same name, `New` panics, and `Durable` returns an error.
-- The agent has no cap on the turns of a run. A `BeforeCall` [hook](hooks.mdx) can set one.
-
-## Resume a Session
-
-`Durable` resumes a session after its last entry. The first message of the session is the base of the prompt. If `Toolset` adds or removes a tool after the base, the agent declares the difference as a [tool change](tool-changes.mdx). The agent runs each successful `tool_search` call of the log again, so the tools that a search loaded stay loaded.
 
 ## Related
 
 - [Events](events.mdx) are what a run reports.
 - [Hooks](hooks.mdx) change a model call, a tool call, or the stop of a run.
-- [Steer and Follow-Up](steer.mdx) send entries to a run that is active.
-- [Tool Changes](tool-changes.mdx) load deferred tools during a conversation.
-- [Sections](sections.mdx) change parts of the prompt during a conversation.
+- [Steer and Follow-Up](steer.mdx) send entries to an active run.
+- [Tool Changes](tool-changes.mdx) load deferred tools.
+- [Sections](sections.mdx) change parts of the prompt.
 - [Sessions](../session/index.mdx) hold the log, the entries, and the values.
 - [Tools](../tool/index.mdx) are what the model calls.
-- [Run an Agent](../guides/run-an-agent.mdx) and [Keep a Session](../guides/keep-a-session.mdx) are the guides.
 
 The design is in [docs/concepts/agent/loop.md](../../../../../docs/concepts/agent/loop.md).
+
+## The Full Example
+
+The program needs no key. Its model is the [fake provider](../../../../../examples/fake-provider/fake.go), which sends scripted replies. `capTurns` is a `BeforeCall` [hook](hooks.mdx#change-a-model-call) that caps the turns.
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/run-an-agent/main.go" />
+</div>
+
+- The `->` lines are the two calls of the first turn. The calls run at the same time, so the `<-` lines come in either order. The log stores the results in the order of the `<-` lines.
+- The token line comes from `agent_end`. It sums the usage of the two model calls.
+- The role lines are the messages of the state, as in the trace above. The last line counts the entries of the log, one for each role line.

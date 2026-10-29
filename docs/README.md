@@ -29,36 +29,44 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | plan route    | The Responses API of api.openai.com with an OAuth token of Sign in with ChatGPT. A call there uses the ChatGPT plan of the user | subscription API, Codex backend |
 | login file    | The JSON file of the signed-in accounts of gopi, one key for each provider. `gopi login` writes it | credentials file, token store |
 | message       | What one role adds to a conversation, with its content       | turn, entry                 |
-| content block | One part of a message: text, thinking, a tool call, or a file | part, chunk, segment        |
+| content block | One part of a message: text, thinking, a tool call, a file, a section or its removal, or a tool change | part, chunk, segment        |
 | tool          | One function that a model can call                           | function, action, skill     |
 | base          | The first message of a history, if it is a system message. It holds the first sections and the first tools | initial prompt, header |
 | section       | A named part of the system prompt. The SystemPrompt option sets it. A system message sets or removes it from its place. | prompt part, fragment, slot |
 | tool change   | A system message block that adds or removes a tool from its place | tool update, tool delta  |
-| stream        | The events of one run, read in order                         | channel, feed, subscription |
-| event         | One thing that happened inside a run                         | message, update, signal     |
+| stream        | The events of one run or of one model call, read in order    | channel, feed, subscription |
+| event         | One thing that happened inside a run or a model call         | message, update, signal     |
 | option        | One typed setting of a model call                            | parameter, flag, config     |
 | cost          | What one model response cost, in US dollars                  | price, spend, charge        |
 | deferred tool | A tool that the agent can run but does not send until a change adds it | lazy tool, hidden tool |
 | sequential tool | A tool whose call runs with no other call of its message at the same time | exclusive tool, serial tool |
-| search tool   | The agent tool that ranks the deferred tools and loads the matches | tool finder, loader   |
+| search tool   | The tool of `pkg/agent` that ranks the deferred tools and loads the matches | tool finder, loader   |
 | agent         | The loop that runs a model with tools until the work is done | assistant, bot              |
 | CLI agent     | An agent that runs an agent CLI, such as Codex or Claude Code, and reports each run with the events and the log of an agent | wrapper, adapter |
-| catalog       | What maps a spec to a model bound to its provider, or to the driver of its agent | registry, model list |
-| model file    | One models.json: the default models of each provider and each driver. A program reads it from a path or a URL | model list, manifest, registry |
+| catalog       | What maps a spec to a model bound to its provider, or to the driver of its agent | registry |
+| model file    | One models.json: the default models of each provider and each driver. A program reads it from a path or a URL | manifest, registry |
+| model list    | The models that a provider API or an agent CLI returns when gopi lists them. A fetch merges it into a catalog | model listing, model catalog |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
 | detector      | What reads one source and gives a catalog a provider or a driver | probe, loader            |
 | harness       | What assembles a coding agent from options, the definitions of its readers, and a catalog, on each call | builder, factory, runtime |
 | assembly      | What one call of a harness resolved: the model, the instruction files, the skills, the subagents, and the tools | build, config |
+| prompt builder | The function of a harness that builds the sections of the system prompt from an assembly, before each model call | prompt template, prompt function |
+| seed          | The first entries of a new session, which the seeders of a harness build once, such as the working directory and the date | preamble, initial context |
 | definition    | An agent, a skill, or an instruction text that a person writes, and that a store reads for the harness | spec, manifest, config |
 | extra key     | A frontmatter key that no field of a definition takes. The definition keeps it with its value | meta, unknown field |
+| agent file    | A Markdown file that defines one agent: its frontmatter, and its prompt as the body | agent spec, agent config |
 | instruction file | A file of rules for the agent, such as AGENTS.md or CLAUDE.md | memory file, rules file  |
 | skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
+| skill tool    | The tool of the harness that gives the model the body of one skill and the paths of its support files | skill loader, skill command |
 | qualified name | The qualifier of a skill, ":", and its name, such as `ops:deploy` | full name, path name |
 | subagent      | An agent that one tool call of a parent starts: the agent tool, the Agent tool of Claude Code, or spawn_agent of Codex | worker, delegate, sub-task |
+| agent tool    | The tool of the harness that runs a subagent in a child session, and gives the parent the last text of the subagent | task tool, subagent tool |
 | session config | The config that a session started with, with the fields of its agent file, which the host keeps in a session value | saved agent, agent snapshot |
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
+| permission policy | The permission mode and the permission rules of a harness, as one value that becomes one BeforeTool hook | policy, approval config |
+| tool kind     | What a tool can do: read, edit, exec, or other. The permission mode decides by it for a call that no rule matches | tool type, category |
 | run           | One call of the loop, from a prompt to a result              | invocation, request, turn   |
 | turn          | One model call of a run, with the tool calls that it makes   | step, iteration, round      |
 | state         | What an agent knows: the messages that the model reads, the progress of the run, the queues, and the loaded tools | context, memory |
@@ -76,15 +84,20 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | hook point    | One point of the loop at which a hook runs, such as BeforeTool. Each point is its own interface | hook type, lifecycle event |
 | approve function | The function that decides a tool call that needs a person, the same type for each agent | permission callback, can-use-tool function |
 | host          | What keeps the sessions of any gopi agent for a Go program, each with an ID, a session config, and a status | runtime, orchestrator, platform |
-| status        | What a host knows about a session: idle, running, or requires_action, with the stop reason of the last run | run state, phase |
+| session status | What a host knows about a session: idle, running, or requires_action, with the stop reason of the last run | status, run state, phase |
 | confirmation  | The answer to a tool call that waits in a host, which `Host.Confirm` gives by the ID of the call | approval answer, tool decision |
 | driver        | What starts an agent of one kind for one session: the harness, the Claude Code agent, or the Codex agent | adapter, backend |
 | runner        | The part of an agent that a caller of a driver uses: Run, Log, and State | instance, handle, connection |
+| steerer       | A runner that takes a steer during a run, such as the agent of the harness or the Claude Code agent | interruptible runner |
+| waker         | A runner whose agent starts a turn on its own between runs, such as Claude Code when background work ends | self-starter |
+| checker       | A driver that reports its driver status | health check, probe |
+| driver status | What a checker reports about its driver: the version of what it runs, and the account that is signed in | status, auth status |
 | steer         | An entry that the agent reads before its next model call     | interrupt, injection        |
 | follow-up     | An entry that the agent reads when the run would stop        | next prompt, queued prompt  |
 | middleware    | A function that wraps a tool and returns a tool              | wrapper, decorator, hook    |
 | sandbox       | The place where the tools read files, write files, and run commands | box, environment, workspace |
 | fence         | An OS sandbox that limits the writes, reads, network, and environment of a command | jail, cage |
+| fence policy  | The options of a fence: the write directories, the hidden paths, the network, and the environment | policy, sandbox profile |
 | system reminder | The text of a system message, in a user message, for a model that takes no system messages | injected note, hint |
 | effort        | How much a model reasons, in the words of its provider API. A thinking level maps to one | reasoning budget, intensity |
 | effort message | A system message with no content that sets the effort of the next assistant turn | effort update, level message |

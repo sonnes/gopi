@@ -66,6 +66,8 @@ p := openaichat.New(
 lm := ai.LanguageModel{Model: kimi, Provider: p}
 ```
 
+The [Fireworks](fireworks.mdx) provider sets the key and the URL of Fireworks for you, and lists its models. For OpenRouter, the [OpenRouter](openrouter.mdx) provider does the same on the Responses API.
+
 ## Thinking
 
 <Ladder
@@ -107,6 +109,7 @@ The Chat API takes only text in a tool result. The provider sends the text as th
 ## Related
 
 - [OpenAI](openai.mdx) is the provider for the Responses API.
+- [Fireworks](fireworks.mdx) sends its calls through this provider.
 - [Models](../ai/models.mdx) is the binding that the provider goes into.
 
 The design is in [docs/concepts/ai/openai.md](../../../../../docs/concepts/ai/openai.md).

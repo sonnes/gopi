@@ -111,17 +111,6 @@ const cover = new URL(`${base.replace(/\/$/, "")}/og.png`, Astro.site).href;
         root.dataset.theme = next;
         localStorage.setItem("starlight-theme", next);
       });
-
-      document.querySelectorAll("[data-copy]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const scope = btn.closest(".install");
-          const src = scope.querySelector("pre code, pre, code");
-          navigator.clipboard?.writeText(src.textContent.trim());
-          const was = btn.textContent;
-          btn.textContent = "Copied";
-          setTimeout(() => (btn.textContent = was), 1200);
-        });
-      });
     </script>
   </body>
 </html>

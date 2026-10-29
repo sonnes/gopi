@@ -1,0 +1,60 @@
+---
+title: OpenRouter
+summary: The host provider for OpenRouter. It sends each call through the OpenAI provider, and it lists the models of OpenRouter with their limits and prices.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+
+<SpecSheet
+  alt="The openrouter package calls the Responses API of OpenRouter. It implements TextProvider, ObjectProvider, and ModelLister, and not TokenCounter or ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The package has no models. A model and the provider bind into a language model."
+  pkg="pkg/ai/openrouter"
+  api="Responses API of OpenRouter"
+  implements={["TextProvider", "ObjectProvider", "ModelLister"]}
+  lacks={["TokenCounter", "ImageProvider"]}
+  options={[
+    ["APIKey(key)", "default `OPENROUTER_API_KEY`"],
+    ["BaseURL(url)", "a proxy or a test server"],
+    ["HTTPClient(c)", "a recording client"],
+  ]}
+  bind={["model + openrouter.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+## Calls
+
+OpenRouter serves a copy of the OpenAI Responses API at `https://openrouter.ai/api/v1`. The provider sends each text call and each object call through the [OpenAI](openai.mdx) provider, with the key and the URL of OpenRouter. The thinking levels, the objects, and the retries of that page apply here. The call options of the openai package apply too, such as `openai.PromptCacheKey` and `openai.OnPayload`.
+
+The provider never reads `OPENAI_API_KEY` or `OPENAI_BASE_URL`, so your OpenAI key never goes to OpenRouter. `env.Detectors` registers the provider when `OPENROUTER_API_KEY` is set.
+
+OpenRouter has no token count API and no image API. `ai.CountTokens` returns an error, and an `ai.ImageModel` with this provider does not compile.
+
+## Models
+
+The package has no models. Name a model by its OpenRouter ID, such as `ai.Model{ID: "anthropic/claude-sonnet-5.5"}`. [models.json](../../../../../models.json) holds the default models of OpenRouter, with their limits and prices.
+
+`ListModels` gives the models that OpenRouter serves today:
+
+- It lists only the models with tools.
+- It skips a model of the Batch API, with the suffix `:batch`.
+- A price is in US dollars for one million tokens. A negative price, such as the price of a router, is unknown and stays zero.
+- A price for a larger prompt becomes a price tier. A price for a time of day is not in the list.
+- The output cap is never larger than the context window.
+
+`FetchModels` of a catalog adds the list to the models of models.json. A model that has prices in the file keeps them.
+
+## System Messages
+
+The OpenAI provider knows the features of `gpt-6-sol`, `gpt-6-luna`, `gpt-6-astra`, and `gpt-5.6`. On OpenRouter, the same models have the prefix `openai/`, such as `openai/gpt-6-luna`, and they get the same features. These are the system messages in place, the tool changes in place, and the cache mark on the system prompt. The [OpenAI](openai.mdx#system-messages) page says how they work.
+
+Every other model gets each system message as a `<system-reminder>` in a user message, and its request has no cache mark. An Anthropic model on OpenRouter is one of these, and so is `openai/gpt-6.1-sol`.
+
+## Errors
+
+An API error wraps `openai.Error`. Read the status code with `errors.As`, as on the [OpenAI](openai.mdx#errors) page.
+
+## Related
+
+- [OpenAI](openai.mdx) is the provider that sends each call.
+- [Fireworks](fireworks.mdx) is the other host provider.
+- [Models](../ai/models.mdx) says how a catalog reads models.json.
+
+The design is in [docs/concepts/ai/host-provider.md](../../../../../docs/concepts/ai/host-provider.md).

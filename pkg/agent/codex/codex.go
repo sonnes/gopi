@@ -31,7 +31,8 @@
 // stops the subagent, and the next run starts a new process. Without
 // [Store], the children are unsaved.
 //
-// The reasons are in docs/concepts/agent/cli-agent.md and
+// The reasons are in docs/concepts/agent/cli-agent.md,
+// docs/concepts/agent/cli-request.md, and
 // docs/concepts/agent/subagent.md.
 package codex
 

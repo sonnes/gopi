@@ -5,6 +5,8 @@ summary: The types of one model call, and how they fit together.
 
 import SignatureAnatomy from "../../../components/figures/SignatureAnatomy.astro";
 import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/call-a-model/main.go?raw";
 
 `pkg/ai` holds the types that name a model call. A provider serves the call. A binding pairs a model with a provider. The messages go in, and a stream of events and one final message come out.
 
@@ -55,7 +57,7 @@ import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
 | ----------- | ---------------------------------------------------------- | ------------------------ |
 | model       | One named model that a provider serves                     | [Models](models.mdx)     |
 | provider    | One backend that answers a model call                      | [Models](models.mdx)     |
-| message     | One turn of a conversation, with a role and content blocks | [Messages](messages.mdx) |
+| message     | What one role adds to a conversation, with its content blocks | [Messages](messages.mdx) |
 | option      | One typed setting of a call                                | [Options](options.mdx)   |
 | stream      | The events of one call, read in order, then the message    | [Streams](streams.mdx)   |
 | tool        | One function that a model can call                         | [Tools](../tool/index.mdx)       |
@@ -67,7 +69,7 @@ The glossary in [docs/README.md](../../../../../docs/README.md) keeps one name f
 A provider always streams text. It can also do these. `ai.GenerateObject` and `ai.CountTokens` are functions that take a language model and assert the interface on its provider. If the provider lacks the interface, the function returns an error. Images and speech have their own bindings, `ai.ImageModel` and `ai.SpeechModel`. Each binding takes only a provider that implements its interface, so a binding to a provider without it does not compile.
 
 <CheckMatrix
-  alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, and image interfaces. OpenAI Chat implements the object interface only. No provider implements speech."
+  alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, and image interfaces. OpenAI Chat, OpenRouter, Fireworks, and ChatGPT implement the object interface only. No provider implements speech."
   corner="provider"
   columns={[
     { label: "Objects", sub: ["GenerateObject[T]", "ObjectProvider"] },
@@ -79,11 +81,56 @@ A provider always streams text. It can also do these. `ai.GenerateObject` and `a
     { label: "Anthropic", code: "anthropic", cells: ["yes", "yes", "no", "no"] },
     { label: "OpenAI", code: "openai", cells: ["yes", "yes", "yes", "no"] },
     { label: "OpenAI Chat", code: "openaichat", cells: ["yes", "no", "no", "no"] },
+    { label: "OpenRouter", code: "openrouter", cells: ["yes", "no", "no", "no"] },
+    { label: "Fireworks", code: "fireworks", cells: ["yes", "no", "no", "no"] },
+    { label: "ChatGPT", code: "chatgpt", cells: ["yes", "no", "no", "no"] },
   ]}
   legend={[["yes", "implements the interface"], ["no", "objects and token counts: an error at run time. Images and speech: a compile error"]]}
   colWidth="112px"
 />
 
-A provider can also list the models that its key can call, with `ModelLister`. The list belongs to the provider and not to one model, so it is a method on the provider and not a function on the binding. All three providers implement it.
+A provider can also list the models that its key can call, with `ModelLister`. The list belongs to the provider and not to one model, so it is a method on the provider and not a function on the binding. Every provider in this repository implements it.
 
-[Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) show what each provider adds to a call.
+The pages for [Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), [OpenAI Chat](../providers/openai-chat.mdx), [OpenRouter](../providers/openrouter.mdx), [Fireworks](../providers/fireworks.mdx), and [ChatGPT](../providers/chatgpt.mdx) show what each provider adds to a call.
+
+## Count the Tokens
+
+`ai.CountTokens` takes the same messages and options as the call. So the count is what the call sends, with the system prompt.
+
+```go
+count, err := ai.CountTokens(ctx, model, messages, system)
+fmt.Println("input tokens:", count.Total)
+```
+
+## Ask for a Typed Value
+
+`ai.GenerateObject` derives a JSON schema from a struct and sends it. Then it decodes the answer into the struct. The model reads the `jsonschema` tag as the description of a field.
+
+```go
+type Recipe struct {
+	Name        string   `json:"name"`
+	Ingredients []string `json:"ingredients"`
+	Minutes     int      `json:"minutes" jsonschema:"total time in minutes"`
+}
+
+res, err := ai.GenerateObject[Recipe](ctx, model, messages)
+fmt.Printf("%s, %d minutes\n", res.Object.Name, res.Object.Minutes)
+fmt.Println("raw:", res.Raw)
+```
+
+`res.Object` is the decoded struct. `res.Raw` is the JSON text that the model wrote. If the provider does not implement `ai.ObjectProvider`, the call returns an error before any request.
+
+## The Full Example
+
+:::note
+The program needs `ANTHROPIC_API_KEY`.
+:::
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/call-a-model/main.go" />
+</div>
+
+- The first answer is one string. The usage line shows the four counts. The two cache counts stay at zero, because the prompt is shorter than the minimum that the model caches.
+- The second call stops on `length`, because a cap of 64 tokens is too small. The third call continues the answer, as [Stop Reasons](messages.mdx#stop-reasons) shows. The usage line after them adds the two calls with `Usage.Add`.
+- The count is the input of the second call, with its system prompt.
+- The recipe line and the ingredients come from `res.Object`. The `raw:` line is `res.Raw`.

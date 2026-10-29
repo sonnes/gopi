@@ -1,9 +1,12 @@
 import { createRequire } from "node:module";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSync } from "fontkit";
 import { describe, expect, it } from "vitest";
 
-import { renderMermaid } from "./render-mermaid.mjs";
+import { failOnMermaidErrors, mermaidErrors, renderMermaid } from "./render-mermaid.mjs";
 
 const require = createRequire(import.meta.url);
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
@@ -37,6 +40,18 @@ describe("renderMermaid", () => {
     expect(() =>
       transform(tree, { path: `${REPO}web/src/content/docs/host/index.mdx` }),
     ).toThrow(/belongs in a concept page/);
+  });
+
+  it("stops the build on a Mermaid block that does not parse", () => {
+    const dir = mkdtempSync(join(tmpdir(), "mermaid-"));
+    writeFileSync(join(dir, "bad.md"), "# Bad\n\n```mermaid\nflowchart LR\n  call --> B\n```\n");
+    expect(mermaidErrors(dir)).toEqual([expect.stringMatching(/^bad\.md: Parse error/)]);
+    const start = failOnMermaidErrors({ dir }).hooks["astro:build:start"];
+    expect(() => start()).toThrow(/bad\.md/);
+  });
+
+  it("parses each Mermaid block of the concept pages", () => {
+    expect(mermaidErrors(`${REPO}docs/concepts`)).toEqual([]);
   });
 
   it("keeps a label inside its box in the site font", () => {

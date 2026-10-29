@@ -15,26 +15,10 @@ const godoc = "https://pkg.go.dev/github.com/sonnes/gopi";
 
 // Layout rules are documented in web/DESIGN.md. Each snippet comes from
 // examples/landing, which the Go toolchain builds. A band shows a preview
-// of the code and links the docs page of what it shows. The replay and
-// the events come from a real run: make site-demo records them.
-
-// A provider module requires the root module, so one go get adds both.
-const install = "go get github.com/sonnes/gopi/pkg/ai/anthropic";
+// of the code and links the docs page of what it shows. The events come
+// from a real run: make site-demo records them.
 
 const bands = [
-  {
-    id: "tools",
-    label: "pkg/tool · tools",
-    title: "A Go Function Is a Tool",
-    words: [
-      "tool.New takes a Go function and derives the JSON schema from its input type. The function gets the typed input.",
-      "The agent runs each call and gives the result to the model.",
-    ],
-    more: ["Read about tools", `${docs}tool/`],
-    path: "tools.go",
-    caption: "a Go function as a tool",
-    code: snippet(customizeSrc, "tools"),
-  },
   {
     id: "hooks",
     label: "pkg/agent · hooks",
@@ -48,20 +32,20 @@ const bands = [
     caption: "a guard and a stop check",
     code: snippet(customizeSrc, "hooks"),
   },
-  {
-    id: "harness",
-    label: "pkg/harness · harness",
-    title: "Turn a Repository Into a Coding Agent",
-    words: [
-      "A harness reads the folders that you give it. AGENTS.md becomes the instructions, a skill loads when the model asks for it, and a subagent runs in a child session.",
-      "It adds the coding tools, MCP servers, a sandbox, and the permission rules. It assembles the agent again at each start, so an edit reaches the next agent.",
-    ],
-    more: ["Read about the harness", `${docs}harness/`],
-    path: "harness.go",
-    caption: "a coding agent from a repository",
-    code: snippet(customizeSrc, "harness"),
-  },
 ];
+
+// The places where an agent of gopi runs, for the section on Agent Gopi.
+const covers = [
+  ["coding agent", "a terminal", "harness.New"],
+  ["issue triage", "a nightly job", "agent.Durable"],
+  ["code reviewer", "a CI step", "harness.Builtin(harness.ReadOnly)"],
+  ["support agent", "an HTTP handler", "h.Stream"],
+  ["Claude Code or Codex", "a page of your app", "claude-code/, codex/"],
+];
+
+// A long call in the covers table wraps after its open parenthesis, not
+// inside a name.
+const breakAfterParen = (s: string) => s.replaceAll("(", "(<wbr>");
 
 // The sessions of one host, each over its own workspace, for fig. 1.
 const sessions = [
@@ -132,18 +116,125 @@ function eventRows(events: RecordedEvent[]): EventRow[] {
 }
 const events = eventRows(demo.events);
 
-// The crash line of a lifetime bar sits at this share of its width. Only
-// the session bar crosses it.
-const crashAt = 62;
-
 const layers = [
-  { id: "host", pkg: "pkg/host", page: "host/", what: "Runs the lifecycle of each session over its workspace: the status, the calls that wait for a person, and the recovery after a restart.", start: "host.Open", lives: "the program", crash: "Each session that ran is idle, with the stop reason restarted.", bar: 56, hue: "harness" },
-  { id: "harness", pkg: "pkg/harness", page: "harness/", what: "Assembles a coding agent at each start: the instructions of AGENTS.md, skills, subagents, coding tools, MCP servers, a sandbox, and the permission rules.", start: "Driver.Start", lives: "one start of an agent", crash: "Assembles the agent again from its files.", bar: 44, hue: "harness" },
-  { id: "agent", pkg: "pkg/agent", page: "agent/", what: "Runs the loop: a model call, the tool calls, and the hooks at each point, until the model stops.", start: "agent.Durable", lives: "while your program holds it", crash: "The next run continues the log.", bar: 48, hue: "agent" },
-  { id: "session", pkg: "pkg/session", page: "session/", what: "Keeps the log of a session in a store. Each message is stored before its event.", start: "session.Open", lives: "until you remove it", crash: "Loses at most the message in flight.", bar: 100, hue: "durable" },
-  { id: "tool", pkg: "pkg/tool", page: "tool/", what: "Turns a Go function into a tool with a typed input. MCP servers add more tools.", start: "tool.New", lives: "one tool call", crash: "A call that a crash cut short gets an error result.", bar: 14, hue: "wire" },
-  { id: "ai", pkg: "pkg/ai", page: "ai/", what: "Makes one model call: messages and options in, a stream of events and a message out.", start: "StreamText", lives: "one request", crash: "Gone. The caller calls again.", bar: 8, hue: "ai" },
+  { id: "host", pkg: "pkg/host", page: "host/", what: "Runs the lifecycle of each session over its workspace: the status, the calls that wait for a person, and the recovery after a restart.", lives: "the program", crash: "Each session that ran is idle, with the stop reason restarted.", hue: "harness" },
+  { id: "harness", pkg: "pkg/harness", page: "harness/", what: "Assembles a coding agent at each start: the instructions of AGENTS.md, skills, subagents, coding tools, MCP servers, a sandbox, and the permission rules.", lives: "one start of an agent", crash: "Assembles the agent again from its files.", hue: "harness" },
+  { id: "agent", pkg: "pkg/agent", page: "agent/", what: "Runs the loop: a model call, the tool calls, and the hooks at each point, until the model stops.", lives: "while your program holds it", crash: "The next run continues the log.", hue: "agent" },
+  { id: "session", pkg: "pkg/session", page: "session/", what: "Keeps the log of a session in a store. Each message is stored before its event.", lives: "until you remove it", crash: "Loses at most the message in flight.", hue: "durable" },
+  { id: "tool", pkg: "pkg/tool", page: "tool/", what: "Turns a Go function into a tool with a typed input. MCP servers add more tools.", lives: "one tool call", crash: "A call that a crash cut short gets an error result.", hue: "wire" },
+  { id: "ai", pkg: "pkg/ai", page: "ai/", what: "Makes one model call: messages and options in, a stream of events and a message out.", lives: "one request", crash: "Gone. The caller calls again.", hue: "ai" },
 ];
+
+// The guide of each layer. The nouns sit beside its slab. The note says
+// what to use the layer for, when to skip it, and the APIs that a
+// program calls first.
+interface Guide {
+  nouns: string[];
+  use: string[];
+  skip: string;
+  apis: string[][];
+}
+const guide: Record<string, Guide> = {
+  host: {
+    nouns: ["Host", "Session", "Config", "Status"],
+    use: [
+      "A product that runs many sessions, such as a web app or a chat bot.",
+      "A page where a person approves the tool calls of an agent.",
+      "Sessions that come back after a deploy or a crash.",
+    ],
+    skip: "One program runs one session. Use agent.Durable.",
+    apis: [
+      ["host.Open", "a host over a store"],
+      ["h.Create", "an idle session from a host.Config"],
+      ["h.Send", "starts a run, or steers it"],
+      ["h.Confirm", "allows or denies a waiting call"],
+      ["h.Stream", "the events of one session"],
+      ["h.Interrupt", "stops the active run"],
+    ],
+  },
+  harness: {
+    nouns: ["Harness", "Option", "Builtins", "Mode"],
+    use: [
+      "A coding agent over a repository.",
+      "An agent that a team changes through files: AGENTS.md, skills, and subagents.",
+      "A permission mode and rules for each tool call.",
+    ],
+    skip: "The code gives the tools and the prompt, and no files. Use agent.New.",
+    apis: [
+      ["harness.New", "a harness from options"],
+      ["h.Durable", "an agent bound to a stored session"],
+      ["harness.Defs", "folders of AGENTS.md, skills/, and agents/"],
+      ["harness.MCP", "MCP servers, connected at each start"],
+      ["harness.Mode", "the permission mode of each call"],
+      ["harness.Deny", "a rule for the calls that never run"],
+    ],
+  },
+  agent: {
+    nouns: ["Agent", "Event", "Hook", "Decision"],
+    use: [
+      "Your own loop in your process, on any provider.",
+      "Hooks around each model call and each tool call.",
+      "A job that continues after a crash, with agent.Durable.",
+    ],
+    skip: "One model call needs no tools. Use StreamText.",
+    apis: [
+      ["agent.New", "an agent with a log in memory"],
+      ["agent.Durable", "an agent bound to a session"],
+      ["a.Run", "one pass of the loop, as a stream"],
+      ["a.Steer", "entries for the next model call"],
+      ["agent.BeforeTool", "a hook before each tool call"],
+      ["agent.Deny", "blocks a call, with a reason"],
+    ],
+  },
+  session: {
+    nouns: ["Log", "Entry", "Value[T]", "Storer"],
+    use: [
+      "A record of the work that outlives the process.",
+      "App state next to the messages, with session.Value.",
+      "A store of your own, such as a database, behind session.Storer.",
+    ],
+    skip: "An agent has agent.Store. The agent writes the log.",
+    apis: [
+      ["session.Open", "creates a session, or resumes it"],
+      ["l.Append", "adds entries to the log"],
+      ["session.Value[T]", "app state next to the entries"],
+      ["session.Storer", "the interface of a store"],
+      ["storefs.Sessions", "a store of JSONL files"],
+    ],
+  },
+  tool: {
+    nouns: ["Tool", "Middleware"],
+    use: [
+      "A Go function that the model can call.",
+      "Code around each call, such as a log, a retry, or a denial.",
+      "Many tools that load only when the model searches for them.",
+    ],
+    skip: "The tools come from an MCP server. Give the server to harness.MCP.",
+    apis: [
+      ["tool.New", "a tool from a Go function"],
+      ["tool.Description", "the text that the model reads"],
+      ["tool.Defer", "a tool that loads on demand"],
+      ["tool.Wrap", "a tool with a new run function"],
+      ["tool.Chain", "middleware around a tool"],
+    ],
+  },
+  ai: {
+    nouns: ["LanguageModel", "Message", "ToolCall", "Usage"],
+    use: [
+      "One model call, such as a reply, a summary, or a label.",
+      "A typed value from a model, with GenerateObject.",
+      "A provider of your own behind one interface.",
+    ],
+    skip: "The model calls tools in a loop. Use pkg/agent.",
+    apis: [
+      ["lm.StreamText", "one model call, as a stream"],
+      ["ai.GenerateObject", "a typed value from a model"],
+      ["ai.CountTokens", "the input tokens, before a call"],
+      ["ai.Message", "a role and its content"],
+      ["ai.TextProvider", "the interface of a provider"],
+    ],
+  },
+};
 
 const providers = [
   ["anthropic", "provider", "API key", "pkg/ai/anthropic"],
@@ -157,14 +248,14 @@ const providers = [
 ];
 
 const waysOut = [
-  ["Get Started", "start/", "install gopi and make one call"],
+  ["Overview", "", "the layers, and where to start"],
   ["Sessions", "session/", "the log that an agent resumes"],
   ["Host", "host/", "sessions of any agent by ID"],
   ["Agents", "agent/", "the loop, hooks, and events"],
   ["CLI Agents", "agent/cli/", "Claude Code and Codex as agents"],
   ["Harness", "harness/", "a coding agent from its files"],
   ["Tools", "tool/", "a Go function the model calls"],
-  ["Guides", "guides/call-a-model/", "one page for each job"],
+  ["Model Call", "ai/", "one call, its stream, and its message"],
 ];
 ---
 
@@ -176,58 +267,54 @@ const waysOut = [
   <header class="row hero agent-hero">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">Go SDK / durable agents</p>
-        <h1><img class="hero-wordmark" src={wordmark.src} alt="agent gopi" width={wordmark.width} height={wordmark.height} fetchpriority="high" /></h1>
-        <p class="hero-description">Durable agents in Go.</p>
+        <p class="label">Go SDK · durable agents</p>
+        <h1>Durable agents in Go.</h1>
         <p class="lede">
           Run your own loop, Claude Code, or Codex as a session in your Go program. If
           the process stops, the next run continues from the last stored message.
         </p>
 
-        <div class="install">
-          <span class="sig">$</span>
-          <code>{install}</code>
-          <button class="copy" data-copy aria-label="Copy the command">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
-              <rect x="5.5" y="5.5" width="8" height="8"></rect>
-              <path d="M10.5 2.5h-8v8"></path>
-            </svg>
-          </button>
-        </div>
-
         <p class="hero-actions">
-          <a class="btn btn--primary" href={`${docs}start/`}>Get started</a>
+          <a class="btn btn--primary" href={docs}>Get started</a>
           <a class="more" href={`${docs}session/`}>Read about sessions</a>
         </p>
       </div>
 
       <div class="cell cell--work">
         <CodeFrame path="triage.go" caption="a durable agent" code={snippet(durableSrc, "durable")} />
-        <figure class="win replay" data-replay>
-          <figcaption class="win-tab">
-            <span>shell  ·  a recorded run, killed and resumed</span>
-            <button class="replay-play" type="button" data-replay-play hidden>Replay</button>
-          </figcaption>
-          <pre class="replay-screen">{
-            demo.runs.map((r) => (
-              <>
-                <span class="replay-cmd" data-line><b>$</b> {r.cmd}</span>
-                {r.lines.map((l) => <span class={l.startsWith("->") ? "replay-call" : "replay-out"} data-line>{l}</span>)}
-                {r.end && <span class="replay-kill" data-line>{r.end}</span>}
-              </>
-            ))
-          }</pre>
-        </figure>
       </div>
     </div>
   </header>
+
+  {/* ============ harness ============ */}
+  <section class="row" id="harness">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/harness · options</p>
+        <h2>Build Your Own Harness</h2>
+        <p>
+          A harness turns a repository into an agent. Each part of the agent is one option:
+          change one and keep the rest. The sessions go to any store: JSONL files, or your
+          own store over SQLite or Postgres.
+        </p>
+        <p>
+          The harness assembles the agent again at each start, so an edit to a skill reaches
+          the next agent.
+        </p>
+        <a class="more" href={`${docs}harness/`}>Read about the harness</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="claude.go" caption="a harness like Claude Code" code={snippet(customizeSrc, "harness")} />
+      </div>
+    </div>
+  </section>
 
   {/* ============ managed agents ============ */}
   <section class="row" id="host">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">pkg/host · managed agents</p>
-        <h2>Manage the Lifecycle of Agents Over Any Workspace</h2>
+        <p class="label">pkg/host · sessions</p>
+        <h2>Managed Agents</h2>
         <p>
           A host runs the lifecycle of each session: it starts the agent, runs one message
           at a time, waits for a person, and recovers the session after a restart.
@@ -276,7 +363,7 @@ const waysOut = [
     </div>
   </section>
 
-  {/* ============ tools, hooks, harness ============ */}
+  {/* ============ hooks ============ */}
   {
     bands.map((b) => (
       <section class="row" id={b.id}>
@@ -311,7 +398,6 @@ const waysOut = [
       <div class="cell cell--work">
         <CodeFrame path="events.go" caption="a page that streams a run" code={snippet(customizeSrc, "events")} />
         <figure class="events" data-events>
-          <figcaption class="label"><span>fig. 2</span><span>the events of the resumed run</span></figcaption>
           <ol class="event-rows">
             {
               events.map((e) => (
@@ -322,6 +408,7 @@ const waysOut = [
               ))
             }
           </ol>
+          <figcaption class="label"><span>fig. 2</span><span>the events of the resumed run</span></figcaption>
         </figure>
       </div>
     </div>
@@ -343,7 +430,7 @@ const waysOut = [
         </div>
       </div>
 
-      <div class="stack" data-stack style={`--crash: ${crashAt}%`}>
+      <div class="stack">
         {
           layers.map((l, i) => (
             <input class="stack-radio" type="radio" name="layer" id={`layer-${l.id}`} checked={i === 0} />
@@ -353,7 +440,21 @@ const waysOut = [
           {
             layers.map((l) => (
               <label class={`stack-bar stack-bar--${l.id}`} for={`layer-${l.id}`} style={`--hue: var(--l-${l.hue})`}>
-                {l.pkg}
+                <svg class="slab" viewBox="0 0 280 160" aria-hidden="true">
+                  <path class="slab-left" d="M2 70 L140 139 L140 158 L2 89 Z" />
+                  <path class="slab-right" d="M140 139 L278 70 L278 89 L140 158 Z" />
+                  <path class="slab-top" d="M140 2 L278 70 L140 139 L2 70 Z" />
+                </svg>
+                <span class="stack-name">
+                  {l.pkg}
+                  <span class="stack-nouns">
+                    {guide[l.id].nouns.map((n, i, all) => (
+                      <>
+                        <span>{n}{i < all.length - 1 && " ·"}</span>{" "}
+                      </>
+                    ))}
+                  </span>
+                </span>
               </label>
             ))
           }
@@ -364,15 +465,23 @@ const waysOut = [
               <div class={`stack-note stack-note--${l.id}`} style={`--hue: var(--l-${l.hue})`}>
                 <p class="stack-pkg">{l.pkg}</p>
                 <p class="stack-what">{l.what}</p>
+                <div class="uses">
+                  <p class="cards-head">use it for</p>
+                  <ul>{guide[l.id].use.map((u) => <li>{u}</li>)}</ul>
+                  <p class="uses-skip"><span>skip it when</span>{guide[l.id].skip}</p>
+                </div>
+                <div class="cards">
+                  <p class="cards-head">start with</p>
+                  <ul>
+                    {guide[l.id].apis.map(([name, what]) => (
+                      <li class="card"><code>{name}</code><span>{what}</span></li>
+                    ))}
+                  </ul>
+                </div>
                 <dl>
-                  <dt>starts with</dt><dd><code>{l.start}</code></dd>
                   <dt>lives for</dt><dd>{l.lives}</dd>
                   <dt>after a crash</dt><dd>{l.crash}</dd>
                 </dl>
-                <div class="life" aria-hidden="true">
-                  <span class="life-bar" style={`width: ${l.bar}%`}></span>
-                  <span class="life-crash">crash</span>
-                </div>
                 <a class="more" href={`${docs}${l.page}`}>Read about {l.pkg}</a>
               </div>
             ))
@@ -395,26 +504,26 @@ const waysOut = [
             A provider serves a model call. A driver starts an agent. A model spec names
             one of them and a model. A spec with no driver runs on the harness.
           </p>
-          <a class="more" href={`${docs}guides/write-a-provider/`}>Write a provider</a>
+          <a class="more" href={`${docs}providers/write-a-provider/`}>Write a provider</a>
         </div>
       </div>
 
       <figure class="spec-fig">
-          <div class="spec" aria-hidden="true">
-            {
-              specParts.map((p) => (
-                <span class="spec-part" style={p.hue ? `--hue: var(--l-${p.hue})` : undefined}>
-                  <span class="spec-text">{p.text}</span>
-                  {p.name && <span class="spec-note"><b>{p.name}</b>{p.note}</span>}
-                </span>
-              ))
-            }
-          </div>
-          <ul class="spec-routes">
-            {specs.map(([spec, where]) => <li><code>{spec}</code><span>{where}</span></li>)}
-          </ul>
-          <figcaption class="label"><span>fig. 3</span><span>the model spec</span></figcaption>
-        </figure>
+        <div class="spec" aria-hidden="true">
+          {
+            specParts.map((p) => (
+              <span class="spec-part" style={p.hue ? `--hue: var(--l-${p.hue})` : undefined}>
+                <span class="spec-text">{p.text}</span>
+                {p.name && <span class="spec-note"><b>{p.name}</b>{p.note}</span>}
+              </span>
+            ))
+          }
+        </div>
+        <ul class="spec-routes">
+          {specs.map(([spec, where]) => <li><code>{spec}</code><span>{where}</span></li>)}
+        </ul>
+        <figcaption class="label"><span>fig. 3</span><span>the model spec</span></figcaption>
+      </figure>
 
       <figure class="artifact">
         <figcaption class="label">spec prefixes</figcaption>
@@ -428,7 +537,7 @@ const waysOut = [
               providers.map(([id, kind, auth, pkg]) => (
                 <tr>
                   <td class="mono">{id}</td>
-                  <td class="mono dim">{kind}</td>
+                  <td class="dim">{kind}</td>
                   <td class="dim">{auth}</td>
                   <td class="mono"><a href={`${godoc}/${pkg}`}>{pkg}</a></td>
                 </tr>
@@ -440,20 +549,40 @@ const waysOut = [
     </div>
   </section>
 
-  {/* ============ THE WAY OUT ============ */}
-  <section class="outro">
-    <div class="outro-inner">
-      <div class="outro-head">
-        <div>
-          <p class="label">the documentation</p>
-          <a class="outro-link" href={docs}>Read the documentation</a>
-          <p class="outro-lede">Start with the overview, or open the page for your job.</p>
-        </div>
+  {/* ============ agent gopi ============ */}
+  <section class="row agent-band" id="agent-gopi">
+    <div class="row-inner">
+      <div class="cell cell--words agent-id">
+        <img class="agent-wordmark" src={wordmark.src} alt="agent gopi" width={wordmark.width} height={wordmark.height} loading="lazy" />
         <figure class="agent-portrait">
           <img src={gopi.src} alt="Agent Gopi, a golden gopher in a cream trench coat, with sunglasses and a coral tie." width={gopi.width} height={gopi.height} loading="lazy" />
           <figcaption class="label"><span>agent gopi</span><span>001 / undercover</span></figcaption>
         </figure>
       </div>
+      <div class="cell cell--work">
+        <p class="label">agent gopi · cover identities</p>
+        <h2>Agent Gopi Can Be Any Agent in Your Code</h2>
+        <p class="agent-lede">
+          An agent is a value in your Go program. It runs where your code runs, with the
+          tools and the rules that you give it.
+        </p>
+        <table class="ledger ledger--covers">
+          <thead><tr><th>cover</th><th>runs in</th><th>built with</th></tr></thead>
+          <tbody>
+            {covers.map(([cover, where, parts]) => (<tr><td>{cover}</td><td class="dim">{where}</td><td class="mono" set:html={breakAfterParen(parts)} /></tr>))}
+          </tbody>
+        </table>
+        <a class="more" href={`${docs}agent/`}>Read about agents</a>
+      </div>
+    </div>
+  </section>
+
+  {/* ============ THE WAY OUT ============ */}
+  <section class="outro">
+    <div class="outro-inner">
+      <p class="label">the documentation</p>
+      <a class="outro-link" href={docs}>Read the documentation</a>
+      <p class="outro-lede">Start with the overview, or open the page for your job.</p>
       <ul class="ways-out">
         {
           waysOut.map(([name, page, note]) => (
@@ -465,25 +594,10 @@ const waysOut = [
   </section>
 
   <script is:inline>
-    // Three motions, and each one waits for the reader. The page shows
-    // the same content without JavaScript: the full replay, every event,
-    // and the first layer.
+    // The events light up in order, once, when the figure comes into
+    // view. Without JavaScript, the page shows every event.
     const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // The replay types each line of the recorded run again.
-    const LINE_MS = 420;
-    document.querySelectorAll("[data-replay]").forEach((fig) => {
-      const play = fig.querySelector("[data-replay-play]");
-      const lines = [...fig.querySelectorAll("[data-line]")];
-      play.hidden = false;
-      play.addEventListener("click", () => {
-        if (still) return;
-        lines.forEach((l) => l.classList.add("is-hidden"));
-        lines.forEach((l, i) => setTimeout(() => l.classList.remove("is-hidden"), (i + 1) * LINE_MS));
-      });
-    });
-
-    // The events light up in order, once, when the figure comes into view.
     const EVENT_MS = 140;
     document.querySelectorAll("[data-events]").forEach((fig) => {
       if (still) return;
@@ -495,21 +609,6 @@ const waysOut = [
         rows.forEach((r, i) => setTimeout(() => r.classList.remove("is-dim"), (i + 1) * EVENT_MS));
       });
       seen.observe(fig);
-    });
-
-    // The stack moves to the next layer until the reader picks one.
-    const LAYER_MS = 4000;
-    document.querySelectorAll("[data-stack]").forEach((stack) => {
-      if (still) return;
-      const radios = [...stack.querySelectorAll(".stack-radio")];
-      const timer = setInterval(() => {
-        const at = radios.findIndex((r) => r.checked);
-        radios[(at + 1) % radios.length].checked = true;
-      }, LAYER_MS);
-      const stop = () => clearInterval(timer);
-      stack.addEventListener("pointerenter", stop);
-      stack.addEventListener("focusin", stop);
-      stack.addEventListener("click", stop);
     });
   </script>
 </Landing>

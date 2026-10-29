@@ -99,6 +99,8 @@
   --gutter: 2.5rem;
   --band: 4rem;
   --measure: 27rem;
+  /* A line of prose that runs beside a figure or over a table. */
+  --measure-wide: 34rem;
   --split-gap: 0;
 }
 
@@ -150,6 +152,7 @@
   --l-wire: #38bdf8;
   --l-wire-deep: #38bdf8;
   --l-mix: 22%;
+
 }
 
 body {
@@ -340,6 +343,6 @@ body {
   }
 }
 
-:root[data-theme="dark"] :is(.wordmark, .hero-wordmark, .site-title img) {
+:root[data-theme="dark"] :is(.wordmark, .agent-wordmark, .site-title img) {
   filter: invert(0.88) hue-rotate(180deg);
 }

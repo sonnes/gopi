@@ -4,7 +4,7 @@ import starlight from "@astrojs/starlight";
 import { unified } from "@astrojs/markdown-remark";
 import { fileURLToPath } from "node:url";
 
-import { renderMermaid } from "./src/remark/render-mermaid.mjs";
+import { failOnMermaidErrors, renderMermaid } from "./src/remark/render-mermaid.mjs";
 import { rewriteDocLinks } from "./src/remark/rewrite-doc-links.mjs";
 import { stripTitleHeading } from "./src/remark/strip-title-heading.mjs";
 import { conceptsGroup } from "./src/sidebar-concepts.mjs";
@@ -17,7 +17,8 @@ const REPO = "https://github.com/sonnes/gopi";
 // as its social card, so a link to any page shows it.
 const COVER = `https://sonnes.github.io${BASE}/og.png`;
 
-// The guides import their programs from ../examples with ?raw, so the
+// The Model Call overview, Streams, Tools, Agents, Sessions, and Write a
+// Provider pages import their programs from ../examples with ?raw, so the
 // dev server has to be allowed to read outside web/.
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
@@ -51,6 +52,7 @@ export default defineConfig({
     }),
   },
   integrations: [
+    failOnMermaidErrors(),
     starlight({
       title: "gopi",
       // The documentation uses the shared image wordmark.
@@ -123,25 +125,14 @@ export default defineConfig({
       // required for the <Code> component to render outside markdown.
       sidebar: [
         { label: "Overview", slug: "docs" },
-        { label: "Get Started", slug: "docs/start" },
+        // The layers, from the top of the stack to the bottom. A layer with
+        // one page is a link, and a layer with more pages is a group.
+        { label: "Host", slug: "docs/host" },
+        { label: "Harness", slug: "docs/harness" },
         {
-          label: "pkg/ai",
+          label: "Agent",
           items: [
-            { label: "The Layer", slug: "docs/ai" },
-            { label: "Models", slug: "docs/ai/models" },
-            { label: "Messages", slug: "docs/ai/messages" },
-            { label: "Options", slug: "docs/ai/options" },
-            { label: "Streams", slug: "docs/ai/streams" },
-          ],
-        },
-        {
-          label: "pkg/tool",
-          items: [{ label: "Tools", slug: "docs/tool" }],
-        },
-        {
-          label: "pkg/agent",
-          items: [
-            { label: "Agents", slug: "docs/agent" },
+            { label: "Overview", slug: "docs/agent" },
             { label: "Events", slug: "docs/agent/events" },
             { label: "Hooks", slug: "docs/agent/hooks" },
             { label: "Steer and Follow-Up", slug: "docs/agent/steer" },
@@ -150,17 +141,17 @@ export default defineConfig({
             { label: "CLI Agents", slug: "docs/agent/cli" },
           ],
         },
+        { label: "Session", slug: "docs/session" },
+        { label: "Tool", slug: "docs/tool" },
         {
-          label: "pkg/harness",
-          items: [{ label: "Harness", slug: "docs/harness" }],
-        },
-        {
-          label: "pkg/session",
-          items: [{ label: "Sessions", slug: "docs/session" }],
-        },
-        {
-          label: "pkg/host",
-          items: [{ label: "Host", slug: "docs/host" }],
+          label: "Model Call",
+          items: [
+            { label: "Overview", slug: "docs/ai" },
+            { label: "Models", slug: "docs/ai/models" },
+            { label: "Messages", slug: "docs/ai/messages" },
+            { label: "Options", slug: "docs/ai/options" },
+            { label: "Streams", slug: "docs/ai/streams" },
+          ],
         },
         {
           label: "Providers",
@@ -168,17 +159,10 @@ export default defineConfig({
             { label: "Anthropic", slug: "docs/providers/anthropic" },
             { label: "OpenAI", slug: "docs/providers/openai" },
             { label: "OpenAI Chat", slug: "docs/providers/openai-chat" },
-          ],
-        },
-        {
-          label: "Guides",
-          items: [
-            { label: "Call a Model", slug: "docs/guides/call-a-model" },
-            { label: "Stream a Response", slug: "docs/guides/stream-a-response" },
-            { label: "Use Tools", slug: "docs/guides/use-tools" },
-            { label: "Write a Provider", slug: "docs/guides/write-a-provider" },
-            { label: "Run an Agent", slug: "docs/guides/run-an-agent" },
-            { label: "Keep a Session", slug: "docs/guides/keep-a-session" },
+            { label: "OpenRouter", slug: "docs/providers/openrouter" },
+            { label: "Fireworks", slug: "docs/providers/fireworks" },
+            { label: "ChatGPT", slug: "docs/providers/chatgpt" },
+            { label: "Write a Provider", slug: "docs/providers/write-a-provider" },
           ],
         },
         conceptsGroup(),

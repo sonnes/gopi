@@ -23,18 +23,14 @@ const sketches = {
 
 const topics: Record<string, keyof typeof sketches> = {
   docs: "explore",
-  "docs/start": "peek",
-  "docs/ai": "explore",
+  "docs/ai": "messages",
   "docs/ai/models": "providers",
   "docs/ai/messages": "peek",
   "docs/ai/options": "thinking",
   "docs/ai/streams": "streams",
   "docs/tool": "tools",
   "docs/providers/anthropic": "providers",
-  "docs/guides/call-a-model": "messages",
-  "docs/guides/stream-a-response": "streams",
-  "docs/guides/use-tools": "tools",
-  "docs/guides/write-a-provider": "providers",
+  "docs/providers/write-a-provider": "providers",
 };
 const topic = topics[Astro.locals.starlightRoute.entry.id];
 const sketch = topic && sketches[topic];

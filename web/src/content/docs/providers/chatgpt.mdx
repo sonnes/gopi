@@ -1,0 +1,83 @@
+---
+title: ChatGPT
+summary: The provider for the ChatGPT plan of a user. It signs in with a ChatGPT account, and it calls the plan route with no API key.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+
+<SpecSheet
+  alt="The chatgpt package calls the plan route: the Responses API of api.openai.com with an OAuth token of the plan. It implements TextProvider, ObjectProvider, and ModelLister, and not TokenCounter or ImageProvider. New takes a token source, such as FileSource, and the options BaseURL and Transport. The model ID in models.json is gpt-6.1-sol. A model and the provider bind into a language model."
+  pkg="pkg/ai/chatgpt"
+  api="Responses API, plan route"
+  implements={["TextProvider", "ObjectProvider", "ModelLister"]}
+  lacks={["TokenCounter", "ImageProvider"]}
+  options={[
+    ["FileSource(path, auth)", "the token source, the first argument of `New`"],
+    ["BaseURL(url)", "a test server"],
+    ["Transport(rt)", "a recording transport under the OAuth transport"],
+  ]}
+  models={[["gpt-6.1-sol", "ai"]]}
+  bind={["model + chatgpt.New(src)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+:::caution
+Use the plan only in an open-source app, or in an app that runs on the computer of the user. A hosted app needs the approval of OpenAI.
+:::
+
+## Sign In With the CLI
+
+1. Run `gopi login chatgpt`.
+2. Open the URL that gopi prints, and sign in with your ChatGPT account.
+3. If the browser cannot reach gopi, such as on a remote host, paste the redirect URL into the terminal.
+
+gopi writes the account to the login file, `auth.json` in `$GOPI_HOME`. If `GOPI_HOME` is not set, the file is `~/.gopi/auth.json`. The CLI then uses the plan before any API key, so its default model comes from the plan. `gopi logout chatgpt` revokes the token.
+
+In your program, give the login file to the provider:
+
+```go
+src := chatgpt.FileSource(path, chatgpt.Auth{})
+p := chatgpt.New(src)
+```
+
+## Sign In From a Program
+
+`Auth.SignIn` runs the sign-in in the browser of the user and returns an `Account`. `SaveAccount` writes it to a login file. Obey these rules:
+
+1. Make a host ID once with `NewHostID`, and keep it.
+2. Use the same port for each sign-in, such as `DefaultPort`.
+3. Keep the `Account` of each sign-in, and give it to the next sign-in. A sign-in without it registers your app again, and each registration stays on the account of the user.
+4. After a sign-out, keep `Account.Registration()` for the next sign-in.
+
+A sign-in fails if the user does not grant the use of the plan.
+
+## Tokens
+
+The refresh token changes on each refresh. `FileSource` keeps the token in memory while the token is valid. To refresh, it locks the login file and reads it again. It refreshes only if the token in the file is still not valid, and then it writes the new tokens to the file. So two processes can share one login file. On a system without flock, the lock holds for one process only.
+
+If OpenAI refuses the refresh token, the error wraps `chatgpt.ErrSignInExpired`, and the user must sign in again. If the file has no signed-in account, the error wraps `chatgpt.ErrNoAccount`.
+
+## Models
+
+The models depend on the account. `ListModels` gives the models that the account can use on the plan route. It skips a model that the model picker of ChatGPT hides, and a model that the API does not serve. models.json holds `gpt-6.1-sol`, the default model of the plan.
+
+## The Plan Route
+
+The provider sends each call through the [OpenAI](openai.mdx) provider with `openai.ChatGPTPlan`. The OAuth transport adds the token to each request. The thinking levels and the retries of the OpenAI page apply. The plan route accepts less than the Responses API:
+
+- A request has no output cap, no temperature, and no cache retention. `ai.MaxTokens`, `ai.Temperature`, and `ai.CacheLong` have no effect.
+- The function tools go into one namespace, `gopi`.
+- An object call reads its response from a stream.
+- The route has no token count. `ai.CountTokens` returns an error.
+
+The OpenAI provider does not know the features of `gpt-6.1-sol`. So that model gets each system message as a `<system-reminder>` in a user message, and its request has no cache mark.
+
+## Errors
+
+An API error wraps `openai.Error`. Read the status code with `errors.As`, as on the [OpenAI](openai.mdx#errors) page.
+
+## Related
+
+- [OpenAI](openai.mdx) is the provider that sends each call.
+- [Models](../ai/models.mdx) says how a catalog reads models.json.
+
+The design is in [docs/concepts/ai/chatgpt.md](../../../../../docs/concepts/ai/chatgpt.md).

@@ -1,14 +1,16 @@
 ---
 title: Sessions
-summary: A session is one conversation that a store keeps, with an ID that the application chooses. Its log holds the entries in append order, and the values.
+summary: A session is one conversation that a store keeps, with an ID that the application chooses, and its log holds the entries and the values.
 ---
 
 import Ledger from "../../../components/figures/Ledger.astro";
 import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
 import Rails from "../../../components/figures/Rails.astro";
 import FileView from "../../../components/figures/FileView.astro";
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/keep-a-session/main.go?raw";
 
-An agent writes each message of a run to its log before the `message_end` event. The model reads the messages of the entries in append order. A value holds application state, such as a title, and the model never reads it.
+An agent writes each message of a run to its log before the `message_end` event. A value holds application state, such as a title.
 
 <Ledger
   alt="A log holds the entries of a session in append order: a user message, an assistant message with a tool call, the tool result, and the answer. The model reads the entries. Next to them, the values are kept by name, and the model never reads them. The value app.label has the key e2."
@@ -32,7 +34,7 @@ An agent writes each message of a run to its log before the `message_end` event.
 
 ## The Log
 
-`agent.New` runs over a log in memory, and the log ends with the process. `agent.Durable` opens the log of a session in a store, so a later process resumes it. `a.Log()` returns the log of an agent.
+`a.Log()` returns the log of an agent. The log of `agent.New` is in memory. `agent.Durable` opens the log in a store, so a later process resumes it.
 
 ```go
 a, err := agent.Durable(ctx, model, "user-42", agent.Store(store))
@@ -45,13 +47,13 @@ A session has one writer. Two logs on one session interleave their entries, and 
 
 ## Entries
 
-An entry holds one message, or the data of a custom entry. You set the author and the ephemeral mark. The log sets the ID and the time.
+An entry holds one message, or the data of a custom entry. The log sets its ID and its time.
 
 ```go
 session.Text("hi", session.Author("user-42"))
 session.Text("The time is 9:14 AM.", session.Ephemeral())
 session.NewEntry(msg, session.Author("importer"))
-marker, err := session.Custom("compaction", summary)
+custom, err := session.Custom("compaction", summary)
 ```
 
 <CheckMatrix
@@ -59,7 +61,7 @@ marker, err := session.Custom("compaction", summary)
   corner="entry · use it for"
   columns={[{ label: "model reads" }, { label: "store keeps" }]}
   rows={[
-    { label: "Text()", kind: "user", code: 'session.Text("hi")', sub: "a turn, or context that stays true", cells: ["yes", "yes"] },
+    { label: "Text()", kind: "user", code: 'session.Text("hi")', sub: "a user message, or context that stays true", cells: ["yes", "yes"] },
     { label: "Ephemeral()", kind: "ephemeral", code: "session.Text(now, session.Ephemeral())", sub: "context that is true only now, such as the time", cells: [{ mark: "half", label: "this run" }, "no"] },
     { label: "Custom()", kind: "meta", code: 'session.Custom("compaction", summary)', sub: "a fact of the application, in its place", cells: ["no", "yes"] },
   ]}
@@ -68,13 +70,13 @@ marker, err := session.Custom("compaction", summary)
 
 To add entries, pass them to `Run`, `Steer`, or `FollowUp` of the [agent](../agent/index.mdx), or return them from an `AfterTurn` or `BeforeStop` [hook](../agent/hooks.mdx).
 
-The author is a user ID or an agent name. The `Name` option of an agent sets the author of each assistant message and tool result. A UI can choose which entries to show by the author.
+The author is a user ID or an agent name. The `Name` option of an agent sets the author of each entry that the agent writes. For context that must stay, such as a skill, give the entry an author of its own. The store keeps it, and your UI can skip that author.
 
-A custom entry keeps a fact of the application in its place among the messages, such as the summary of a compaction. `Messages` skips it. The kind `gopi` and each kind that starts with `gopi.` belong to gopi.
+A custom entry of the kind `gopi`, or of a kind that starts with `gopi.`, belongs to gopi.
 
 ## Values
 
-A value has a namespace, a key, and a type. Declare it once, then read and write it through the log. The store keeps it as JSON.
+A value has a namespace, a key, and a type. Declare it once, then read and write it through the log. The store keeps it as JSON, and a later `Set` replaces it.
 
 ```go
 var title = session.Value[string]{Namespace: "app.title"}
@@ -84,25 +86,20 @@ t, ok, err := title.Get(a.Log())
 err = title.Delete(ctx, a.Log())
 ```
 
-| Call     | Result                                                                    |
-| -------- | ------------------------------------------------------------------------- |
-| `Set`    | Encodes the value as JSON and stores it. A later set replaces it          |
-| `Get`    | Returns the value. `ok` is false if the value is not set                  |
-| `Delete` | Removes the value. A delete of a value that is not set does nothing       |
-| `Read`   | Returns the value from a `session.Snapshot`, before you open the session  |
+`Read` gets a value from a `session.Snapshot`, before you open the session. [`session.Value`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/session#Value) has each method.
 
 ```go
 snap, err := store.Load(ctx, "user-42")
 t, ok, err := title.Read(snap)
 ```
 
-The JSONL store can repair the file in `Load`. Call `Load` only when no other process writes the session.
+The JSONL store can repair the file in `Load`, so call `Load` only when no other process writes the session.
 
-A key names one value in a namespace, for example a label for each entry: `session.Value[string]{Namespace: "app.label", Key: entryID}`. The namespace `gopi` and each namespace that starts with `gopi.` belong to gopi. To give the model a value, append it as an entry.
+A key names one value in a namespace, such as a label for each entry: `session.Value[string]{Namespace: "app.label", Key: entryID}`. The namespace `gopi` and each namespace that starts with `gopi.` belong to gopi.
 
 ## In a Hook
 
-A hook reads the session from `State.Log()`: the entries, the messages, and the values. It can set and delete values. It cannot append an entry. To add entries, return them from an `AfterTurn` or `BeforeStop` hook, or queue them with [`s.Steer` or `s.FollowUp`](../agent/hooks.mdx#steer-from-a-hook).
+A hook reads the session from `State.Log()`. It can set and delete values, and it cannot append an entry. An `AfterTurn` or `BeforeStop` hook returns entries, and any hook can queue them with [`s.Steer` or `s.FollowUp`](../agent/hooks.mdx#steer-from-a-hook).
 
 ```go
 var turns = session.Value[int]{Namespace: "app.turns"}
@@ -116,7 +113,7 @@ count := agent.AfterTurn(func(ctx context.Context, s agent.State) ([]session.Ent
 })
 ```
 
-A value is in the store when `Set` returns, also if the run fails after it. A state that a viewer decoded from JSON has no log, so its `Log` returns nil.
+A value is in the store when `Set` returns, also if the run fails after it.
 
 ## After a Crash
 
@@ -141,8 +138,6 @@ A crash loses at most the message in flight. It can leave a tool call with no re
   `Messages` adds the error result each time it builds the messages. The store never holds it.
 </Rails>
 
-If a run fails in its tool calls and the process lives on, the next run stores the error results first, with their events.
-
 ## Stores
 
 | Store                      | Keeps                              | Use it for                 |
@@ -162,7 +157,7 @@ The file of a session is `<dir>/<id>.jsonl`. The first line is the record. Each 
   note="the session ID is the file name"
   lines={[
     { tag: "record", text: '{"type":"session_init","id":"demo","created_at":"2026-09-23T09:14:00Z"}' },
-    { tag: "entry", text: '{"type":"message","id":"9f2c41d07a3be815","author":"user-1","message":{...}}' },
+    { tag: "entry", text: '{"type":"message","id":"9f2c41d07a3be815","created_at":"2026-09-23T09:14:02.481516Z","author":"user-1","message":{...}}' },
     { tag: "value", text: '{"type":"value","op":"set","namespace":"app.title","key":"","value":"Trip to Lisbon"}' },
   ]}
   next="+ the next entry or value write"
@@ -170,7 +165,7 @@ The file of a session is `<dir>/<id>.jsonl`. The first line is the record. Each 
 />
 
 - A custom entry is a `message` line too.
-- The load replays the value lines in order, so a later set replaces an earlier one. Each set adds a line.
+- Each set adds a line, and the load replays the value lines in order.
 - If a complete line does not decode, the load fails.
 - An ID that holds `/` or `\`, or that is `.` or `..`, is an error.
 
@@ -195,6 +190,21 @@ The file of a session is `<dir>/<id>.jsonl`. The first line is the record. Each 
 
 - [Agents](../agent/index.mdx) write to a log.
 - [Hooks](../agent/hooks.mdx) read the log of a run.
-- [Keep a Session](../guides/keep-a-session.mdx) is the guide.
 
 The design is in [docs/concepts/session/log.md](../../../../../docs/concepts/session/log.md), [docs/concepts/session/value.md](../../../../../docs/concepts/session/value.md), and [docs/concepts/session/store.md](../../../../../docs/concepts/session/store.md).
+
+## The Full Example
+
+:::note
+The program needs `ANTHROPIC_API_KEY`.
+:::
+
+Run the program twice. The first run tells the agent a name, and the second run resumes the session and asks for it.
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/keep-a-session/main.go" />
+</div>
+
+- The first run prints a `stored` line for the `system` message, the question, and the answer. The ephemeral clock has no line.
+- The second run prints two `stored` lines, because the prompt did not change.
+- The last line is the path of the file. To start again, delete the file.

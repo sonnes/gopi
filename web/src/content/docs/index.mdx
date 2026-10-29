@@ -1,22 +1,20 @@
 ---
 title: Overview
-summary: Model calls, typed tools, streamed events, and an agent loop for AI agents in Go.
+summary: The layers of gopi, from a host of many sessions down to one model call.
 ---
 
 import LayerStack from "../../components/figures/LayerStack.astro";
-import AnnotatedCode from "../../components/figures/AnnotatedCode.astro";
-import { Card, CardGrid, Code } from "@astrojs/starlight/components";
-import hello from "../../../../examples/hello/main.go?raw";
 
-gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a model can call, and the events of a call as a stream. An agent runs the calls and the tools in a loop, and a session keeps its history.
+Each package is a layer, and a layer calls only the layers under it. So a program can use any layer without the layers above it. Start at the highest layer that your program needs.
 
 ## The Stack
 
 <LayerStack
-  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls pkg/host, pkg/agent, or pkg/ai directly. pkg/host keeps the sessions of the agents. pkg/agent runs the tools of pkg/tool, and writes its history to pkg/session. The providers plug into pkg/ai from the side."
+  alt="The packages of the stack, from your application at the top down to pkg/stream. Your application calls any layer directly. pkg/host keeps the sessions of the agents. pkg/harness assembles a coding agent from the files of a repository. pkg/agent runs the tools of pkg/tool, and writes its history to pkg/session. The providers plug into pkg/ai from the side. pkg/catalog resolves a model spec to a provider or a driver."
   layers={[
-    { name: "your application", job: "calls pkg/host, pkg/agent, or pkg/ai" },
+    { name: "your application", job: "calls any layer" },
     { name: "pkg/host", job: "the sessions: status, confirmations, streams", hue: "harness" },
+    { name: "pkg/harness", job: "the coding agent: instruction files, skills, permissions", hue: "harness" },
     { name: "pkg/agent", job: "the loop: model calls, tools, hooks", hue: "agent" },
     { name: "pkg/session", job: "the history: entries, values, stores", hue: "durable" },
     { name: "pkg/tool", job: "the tools: typed input, deferral, middleware", hue: "wire" },
@@ -24,100 +22,70 @@ gopi is a Go SDK for AI agents. It gives you one call to a model, tools that a m
       name: "pkg/ai",
       job: "the call: model, message, option, stream, tool",
       hue: "ai",
-      plug: { label: "providers", items: ["anthropic", "openai", "openaichat"] },
+      plug: {
+        label: "providers",
+        items: ["anthropic", "openai", "openaichat", "openrouter", "fireworks", "chatgpt"],
+      },
     },
+    { name: "pkg/catalog", job: "the specs: a model spec to a provider or a driver", hue: "ai" },
     { name: "pkg/stream", job: "one producer, one consumer, one result", hue: "outside" },
   ]}
 />
 
-## One Call
+## Host
 
-<AnnotatedCode
-  alt="The call lines of the hello program in three steps. Step 1 binds a model to a provider. Step 2 builds the messages. Step 3 reads the stream with Wait."
-  steps={[
-    {
-      code: `model := ai.LanguageModel{
-\tModel:    ai.Model{ID: "claude-sonnet-5"},
-\tProvider: anthropic.New(),
-}`,
-      title: "bind",
-      type: "ai.LanguageModel",
-      note: "Model + Provider",
-    },
-    {
-      code: `messages := []ai.Message{
-\tai.UserMessage("Say hello in one sentence."),
-}`,
-      title: "build",
-      type: "[]ai.Message",
-      note: "+ ai.Options, if any",
-    },
-    {
-      code: `msg, err := model.StreamText(ctx, messages).Wait()
-if err != nil {
-\tlog.Fatal(err)
-}
-fmt.Println(msg.Text())`,
-      title: "read",
-      type: "Wait() → *ai.Message",
-      note: "Events() gives the deltas",
-    },
-  ]}
-/>
+`pkg/host` runs the lifecycle of each session over its workspace: the status, the calls that wait for a person, and the recovery after a restart.
 
-<Code code={hello} lang="go" title="examples/hello/main.go" />
+Use it for a product that runs many sessions, a page where a person approves tool calls, or sessions that come back after a deploy. Skip it when one program runs one session, and use `agent.Durable`.
 
-## Find a Page
+[Read about the host](host/index.mdx)
 
-<CardGrid>
-  <Card title="Get Started" icon="rocket">
-    Install the module, set a key, and run the program above.
+## Harness
 
-    [Get Started](start.mdx)
-  </Card>
-  <Card title="The Abstractions" icon="puzzle">
-    One page for each type that you touch: model, message, option, stream, tool.
+`pkg/harness` turns a repository into an agent. Each part of the agent is an option: the model, the instruction files, skills, subagents, MCP servers, tools, and the permission rules.
 
-    [pkg/ai](ai/index.mdx)
-  </Card>
-  <Card title="Tools" icon="random">
-    The functions that a model can call, and the middleware that wraps them.
+Use it for a coding agent, or for an agent that a team changes through files. Skip it when the code gives the tools and the prompt and reads no files, and use `agent.New`.
 
-    [pkg/tool](tool/index.mdx)
-  </Card>
-  <Card title="Agents" icon="seti:go">
-    The loop that runs a model with tools, its events, and its hooks.
+[Read about the harness](harness/index.mdx)
 
-    [pkg/agent](agent/index.mdx)
-  </Card>
-  <Card title="Sessions" icon="open-book">
-    The log of an agent, its entries and values, and the stores that keep it.
+## Agent
 
-    [pkg/session](session/index.mdx)
-  </Card>
-  <Card title="Host" icon="laptop">
-    Sessions of any agent for a Go program, with a stream of their state.
+`pkg/agent` runs the loop: a model call, the tool calls, and the hooks at each point, until the model stops. Claude Code and Codex run as agents too.
 
-    [pkg/host](host/index.mdx)
-  </Card>
-  <Card title="Guides" icon="list-format">
-    One page for each job, with snippets for the choices and one complete program that compiles.
+Use it for your own loop in your process, on any provider, with hooks around each call. Skip it when one model call needs no tools, and use `StreamText`.
 
-    [Call a Model](guides/call-a-model.mdx)
-  </Card>
-  <Card title="Providers" icon="setting">
-    What each provider adds to a call.
+[Read about agents](agent/index.mdx)
 
-    [Anthropic](providers/anthropic.mdx), [OpenAI](providers/openai.mdx), [OpenAI Chat](providers/openai-chat.mdx)
-  </Card>
-  <Card title="Reference" icon="document">
-    Every signature and field.
+## Session
 
-    [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi)
-  </Card>
-  <Card title="Design" icon="github">
-    The design rules of each part, and their reasons. For the developers of gopi.
+`pkg/session` keeps the log of a session in a store. Each message is stored before its event, so a crash loses at most the message in flight.
 
-    [docs/concepts](../../../../docs/concepts/README.md)
-  </Card>
-</CardGrid>
+Use it for a record of the work that outlives the process, and for app state next to the messages. An agent with `agent.Store` writes the log, so a program seldom calls this layer.
+
+[Read about sessions](session/index.mdx)
+
+## Tool
+
+`pkg/tool` turns a Go function into a tool with a typed input. A middleware wraps each call, and a deferred tool loads only when the model searches for it.
+
+Use it for each function that the model can call. For the tools of an MCP server, give the server to `harness.MCP`.
+
+[Read about tools](tool/index.mdx)
+
+## Model Call
+
+`pkg/ai` makes one model call: messages and options in, a stream of events and a message out. Each provider plugs into this layer.
+
+Use it for one reply, a summary, a label, or a typed value with `ai.GenerateObject`. Skip it when the model calls tools in a loop, and use `pkg/agent`.
+
+[Read about model calls](ai/index.mdx) · [Providers](providers/anthropic.mdx)
+
+## Catalog
+
+`pkg/catalog` resolves a model spec, such as `anthropic/claude-opus-5-5`, to a provider or to the driver of an agent. Skip it when the code builds an `ai.LanguageModel` itself. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/catalog) has its calls.
+
+## Start
+
+gopi is a root module and one module for each provider. Import the packages that your program uses, then run `go mod tidy` to add their modules. gopi needs Go 1.27 or later. [Model Call](ai/index.mdx) ends with a program that makes the first call.
+
+Every signature and field is in [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi). The design rules of each part are in [Concepts](../../../../docs/concepts/README.md).

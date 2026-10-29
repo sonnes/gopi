@@ -43,6 +43,9 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Section](agent/section.md)         | How a named part of the system prompt changes from a place in a conversation, and how the agent keeps the history in step with it. |
 | [Tool Change](agent/tool-change.md) | How an agent loads a deferred tool on demand, and how it adds and removes the tools that the model can call in a conversation. |
 | [CLI Agent](agent/cli-agent.md)     | How an agent CLI such as Codex or Claude Code runs as a gopi agent, with the same events, state, and log as the loop. |
+| [CLI Emitter](agent/cli-emitter.md) | How the output of an agent CLI becomes the events of a run stream, the entries of a log, and a state, in the event order of the loop. |
+| [CLI Steer](agent/cli-steer.md)     | How a steer reaches Claude Code during a run, where the log keeps it, and what happens to a steer that the run does not take. |
+| [CLI Request](agent/cli-request.md) | How a CLI agent answers the requests of its CLI, an approval or a hook call, with the approve function and the hooks of gopi. |
 | [Driver](agent/driver.md)           | How one interface starts the harness, Claude Code, or Codex for a session, and what a driver does with a field or a hook point that its agent cannot honor. |
 | [Subagent](agent/subagent.md)       | How a subagent of any driver becomes a child session, and how the run stream of the parent shows its start, its events, and its end. |
 
@@ -65,7 +68,8 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept              | Description                                                                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [Host](host/host.md) | How a host keeps the sessions of any gopi agent for a Go program, as resources with an ID, a config, and a status that survive a restart. |
+| [Host](host/host.md) | How a host keeps the sessions of any gopi agent for a Go program, each with an ID, a session config, and a session status that survive a restart. |
+| [Child Session](host/child-session.md) | How a host keeps the session of a subagent as a read-only session that follows the run of its parent, also in the background and after the run. |
 
 ## session
 

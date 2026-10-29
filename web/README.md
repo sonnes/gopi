@@ -6,20 +6,18 @@ The site uses Astro and Starlight. The landing page has its own layout. Its code
 builds each line that the page shows. A snippet drops its error checks, so
 each preview shows the calls that create and customize an agent.
 
-The replay under the hero and the events figure come from a real run.
+The events figure comes from a real run.
 `make site-demo` builds `../examples/landing/demo`, a durable agent on a
 scripted model. `scripts/record-demo.mjs` runs it, kills it during its third
-tool call, and runs it again with no task. The script writes the output of
-both runs and the events of the second run to `src/data/demo.json`. Run
+tool call, and runs it again with no task. The script writes the events of
+the second run to `src/data/demo.json`. Run
 `make site-demo` again after a change to the demo or to the events of an
 agent. If a run gives an output that the page does not expect, the script
 writes nothing.
 
-Three figures move, and each one has the same content without JavaScript:
-the replay types its lines again on a click, the events light up once in
-order, and the layers figure moves to the next layer every 4 seconds until
-the reader picks one. A radio picks the layer, so the figure works without
-the script. With `prefers-reduced-motion`, nothing moves.
+The events figure lights up once in order. Without JavaScript, it shows every
+event. With `prefers-reduced-motion`, nothing moves. A radio picks the layer of
+the layers figure, so the figure works without the script.
 The pages live in `src/content/docs/`. The concept pages in the
 repository's `docs/concepts/` are on the site too, under Concepts. The rest
 of `docs/` is not part of the site. A link to a file that the site does not
@@ -50,8 +48,9 @@ The frontmatter controls the page introduction:
 `src/components/PageTitle.astro` renders these fields in place of Starlight's
 page title component.
 
-A guide imports its program from `../examples/<guide>/main.go` with a
-`?raw` import and renders it with the Starlight `Code` component. The Go
+A page that ends with a full example imports its program from
+`../examples/<name>/main.go` with a `?raw` import and renders it with the
+Starlight `Code` component. The Go
 toolchain compiles the program, so the page cannot show code that does not
 build. `astro.config.mjs` allows the dev server to read the directory.
 

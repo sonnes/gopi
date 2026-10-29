@@ -8,14 +8,15 @@ import Ladder from "../../../components/figures/Ladder.astro";
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
 <SpecSheet
-  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are gpt-6-luna, gpt-6-sol, gpt-6-astra, and gpt-5.6, and the image model IDs are gpt-image-2, gpt-image-2.5-flare, and gpt-image-2.5-sunburst. A model and the provider bind into a language model."
+  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, HTTPClient, and ChatGPTPlan. The model IDs in models.json are gpt-6-luna, gpt-6-sol, gpt-6-astra, and gpt-5.6, and the image model IDs are gpt-image-2, gpt-image-2.5-flare, and gpt-image-2.5-sunburst. A model and the provider bind into a language model."
   pkg="pkg/ai/openai"
   api="Responses API"
   implements={["TextProvider", "ObjectProvider", "TokenCounter", "ImageProvider", "ModelLister"]}
   options={[
     ["APIKey(key)", "default `OPENAI_API_KEY`"],
-    ["BaseURL(url)", "OpenRouter, a proxy, a test server"],
+    ["BaseURL(url)", "a proxy or a test server"],
     ["HTTPClient(c)", "a recording client"],
+    ["ChatGPTPlan()", "the plan route of a ChatGPT sign-in"],
   ]}
   models={[
     ["gpt-6-luna", "ai"],
@@ -111,7 +112,11 @@ resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1024x1024"))
 
 ## Other Servers
 
-`BaseURL` points the provider at another Responses API. OpenRouter serves one at `https://openrouter.ai/api/v1`. It has no token count and no images. For Fireworks, use [OpenAI Chat](openai-chat.mdx).
+`BaseURL` points the provider at another Responses API. The [OpenRouter](openrouter.mdx) provider sends its calls through this provider, with the key and the URL of OpenRouter, and it lists the models of OpenRouter. For Fireworks, use the [Fireworks](fireworks.mdx) provider.
+
+## The ChatGPT Plan
+
+`openai.ChatGPTPlan` shapes each request for the plan route, the Responses API with an OAuth token of a ChatGPT plan. The option needs an `HTTPClient` that sends the token. The [ChatGPT](chatgpt.mdx) provider sets both, and its page says what the route does not accept.
 
 ## Errors
 

@@ -5,7 +5,7 @@ summary: An event is one thing that happened in a run. The events of a run arriv
 
 import Spans from "../../../components/figures/Spans.astro";
 
-`Agent.Run` returns the stream of the run. `Events` reads each event in order. `Wait` returns the messages that the run produced. Your input is not in that result, because you already have it.
+`Agent.Run` returns the stream of the run. Range over `Events` to show the run as it happens, or call `Wait` for the messages that the run produced, without your input.
 
 <Spans
   alt="A trace of one run as nested bars. agent_start and agent_end are the two ends of the outer bar, and agent_end carries the usage and the error. Turn 1 holds the input message, an assistant message with a ToolCall, one tool execution of weather, and a tool result message. Turn 2 holds an assistant message with Text. Each message ends with message_end, and the log stores the message before it. The run ends after turn 2, because it has no tool call."
@@ -49,9 +49,10 @@ for ev, err := range s.Events() {
 - A turn starts with `turn_start`. If the [sections](sections.mdx) or the [tools](tool-changes.mdx) changed, a system message with the change comes next.
 - Then the new messages of the turn come. In turn 1, they are your input, then the [steer queue](steer.mdx).
 - The assistant message comes next: one `message_start`, one `message_update` for each model event, and one `message_end`. A `message_update` carries a snapshot of the partial message and the model event behind it.
-- The tool calls of one message run at the same time. Each `tool_execution_start` comes first, in call order. When a call ends, its `tool_execution_end` comes, then its result message. So the results are in the order in which the calls end.
-- If the message calls a sequential tool, the calls run in order. Each call then sends its start, its end, and its result before the next call starts.
+- The tool calls of one message run at the same time. Each `tool_execution_start` comes first, in call order. When a call ends, its `tool_execution_end` comes, then its result message.
+- If the message calls a sequential tool, each call sends its start, its end, and its result before the next call starts.
 - `turn_end` carries the assistant message and the tool results. The messages of the `AfterTurn` [hooks](hooks.mdx) come after it.
+- A subagent that a tool call starts sends `subagent_start`, each event of its run inside a `subagent` event, and `subagent_end`. [`agent.EventSubagent`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#EventSubagent) has the fields.
 
 ## Failures
 

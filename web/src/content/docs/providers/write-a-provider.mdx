@@ -6,10 +6,6 @@ summary: Implement TextProvider with an option of your own and an event stream, 
 import { Code } from "@astrojs/starlight/components";
 import code from "../../../../../examples/write-a-provider/main.go?raw";
 
-:::note
-The program in this guide runs without a key.
-:::
-
 A provider is one method. `pkg/ai` gives the types, and the provider gives the transport.
 
 ```go
@@ -111,22 +107,22 @@ got, err := Greet(context.Background(), lm, "Ada")
 
 `Replies` are consumed in order, so a call with no reply left fails and a test covers the error path. `Calls` holds the messages of each call and `Options` holds the options, so a test asserts on the prompt and on the settings. The fake is [examples/fake-provider/fake.go](../../../../../examples/fake-provider/fake.go), and its test is [fake_test.go](../../../../../examples/fake-provider/fake_test.go).
 
+## Related
+
+- [Streams](../ai/streams.mdx) for the event types and the rules of a producer.
+- [Options](../ai/options.mdx) for `NewOption` and `GetOption`.
+- [Anthropic](anthropic.mdx), [OpenAI](openai.mdx), [OpenAI Chat](openai-chat.mdx), [ChatGPT](chatgpt.mdx), [OpenRouter](openrouter.mdx), and [Fireworks](fireworks.mdx) are the providers in this repository.
+
 ## The Full Example
+
+The program calls no model, so it needs no key.
 
 <div class="program">
   <Code code={code} lang="go" title="examples/write-a-provider/main.go" />
 </div>
 
-## Read the Program
-
-- `logging` wraps `Echo`. The line `call echo-1 1 messages` on stderr comes from it.
+- `logging` wraps `Echo`. It writes the line on stderr that ends with `call echo-1 1 messages`. The `log` package puts the date and the time in front.
 - `Upper` is an option that only this provider reads.
 - An empty message list fails before the stream starts. The caller sees it from `Events` or from `Wait`.
 - The producer checks `ctx.Err()` in its loop.
 - The final message carries the model ID, the stop reason, and the usage.
-
-## Related
-
-- [Streams](../ai/streams.mdx) for the event types and the rules of a producer.
-- [Options](../ai/options.mdx) for `NewOption` and `GetOption`.
-- [Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) are the providers in this repository.

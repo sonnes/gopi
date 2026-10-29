@@ -5,7 +5,7 @@ summary: A tool change is a system message that adds or removes the tools that t
 
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
-Defer a tool when the agent has more tools than you want to send on each model call. Without deferred tools, every tool of `agent.Toolset` goes in the [base](sections.mdx#the-base), and each model call sends all of them. A deferred tool is not in the base. The agent can run it, but the model cannot call it until a tool change adds it.
+Defer a tool when the agent has more tools than you want to send on each model call. Without deferred tools, each model call sends every tool of `agent.Toolset` in the [base](sections.mdx#the-base). The agent can run a deferred tool, but the model cannot call it until a tool change adds it.
 
 <PrefixBar
   alt="A request after a tool change. The base, with the system prompt and the tools that are not deferred, and the history are the same as on the last call, so they are cached. The tool change that adds get_weather comes after the history, then the new messages of the turn."
@@ -49,9 +49,7 @@ If a tool is deferred, the agent adds the `tool_search` tool after the tools of 
 | `weather forecast`                 | The best keyword matches, up to `max_results`, 5 by default   |
 | `+stock price`                     | Only the tools with `stock` in the name, ranked by `price`    |
 
-A keyword in the name of a tool counts twice as much as a keyword in its description or input properties. If two tools have the same score, the tool that comes first in `Toolset` wins. If the model calls a deferred tool before a search loads it, the result tells it to search first.
-
-At the start of the next turn, the agent adds one system message with an `ai.ToolAdded` block for each loaded tool.
+A keyword in the name of a tool counts twice as much as a keyword in its description or input properties. If two tools have the same score, the tool that comes first in `Toolset` wins. At the start of the next turn, the agent adds one system message with an `ai.ToolAdded` block for each loaded tool.
 
 ## Resume a Session
 
@@ -76,19 +74,20 @@ A provider sends a change in place when its API has a form for it. Otherwise, it
 | `openai`     | `additional_tools` item, in place  | `allowed_tools` tool choice     |
 | `openaichat` | A new tool list                    | `allowed_tools` tool choice     |
 
-The pages for [anthropic](../providers/anthropic.mdx), [openai](../providers/openai.mdx), and [openaichat](../providers/openai-chat.mdx) name the models that take these forms.
+The `chatgpt` and `openrouter` providers send each call through `openai`, and `fireworks` through `openaichat`. The pages for [anthropic](../providers/anthropic.mdx), [openai](../providers/openai.mdx), and [openrouter](../providers/openrouter.mdx) name the models that take the forms in place.
 
 ## Rules
 
 A loaded tool stays loaded after the run ends, also when a failure or a cancel ends the run before the next model call.
 
-- If the model calls a deferred tool that the search did not load, it gets an error result. A removed tool gets the same result.
-- Each tool needs a unique name. If a tool is deferred, a tool of your own named `tool_search` clashes with the search. Then `agent.New` panics, and `agent.Durable` returns an error.
+- If the model calls a deferred tool that no search loaded, it gets the error result `tool "x" is deferred. Load it with tool_search first.`
+- If the model calls a removed tool, it gets the error result `tool "x" not found`.
+- If a tool is deferred, a tool of your own named `tool_search` clashes with the search. Then `agent.New` panics, and `agent.Durable` returns an error.
 
 ## Related
 
 - [Agents](index.mdx) run the loop that declares the change.
-- [Events](events.mdx) carry each message that the agent adds to the history.
+- [Events](events.mdx) carry each message that the agent adds.
 - [Tools](../tool/index.mdx) have the deferred flag.
 - [Messages](../ai/messages.mdx) hold the blocks of a change.
 

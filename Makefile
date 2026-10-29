@@ -110,9 +110,9 @@ site-check:
 site-test:
 	cd web && pnpm test
 
-# Record the replay of the landing page. The target builds the demo
+# Record the events of the landing page. The target builds the demo
 # program, runs it, stops it during a tool call, and runs it again. Run
-# it after a change to the demo or to the output of an agent.
+# it after a change to the demo or to the events of an agent.
 site-demo:
 	go build -o .bin/landing-demo ./examples/landing/demo
 	node web/scripts/record-demo.mjs .bin/landing-demo web/src/data/demo.json

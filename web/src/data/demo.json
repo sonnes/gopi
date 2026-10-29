@@ -1,22 +1,4 @@
 {
-  "runs": [
-    {
-      "cmd": "triage \"Triage the open issues\"",
-      "lines": [
-        "-> list_issues {\"state\":\"open\"}",
-        "-> read_issue {\"number\":41}",
-        "-> read_issue {\"number\":42}"
-      ],
-      "end": "signal: killed"
-    },
-    {
-      "cmd": "triage",
-      "lines": [
-        "-> read_issue {\"number\":42}",
-        "Two issues are open: #41 is a bug, #42 asks for a feature."
-      ]
-    }
-  ],
   "events": [
     {
       "type": "agent_start"

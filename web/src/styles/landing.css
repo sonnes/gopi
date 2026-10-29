@@ -30,18 +30,12 @@ h2 {
   max-width: var(--shell);
   margin: 0 auto;
 }
-.index li a {
-  padding-inline: 0;
-}
 /* Every rule across the page stops at the container, including the one
    under the nav and the one over the footer. */
 .row-inner,
 .site-nav-inner,
 .site-footer .foot {
   border-top: 1px solid var(--line);
-}
-.row--wide .row-inner {
-  border-top: 0;
 }
 .site-nav-inner {
   border-top: 0;
@@ -51,11 +45,10 @@ h2 {
 .site-footer {
   border: 0;
 }
-/* The hero opens the sheet: no rule above it, one below, where the spine
-   between its columns can land. */
+/* The hero opens the sheet, so it has no rule above it. The band under
+   it draws the rule between them. */
 .hero .row-inner {
   border-top: 0;
-  border-bottom: 1px solid var(--line);
 }
 
 .row-inner {
@@ -89,65 +82,34 @@ h2 {
   gap: var(--gutter);
   margin-bottom: 2.5rem;
 }
-/* The eyebrow sits above the heading in the left cell, so the right cell
-   drops by exactly that much and the two first lines meet. */
+/* The label sits above the heading in the left cell, so the right cell
+   drops by the label line and its margin, and the two first lines meet. */
 .wide-note {
-  padding-top: 2.25rem;
+  padding-top: calc(var(--label-size) * 1.6 + 1rem);
+}
+.wide-head p + p {
+  margin-top: 1rem;
 }
 .wide-head p {
   color: var(--copy);
   font-size: 1rem;
   line-height: 1.55;
   margin: 0;
-  max-width: 34rem;
+  max-width: var(--measure-wide);
 }
 .wide-head code {
   color: var(--text);
   font-size: 0.92em;
 }
 
-/* Four ways, four columns, one rule between each. */
-.fourup {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-top: 1px solid var(--line-strong);
-}
-.fourup li {
-  padding: 1.5rem var(--gutter) 0 0;
-  border-right: 1px solid var(--line);
-}
-.fourup li + li {
-  padding-left: var(--gutter);
-}
-.fourup li:last-child {
-  border-right: 0;
-  padding-right: 0;
-}
-.fourup p {
-  margin: 0;
-  color: var(--copy);
-  font-size: 0.95rem;
-  line-height: 1.55;
-}
-.fourup .label {
-  margin-bottom: 0.7rem;
-}
-.fourup-cmd {
-  margin-top: 1rem !important;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-
 /* ---------- the label voice ---------- */
 /* The voice itself is in tokens.css, under .label. These are the other
    things on this page that speak in it. */
 .ledger th,
-.tree-head,
-.ways dt {
+.cycle-sessions th,
+.cards-head,
+.stack-note dt,
+.win-tab {
   font-family: var(--font-mono);
   font-size: var(--label-size);
   font-weight: 400;
@@ -159,12 +121,16 @@ h2 {
 .foot-right {
   margin-left: auto;
 }
-/* Element-qualified to outrank `.cell--words p`, which would otherwise
-   set a kicker at the size of the body copy. */
+/* Element-qualified to outrank `.cell--words p` and `.wide-head p`,
+   which would otherwise set a label in the voice of the body copy. */
 .cell--words p.label,
+.wide-head p.label,
 .label {
   margin: 0 0 1rem;
   max-width: none;
+  font-size: var(--label-size);
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 /* ---------- hero ---------- */
@@ -181,63 +147,9 @@ h2 {
   font-size: 1.05rem;
   line-height: 1.6;
   max-width: var(--measure);
-  margin: 1.4rem 0 2.5rem;
+  margin: 1.5rem 0 2.5rem;
 }
 
-/* The command is a field you can take: the artifact frame, at the size
-   of a control. */
-.install {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  max-width: var(--measure);
-  padding-bottom: 0.7rem;
-  border-bottom: 1px solid var(--line-strong);
-}
-.install code {
-  font-size: 0.85rem;
-}
-.install .sig {
-  font-family: var(--font-mono);
-  color: var(--muted);
-}
-.install code {
-  flex: 1;
-  color: var(--text);
-  font-size: 0.8rem;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-/* Element-qualified: Expressive Code wraps its own copy button in a
-   `div.copy`, and a bare class selector would draw one over it. */
-button.copy {
-  align-self: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.7rem;
-  height: 1.7rem;
-  flex: none;
-  background: none;
-  border: 0;
-  padding: 0;
-  color: var(--muted);
-  cursor: pointer;
-}
-button.copy svg {
-  width: 15px;
-  height: 15px;
-}
-button.copy:hover {
-  color: var(--link);
-}
-
-.hero-meta {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: var(--muted);
-}
 .cell--words p.hero-actions {
   margin: 2.5rem 0 0;
 }
@@ -259,7 +171,7 @@ button.copy:hover {
 .cell--words p:last-of-type {
   margin-bottom: 0;
 }
-.cell--words code {
+.cell--words p code {
   color: var(--text);
   font-size: 0.92em;
 }
@@ -283,20 +195,11 @@ button.copy:hover {
 /* A table is a name on a rule, then the table. Hairlines divide. */
 .artifact {
   margin: 0;
-}
-.artifact figcaption {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding-bottom: 1rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 1px solid var(--line);
-  font-size: var(--label-size);
-  color: var(--muted);
+  overflow-x: auto;
 }
 
 /* ---------- code windows ---------- */
-/* Code and a recorded run sit in a window, in the style of xdb.dev: a
+/* Code sits in a window, in the style of xdb.dev: a
    white sheet on a hairline, and a tab bar in the panel tint with the
    name of the file and what it shows. The code is ink. A comment is
    grey, and a string is rose. */
@@ -314,9 +217,6 @@ button.copy:hover {
   padding: 0.45rem 0.9rem;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--muted);
   white-space: pre;
 }
 .win pre {
@@ -337,15 +237,16 @@ button.copy:hover {
 }
 .win + .win,
 .win + figure {
-  margin-top: 1.25rem;
+  margin-top: 1.5rem;
 }
 
 /* ---------- ledgers: the session and the providers ---------- */
 .ledger {
   width: 100%;
+  min-width: 42rem;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  font-size: 0.94rem;
   font-variant-numeric: tabular-nums;
 }
 .ledger th {
@@ -364,6 +265,7 @@ button.copy:hover {
 }
 .ledger td.mono {
   font-family: var(--font-mono);
+  font-size: 0.8rem;
 }
 .ledger tr:last-child td {
   border-bottom: 0;
@@ -378,108 +280,15 @@ button.copy:hover {
 .ledger td.dim {
   color: var(--muted);
 }
-/* The second path steps in behind a corner, so the branch is visible in
-   the shape of the rows and not only in the note beside them. */
-/* ---------- the session tree ---------- */
-/* The rows are a fixed height so the drawn path can meet each one. */
-.tree {
-  position: relative;
-}
-.tree-lines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  fill: none;
-  stroke: var(--line-strong);
-  stroke-width: 1;
-}
-.tree-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  position: relative;
-}
-.tree-rows li {
-  display: grid;
-  grid-template-columns: 8rem 9rem 22rem 1fr;
-  align-items: center;
-  height: 44px;
-  font-size: 0.86rem;
-  color: var(--text);
-}
-/* The head of the tree is the head of a ledger: the label voice on the
-   one strong rule. */
-.tree-head {
-  border-bottom: 1px solid var(--line-strong);
-}
-.tree-rows .mono {
-  font-family: var(--font-mono);
-}
-.tree-rows .dim {
-  color: var(--muted);
-}
-.tree-head span:first-child,
-.tree-rows .id {
-  padding-left: 32px;
-}
-.tree-rows .is-child .id {
-  padding-left: 59px;
-}
-.tree-lines {
-  stroke-width: 1.5;
-}
-.tree-lines .is-fork {
-  stroke: var(--primary);
-}
-.ledger col:nth-child(1) {
-  width: 20%;
-}
-.ledger col:nth-child(2) {
-  width: 13%;
-}
-.ledger col:nth-child(3) {
-  width: 14%;
-}
-.ledger col:nth-child(4) {
-  width: 22%;
-}
-
-/* ---------- the four run modes ---------- */
-/* A definition table, not four little headings: the term in the label
-   voice at the left, the line about it beside. */
-.ways {
-  display: grid;
-  grid-template-columns: 6rem 1fr;
-  grid-auto-rows: minmax(2.6rem, auto);
-  align-items: start;
-  margin: 0;
-  max-width: var(--measure);
-}
-.ways dt {
-  line-height: 1.6;
-  padding: 0.28rem 1rem 0 0;
-}
-.ways dd {
-  margin: 0 0 1rem;
-  color: var(--copy);
-  font-size: 0.95rem;
-  line-height: 1.6;
-  padding-top: 0.25rem;
-}
-.ways dd:last-of-type {
-  margin-bottom: 0;
-}
 
 /* ---------- the way out ---------- */
 /* The page ends on the same paper it began on, with the largest line
    after the headline, Agent Gopi, and the ways into the documentation. */
-.outro {
-  border-top: 1px solid var(--line);
-}
 .outro-inner {
   max-width: var(--shell);
   margin: 0 auto;
   padding: var(--band) var(--shell-pad) 0;
+  border-top: 1px solid var(--line);
 }
 .outro-link {
   display: inline-block;
@@ -497,7 +306,7 @@ button.copy:hover {
   font-size: 1rem;
   line-height: 1.6;
   max-width: var(--measure);
-  margin: 1.75rem 0 3.5rem;
+  margin: 1.5rem 0 2.5rem;
   color: var(--copy);
 }
 /* Each way out sits on its own rule, so a second row lines up with the
@@ -516,11 +325,12 @@ button.copy:hover {
 }
 .ways-out a {
   font-family: var(--font-mono);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
   color: var(--link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+  text-underline-offset: 3px;
 }
 .ways-out a:hover {
   color: var(--primary);
@@ -528,14 +338,13 @@ button.copy:hover {
 .ways-out span {
   display: block;
   margin-top: 0.5rem;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   color: var(--muted);
 }
 
 @media (max-width: 62rem) {
   .row-inner,
-  .ways-out,
-  .fourup {
+  .ways-out {
     display: block;
   }
   .row--wide .wide-inner {
@@ -544,13 +353,10 @@ button.copy:hover {
   .wide-head {
     display: block;
   }
+  /* Stacked, the heading margin already parts the label and heading from
+     the words. */
   .wide-note {
-    padding-top: 1.5rem;
-  }
-  .fourup li,
-  .fourup li + li {
-    padding: 1.25rem 0 0;
-    border-right: 0;
+    padding-top: 0;
   }
   .ways-out li {
     padding-block: 1rem;
@@ -562,10 +368,6 @@ button.copy:hover {
   /* Stacked, the words already close the band above the code. */
   .cell--work {
     padding: 0 var(--shell-pad) var(--band);
-  }
-  .index a {
-    grid-template-columns: 1fr;
-    gap: 0.2rem;
   }
 }
 
@@ -581,25 +383,6 @@ button.copy:hover {
 }
 .agent-hero .cell--work {
   padding-block: 4rem;
-}
-.agent-hero h1 {
-  font-family: var(--font-brand);
-  font-weight: 400;
-  font-size: clamp(3.1rem, 6.5vw, 5.5rem);
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-}
-.agent-hero .hero-description {
-  font-family: var(--font-mono);
-  font-size: clamp(1.1rem, 2vw, 1.5rem);
-  margin: 1.5rem 0 0;
-  color: var(--text);
-}
-.agent-hero .cell--words p.lede {
-  margin: 1rem 0 2rem;
-}
-.agent-hero .install code {
-  font-size: 0.76rem;
 }
 .agent-hero .hero-actions {
   display: flex;
@@ -618,21 +401,16 @@ button.copy:hover {
 .agent-hero .btn--primary:hover {
   background: var(--primary-ink);
 }
-.hero-wordmark {
-  display: block;
-  width: min(100%, 340px);
-  height: auto;
-  margin-left: -0.04em;
-}
 
 /* ---------- figures under the code ---------- */
-/* A figure under a snippet sits on one strong rule, with its caption in
-   the label voice: the number at the left, the name at the right. */
+/* A figure under a snippet sits on one strong rule. Every numbered
+   figure ends on its caption, in the label voice: the number at the
+   left, the name at the right. */
 .cycle,
 .spec-fig,
 .events {
   margin: 1.5rem 0 0;
-  padding-top: 1.1rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--line-strong);
 }
 .cycle figcaption,
@@ -641,62 +419,15 @@ button.copy:hover {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin: 0;
-}
-.spec-fig figcaption {
-  margin-top: 1.25rem;
+  gap: 1rem;
+  margin: 1.5rem 0 0;
 }
 #providers .spec-fig {
-  margin: 0 0 3rem;
-}
-
-/* ---------- the replay ---------- */
-/* The record of a real run. Without JavaScript it is a still frame of
-   the whole run; the button types it again, line by line. */
-.replay-play {
-  font: inherit;
-  color: var(--muted);
-  background: var(--code-bg);
-  border: 1px solid var(--line);
-  padding: 0.05rem 0.55rem;
-  cursor: pointer;
-}
-.replay-play:hover {
-  color: var(--text);
-  border-color: var(--primary);
-}
-/* Each line is a block, so the white space of the markup between the
-   lines collapses and a line keeps its own. */
-.win pre.replay-screen {
-  white-space: normal;
-  color: var(--copy);
-}
-.replay-screen span {
-  display: block;
-  white-space: pre;
-}
-.replay-screen .is-hidden {
-  visibility: hidden;
-}
-.replay-cmd {
-  color: var(--text);
-}
-.replay-cmd b {
-  color: var(--primary);
-  font-weight: 600;
-}
-.replay-call {
-  color: var(--muted);
-}
-.replay-kill {
-  color: var(--l-ai);
-}
-.replay-out {
-  color: var(--text);
+  margin: 0 0 2.5rem;
 }
 
 /* ---------- the lifecycle ---------- */
-/* fig. 1: the sessions of one host, each over its own workspace, then
+/* fig. 2: the sessions of one host, each over its own workspace, then
    the statuses that a session moves through. A status is a pill in the
    hue of what it asks of the reader: green runs, amber waits for a
    person, and grey is idle. */
@@ -704,19 +435,21 @@ button.copy:hover {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: 0.75rem;
 }
 .cycle-sessions th {
   text-align: left;
-  font-weight: 400;
-  color: var(--muted);
   padding: 0 0.75rem 0.5rem 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-strong);
 }
 .cycle-sessions td {
   padding: 0.45rem 0.75rem 0.45rem 0;
   border-bottom: 1px solid var(--line);
   color: var(--text);
+  white-space: nowrap;
+}
+.cycle-sessions tr:last-child td {
+  border-bottom: 0;
 }
 .cycle-sessions td:nth-child(2),
 .cycle-sessions td:nth-child(3) {
@@ -725,7 +458,7 @@ button.copy:hover {
 .status {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.5;
   padding: 0 0.45rem;
   border: 1px solid var(--hue);
@@ -756,7 +489,7 @@ button.copy:hover {
 }
 .cycle-via {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.6875rem;
   color: var(--muted);
   padding: 0 0.5rem;
 }
@@ -767,12 +500,12 @@ button.copy:hover {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0.2rem 1rem;
-  margin: 1rem 0 1.25rem;
+  margin: 1rem 0 0;
   font-size: 0.8rem;
 }
 .cycle-stops dt {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--muted);
 }
 .cycle-stops dd {
@@ -798,6 +531,7 @@ button.copy:hover {
   font-size: 1.35rem;
   font-weight: 600;
   letter-spacing: -0.02em;
+  white-space: nowrap;
   color: var(--hue, var(--muted));
   padding: 0 0.2rem 0.3rem;
   border-bottom: 3px solid var(--hue, transparent);
@@ -805,7 +539,7 @@ button.copy:hover {
 .spec-note {
   margin-top: 0.6rem;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.5;
   color: var(--muted);
   text-align: center;
@@ -838,7 +572,7 @@ button.copy:hover {
    a message or a tool call inside a turn. The hue is the kind. */
 .event-rows {
   list-style: none;
-  margin: 0.9rem 0 0;
+  margin: 0;
   padding: 0;
   font-size: 0.78rem;
   line-height: 1.5;
@@ -848,7 +582,6 @@ button.copy:hover {
   gap: 0.8rem;
   align-items: baseline;
   padding: 0.12rem 0 0.12rem calc(var(--depth) * 1.25rem);
-  border-left: 2px solid transparent;
   transition: opacity 0.2s;
 }
 .event code {
@@ -875,94 +608,218 @@ button.copy:hover {
 
 /* ---------- the stack ---------- */
 /* The layers at the left, and the note of one layer at the right. A
-   radio picks the layer, so the figure works without JavaScript; the
-   script only moves it on until the reader picks one. */
+   radio picks the layer, so the figure works without JavaScript. */
 .stack {
   display: grid;
   grid-template-columns: var(--split);
   gap: var(--gutter);
-  align-items: start;
+  align-items: center;
 }
 .stack-radio {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
+/* The layers are an exploded stack of slabs, seen from above at the
+   2:1 angle of an isometric drawing. Each label is one band of the
+   stack, and its slab hangs below it, so a higher layer covers the top
+   of the layer under it. The picked slab slides out of the stack. */
 .stack-bars {
+  --slab-w: 250px;
+  --slab-step: 82px;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  padding-bottom: calc(var(--slab-w) * 160 / 280 - var(--slab-step));
 }
 .stack-bar {
-  font-family: var(--font-mono);
-  font-size: 0.86rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  border-left: 4px solid var(--hue);
-  color: var(--muted);
+  position: relative;
+  display: block;
+  height: var(--slab-step);
   cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
+  color: var(--muted);
+}
+/* A higher layer paints over the slabs under it. */
+.stack-bar--host { z-index: 6; }
+.stack-bar--harness { z-index: 5; }
+.stack-bar--agent { z-index: 4; }
+.stack-bar--session { z-index: 3; }
+.stack-bar--tool { z-index: 2; }
+.stack-bar--ai { z-index: 1; }
+.slab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--slab-w);
+  height: auto;
+  overflow: visible;
+  transition: transform 0.3s ease;
+}
+.slab path {
+  stroke: color-mix(in srgb, var(--hue) 70%, var(--ground));
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  transition: fill 0.3s ease;
+}
+.slab-top {
+  fill: color-mix(in srgb, var(--hue) 10%, var(--ground));
+}
+.slab-left {
+  fill: color-mix(in srgb, var(--hue) 34%, var(--ground));
+}
+.slab-right {
+  fill: color-mix(in srgb, var(--hue) 22%, var(--ground));
+}
+/* The name sits at the right corner of its slab, on a short leader. */
+.stack-name {
+  position: absolute;
+  top: calc(var(--slab-w) * 70 / 280 - 0.7rem);
+  left: calc(var(--slab-w) + 1.75rem);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1.4rem;
+  white-space: nowrap;
+  transition: color 0.2s, transform 0.3s ease;
+}
+/* The nouns of the layer, in one muted line under its name. */
+.stack-nouns {
+  display: block;
+  max-width: 13rem;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  white-space: normal;
+  color: var(--muted);
+  font-weight: 400;
+}
+/* A wrap falls between two nouns, never before a dot. */
+.stack-nouns span {
+  white-space: nowrap;
+}
+.stack-name::before {
+  content: "";
+  position: absolute;
+  top: 0.7rem;
+  right: calc(100% + 0.4rem);
+  width: 1.1rem;
+  border-top: 1px solid var(--line-strong);
 }
 .stack-bar:hover {
   color: var(--text);
 }
+/* Every note takes the same cell, so the figure keeps the height of the
+   tallest note when the reader picks another layer. Only the picked
+   note shows. */
+.stack-notes {
+  display: grid;
+}
 .stack-note {
-  display: none;
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+/* What to use a layer for, as a short list, then when to skip it. The
+   list marks take the hue of the layer. */
+.uses {
+  margin: 0 0 1.5rem;
+}
+.uses ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uses li {
+  position: relative;
+  padding-left: 1rem;
+  margin: 0 0 0.35rem;
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: var(--copy);
+}
+.uses li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 0.4rem;
+  height: 0.4rem;
+  background: var(--hue);
+}
+.uses-skip {
+  margin: 0.75rem 0 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.94rem;
+  line-height: 1.5;
+  color: var(--copy);
+}
+.uses-skip span {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--label-size);
+  letter-spacing: var(--label-track);
+  color: var(--muted);
+}
+/* The APIs that a program calls first, as cards with an edge in the hue
+   of the layer. */
+.cards {
+  margin: 0 0 1.5rem;
+}
+.cards-head {
+  margin: 0 0 0.5rem;
+}
+.cards ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--hue);
+}
+.card code {
+  font-size: 0.8rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.card span {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
 }
 .stack-pkg {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.5rem;
   font-family: var(--font-mono);
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--hue);
 }
 .stack-what {
-  margin: 0 0 1.25rem;
+  margin: 0 0 1.5rem;
   font-size: 1.05rem;
   line-height: 1.55;
-  color: var(--text);
-  max-width: 34rem;
+  color: var(--copy);
+  max-width: var(--measure-wide);
 }
 .stack-note dl {
   display: grid;
   grid-template-columns: 8rem 1fr;
   gap: 0.4rem 1rem;
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
 }
 .stack-note dt {
-  font-family: var(--font-mono);
-  font-size: var(--label-size);
-  color: var(--muted);
   padding-top: 0.15rem;
 }
 .stack-note dd {
   margin: 0;
   color: var(--copy);
-}
-.life {
-  position: relative;
-  margin-top: 1.5rem;
-  height: 2.2rem;
-}
-.life-bar {
-  position: absolute;
-  bottom: 0.3rem;
-  left: 0;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--hue);
-}
-.life-crash {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  line-height: 1;
-  left: var(--crash);
-  padding-left: 0.4rem;
-  border-left: 1px dashed var(--err);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--err);
 }
 .stack-note .more {
   margin-top: 1.5rem;
@@ -973,7 +830,7 @@ button.copy:hover {
 #layer-session:checked ~ .stack-notes .stack-note--session,
 #layer-tool:checked ~ .stack-notes .stack-note--tool,
 #layer-ai:checked ~ .stack-notes .stack-note--ai {
-  display: block;
+  visibility: visible;
 }
 #layer-host:checked ~ .stack-bars .stack-bar--host,
 #layer-harness:checked ~ .stack-bars .stack-bar--harness,
@@ -981,8 +838,30 @@ button.copy:hover {
 #layer-session:checked ~ .stack-bars .stack-bar--session,
 #layer-tool:checked ~ .stack-bars .stack-bar--tool,
 #layer-ai:checked ~ .stack-bars .stack-bar--ai {
-  background: color-mix(in srgb, var(--hue) var(--l-mix), transparent);
+  --picked: 1;
   color: var(--text);
+}
+.stack-bar .slab,
+.stack-bar .stack-name {
+  --out: calc(var(--picked, 0) * 1.25rem);
+}
+.stack-bar .slab {
+  transform: translate(var(--out), calc(var(--out) * -0.5));
+}
+.stack-bar .stack-name {
+  transform: translateX(var(--out));
+}
+.stack-bar:hover .slab {
+  transform: translate(var(--out), calc(var(--out) * -0.5 - 4px));
+}
+.stack-bar .slab-top {
+  fill: color-mix(in srgb, var(--hue) calc(10% + var(--picked, 0) * 18%), var(--ground));
+}
+.stack-bar .slab path {
+  stroke-width: calc(1.2px + var(--picked, 0) * 0.8px);
+}
+.stack-bar .stack-name {
+  font-weight: calc(400 + var(--picked, 0) * 200);
 }
 #layer-host:focus-visible ~ .stack-bars .stack-bar--host,
 #layer-harness:focus-visible ~ .stack-bars .stack-bar--harness,
@@ -1008,17 +887,23 @@ button.copy:hover {
   width: auto;
 }
 
-/* ---------- the portrait, in the way out ---------- */
-.outro-head {
-  display: grid;
-  grid-template-columns: var(--split);
-  gap: var(--gutter);
-  align-items: end;
+/* ---------- agent gopi ---------- */
+/* The wordmark and the portrait at the left, the places where an agent
+   runs at the right. */
+.agent-id {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+.agent-wordmark {
+  display: block;
+  width: min(100%, 320px);
+  height: auto;
 }
 .agent-portrait {
-  margin: 0 0 2.5rem;
-  justify-self: end;
-  width: min(100%, 280px);
+  margin: 0;
+  width: min(100%, 260px);
 }
 .agent-portrait img {
   display: block;
@@ -1030,16 +915,31 @@ button.copy:hover {
   justify-content: space-between;
   border-top: 1px solid var(--line-strong);
   padding-top: 0.75rem;
+  margin: 0;
 }
 .agent-portrait figcaption span:first-child {
-  color: var(--link);
+  color: var(--text);
 }
-
-.artifact {
-  overflow-x: auto;
+.agent-band .cell--work p.agent-lede {
+  color: var(--copy);
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: var(--measure-wide);
+  margin: 0 0 1.5rem;
 }
-.ledger {
-  min-width: 42rem;
+/* The covers fit the column, so they do not keep the width of a ledger. */
+.ledger.ledger--covers {
+  min-width: 0;
+}
+.ledger--covers th:nth-child(1) {
+  width: 30%;
+}
+.ledger--covers th:nth-child(2) {
+  width: 26%;
+}
+.ledger--covers td.mono {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 62rem) {
@@ -1052,17 +952,50 @@ button.copy:hover {
   .stack {
     grid-template-columns: minmax(0, 1fr);
   }
-  .outro-head {
-    display: block;
+  .agent-wordmark {
+    width: 260px;
   }
   .agent-portrait {
     width: 220px;
-    margin-inline: auto;
   }
 }
 @media (max-width: 46rem) {
   .agent-hero .hero-actions {
     gap: 1rem;
     flex-wrap: wrap;
+  }
+}
+/* The slabs shrink where their column is narrow, so that the names and
+   the nouns beside them keep their lines. The step keeps the slab ratio,
+   82 over 250. */
+@media (min-width: 62.01rem) and (max-width: 80rem) {
+  .stack-bars {
+    --slab-w: 200px;
+    --slab-step: 66px;
+  }
+}
+/* On a phone, the slabs shrink again, and the figures tighten to fit
+   the column. */
+@media (max-width: 40rem) {
+  .stack-bars {
+    --slab-w: 160px;
+    --slab-step: 56px;
+  }
+  .stack-nouns {
+    max-width: 10rem;
+  }
+  .cycle-sessions td {
+    padding-right: 0.5rem;
+  }
+  .spec-text {
+    font-size: 1.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slab,
+  .slab path,
+  .stack-name {
+    transition: none;
   }
 }

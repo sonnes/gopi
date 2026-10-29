@@ -1,0 +1,55 @@
+---
+title: Fireworks
+summary: The host provider for Fireworks. It sends each call through the OpenAI Chat provider, and it lists the models of one Fireworks account.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+
+<SpecSheet
+  alt="The fireworks package calls the Chat Completions API of Fireworks. It implements TextProvider, ObjectProvider, and ModelLister, and not TokenCounter or ImageProvider. New takes APIKey, BaseURL, Account, and HTTPClient. The package has no models. A model and the provider bind into a language model."
+  pkg="pkg/ai/fireworks"
+  api="Chat Completions API of Fireworks"
+  implements={["TextProvider", "ObjectProvider", "ModelLister"]}
+  lacks={["TokenCounter", "ImageProvider"]}
+  options={[
+    ["APIKey(key)", "default `FIREWORKS_API_KEY`"],
+    ["BaseURL(url)", "the root URL of a proxy or a test server"],
+    ["Account(id)", "the account to list, default `fireworks`"],
+    ["HTTPClient(c)", "a recording client"],
+  ]}
+  bind={["model + fireworks.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+## Calls
+
+Fireworks serves a copy of the Chat Completions API at `https://api.fireworks.ai/inference/v1`. The provider sends each text call and each object call through the [OpenAI Chat](openai-chat.mdx) provider, with the key and the URL of Fireworks. The thinking levels, the thinking blocks, the objects, and the tool results with files of that page apply here. The call options of the openaichat package apply too, such as `openaichat.OnPayload`.
+
+`BaseURL` takes the root URL, such as `https://api.fireworks.ai`, and not the URL of the Chat Completions API. The provider adds `/inference/v1` for a call and `/v1` for the model list.
+
+The provider never reads `OPENAI_API_KEY` or `OPENAI_BASE_URL`, so your OpenAI key never goes to Fireworks. `env.Detectors` registers the provider when `FIREWORKS_API_KEY` is set.
+
+## Models
+
+The package has no models. Name a model by its Fireworks resource name, such as `ai.Model{ID: "accounts/fireworks/models/kimi-k3"}`. [models.json](../../../../../models.json) holds the default models of Fireworks, with their output caps and prices.
+
+`ListModels` gives the models of one account, page by page. The default account is `fireworks`, which holds the public models. To list the models of your own account, such as a fine-tuned model, set `Account`. The list keeps only a model that is ready, serverless, and has tools. A listed model has its context window and its input modalities, and no output cap and no prices.
+
+## Output Cap
+
+If a call has no output cap, Fireworks stops the answer at 2048 tokens. A model from `ListModels` has no `MaxTokens`. If you need a longer answer from such a model, set `ai.MaxTokens` on the call, or `MaxTokens` on the model. A model of models.json has its cap, and `FetchModels` of a catalog keeps that cap.
+
+## Caching
+
+The provider sends no cache mark. Fireworks rejects the cache fields of OpenAI. `ai.CacheLong` adds one of these fields to the request, so do not use it with this provider.
+
+## Errors
+
+An API error wraps `openaichat.Error`. Read the status code with `errors.As`. With `ai.MaxRetries`, the provider retries before the first event, as the [Anthropic](anthropic.mdx#errors) provider does.
+
+## Related
+
+- [OpenAI Chat](openai-chat.mdx) is the provider that sends each call.
+- [OpenRouter](openrouter.mdx) is the other host provider.
+- [Models](../ai/models.mdx) says how a catalog reads models.json.
+
+The design is in [docs/concepts/ai/host-provider.md](../../../../../docs/concepts/ai/host-provider.md).

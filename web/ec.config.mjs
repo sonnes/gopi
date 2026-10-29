@@ -1,5 +1,5 @@
 // Expressive Code lives in its own config file, so the <Code> component
-// can be rendered outside markdown, as on the pages of the guides.
+// can be rendered outside markdown, as in the full example of a page.
 // Starlight picks this up automatically.
 import { emberDark, emberLight } from "./src/shiki/ember.js";
 

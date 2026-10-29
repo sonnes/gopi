@@ -14,11 +14,12 @@ These rules apply to every page under `web/src/content/docs/`. The pages are for
 | What is the signature, the field, the flag | GoDoc                           |
 | What is this thing, and how do I use it    | `ai/`, `tool/`, and `agent/`, one page per abstraction |
 | What does one provider add to a call       | `providers/`, one page per provider |
-| How do I do one job                        | `guides/*.mdx`, one page per job  |
+| How do I write a provider                  | `providers/write-a-provider.mdx` |
+| How do the parts work in one program       | the full example at the end of a layer page |
 | Why is it built this way, which file to open | `docs/concepts/`, under Concepts |
 | One name for one thing                     | the glossary in `docs/README.md` |
 
-Do not write a type list, a method list, or a field table. Link GoDoc. Do not write a design rule or its reason. Link the concept page. Do not compare gopi with another project.
+Do not write a type list, a method list, or a field table. Link GoDoc. An option table is the one exception: it lists each option, what the option sets, and its default. Do not write a design rule or its reason. Link the concept page. Do not compare gopi with another project.
 
 ## Frontmatter
 
@@ -41,29 +42,34 @@ The first paragraph comes after the lede. Do not repeat the summary in it.
 4. Show how to use it. Keep a fragment at 15 lines or fewer.
 5. Say what a caller can depend on, in one sentence. Do not give the reason.
 6. Link the pages that it depends on.
-7. End with one line: "The design is in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)."
+7. End the text with one line: "The design is in [docs/concepts/ai/x.md](../../../../../docs/concepts/ai/x.md)." If the page has a full example, the full example comes after this line.
 
-## A Guide
+## The Full Example
 
-A guide covers one job, not one call. There are six: call a model, stream a
-response, use tools, write a provider, run an agent, keep a session. Add a section to one of them before
-you add a page.
+A layer page can end with one full example: a complete program from `examples/<name>/`. Write a Provider is a page under Providers, and it ends with a full example too.
 
-1. Open with the smallest call that does the job.
-2. Give each choice its own section, with a snippet of 15 lines or fewer. A snippet shows one possibility: an option, a branch, a middleware.
-3. Use a table for a list of values. Do not draw a figure in a guide. The shape belongs on the abstraction page.
-4. End with "## The Full Example". Import one program from `examples/<guide>/main.go` with a `?raw` import, and render it with the Starlight `Code` component inside `<div class="program">`. Set `title` to the path of the program.
-5. Say what to read in the output.
-6. Link the abstraction pages that the program uses.
+1. Name the last section "## The Full Example".
+2. If the program needs a key, start the section with a `:::note` that names the key. Say it in the doc comment of the program too.
+3. Import the program from `examples/<name>/main.go` with a `?raw` import. Render it with the Starlight `Code` component inside `<div class="program">`. Set `title` to the path of the program.
+4. Under the program, say what to read in the output.
 
-A guide has one full example. Every snippet above it is a copy of lines from a
-program in `examples/`, or a call that GoDoc shows.
-
-A program in `examples/` runs without a key when it can. Start each guide with a `:::note` that says if its program needs a key. Say it in the doc comment of the program too.
+A program in `examples/` runs without a key when it can. Every snippet on the page is a copy of lines from a program in `examples/`, or a call that GoDoc shows.
 
 ## Examples
 
-- Every complete program lives in `examples/<guide>/`, named for the guide that ends with it. `make check` vets it and `make test` runs its tests.
+- Every complete program lives in `examples/<name>/`. `make check` vets it and `make test` runs its tests.
+- Each of these programs is the full example of one page:
+
+  | Program                   | Page                              |
+  | ------------------------- | --------------------------------- |
+  | `call-a-model`            | `ai/index.mdx`                    |
+  | `stream-a-response`       | `ai/streams.mdx`                  |
+  | `use-tools`               | `tool/index.mdx`                  |
+  | `run-an-agent`            | `agent/index.mdx`                 |
+  | `keep-a-session`          | `session/index.mdx`               |
+  | `write-a-provider`        | `providers/write-a-provider.mdx`  |
+
+- A page links a program that is not a full example, such as `fake-provider` or `save-a-conversation`.
 - A fragment on a page is a copy of lines from a program in `examples/`, or a call that GoDoc shows. If a fragment cannot come from either, write the program.
 - Do not paste a program into a page. Import it.
 

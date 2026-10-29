@@ -4,51 +4,36 @@ description: How a named part of the system prompt changes from a place in a con
 package: pkg/ai, pkg/agent, pkg/agent/internal/sections
 read_when:
   - A part of the system prompt changes during a conversation
-  - A Claude Code or Codex agent reads a prompt that you do not expect
-  - A provider sends system text that you do not expect
-  - A resumed session has a prompt that you do not expect
+  - An agent or a provider sends a prompt that you do not expect
 ---
 
 # Section
 
-A section is a named part of the system prompt. A system message sets a section or removes it, from its place in the conversation. The `System` option of the agent builds the whole prompt as a list of sections. A prompt that never changes is one section.
+A section is a named part of the system prompt. A system message sets a section or removes it, from its place in the conversation.
 
-```
-  agent.System(fn)
-     |
-  before each model call: fn() != sections of the history?
-  (after turn_start, before the new messages)
-     | yes
-     v
-  order kept?  -- yes -->  patch: set changed and new, remove missing
-     | no
-     v
-  reset: remove every section, set all again
-     |
-  one system message --> history
-    SectionRemoved..., Section..., ToolRemoved..., ToolAdded...
-     |
-  first message of the history, the base  -->  ai.SystemPrompt, ai.Tools
-  each later system message               -->  in place, framed by name
+```mermaid
+flowchart LR
+  accTitle: A section change before a model call
+  accDescr: If the sections differ from the history, the agent adds one system message. A provider sends the base as the system prompt, and a later system message in its place.
+  call([before a model call]) --> diff{sections differ?}
+  diff -- yes --> msg[one system message: a patch or a reset]
+  msg --> hist[history]
+  hist -- the base --> base[ai.SystemPrompt and ai.Tools]
+  hist -- a later system message --> later[in place, framed by name]
 ```
 
 ## Design
 
-- A section is a content block of a system message, as in [Message](../ai/message.md). The content of a message is an ordered list, so the history keeps the order of the sections.
-- A removal is its own block, `SectionRemoved`, because a section with an empty text is a valid section.
+- A section is a content block of a system message, so the history keeps the order of the sections. A removal is its own block, `SectionRemoved`, because a section with an empty text is a valid section.
 - The agent has one prompt option, `System`, and its function returns the sections. The whole prompt then lives in the history, and the log records the prompt that the model read.
-- The agent calls the function one time for each model call. The change goes before the new messages of the turn, so the model reads the prompt before the messages that it applies to.
-- A provider puts the base in the system prompt and the tool list of its API, with no frame. The base never changes, so the cached prefix stays the same across a change, and a change costs only the tokens of its system message. The prefix changes on a call where a provider sends a new tool list, as [Tool Change](tool-change.md) shows.
+- The change goes before the new messages of the turn, so the model reads the prompt before the messages that it applies to.
+- The base never changes, so the cached prefix stays across a change, and a change costs only the tokens of its system message. The prefix changes on a call where a provider sends a new tool list, as [Tool Change](tool-change.md) shows.
 - The agent folds the sections, and a provider does not, because only the agent compares the history with the sections that it wants. A provider adds only the frame of [Message](../ai/message.md), so a tag or a heading in the text is the choice of the caller.
-- The section changes and the tool changes go in one system message, so a turn adds at most one system message.
-- If it can, a change keeps the order of the history, and if it cannot, it resets every section. A reset is longer, but it gives the order of `fn`, so the model reads one order.
-- An agent without `System` leaves the sections of the history as they are. A caller that does not use sections then removes nothing that another agent wrote.
-- A provider sends each system message in its place, and never merges the sections into one prompt. The reasons are in [Message](../ai/message.md).
-- A Claude Code or Codex agent keeps the same log: the base first, then each change as a system message. The fold lives in one package, so every driver agrees on the sections that the model read.
-- An agent CLI gets the text of the base as its prompt at each start, and never the current sections. A resumed CLI then gets the same prompt, so the cache of the conversation stays.
-- Claude Code takes no system message in a conversation, so a change goes as a `<system-reminder>` text block before the input of the next run. The log keeps the input without the reminder.
-- Codex gets a change as a developer message in the history of the thread, through `thread/inject_items`, before the next turn. A Codex model reads a developer message over an older user message, so a reminder holds only for its own turn.
-- A CLI reads a change only at the next run, not at each model call.
+- A reset is longer than a patch, but the model then reads one order.
+- An agent without `System` leaves the sections of the history, so it removes nothing that another agent wrote.
+- An agent CLI gets the text of the base as its prompt at each start, so a resumed CLI gets the same prompt, and the cache of the conversation stays.
+- A CLI reads a change only at the next run. Claude Code takes no system message in a conversation, so a change goes as a `<system-reminder>` block before the input.
+- Codex gets a change as a developer message before the next turn. A Codex model reads a developer message over an older user message, so a change in a user message holds only for its own turn.
 - After an agent CLI compacts its conversation, the model can lose a change, because the summary replaces the reminders.
 
 ## Map
@@ -58,7 +43,7 @@ A section is a named part of the system prompt. A system message sets a section 
 | Change the section blocks                         | `pkg/ai/content.go`            |
 | Change the fold or the change blocks              | `pkg/agent/internal/sections/sections.go` |
 | Change when the native agent writes a change      | `pkg/agent/system.go`          |
-| Change how a CLI agent sends the base or a change | `pkg/agent/claude/claude.go`, `pkg/agent/codex/codex.go` |
+| Change how a CLI agent sends the base or a change | `pkg/agent/claude/claude.go`, `pkg/agent/claude/background.go`, `pkg/agent/codex/codex.go` |
 | Change how a provider sends a system message      | `pkg/ai/<provider>/convert.go` |
 
 ## Related Concepts

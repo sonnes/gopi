@@ -6,6 +6,8 @@ summary: A tool is one Go function that a model can call, and a middleware wraps
 import ToolFaces from "../../../components/figures/ToolFaces.astro";
 import FailureFork from "../../../components/figures/FailureFork.astro";
 import Onion from "../../../components/figures/Onion.astro";
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/use-tools/main.go?raw";
 
 {/* The tool figure takes its code from these constants. A multi-line
     prop loses its indent in MDX, and an export keeps it. */}
@@ -59,6 +61,22 @@ A tool has info that the model reads, and a run function that you call with a to
   }}
 />
 
+## A Raw Tool
+
+`tool.Func` takes the tool call as it is. If the schema is not a struct, or if a struct cannot hold the input, use `tool.Func`.
+
+```go
+var clock = tool.Func(
+	"clock",
+	func(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
+		now := time.Now().Format(time.RFC3339)
+		return ai.ToolResult{Content: []ai.Content{ai.Text{Text: now}}}, nil
+	},
+	tool.Description("Get the current time in RFC 3339."),
+	tool.InputSchema(&jsonschema.Schema{Type: "object"}),
+)
+```
+
 ## Two Failure Channels
 
 <FailureFork
@@ -92,12 +110,12 @@ A tool has info that the model reads, and a run function that you call with a to
 
 ## Options
 
-| Option                 | Sets                                                                  |
-| ---------------------- | --------------------------------------------------------------------- |
-| `tool.Description(s)`  | The description that the model reads to decide when to call the tool |
-| `tool.InputSchema(s)`  | The schema of the input. `tool.New` derives it, so only `tool.Func` needs it |
-| `tool.Sequential()`    | The calls of a message with this tool run one after another |
-| `tool.Deferred()`      | The tool waits until an `ai.ToolAdded` block in a [system message](../ai/messages.mdx#system-messages) adds it |
+| Option                 | Sets                                                                  | Default |
+| ---------------------- | --------------------------------------------------------------------- | ------- |
+| `tool.Description(s)`  | The description that the model reads to decide when to call the tool | No description |
+| `tool.InputSchema(s)`  | The schema of the input. Only `tool.Func` needs it                    | `tool.New` derives it from the input type |
+| `tool.Sequential()`    | The calls of a message with this tool run one after another           | The calls run at the same time |
+| `tool.Deferred()`      | The tool waits until an `ai.ToolAdded` block in a [system message](../ai/messages.mdx#system-messages) adds it | The model can call the tool at once |
 
 `tool.New` and `tool.Func` take the same options. `tool.Defer(t)` marks a tool that is already built, such as a tool from another package, as deferred. An agent loads a deferred tool with its search. [Tool Changes](../agent/tool-changes.mdx) shows how.
 
@@ -116,27 +134,86 @@ A tool has info that the model reads, and a run function that you call with a to
   chain={{ call: "tool.Chain(t, a, b)", note: "runs a, then b, then t" }}
 />
 
-[Use Tools](../guides/use-tools.mdx) shows three middlewares.
+`tool.Wrap` keeps the info of the tool and swaps its run function. A middleware keeps the schema and the flags of the tool if it uses `tool.Wrap` or copies the info.
+
+A middleware that appends to every result is a place for a rule that the model must obey. `Remind` appends its text after a run with no Go error:
 
 ```go
-func Reminder(text string) tool.Middleware {
+func Remind(text string) tool.Middleware {
 	return func(next tool.Tool) tool.Tool {
 		return tool.Wrap(next, func(ctx context.Context, call ai.ToolCall) (ai.ToolResult, error) {
 			res, err := next.Run(ctx, call)
-			if err == nil {
-				res.Content = append(res.Content, ai.Text{Text: text})
+			if err != nil {
+				return res, err
 			}
-			return res, err
+			res.Content = append(res.Content, ai.Text{Text: text})
+			return res, nil
 		})
 	}
 }
 ```
 
-A middleware keeps the schema and the flags of the tool if it uses `tool.Wrap` or copies the info.
+`tool.Chain` applies one chain to a tool. The first middleware is the outermost, so `Log` sees the result of `Deny`. `Retry` runs the tool again only on a Go error, and an error result passes through to the model.
+
+```go
+func guard(t tool.Tool) tool.Tool {
+	return tool.Chain(t,
+		Log(os.Stdout),
+		Deny("rm"),
+		Remind("Do not delete files."),
+		Retry(2),
+	)
+}
+```
+
+## Run the Calls Yourself
+
+An [agent](../agent/index.mdx) runs the tool calls of a model for you. Without an agent, write the loop:
+
+1. Call the model with the tool infos in `ai.Tools`. Append the reply to the messages.
+2. If the stop reason is not `tool_use`, stop. A refusal can hold tool calls, so do not run the calls of any other stop.
+3. Run each tool call of the reply. Append each result to the messages.
+4. Call the model again.
+
+```go
+for {
+	msg, err := model.StreamText(ctx, messages, ai.Tools(infos)).Wait()
+	if err != nil {
+		log.Fatal(err)
+	}
+	messages = append(messages, *msg)
+	if msg.StopReason != ai.StopReasonToolUse {
+		fmt.Println(msg.Text())
+		return
+	}
+	for _, call := range msg.ToolCalls() {
+		messages = append(messages, runTool(ctx, tools, call))
+	}
+}
+```
+
+If the model calls an unknown tool, send an error result, so the model can pick another tool:
+
+```go
+m := ai.ToolResultMessage(call.ID, ai.Text{Text: "unknown tool " + call.Name})
+m.IsError = true
+```
 
 ## Related
 
 - [Messages](../ai/messages.mdx) carry the tool call in and the tool result back.
-- [Use Tools](../guides/use-tools.mdx) is the guide.
 
 The design is in [docs/concepts/tool/tool.md](../../../../../docs/concepts/tool/tool.md).
+
+## The Full Example
+
+:::note
+The program needs `ANTHROPIC_API_KEY`.
+:::
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/use-tools/main.go" />
+</div>
+
+- Each `->` line is one tool call with its input. The model calls the weather tool once for each city.
+- Each `log:` line comes from the `Log` middleware. It writes the name, the result flag, and the Go error. `Log` also adds `(logged)` to each description, so the model reads the change.

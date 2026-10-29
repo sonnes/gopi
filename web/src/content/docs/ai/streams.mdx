@@ -5,6 +5,8 @@ summary: A stream is the events of one call, read in order, then the final messa
 
 import Lanes from "../../../components/figures/Lanes.astro";
 import StopOrCancel from "../../../components/figures/StopOrCancel.astro";
+import { Code } from "@astrojs/starlight/components";
+import code from "../../../../../examples/stream-a-response/main.go?raw";
 
 `Events` reads the events in order. `Wait` waits for the message. The message and the terminal error are the result, not events.
 
@@ -88,14 +90,59 @@ msg, err := stream.Wait()
 | `thinking_end`                                  | `ContentIndex`                      |
 | `tool_end`                                      | `ContentIndex`, `ToolCall`          |
 
-`ContentIndex` tells you which block a delta belongs to. A response with thinking and text has two blocks.
+`ContentIndex` tells you which block a delta belongs to. A response with thinking and text has two blocks, so a UI keeps one buffer for each index. To show each kind of block in its own place, switch on the event type:
+
+```go
+switch ev.Type {
+case ai.EventThinkDelta:
+	fmt.Fprint(os.Stderr, ev.Delta)
+case ai.EventThinkEnd:
+	fmt.Fprintln(os.Stderr)
+case ai.EventTextDelta:
+	fmt.Print(ev.Delta)
+case ai.EventTextEnd:
+	fmt.Println()
+}
+```
+
+## Thinking
+
+The `ai.Thinking` option sets the thinking level. The provider maps the level to its own parameter.
+
+```go
+stream := model.StreamText(ctx, messages, ai.Thinking(ai.ThinkingMedium))
+```
+
+A thinking block comes back signed, and the API verifies the signature. Append the whole assistant message to the next turn, and do not edit the block:
+
+```go
+messages = append(messages, *msg, ai.UserMessage("And half of that?"))
+msg, err = model.StreamText(ctx, messages, ai.Thinking(ai.ThinkingMedium)).Wait()
+```
+
+[Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) give the levels that each provider maps. ChatGPT and OpenRouter use the levels of OpenAI. Fireworks uses the levels of OpenAI Chat.
+
+## Forward to a Browser
+
+An event round-trips through JSON with the zero fields omitted, so a text delta is one small object.
+
+```go
+func forward(w *json.Encoder, ev ai.Event) error {
+	return w.Encode(ev)
+}
+```
+
+```json
+{"type":"text_delta","content_index":1,"delta":"outine"}
+```
+
+A handler that serves server-sent events calls `forward` for each event. Then it sends the message from `Wait` as the last frame.
 
 ## Rules
 
 - A stream has one consumer, on one goroutine.
 - A break out of `Events` does not stop the producer. It runs to its end, and the stream drops the later events. To stop a call, cancel the context.
 - An error from before the request comes on the stream. There is one error path.
-- An event round-trips through JSON with the zero fields omitted. [Stream a Response](../guides/stream-a-response.mdx) forwards one.
 
 <StopOrCancel
   alt="A break out of Events stops your loop, but the provider runs to its return and the stream drops the later events. A cancel of the context stops the provider, and your loop gets an error."
@@ -128,3 +175,17 @@ msg, err := stream.Wait()
 - [Tools](../tool/index.mdx) run from the `ToolCall` of a `tool_end` event.
 
 The design is in [docs/concepts/ai/stream.md](../../../../../docs/concepts/ai/stream.md).
+
+## The Full Example
+
+:::note
+The program needs `ANTHROPIC_API_KEY`.
+:::
+
+<div class="program">
+  <Code code={code} lang="go" title="examples/stream-a-response/main.go" />
+</div>
+
+- The thinking goes to stderr and the text to stdout. To see only the answer, run the program with `2>/dev/null`.
+- `Wait` after the loop returns the final message. The `blocks:` line counts its two blocks.
+- The `thinking` line shows that the block is signed. The second turn sends the block back, and the model continues from it.

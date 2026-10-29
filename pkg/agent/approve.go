@@ -66,7 +66,8 @@ type ApprovalRequest struct {
 	Reason string
 	// NoAlways reports that the agent does not keep an Always decision
 	// for this call. An approve function does not offer Always then.
-	// The Claude Code agent sets it when the rule of the CLI for the
-	// call allows more than the call. It then allows only this call.
+	// The Claude Code agent sets it when the CLI offers no "allow
+	// always" for the call, because the rule that "allow always" writes
+	// allows more than the call. The agent then allows only this call.
 	NoAlways bool
 }

@@ -1,6 +1,6 @@
 ---
 title: Messages
-summary: A message is one turn, with a role and a list of content blocks.
+summary: A message is what one role adds to a conversation, with a list of content blocks.
 ---
 
 import Transcript from "../../../components/figures/Transcript.astro";
@@ -80,7 +80,16 @@ msg.Usage         // the token counts of this response
   ]}
 />
 
-`length` means that the output cap or the context is full. `refusal` means that a safety classifier stopped the turn, and `msg.StopDetail` holds the reason that the API gave.
+`length` means that the output cap or the context is full. To get the rest of the answer, append the partial answer and ask the model to continue:
+
+```go
+if msg.StopReason == ai.StopReasonLength {
+	messages = append(messages, *msg, ai.UserMessage("Continue."))
+	msg, err = model.StreamText(ctx, messages, system, ai.MaxTokens(200)).Wait()
+}
+```
+
+`refusal` means that a safety classifier stopped the turn, and `msg.StopDetail` holds the reason that the API gave.
 
 A provider never sets `aborted` or `error`. A caller that keeps a partial message sets one of them, so a later reader knows that the message is incomplete. The [agent](../agent/index.mdx) does this when a cancel or a failure cuts a reply short, and `error` puts the error in `msg.StopDetail`.
 

@@ -10,20 +10,22 @@ Add an option when a call needs a system prompt, tools, retries, or a setting ot
 
 ## The Built-In Options
 
-| Setter              | Type                | Default when unset                         |
-| ------------------- | ------------------- | ------------------------------------------ |
-| `ai.SystemPrompt`   | `[]ai.Content`      | No system prompt                           |
-| `ai.Tools`          | `[]ai.ToolInfo`     | No tools                                   |
-| `ai.MaxTokens`      | `int`               | `Model.MaxTokens`, then the provider's own |
-| `ai.Thinking`       | `ai.ThinkingLevel`  | The default of the model                   |
-| `ai.Temperature`    | `float64`           | The default of the model                   |
-| `ai.ToolChoice`     | `ai.ToolChoiceMode` | The model decides                          |
-| `ai.ImageSize`      | `string`            | The API picks the size                     |
-| `ai.ImageCount`     | `int`               | The API picks the number                   |
-| `ai.CacheRetention` | `ai.Retention`      | `ai.CacheShort`                            |
-| `ai.MaxRetries`     | `int`               | No retry                                   |
-| `ai.MaxRetryDelay`  | `time.Duration`     | 60 seconds                                 |
-| `ai.Headers`        | `map[string]string` | No extra headers                           |
+| Setter              | Sets                                        | Default when unset                         |
+| ------------------- | ------------------------------------------- | ------------------------------------------ |
+| `ai.SystemPrompt`   | The system prompt, as a list of blocks      | No system prompt                           |
+| `ai.Tools`          | The tools that the model can call           | No tools                                   |
+| `ai.MaxTokens`      | The cap on the output tokens                | `Model.MaxTokens`, then the provider's own |
+| `ai.Thinking`       | How much the model reasons                  | The default of the model                   |
+| `ai.Temperature`    | The sampling temperature                    | The default of the model                   |
+| `ai.ToolChoice`     | If the model must call a tool, and which one | The model decides                         |
+| `ai.ImageSize`      | The size of each image                      | The API picks the size                     |
+| `ai.ImageCount`     | The number of images                        | The API picks the number                   |
+| `ai.CacheRetention` | How long the provider keeps the cached prefix | `ai.CacheShort`                          |
+| `ai.MaxRetries`     | The number of retries of a call             | No retry                                   |
+| `ai.MaxRetryDelay`  | The cap on the wait that a server asks for | 60 seconds                                 |
+| `ai.Headers`        | More HTTP headers for the request           | No extra headers                           |
+
+[GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai) gives the type of each setter.
 
 The system prompt is a list of blocks. An `ai.Text` block is plain text, and an `ai.Section` block is a named part of the prompt:
 
@@ -82,7 +84,7 @@ Unset is a state of its own. A provider reads a value and a flag.
 
 ## Your Own Option
 
-A provider defines an option with `NewOption`, once, at package level. It travels in the same list as the built-in ones, and no other provider sees it.
+A provider defines an option with `NewOption`, once, at package level. It travels in the same list as the built-in ones. A provider that does not read it ignores it.
 
 ```go
 var Upper = ai.NewOption[bool]()
@@ -91,7 +93,7 @@ var Upper = ai.NewOption[bool]()
 if upper, ok := ai.GetOption(opts, Upper); ok && upper { ... }
 ```
 
-`openai.PromptCacheKey` is one. [OpenAI](../providers/openai.mdx) shows it, and [Write a Provider](../guides/write-a-provider.mdx) shows one in a program.
+`openai.PromptCacheKey` is one, and the OpenAI Chat provider reads it too. [OpenAI](../providers/openai.mdx) shows it, and [Write a Provider](../providers/write-a-provider.mdx) shows one in a program.
 
 ## Related
 

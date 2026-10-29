@@ -47,7 +47,7 @@ at the size of a sidebar link, in `--text`. It keeps the case of its name.
 A sidebar link uses the prose face. A top-level link takes the title
 weight and `--text`.
 The wordmark uses `src/assets/gopi-wordmark.png`, with rounded brown letters and a coral dot above the “i”.
-The hero uses `src/assets/agent-gopi-wordmark.png`, which combines both words in one illustration. Noto Sans
+The section on Agent Gopi uses `src/assets/agent-gopi-wordmark.png`, which combines both words in one illustration. Noto Sans
 distinguishes prose from display text.
 
 The label style applies to section labels, filenames, table headings, footer
@@ -123,6 +123,7 @@ contents.
 | `--gutter`    | 2.5rem   | Between two columns                    |
 | `--band`      | 4rem     | Above and below a band                 |
 | `--measure`   | 27rem    | A line of prose, about 57 characters   |
+| `--measure-wide` | 34rem | A line of prose beside a figure or over a table |
 | `--split`     | 5fr / 7fr | Words against code                    |
 
 The wider code column leaves room for examples while keeping prose lines short.
@@ -192,8 +193,12 @@ the snippet shows. The code is ink, a comment is grey, and a string is rose.
 `src/highlight.mjs` colours it. In the docs, code interrupts prose and uses a
 frame with `--r-xl`.
 
+A numbered figure on the landing page ends with its caption in the label
+style. The number is at the left, and the name is at the right. A figure
+under a code window starts with one `--line-strong` rule.
+
 In the docs, a long line wraps. The wrapped part keeps the indent of its line,
-plus two columns. The full program at the end of a guide stops at 32rem and
+plus two columns. The full program at the end of a page stops at 32rem and
 scrolls, with a fade at the bottom edge. A title
 or a terminal bar is a row at the top of the code panel, with a hairline under
 it. A file name in that row uses the label style. On the landing page, a line does not wrap.
@@ -201,6 +206,21 @@ it. A file name in that row uses the label style. On the landing page, a line do
 Docs callouts and cards use fills to separate them from prose. The landing
 page uses no fills. A docs card holds one link, and the whole card takes the
 click.
+
+## The Layers Figure
+
+The layers figure is an exploded isometric stack of slabs, one for each
+layer, in the layer hues. The name of each layer sits beside its slab, with
+its nouns in one muted line under the name. The picked slab slides out of
+the stack. Where the column is narrow, the slabs are smaller, so the names
+keep their lines.
+
+The note of a layer builds a mental model of the layer. It lists what to
+use the layer for, and it says when to skip the layer. Then it shows the
+APIs to start with, as cards. `guide` in `src/pages/index.astro` holds
+the text. A card has an edge in the hue of its layer, a hairline, square
+corners, and no fill. Every note takes the same cell, so the figure keeps
+the height of the tallest note.
 
 ## Adding to the System
 
@@ -214,16 +234,16 @@ Put layout-specific rules in the stylesheet for that layout.
 ## Mascot
 
 Agent Gopi is a golden gopher with lowered sunglasses, a cream trench coat, and a coral tie.
-The way out of the landing page uses `src/assets/agent-gopi.png`. Preserve its transparent background and full silhouette.
+The section on Agent Gopi uses `src/assets/agent-gopi.png`, under the wordmark. Preserve its transparent background and full silhouette.
 The SVG face marks appear in navigation and browser tabs. Keep both theme variants consistent.
 
 ## Sidebar Illustrations
 
 Docs pages use contextual pencil sketches of Agent Gopi below the table of contents.
-`DocsTableOfContents.astro` maps each page to a sketch in `src/assets/docs/`. Related guides share a sketch.
+`DocsTableOfContents.astro` maps each page to a sketch in `src/assets/docs/`. Related pages share a sketch.
 Use dark, slightly irregular, overlapping strokes for each outline. All backgrounds and interiors are transparent.
 Do not add fills, shading, sunglasses, a card, or a caption. Dark mode inverts the stroke color.
 Use generated pencil artwork saved as PNGs. Do not use Rough.js to draw these illustrations.
 The illustrations appear only in the desktop sidebar, at widths of 72rem or more.
-The peeking sketch uses a pencil divider as the scene edge on Get Started and Messages.
+The peeking sketch uses a pencil divider as the scene edge on Messages.
 The illustrations do not replace technical diagrams.

@@ -31,14 +31,15 @@ type Entry struct {
 	// Kind is [KindProvider] or [KindDriver].
 	Kind string `json:"kind"`
 	// Default is the ID of the model that a caller uses when it names
-	// no model.
+	// no model. It is the ID of one of Models.
 	Default string `json:"default"`
 	// Models are sorted by ID.
 	Models []Model `json:"models"`
 }
 
-// Model is one model of the file. Note is for a person to read, such as
-// the reason for a value.
+// Model is one model of the file. A zero or missing field is unknown.
+// Note is for a person to read, such as the reason for a value, because
+// JSON has no comments. gopi does not read it.
 type Model struct {
 	ai.Model
 	Note string `json:"note,omitempty"`

@@ -75,7 +75,7 @@ Name a model by the ID of the API, such as `ai.Model{ID: "claude-sonnet-5"}`. [m
 
 On a model that always thinks, the provider sends the effort as a system message before each assistant message. Each assistant message keeps the effort that it used, so a change of level does not change the cached prefix. `msg.Effort` holds the effort that the API used.
 
-A thinking block comes back signed. Send the assistant message back unchanged, and the API verifies it. On a model that always thinks, the provider asks the API to drop a block that does not match its prefix. Then the call goes on. [Stream a Response](../guides/stream-a-response.mdx) shows the round trip.
+A thinking block comes back signed. Send the assistant message back unchanged, and the API verifies it. On a model that always thinks, the provider asks the API to drop a block that does not match its prefix. Then the call goes on. [Streams](../ai/streams.mdx#thinking) shows the round trip.
 
 ## Caching
 

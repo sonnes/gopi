@@ -42,14 +42,24 @@ const (
 const tokensPerPriceUnit = 1_000_000
 
 // Pricing is the price of each category of [Usage], in US dollars for
-// one million tokens. CacheWrite is the price of the cache that a
-// provider writes by default. CacheWriteLong is the price of the long
-// cache, which [CacheLong] asks for.
+// one million tokens. It holds no cache durations, because no API that
+// lists models gives them. The provider sets the duration from
+// [CacheRetention].
 type Pricing struct {
-	Input          float64 `json:"input,omitempty"`
-	Output         float64 `json:"output,omitempty"`
-	CacheRead      float64 `json:"cache_read,omitempty"`
-	CacheWrite     float64 `json:"cache_write,omitempty"`
+	// Input is the price of an input token that is not in the cache.
+	Input float64 `json:"input,omitempty"`
+	// Output is the price of an output token.
+	Output float64 `json:"output,omitempty"`
+	// CacheRead is the price of an input token that the provider reads
+	// from its cache.
+	CacheRead float64 `json:"cache_read,omitempty"`
+	// CacheWrite is the price of a token that the provider writes to
+	// the cache that it keeps by default.
+	CacheWrite float64 `json:"cache_write,omitempty"`
+	// CacheWriteLong is the price of a token that the provider writes to
+	// the long cache, which [CacheLong] asks for. A provider whose usage
+	// does not count the long writes, such as OpenAI, leaves
+	// [Usage.CacheWriteLong] zero, so each write costs CacheWrite.
 	CacheWriteLong float64 `json:"cache_write_long,omitempty"`
 	// Tiers holds the prices of a large request, in order of InputAbove.
 	Tiers []PriceTier `json:"tiers,omitempty"`

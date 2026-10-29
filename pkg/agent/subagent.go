@@ -144,7 +144,7 @@ func withSubagentSink(ctx context.Context, callID string, emit func(Event)) cont
 }
 
 // EmitSubagent sends e on the run stream of the tool call of ctx, with
-// the ID of that call. A tool that runs a subagent, such as the task
+// the ID of that call. A tool that runs a subagent, such as the agent
 // tool of the harness, calls it. The tool sends the start, the events
 // of the child, and the end before it returns. e must be an
 // [EventSubagentStart], an [EventSubagent], or an [EventSubagentEnd],

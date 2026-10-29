@@ -10,7 +10,7 @@ gopi is a Go SDK for building AI agents.
 - `models.json` - the default models of each provider and driver. `make models` writes it, and a program reads it with `catalog.ReadModelFile`.
 - `docs/` - the developer docs: the concept pages and the glossary. `docs/README.md` has the layout. The site shows the concept pages.
 - `web/` - the site for the users of gopi, with Astro and Starlight. `web/README.md` has the layout.
-- `examples/` - the programs of the site guides, and the code of the landing page in `examples/landing/`. It is its own module, and `make test` builds it.
+- `examples/` - the programs of the site pages, and the code of the landing page in `examples/landing/`. It is its own module, and `make test` builds it.
 - `.claude/rules/` - path-scoped rules for Go code, tests, `docs/`, and the site pages
 
 <important if="you need to run commands to build, test, lint, or tidy the code">
@@ -31,7 +31,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make site-dev` | Serve the site with hot reload. Run `make site-install` first. |
 | `make site-check` | Type-check the site                                       |
 | `make site-test` | Run the tests of the site                                  |
-| `make site-demo` | Record the replay and the events of the landing page       |
+| `make site-demo` | Record the events of the landing page                      |
 | `make site-og` | Render the cover of the site to `web/public/og.png`         |
 | `make site-build` | Build the site to `web/dist`                              |
 | `make docs-links` | Make sure that each link in `docs/` and the pages resolves |

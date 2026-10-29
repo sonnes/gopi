@@ -1,9 +1,9 @@
-// Records the replay of the landing page. It runs the demo program of
+// Records the events of the landing page. It runs the demo program of
 // examples/landing/demo twice on one sessions folder. The first run gets
 // a task, and the script kills it during its third tool call. The second
 // run gets no task and continues the session. The script writes the
-// output of both runs, and the agent events of the second, to a JSON
-// file that src/pages/index.astro reads.
+// agent events of the second run to a JSON file that
+// src/pages/index.astro reads.
 //
 // Usage: node web/scripts/record-demo.mjs <demo binary> <out.json>
 //
@@ -81,14 +81,7 @@ try {
       };
     });
 
-  const demo = {
-    runs: [
-      { cmd: `triage "${TASK}"`, lines: first.lines, end: "signal: killed" },
-      { cmd: "triage", lines: second.lines },
-    ],
-    events,
-  };
-  writeFileSync(out, `${JSON.stringify(demo, null, 2)}\n`);
+  writeFileSync(out, `${JSON.stringify({ events }, null, 2)}\n`);
   console.log(`record-demo: wrote ${out}`);
 } finally {
   rmSync(dir, { recursive: true, force: true });

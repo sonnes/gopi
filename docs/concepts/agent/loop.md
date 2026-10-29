@@ -13,39 +13,35 @@ read_when:
 
 An agent is the loop that runs a model with tools until the work is done. It stores each message in its [log](../session/log.md) as the message completes, then adds it to the history.
 
-```
-  Run(entries...)
-    agent_start
-    +--> turn_start
-    |      the results of interrupted calls, in turn 1
-    |      the system change, if any
-    |      the new messages: input, a queue, or BeforeStop
-    |      BeforeCall
-    |      call the model
-    |      AfterCall
-    |      for each tool call, in call order:
-    |        BeforeTool ...... change or block the call
-    |      run the calls, and for each call:
-    |        AfterTool
-    |        store its result, as the call ends
-    |    turn_end
-    |    AfterTurn ........... add entries, no new turn
-    |    steer queue? ........ yes: next turn
-    |    tool calls? ......... yes: next turn
-    |    follow-up queue? .... yes: next turn
-    +--- BeforeStop entries?.. yes: next turn
-    agent_end
+```mermaid
+flowchart TD
+  accTitle: The turns of one run
+  accDescr: Each turn adds the new messages, calls the model, and runs the tool calls. A steer, a tool call, a follow-up, or a BeforeStop entry starts the next turn.
+  run([Run: agent_start]) --> turn[turn_start]
+  turn --> add[add the interrupted results, the system change, the new messages]
+  add --> mc[BeforeCall, the model call, AfterCall]
+  mc --> before[BeforeTool for each call, in call order]
+  before --> tools[run the calls: AfterTool, then store each result]
+  tools --> tend[turn_end, then AfterTurn]
+  tend --> steer{steer queue?}
+  steer -- yes --> turn
+  steer -- no --> calls{tool calls?}
+  calls -- yes --> turn
+  calls -- no --> follow{follow-up queue?}
+  follow -- yes --> turn
+  follow -- no --> stop{BeforeStop entries?}
+  stop -- yes --> turn
+  stop -- no --> fin([agent_end])
 ```
 
 ## Design
 
-- Each setting of a model call is an option of the agent, so a caller configures an agent from one package. The cost: a new text option in `pkg/ai` needs a new option here.
+- The agent has an option for each setting that every call needs: `MaxTokens` and `Thinking`. A `BeforeCall` hook sets any other option of a call, such as `ai.Temperature` or `ai.CacheRetention`, in `Request.Options`. A new option in `pkg/ai` then needs no change here.
 - The tool calls of one message run at the same time, so the slowest call sets the time of the turn. If a message calls a sequential tool, every call of the message runs in order.
 - A Go error from a tool or a tool hook, or an unknown tool, becomes an error result, so the model can correct the call. A canceled or expired context stops the run, because the caller asked for it.
 - A finished tool call runs whatever the stop reason, except a refusal. A provider can stop at the output cap after a complete call, and a call that does not run gives the model no result.
-- Each point of a hook is its own interface, such as `BeforeToolHook`, so a policy at two points is one value, and a driver sees the points that a hook uses. The unexported method of `Hook` forces the embed of `BaseHook`. The cost: a misspelled method compiles and never runs.
-- A hook adds entries only through the return value of `AfterTurn` or `BeforeStop`, or through `State.Steer` and `State.FollowUp`, so every message of a run has its events. `State.Log` has no `Append`.
-- The `BeforeTool` hooks run one call at a time, before the calls that run together start. A hook that asks a person to approve a call then asks one question at a time.
+- Each hook point is its own interface, such as `BeforeToolHook`, so a hook at two points is one value, and a driver sees the points that a hook uses. The cost: a misspelled method compiles and never runs.
+- The `BeforeTool` hooks run one call at a time, before the calls start. A hook that asks a person to approve a call then asks one question at a time.
 - `BeforeStop` is the one hook that continues a run, so one place decides the stop. The agent has no turn cap, so a run stops early in one way: a `BeforeCall` hook that reads `State.Turn` returns an error.
 
 ## Map

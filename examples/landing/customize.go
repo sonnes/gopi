@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -16,28 +17,6 @@ import (
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
-
-// WeatherIn is the input of the weather tool. tool.New derives the JSON
-// schema of the tool from it.
-type WeatherIn struct {
-	City string `json:"city" jsonschema:"the name of the city"`
-}
-
-// Tools is the preview of the tools tab: a Go function becomes a tool
-// of an agent.
-func Tools(model ai.LanguageModel, forecast func(string) string) *agent.Agent {
-	// snippet:tools
-	weather := tool.New("get_weather",
-		func(ctx context.Context, in WeatherIn) (string, error) {
-			return forecast(in.City), nil
-		},
-		tool.Description("Get the weather for a city"),
-	)
-
-	a := agent.New(model, agent.Toolset(weather))
-	// end
-	return a
-}
 
 // Hooks is the preview of the hooks tab: a BeforeStop hook keeps the
 // run going until the agent posts its summary, and a BeforeTool hook
@@ -79,29 +58,51 @@ func posted(msgs []ai.Message) bool {
 	return false
 }
 
-// Harness is the preview of the harness band: one harness turns the
-// folder of a repository into a coding agent, with its instructions,
-// skills, subagents, tools, MCP servers, sandbox, and permission rules.
-func Harness(
+// ClaudeCode is the preview of the harness band: a harness with the
+// parts of Claude Code. Each option is one part, so a caller can change
+// one part and keep the others.
+func ClaudeCode(
 	ctx context.Context,
 	cat *catalog.Catalog,
-	store session.Storer,
+	home string,
 	repo string,
 	github agent.MCPServer,
+	deploy tool.Tool,
+	guard agent.BeforeToolFunc,
+	ask agent.ApproveFunc,
 ) (*agent.Agent, error) {
 	// snippet:harness
+	store, err := storefs.Sessions(filepath.Join(home, ".gopi"))
+	if err != nil {
+		return nil, err
+	}
+	md := storefs.InstructionFiles("CLAUDE.md", "AGENTS.md")
+
 	h := harness.New(
 		harness.Catalog(cat),
 		harness.Model("anthropic/claude-opus-5-5"),
 		harness.Store(store),
-		// AGENTS.md, skills/, and agents/ of the repository.
-		harness.Defs(storefs.Dir(repo)),
+
+		harness.Defs(
+			storefs.Dir(filepath.Join(home, ".claude"), md),
+			storefs.Dir(filepath.Join(repo, ".claude"), md),
+			storefs.Dir(repo, md),
+		),
+
 		harness.MCP(github),
+		harness.Toolset(harness.Tools(deploy)),
+
 		harness.Mode(permission.AcceptEdits),
+		harness.Allow("bash(go test *)"),
 		harness.Deny("bash(git push *)"),
+		harness.Approve(ask),
+
+		harness.AgentDefaults(
+			agent.Thinking(ai.ThinkingHigh),
+			agent.BeforeTool(guard),
+		),
 	)
 
-	// Each start reads the folder again, so an edit reaches the next agent.
 	a, err := h.Durable(ctx, "fix-login", harness.Dir(repo))
 	// end
 	return a, err

@@ -7,15 +7,9 @@
 
 gopi is a Go SDK for durable agents. Run your own agent loop, Claude Code, or Codex as a session in your Go program. If the process stops, the next run continues from the last stored message.
 
+gopi started as a Go port of [Mario Zechner](https://github.com/badlogic)'s [pi](https://github.com/badlogic/pi-mono). The vocabulary of messages, content blocks, streaming events, tool calls, and the agent loop comes from pi. The rewrite shapes the rest around Go: typed tools from Go types, one stream for each run with `Events` and `Wait`, a session log that stores each message before its event, and one driver interface for the harness, Claude Code, and Codex.
+
 [Site](https://sonnes.github.io/gopi/) · [Documentation](https://sonnes.github.io/gopi/docs/) · [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi)
-
-## Install
-
-gopi needs Go 1.27 or later. Each provider is its own module, and it requires the root module, so one `go get` adds both:
-
-```sh
-go get github.com/sonnes/gopi/pkg/ai/anthropic
-```
 
 ## Quick Start
 
@@ -74,21 +68,64 @@ if err != nil {
 _, err = a.Run(ctx).Wait()
 ```
 
-The site has [a guide for each job](https://sonnes.github.io/gopi/docs/guides/call-a-model/). The programs of the guides are in [`examples/`](examples/), and `make test` builds each one.
+The [site](https://sonnes.github.io/gopi/docs/) has a page for each layer. Several of its pages end with a complete program from [`examples/`](examples/), and `make test` builds each one.
+
+## Build Your Own Harness
+
+A harness turns a repository into an agent. Each part of the agent is one option: change one and keep the rest. The harness assembles the agent again at each start, so an edit to a skill reaches the next agent.
+
+This harness reads the folders of Claude Code: `CLAUDE.md`, `skills/`, and `agents/`, in your home and in the repository. A later folder wins.
+
+```go
+store, err := storefs.Sessions(filepath.Join(home, ".gopi"))
+if err != nil {
+	log.Fatal(err)
+}
+md := storefs.InstructionFiles("CLAUDE.md", "AGENTS.md")
+
+h := harness.New(
+	harness.Catalog(cat),
+	harness.Model("anthropic/claude-opus-5-5"),
+	harness.Store(store),
+
+	harness.Defs(
+		storefs.Dir(filepath.Join(home, ".claude"), md),
+		storefs.Dir(filepath.Join(repo, ".claude"), md),
+		storefs.Dir(repo, md),
+	),
+
+	harness.MCP(github),
+	harness.Toolset(harness.Tools(deploy)),
+
+	harness.Mode(permission.AcceptEdits),
+	harness.Allow("bash(go test *)"),
+	harness.Deny("bash(git push *)"),
+	harness.Approve(ask),
+
+	harness.AgentDefaults(
+		agent.Thinking(ai.ThinkingHigh),
+		agent.BeforeTool(guard),
+	),
+)
+
+a, err := h.Durable(ctx, "fix-login", harness.Dir(repo))
+```
+
+To use another model, change the model spec, such as to `openai/gpt-6-sol`. The other options stay the same. The sessions go to any store: JSONL files, or your own store over SQLite or Postgres.
 
 ## Pick Your Layer
 
 The SDK is a stack. Each layer calls only the layers under it, so you can use any layer without the layers above it.
 
-| Layer | Package | Use it for |
-|---|---|---|
-| Host | `pkg/host` | The lifecycle of many sessions over their workspaces: status, approvals, and recovery after a restart |
-| Harness | `pkg/harness` | A coding agent from a repository: AGENTS.md, skills, subagents, coding tools, MCP servers, a sandbox, and permission rules |
-| Agent | `pkg/agent` | The loop of model calls and tool calls, with hooks, steer, follow-up, and typed events |
-| Session | `pkg/session`, `pkg/store/fs` | The log of a session in a store, which survives a crash |
-| Tool | `pkg/tool`, `pkg/mcp` | Typed Go functions and MCP servers as tools |
-| Model call | `pkg/ai` | One call: messages and options in, a stream of events and a message out |
-| Catalog | `pkg/catalog` | Model specs, such as `anthropic/claude-opus-5-5`, resolved to a provider or a driver |
+| Layer | Package | Use it for | Skip it when |
+|---|---|---|---|
+| Host | `pkg/host` | A product that runs many sessions, a page where a person approves tool calls, and sessions that come back after a restart | One program runs one session. Use `agent.Durable`. |
+| Harness | `pkg/harness` | An agent from a repository: AGENTS.md, skills, subagents, MCP servers, and a permission mode and rules for each tool call | The code gives the tools and the prompt, and no files. Use `agent.New`. |
+| Agent | `pkg/agent` | Your own loop in your process, on any provider, with hooks around each model call and tool call | One model call needs no tools. Use `StreamText`. |
+| Session | `pkg/session`, `pkg/store/fs` | A record of the work that outlives the process, app state next to the messages, and a store of your own | An agent has `agent.Store`. The agent writes the log. |
+| Tool | `pkg/tool`, `pkg/mcp` | A Go function that the model can call, code around each call, and tools that load on demand | The tools come from an MCP server. Give the server to `harness.MCP`. |
+| Model call | `pkg/ai` | One model call, such as a reply, a summary, or a label, or a typed value with `GenerateObject` | The model calls tools in a loop. Use `pkg/agent`. |
+| Catalog | `pkg/catalog` | Model specs, such as `anthropic/claude-opus-5-5`, resolved to a provider or a driver | The code builds an `ai.LanguageModel` itself. |
 
 Under each layer is `pkg/stream`: one producer, one consumer, and one result.
 
@@ -110,19 +147,80 @@ if err != nil {
 	log.Fatal(err)
 }
 
-s, err := h.Create(ctx, host.Config{
+// Each session works in its own folder, with its own kind of agent.
+fix, err := h.Create(ctx, host.Config{
 	Model: "claude-code/claude-opus-5-5",
 	Dir:   "repos/app",
-	Deny:  []string{"Bash(git push:*)"},
+})
+if err != nil {
+	log.Fatal(err)
+}
+notes, err := h.Create(ctx, host.Config{
+	Model: "codex/gpt-6-astra",
+	Dir:   "repos/site",
+	Dirs:  []string{"repos/site/.agents"},
 })
 if err != nil {
 	log.Fatal(err)
 }
 
-err = h.Send(ctx, s.ID, host.Text("Fix the failing test."))
+h.Send(ctx, fix.ID, host.Text("Fix the failing test."))
+h.Send(ctx, notes.ID, host.Text("Write the release notes."))
+
+// The status of every session, then each change of it.
+state, events := h.Events(ctx)
 ```
 
 The model spec picks the agent of a session. `claude-code/...` and `codex/...` start their CLI. A provider, such as `anthropic/...`, runs on the harness. The harness, Claude Code, and Codex send the same events and keep the same log.
+
+## Hooks
+
+A hook runs at one point of the loop. A denied call does not run, and the model reads the reason. A `BeforeStop` hook keeps the run going until the work is done.
+
+```go
+a := agent.New(model,
+	agent.Toolset(tools...),
+	agent.BeforeTool(func(
+		ctx context.Context, s agent.State, c ai.ToolCall,
+	) (ai.ToolCall, error) {
+		if c.Name == "close_issue" {
+			return c, agent.Deny("ask a maintainer to close issues")
+		}
+		return c, nil
+	}),
+	agent.BeforeStop(func(
+		ctx context.Context, s agent.State,
+	) ([]session.Entry, error) {
+		if posted(s.Messages()) {
+			return nil, nil
+		}
+		return []session.Entry{session.Text("Post the summary.")}, nil
+	}),
+)
+```
+
+## Events
+
+Each step of a run is a typed event on one stream, so a page can show the run as it happens. This handler streams the events of one session of a host to a page:
+
+```go
+func events(h *host.Host) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, events, err := h.Stream(r.Context(), r.PathValue("id"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		for e, err := range events {
+			if err != nil {
+				return
+			}
+			data, _ := json.Marshal(e)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+		}
+	}
+}
+```
 
 ## Providers and Drivers
 
@@ -140,6 +238,18 @@ A provider serves a model call. A driver starts an agent. A model spec names one
 | `codex` | driver | CLI login | `pkg/agent/codex` |
 
 A spec with no driver runs on the harness, the default driver. `models.json` holds the default models of each provider and driver, and `catalog.ReadModelFile` reads it.
+
+## Any Agent in Your Code
+
+An agent is a value in your Go program. It runs where your code runs, with the tools and the rules that you give it.
+
+| Agent | Runs in | Built with |
+|---|---|---|
+| A coding agent | a terminal | `harness.New` |
+| Issue triage | a nightly job | `agent.Durable` |
+| A code reviewer | a CI step | `harness.Builtin(harness.ReadOnly)` |
+| A support agent | an HTTP handler | `h.Stream` |
+| Claude Code or Codex | a page of your app | the `claude-code/` and `codex/` specs |
 
 ## Try the CLI
 
@@ -160,7 +270,7 @@ Each abstraction has a concept page in [`docs/concepts/`](docs/concepts/README.m
 - [Loop](docs/concepts/agent/loop.md): how an agent runs, and where a hook changes a run.
 - [Run Stream](docs/concepts/agent/run-stream.md): the events of one run, in order.
 - [Host](docs/concepts/host/host.md): the sessions of a program, with their status and approvals.
-- [Harness](docs/concepts/harness/harness.md): how a harness assembles a coding agent.
+- [Harness](docs/concepts/harness/harness.md): how a harness assembles an agent.
 - [Driver](docs/concepts/agent/driver.md): one interface for the harness, Claude Code, and Codex.
 - [Catalog](docs/concepts/catalog/catalog.md): how a model spec resolves.
 - [Tool](docs/concepts/tool/tool.md) and [MCP](docs/concepts/tool/mcp.md): typed tools, and the tools of an MCP server.
@@ -185,7 +295,7 @@ pkg/
 ├── sandbox/     a local sandbox and its fence
 └── stream/      one producer, one consumer, one result
 cmd/gopi/        the CLI
-examples/        the programs of the site and its guides
+examples/        the programs of the site
 web/             the site, with Astro and Starlight
 docs/            the concept pages
 ```
@@ -206,10 +316,6 @@ Use the `make` targets:
 | `make docs-links` | Make sure that each link in `docs/` and the site resolves |
 
 A push to `main` that changes `web/` or `examples/` deploys the site to GitHub Pages.
-
-## Origins
-
-gopi is a rewrite of pi-go, which started as a Go port of [Mario Zechner](https://github.com/badlogic)'s [pi](https://github.com/badlogic/pi-mono). The vocabulary of messages, content blocks, streaming events, tool calls, and the agent loop comes from pi. The rewrite shapes the rest around Go: typed tools from Go types, one stream for each run with `Events` and `Wait`, a session log that stores each message before its event, and one driver interface for the harness, Claude Code, and Codex.
 
 ## License
 

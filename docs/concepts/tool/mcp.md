@@ -15,7 +15,7 @@ An MCP server is a process or an HTTP endpoint that offers tools over the Model 
 ```mermaid
 flowchart TD
   accTitle: How an agent gets the tools of an MCP server
-  accDescr: The config of a session names its MCP servers. The Claude Code and Codex drivers give them to the CLI, which connects. The harness and the gopi CLI connect with mcp.Connect, and each tool of a server becomes a tool of the agent.
+  accDescr: The Claude Code and Codex drivers give the MCP servers of the config to the CLI, which connects. The harness connects with mcp.Connect, and each tool of a server becomes a tool of the agent.
   config[agent.Config.MCP] --> claude[claude driver: --mcp-config]
   config --> codex[codex driver: mcp_servers]
   config --> connect[harness or gopi CLI: mcp.Connect]
@@ -32,15 +32,12 @@ flowchart TD
 - One type, `agent.MCPServer`, names a server for each driver. It has the fields of an entry of an mcp.json file, so the file of the CLI, the config of a session, and the arguments of Claude Code and Codex hold the same data.
 - A CLI agent connects to its own servers, so gopi holds no MCP session for it. The servers of the settings of the CLI stay.
 - `pkg/mcp` is in the root module, because the harness connects with it. The cost: each caller of gopi depends on the MCP SDK.
-- `mcp.Tools` returns tools from `tool.Func`, so the agent and the providers need no MCP code. Its caller owns the session. `mcp.Connect` owns the sessions that it opens, and its close function closes them.
+- `mcp.Tools` returns tools from `tool.Func`, so the agent and the providers need no MCP code.
 - The harness connects at `New` or `Durable`, and `agent.Agent.Close` closes the sessions. A subagent of the agent tool shares the sessions of its parent, so an agent call opens no connection.
 - `mcp.Connect` returns the tools of each server that connected, also with an error. The harness then fails the start of the agent, because a config that names a server expects its tools. The CLI writes a warning and continues, so one server that is down does not stop the work.
-- An MCP result with `isError` becomes an error result, and a failed call becomes a Go error. This obeys the two failure channels in [Tool](tool.md).
-- `mcp.Tools` changes each character that a provider rejects in a tool name to `_`, and cuts the name to the length limit of the providers. If two tools then have the same name, it returns an error, because the model calls a tool by its name.
-- The tools are fixed when `mcp.Tools` returns. `agent.Toolset` is fixed at `agent.New` or `agent.Durable`, so a change of the tool list that a server announces does not reach the model.
+- `agent.Toolset` is fixed at `agent.New` or `agent.Durable`, so a change of the tool list that a server announces does not reach the model.
 - `mcp.Connect` defers each tool, because one server can have many tools. The search tool loads them, as in [Tool Change](../agent/tool-change.md).
-- `mcp.Connect` names each tool `mcp__<server>__<tool>`. If two server names, such as `a.b` and `a_b`, give one tool name, it keeps the first server and reports the other.
-- The fence does not confine an MCP server. A stdio server is a normal process of the user, so it can write any file and use the network.
+- The fence does not confine an MCP server, so a stdio server can write any file and use the network.
 
 ## Map
 

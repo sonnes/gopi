@@ -5,7 +5,7 @@ summary: A hook is a function that the agent loop calls before and after a model
 
 import HookRail from "../../../components/figures/HookRail.astro";
 
-Add a hook when a run needs a rule that the loop does not have, such as a token budget or an approval for each tool call. Without hooks, the agent runs each tool call that the model makes. It stops when a turn makes no tool calls and the queues are empty.
+Add a hook when a run needs a rule that the loop does not have, such as a token budget. Without hooks, the agent runs each tool call. It stops when a turn makes no tool calls and the queues are empty.
 
 <HookRail
   alt="One turn of the loop, top to bottom. BeforeCall changes the request before the model call. AfterCall changes the message before message_end. For each tool call, BeforeTool runs after tool_execution_start and can block the call with Deny, then the tool runs, then AfterTool changes the result before tool_execution_end. AfterTurn runs after turn_end and adds entries. If the turn made no tool calls and the queues are empty, BeforeStop runs, and its entries start the next turn."
@@ -30,7 +30,7 @@ Add a hook when a run needs a rule that the loop does not have, such as a token 
 
 ## Add a Hook
 
-Each point is its own interface, such as `agent.BeforeToolHook`. A hook embeds `agent.BaseHook` and implements the points that it needs. Each point gets a copy of `agent.State`. `agent.Hooks` adds hook values to the agent, and one value can act at more than one point.
+Each point is its own interface, such as `agent.BeforeToolHook`. A hook embeds `agent.BaseHook` and implements the points that it needs. A misspelled method compiles and never runs. Each point gets a copy of `agent.State`.
 
 ```go
 type Budget struct {
@@ -48,17 +48,13 @@ func (b Budget) BeforeTool(ctx context.Context, s agent.State, c ai.ToolCall) (a
 a := agent.New(lm, agent.Hooks(Budget{Max: 50_000}))
 ```
 
-For one point, use the option of that point, such as `agent.BeforeTool`. The hooks run in the order that you add them. Each hook gets the value that the hook before it returned.
+For one point, use its option, such as `agent.BeforeTool`. The hooks run in the order that you add them, and each one gets the value that the one before it returned.
 
-A hook reads the [session](../session/index.mdx#in-a-hook) from `State.Log()`: the entries, the messages, and the values. It can set values through it, and it cannot append an entry.
+A hook reads the [session](../session/index.mdx#in-a-hook) from `State.Log()`.
 
-A hook keeps compiling when gopi adds a hook point. A misspelled method also compiles, and it never runs.
+## Change a Model Call
 
-## Change One Model Call
-
-A `BeforeCall` hook gets the `agent.Request` of one call: the messages and the options. The agent sends the request that the last hook returns, and the history does not change. To add an option, use `ai.JoinOptions`. To change a message, change a copy of it, because the messages share their arrays with the history.
-
-The agent has no cap on the turns of a run. To set one, return an error from a `BeforeCall` hook.
+A `BeforeCall` hook gets the `agent.Request` of one call: the messages and the options. The history does not change. To change a message, change a copy, because the messages share their arrays with the history. The agent has no cap on the turns of a run. To set one, return an error.
 
 ```go
 maxTurns := agent.BeforeCall(func(ctx context.Context, s agent.State, r agent.Request) (agent.Request, error) {
@@ -69,15 +65,11 @@ maxTurns := agent.BeforeCall(func(ctx context.Context, s agent.State, r agent.Re
 })
 ```
 
-## Change the Message
-
-An `AfterCall` hook gets the final message of the model before `message_end`. `message_end` and the history have the message that the last hook returns, and the agent runs the tool calls of that message. If the stream fails, no `AfterCall` hook runs.
+An `AfterCall` hook changes the final message of the model before `message_end`. The agent keeps that message and runs its tool calls. If the stream fails, no `AfterCall` hook runs.
 
 ## Change or Block a Tool Call
 
-A `BeforeTool` hook can change the input or the name of a call. It runs after the agent finds the tool, so a call to an unknown tool gets an error result and no hook runs.
-
-To block a call, return `agent.Deny` with a reason. The model reads the reason as an error result.
+A `BeforeTool` hook can change the input or the name of a call. To block a call, return `agent.Deny` with a reason. The model reads the reason as an error result.
 
 ```go
 readOnly := agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
@@ -88,19 +80,15 @@ readOnly := agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolC
 })
 ```
 
-When the calls of a message run at the same time, the `BeforeTool` hooks of every call run before any call runs, one call at a time, in call order.
+When the calls of a message run at the same time, all their `BeforeTool` hooks run first, one call at a time, in call order.
 
-## Change a Result
-
-An `AfterTool` hook changes the result before `tool_execution_end`. It runs in the goroutine of its call, so it must be safe for concurrent use.
-
-A tool hook covers every tool of the agent, and a [middleware](../tool/index.mdx) wraps one tool.
+An `AfterTool` hook changes the result before `tool_execution_end`. It runs in the goroutine of its call, so it must be safe for concurrent use. A tool hook covers every tool, and a [middleware](../tool/index.mdx) wraps one tool.
 
 ## Add Entries
 
-An `AfterTurn` hook returns [entries](../session/index.mdx#entries) to add after `turn_end`. The agent stores them in the log. Each message entry gets `message_start` and `message_end` on the [stream](events.mdx). A custom entry gets no event, and the model does not read it. The entries do not start a turn. The next model call reads them, in this run or in the next run. An ephemeral entry goes to the state and not to the store, and `agent_end` removes it. So only a later model call of this run reads it.
+An `AfterTurn` hook returns [entries](../session/index.mdx#entries) that the agent adds to the log after `turn_end`. The entries do not start a turn. The next model call reads them, in this run or the next.
 
-A `BeforeStop` hook runs when the turn made no tool calls and the [steer and follow-up queues](steer.mdx) are empty. The first hook that returns entries starts a new turn with them. The hooks after it do not run.
+A `BeforeStop` hook runs when the turn made no tool calls and the [queues](steer.mdx) are empty. The first hook that returns entries starts a new turn with them, and the hooks after it do not run.
 
 ```go
 untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]session.Entry, error) {
@@ -113,7 +101,7 @@ untilGreen := agent.BeforeStop(func(ctx context.Context, s agent.State) ([]sessi
 
 ## Steer From a Hook
 
-A hook steers the run through its state. `s.Steer` and `s.FollowUp` add entries to the [queues](steer.mdx) of the agent, as `a.Steer` and `a.FollowUp` do. Use them from a hook in the middle of a turn, where a returned entry has no place.
+In the middle of a turn, a hook adds entries to the [queues](steer.mdx) with `s.Steer` and `s.FollowUp`.
 
 ```go
 checkErrors := agent.AfterTool(func(ctx context.Context, s agent.State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
@@ -123,8 +111,6 @@ checkErrors := agent.AfterTool(func(ctx context.Context, s agent.State, c ai.Too
 	return r, nil
 })
 ```
-
-A state that a viewer decoded from JSON has no queues, so the two calls do nothing there.
 
 ## Errors
 
@@ -140,7 +126,7 @@ The hooks after the failed hook do not run.
 
 ## Hooks on a CLI Agent
 
-The same hooks run on Claude Code and Codex, through `claude.Hooks` and `codex.Hooks`, or through an [agent.Driver](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Driver). The CLI calls each point at one of its own hook events:
+The same hooks run on Claude Code and Codex. The CLI calls each point at one of its own hook events:
 
 | Point        | Claude Code                         | Codex         |
 | ------------ | ----------------------------------- | ------------- |
@@ -151,17 +137,12 @@ The same hooks run on Claude Code and Codex, through `claude.Hooks` and `codex.H
 | `AfterTurn`  | `PostToolBatch`                     | none          |
 | `BeforeStop` | `Stop`                              | `Stop`        |
 
-After a failed call, Claude Code calls `AfterTool` with an error result. The model reads the error, and the new text of the hook comes after it as context. If a hook changes the result of a built-in tool such as `Bash`, it must return JSON in the shape of the tool response.
-
-A hook at a point that the CLI does not have fails the run, or the start of the session. A hook entry must be text. A CLI cannot rename a tool call, so a new name denies the call.
-
-Codex runs each hook as the command `gopi hook`, so the `gopi` binary must be on the `PATH`, or in `codex.HookCommand`. If the agent cannot find the command, the run fails. If the command fails or times out, Codex runs the tool. If the command cannot reach the agent, it denies the tool call, replaces a tool output with the error, or ends the turn at a stop. For `Bash` and `apply_patch`, a new input must have a string `command`, or the agent denies the call. Codex does not call a hook for a hosted tool, such as web search.
+A hook at a point that the CLI does not have fails the run. Codex runs each hook as the command `gopi hook`, from the `PATH` or from `codex.HookCommand`. If that command fails, Codex runs the tool. [`claude.Hooks`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Hooks) and [`codex.Hooks`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#Hooks) give the other rules.
 
 ## Related
 
 - [Agents](index.mdx) run the loop.
 - [Events](events.mdx) are what a run reports.
-- [Steer and Follow-Up](steer.mdx) add entries from outside the run.
 - [Sessions](../session/index.mdx) hold the log that a hook reads.
 - [Tools](../tool/index.mdx) have middleware for the rules of one tool.
 
