@@ -63,7 +63,7 @@ export default defineConfig({
       },
       favicon: "/favicon.svg",
       description:
-        "Build AI agents in Go with model calls, typed tools, and streamed events.",
+        "Durable agents in Go. Each session is a log in your store, so an agent continues where it stopped: after a deploy, a restart, or between the steps of a long workflow.",
       customCss: ["./src/styles/tokens.css", "./src/styles/starlight.css"],
       // The docs pages do not go through Landing.astro, so the fonts have
       // to be requested here as well.

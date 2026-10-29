@@ -5,7 +5,7 @@
 
 ![gopi: durable agents in Go](web/public/og.png)
 
-gopi is a Go SDK for durable agents. Run your own agent loop, Claude Code, or Codex as a session in your Go program. If the process stops, the next run continues from the last stored message.
+gopi is a Go SDK for durable agents. Run your own agent loop, Claude Code, or Codex as a session in your Go program. Each session is a log in your store, so an agent continues where it stopped: after a deploy, a restart, or between the steps of a long workflow.
 
 gopi started as a Go port of [Mario Zechner](https://github.com/badlogic)'s [pi](https://github.com/badlogic/pi-mono). The vocabulary of messages, content blocks, streaming events, tool calls, and the agent loop comes from pi. The rewrite shapes the rest around Go: typed tools from Go types, one stream for each run with `Events` and `Wait`, a session log that stores each message before its event, and one driver interface for the harness, Claude Code, and Codex.
 
