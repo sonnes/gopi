@@ -67,7 +67,7 @@ s, err := h.Create(ctx, host.Config{
 })
 ```
 
-The model, the mode, and the effort of the file fill the empty fields of the config, and an edit of them changes only a new session. If two dirs have the agent, the later dir wins. The host reads the prompt of the file before each run. The harness also reads the skills and the subagents of `Dirs`.
+The model, the mode, and the effort of the file fill the empty fields of the config, and an edit of them changes only a new session. If two dirs have the agent, the later dir wins. The host reads the prompt of the file before each run. The harness also reads the skills and the subagents of `Dirs`. Claude Code gets the subagents of `Dirs`, and loads its own skills. Codex loads its own skills and subagents.
 
 ## Send a Message
 

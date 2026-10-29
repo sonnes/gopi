@@ -14,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
@@ -110,6 +111,7 @@ type config struct {
 	approve    agent.ApproveFunc
 	hooks      []agent.Hook
 	mcp        []agent.MCPServer
+	agents     []def.Agent
 	idle       func(agent.Event)
 	wake       func()
 }
@@ -237,6 +239,19 @@ func Approve(fn agent.ApproveFunc) Option {
 // replaces a server of the settings with the same name.
 func MCP(servers ...agent.MCPServer) Option {
 	return func(c *config) { c.mcp = append(c.mcp, servers...) }
+}
+
+// Agents gives the CLI the agents, with --agents. The Task tool of the
+// CLI starts each agent as a subagent. A later agent wins for a name.
+// The CLI gets the description, the prompt, the tools, and the model of
+// each agent. It gets the tools only if the agent sets them. It gets
+// the model only if the model is a bare ID or alias other than
+// "inherit", such as "sonnet".
+// The CLI keeps the agents of its own folders. An agent of Agents
+// replaces an agent of those folders with the same name. Without
+// Agents, the agent adds no flag.
+func Agents(agents ...def.Agent) Option {
+	return func(c *config) { c.agents = append(c.agents, agents...) }
 }
 
 // Idle sets the function that gets the events between runs: the events
@@ -459,6 +474,56 @@ func mcpConfig(servers []agent.MCPServer) (string, error) {
 	return string(data), nil
 }
 
+// inheritModel is the model of an agent file that uses the model of
+// the parent.
+const inheritModel = "inherit"
+
+// agentEntry is one agent of the --agents JSON, as the CLI reads it.
+// Tools has omitzero, so an empty list that is not nil gives the agent
+// no tools.
+type agentEntry struct {
+	Description string   `json:"description"`
+	Prompt      string   `json:"prompt"`
+	Tools       []string `json:"tools,omitzero"`
+	Model       string   `json:"model,omitempty"`
+}
+
+// agentsConfig returns agents as the JSON of --agents. A later agent
+// replaces an earlier agent with the same name.
+func agentsConfig(agents []def.Agent) (string, error) {
+	entries := make(map[string]agentEntry, len(agents))
+	for _, a := range agents {
+		var tools []string
+		if a.Tools != nil {
+			tools = claudeRules(a.Tools)
+		}
+		entries[a.Name] = agentEntry{
+			Description: a.Description,
+			Prompt:      a.Prompt,
+			Tools:       tools,
+			Model:       agentModel(a.Model),
+		}
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return "", fmt.Errorf("claude: encode the agents: %w", err)
+	}
+	return string(data), nil
+}
+
+// agentModel returns the model of an agent file for the CLI, or "" so
+// that the agent uses the model of the parent. A spec with a provider,
+// such as "openai/gpt-5", names a model of gopi, and the CLI cannot run
+// it. So the CLI gets only a bare ID or alias.
+func agentModel(model string) string {
+	isInherit := strings.EqualFold(model, inheritModel)
+	hasProvider := strings.Contains(model, "/")
+	if isInherit || hasProvider {
+		return ""
+	}
+	return model
+}
+
 // command returns the command that starts the CLI, and resumes the
 // session of the CLI if the log has one.
 func (a *Agent) command() (*exec.Cmd, error) {
@@ -537,6 +602,13 @@ func cliArgs(c config, system string) ([]string, error) {
 			return nil, err
 		}
 		args = append(args, "--mcp-config", servers)
+	}
+	if len(c.agents) > 0 {
+		agents, err := agentsConfig(c.agents)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "--agents", agents)
 	}
 	return args, nil
 }

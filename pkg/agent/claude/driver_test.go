@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,6 +81,73 @@ func TestDriverStart(t *testing.T) {
 		assert.Contains(t, args, want)
 	}
 	assert.NotContains(t, args, "bypassPermissions", "the mode of the config replaces the mode of the driver")
+	assert.NotContains(t, args, "--agents", "a config with no dirs gives no agents")
+}
+
+func TestDriverDirs(t *testing.T) {
+	low := t.TempDir()
+	writeAgent(t, low, "penny.md", `---
+name: penny
+description: Old penny
+---
+Old prompt.
+`)
+	writeAgent(t, low, "rex.md", `---
+name: rex
+description: Reviews a diff
+model: inherit
+tools: Read, bash
+---
+Review the diff.
+`)
+	high := t.TempDir()
+	writeAgent(t, high, "penny.md", `---
+name: penny
+description: Counts coins
+model: sonnet
+---
+Count the coins.
+`)
+	writeAgent(t, high, "otto.md", `---
+name: otto
+description: Runs on another provider
+model: openai/gpt-5
+---
+Answer.
+`)
+
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Dirs:      []string{low, high},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok, "the driver starts a *claude.Agent")
+	defer closeAgent(t, a)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	args := starts.Cmds()[0].Args
+	at := slices.Index(args, "--agents")
+	require.NotEqual(t, -1, at, "the CLI gets --agents")
+	require.Less(t, at+1, len(args))
+	assert.JSONEq(t, `{
+		"otto": {"description": "Runs on another provider", "prompt": "Answer."},
+		"penny": {"description": "Counts coins", "prompt": "Count the coins.", "model": "sonnet"},
+		"rex": {"description": "Reviews a diff", "prompt": "Review the diff.", "tools": ["Read", "Bash"]}
+	}`, args[at+1])
+	assert.NotContains(t, args, "--agent", "the host gives the prompt of the agent of the session")
+}
+
+// writeAgent writes an agent file to the agents folder of dir.
+func writeAgent(t *testing.T, dir, name, text string) {
+	t.Helper()
+	agents := filepath.Join(dir, "agents")
+	require.NoError(t, os.MkdirAll(agents, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(agents, name), []byte(text), 0o644))
 }
 
 func TestDriverRejects(t *testing.T) {

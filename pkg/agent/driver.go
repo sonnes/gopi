@@ -49,9 +49,10 @@ type Config struct {
 	// Skills names the skills that the agent loads at the start.
 	Skills []string
 	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
-	// first. A later folder wins for a name. The harness reads them. A
-	// driver of a CLI skips them, because the caller gives the CLI its
-	// own skills and agents.
+	// first. A later folder wins for a name. The harness reads each
+	// part. The Claude Code driver gives the agents to the CLI as
+	// subagents, and skips the skills and AGENTS.md, because the CLI
+	// loads its own. Another driver of a CLI skips Dirs.
 	Dirs []string
 	// Effort is the thinking level of each model call. If it is empty,
 	// the driver keeps the default of the model.

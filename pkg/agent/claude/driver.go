@@ -8,6 +8,8 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -28,8 +30,13 @@ import (
 // fails the start. With ToolNames, a hook blocks the MCP tools that
 // ToolNames does not name.
 //
-// It rejects Skills, because the CLI loads its own skills. It skips
-// Dirs: the caller gives the CLI its skills and agents. It runs the
+// Start reads the agent files of Dirs and gives them to the CLI with
+// [Agents], so the Task tool of the CLI starts each one as a subagent.
+// A later folder wins for a name. An edit of an agent file reaches the
+// CLI at the next Start. The driver skips the skills and the AGENTS.md
+// files of Dirs, because the CLI loads its own.
+//
+// It rejects Skills, because the CLI loads its own skills. It runs the
 // hooks at the points of [Hooks]. Start rejects a hook at a model call,
 // in the options of the driver or in the config.
 func Driver(opts ...Option) agent.Driver {
@@ -114,6 +121,13 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
+	agents, err := readAgents(ctx, c.Dirs)
+	if err != nil {
+		return nil, err
+	}
+	if len(agents) > 0 {
+		opts = append(opts, Agents(agents...))
+	}
 	if c.Approve != nil {
 		opts = append(opts, Approve(c.Approve))
 	}
@@ -127,6 +141,19 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
+}
+
+// readAgents returns the agents of each folder of dirs, in order.
+func readAgents(ctx context.Context, dirs []string) ([]def.Agent, error) {
+	var out []def.Agent
+	for _, d := range dirs {
+		agents, err := storefs.Dir(d).ReadAgents(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("claude: the agents of %s: %w", d, err)
+		}
+		out = append(out, agents...)
+	}
+	return out, nil
 }
 
 // unsupported returns the error of a config field that the driver
