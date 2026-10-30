@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -16,7 +15,9 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -123,8 +124,9 @@ model: openai/gpt-5
 Answer.
 `)
 
+	root := t.TempDir()
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	r, err := claude.Driver().Start(context.Background(), agent.Config{
+	r, err := claude.Driver(claude.DefsRoot(root)).Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
 		Spec:      "claude-code/claude-opus-5-5",
@@ -139,16 +141,23 @@ Answer.
 	require.NoError(t, err)
 
 	args := starts.Cmds()[0].Args
-	at := slices.Index(args, "--agents")
-	require.NotEqual(t, -1, at, "the CLI gets --agents")
-	require.Less(t, at+1, len(args))
-	assert.JSONEq(t, `{
-		"bea": {"description": "Names a bare model", "prompt": "Answer."},
-		"otto": {"description": "Runs on another provider", "prompt": "Answer."},
-		"penny": {"description": "Counts coins", "prompt": "Count the coins.", "model": "claude-sonnet-5-5"},
-		"rex": {"description": "Reviews a diff", "prompt": "Review the diff.", "tools": ["Read", "Bash"]}
-	}`, args[at+1])
+	assert.NotContains(t, args, "--agents", "the folder holds the agents")
 	assert.NotContains(t, args, "--agent", "the host gives the prompt of the agent of the session")
+
+	folder := os.DirFS(filepath.Join(root, "s1"))
+	got, err := storefs.Agents(folder, ".claude/agents").ReadAgents(context.Background())
+	require.NoError(t, err)
+	byName := make(map[string]def.Agent, len(got))
+	for _, agent := range got {
+		byName[agent.Name] = agent
+	}
+	require.Len(t, byName, 4)
+	assert.Equal(t, "Counts coins", byName["penny"].Description, "a later folder wins")
+	assert.Equal(t, "claude-sonnet-5-5", byName["penny"].Model, "a spec of the account gives its ID")
+	assert.Empty(t, byName["bea"].Model, "a bare model gives the model of the parent")
+	assert.Empty(t, byName["otto"].Model, "another account gives the model of the parent")
+	assert.Empty(t, byName["rex"].Model, "inherit gives the model of the parent")
+	assert.Equal(t, []string{"Read", "Bash"}, byName["rex"].Tools, "the file has Claude Code names")
 }
 
 // writeAgent writes an agent file to the agents folder of dir.
@@ -157,6 +166,70 @@ func writeAgent(t *testing.T, dir, name, text string) {
 	agents := filepath.Join(dir, "agents")
 	require.NoError(t, os.MkdirAll(agents, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(agents, name), []byte(text), 0o644))
+}
+
+// defsDir writes a folder with the skill deploy and the agent reviewer.
+func defsDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	skills := filepath.Join(dir, "skills", "deploy")
+	agents := filepath.Join(dir, "agents")
+	require.NoError(t, os.MkdirAll(skills, 0o755))
+	require.NoError(t, os.MkdirAll(agents, 0o755))
+	skill := "---\ndescription: Deploy.\n---\nDeploy it.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(skills, "SKILL.md"), []byte(skill), 0o644))
+	reviewer := "---\nname: reviewer\ndescription: Review.\nmodel: codex/gpt-6\n---\nReview it.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(agents, "reviewer.md"), []byte(reviewer), 0o644))
+	return dir
+}
+
+func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	root := t.TempDir()
+	d := claude.Driver(claude.DefsRoot(root))
+
+	r, err := d.Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Dirs:      []string{defsDir(t)},
+		Skills:    []string{"deploy"},
+	})
+	require.NoError(t, err, "the driver takes a skill of the dirs")
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	folder := filepath.Join(root, "s1")
+	cmds := starts.Cmds()
+	require.Len(t, cmds, 1)
+	assert.Contains(t, strings.Join(cmds[0].Args, " "), "--add-dir "+folder)
+	assert.FileExists(t, filepath.Join(folder, ".claude", "skills", "deploy", "SKILL.md"))
+	agentFile, err := os.ReadFile(filepath.Join(folder, ".claude", "agents", "reviewer.md"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(agentFile), "gpt-6", "the model of another CLI stays out")
+
+	require.NoError(t, a.Close())
+	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
+}
+
+func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+	defer closeAgent(t, a)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	assert.NotContains(t, starts.Cmds()[0].Args, "--add-dir")
 }
 
 func TestDriverRejects(t *testing.T) {
@@ -169,13 +242,12 @@ func TestDriverRejects(t *testing.T) {
 		errText     string
 	}{
 		{
-			name: "skills",
+			name: "a skill that no dir has",
 			config: agent.Config{
 				SessionID: "s1",
 				Skills:    []string{"deploy"},
 			},
-			unsupported: true,
-			errText:     "claude: the config field Skills: unsupported operation",
+			errText: `claude: clidefs: the skill "deploy": no skill has this name`,
 		},
 		{
 			name: "a tool of the caller that ToolNames names",

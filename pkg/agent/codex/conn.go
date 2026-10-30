@@ -365,12 +365,23 @@ func (c *conn) inject(ctx context.Context, thread, text string) error {
 	return c.call(ctx, "thread/inject_items", params, &res)
 }
 
+// methodSkillRoots adds the folders of skills of a connection. An older
+// CLI does not have it.
+const methodSkillRoots = "skills/extraRoots/set"
+
 // handshake initializes the connection, then starts the thread, or
 // resumes it if params has a thread ID.
 func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult, error) {
 	var res threadResult
 	if err := c.initialize(ctx); err != nil {
 		return res, err
+	}
+	if params.skillRoot != "" {
+		roots := skillRootsParams{ExtraRoots: []string{params.skillRoot}}
+		var result json.RawMessage
+		if err := c.call(ctx, methodSkillRoots, roots, &result); err != nil {
+			return res, fmt.Errorf("%w: the config field Dirs: %w", errors.ErrUnsupported, err)
+		}
 	}
 	method := "thread/start"
 	if params.ThreadID != "" {

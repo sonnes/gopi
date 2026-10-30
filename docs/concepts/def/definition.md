@@ -10,7 +10,7 @@ read_when:
 
 # Definition
 
-A definition is a part of an agent that a person writes: an agent, a skill, or an instruction text such as `AGENTS.md`. Package `def` holds the types and a reader interface for each. A store implements the readers, and the harness takes them.
+A definition is a part of an agent that a person writes: an agent, a skill, or an instruction text such as `AGENTS.md`. Package `def` holds the types and a reader interface for each. A store implements the readers. The harness takes them, and `Resolve` merges them for a driver of a CLI.
 
 ```
   store (fs, code, ...) --ReadAgents-------> harness: "agents" section, agent tool
@@ -24,6 +24,7 @@ A definition is a part of an agent that a person writes: an agent, a skill, or a
 - An `Agent` and a `Skill` are readers of themselves. A definition in code then goes in the list of readers, at the place where it must win or lose.
 - The fields keep the values as the file writes them, such as a model spec or a permission mode. The harness maps them, so a store needs no catalog.
 - A reader keeps each key that no field takes in `Extra`, with the value as the reader parsed it. A file in the format of Claude Code, Codex, or Agent Skills then loads. A caller reads a key as its own type with `Extra.Read`, because only the caller knows the shape of its own keys.
+- `Resolve` merges a list of readers with one rule: a later definition wins at the position of the earlier one. The harness uses the same merge, so each driver shows the same names.
 - A folder on disk goes to the readers as the FS of an `os.Root`. `os.DirFS` follows a symbolic link out of the folder, and the skill tool reads the support files of a skill for the model. The root closes when its FS is unreachable, because the skill tool reads files after the assembly.
 - `FindAgent` returns the last agent with a name, as the merge of the harness does. The host then picks the same agent from a list of folders as the harness does.
 
@@ -33,6 +34,7 @@ A definition is a part of an agent that a person writes: an agent, a skill, or a
 | ------------------------------------------ | -------------------- |
 | Change the fields of an agent              | `pkg/def/agent.go`   |
 | Change the fields of a skill               | `pkg/def/skill.go`   |
+| Change the merge of a list of readers      | `pkg/def/resolve.go` |
 | Change a reader interface                  | `pkg/def/reader.go`  |
 | Change how a caller reads an unknown key   | `pkg/def/extra.go`   |
 | Change how the host finds an agent by name | `pkg/def/find.go`    |

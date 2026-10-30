@@ -46,13 +46,14 @@ type Config struct {
 	// start of the conversation stays the same for the cache. If it is
 	// nil, the agent adds no prompt.
 	Sections SystemFunc
-	// Skills names the skills that the agent loads at the start.
+	// Skills names the skills that the agent loads at the start. A name
+	// that no folder of Dirs has fails the start. The harness adds the
+	// body of each skill to the prompt. A driver of a CLI adds no text,
+	// because the CLI lists each skill and loads its body.
 	Skills []string
 	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
-	// first. A later folder wins for a name. The harness reads each
-	// part. The Claude Code driver gives the agents to the CLI as
-	// subagents, and skips the skills and AGENTS.md, because the CLI
-	// loads its own. Another driver of a CLI skips Dirs.
+	// first. A later folder wins for a name. Each driver gets the same
+	// skills and agents. Only the harness reads AGENTS.md.
 	Dirs []string
 	// Effort is the thinking level of each model call. If it is empty,
 	// the driver keeps the default of the model.

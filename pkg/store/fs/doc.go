@@ -6,7 +6,8 @@
 // folder on disk. [Skills] and [Agents] read one directory of an
 // [io/fs.FS], so an [embed.FS] of files that ship in the binary reads
 // the same as a folder on disk. Their paths are relative to the fs.FS.
-// [Sessions] returns the [SessionStore], a [session.Storer].
+// [Sessions] returns the [SessionStore], a [session.Storer]. [WriteSkills]
+// and [WriteAgents] write the formats that the readers read.
 //
 // The package name hides io/fs. A caller imports it as storefs:
 //

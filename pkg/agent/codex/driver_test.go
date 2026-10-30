@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -163,6 +164,68 @@ func TestDriverAllowAnswersAnApproval(t *testing.T) {
 	assert.Empty(t, asked, "the approve function does not get the request")
 }
 
+// defsDir writes a folder with the skill deploy and the agent reviewer.
+func defsDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	skills := filepath.Join(dir, "skills", "deploy")
+	agents := filepath.Join(dir, "agents")
+	require.NoError(t, os.MkdirAll(skills, 0o755))
+	require.NoError(t, os.MkdirAll(agents, 0o755))
+	skill := "---\ndescription: Deploy.\n---\nDeploy it.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(skills, "SKILL.md"), []byte(skill), 0o644))
+	reviewer := "---\nname: reviewer\ndescription: \"Review \\\"it\\\".\"\n" +
+		"model: codex/gpt-6\neffort: max\ntools: Read\nmaxTurns: 3\n---\nReview\nit.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(agents, "reviewer.md"), []byte(reviewer), 0o644))
+	return dir
+}
+
+func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
+	root := t.TempDir()
+	a := startAgent(t, Driver(DefsRoot(root)), agent.Config{
+		Spec:   "codex/gpt-5",
+		Dirs:   []string{defsDir(t)},
+		Skills: []string{"deploy"},
+	})
+	folder := filepath.Join(root, "s1")
+
+	require.NoError(t, a.writeDefs(context.Background()))
+	p := a.threadParams("", nil, "")
+
+	assert.Equal(t, filepath.Join(folder, "skills"), p.skillRoot)
+	assert.FileExists(t, filepath.Join(folder, "skills", "deploy", "SKILL.md"))
+
+	roleFile := filepath.Join(folder, "codex", "agents", "reviewer.toml")
+	assert.Equal(t, map[string]any{
+		"reviewer": map[string]any{
+			"description": `Review "it".`,
+			"config_file": roleFile,
+		},
+	}, p.Config["agents"])
+	data, err := os.ReadFile(roleFile)
+	require.NoError(t, err)
+	want := `name = "reviewer"
+description = "Review \"it\"."
+developer_instructions = "Review\nit."
+model = "gpt-6"
+model_reasoning_effort = "xhigh"
+`
+	assert.Equal(t, want, string(data), "a role has no limits: Codex has no key for them")
+
+	require.NoError(t, a.Close())
+	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
+}
+
+func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
+	a := startAgent(t, Driver(), agent.Config{})
+
+	require.NoError(t, a.writeDefs(context.Background()))
+	p := a.threadParams("", nil, "")
+
+	assert.Empty(t, p.skillRoot)
+	assert.NotContains(t, p.Config, "agents")
+}
+
 func TestDriverRejects(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -171,10 +234,9 @@ func TestDriverRejects(t *testing.T) {
 		errText     string
 	}{
 		{
-			name:        "skills",
-			config:      agent.Config{Skills: []string{"deploy"}},
-			unsupported: true,
-			errText:     "codex: the config field Skills: unsupported operation",
+			name:    "a skill that no dir has",
+			config:  agent.Config{Skills: []string{"deploy"}},
+			errText: `codex: clidefs: the skill "deploy": no skill has this name`,
 		},
 		{
 			name: "a tool of the caller that ToolNames names",

@@ -74,6 +74,14 @@ type threadParams struct {
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
 	// Config overrides the config of the CLI for the thread.
 	Config map[string]any `json:"config,omitempty"`
+	// skillRoot is the folder of the skills of the session, for
+	// skills/extraRoots/set. It does not go in the request.
+	skillRoot string
+}
+
+// skillRootsParams is the parameters of skills/extraRoots/set.
+type skillRootsParams struct {
+	ExtraRoots []string `json:"extraRoots"`
 }
 
 // threadResult is the result of thread/start and thread/resume.

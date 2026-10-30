@@ -2,15 +2,12 @@ package claude
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/def"
-	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -31,15 +28,17 @@ import (
 // fails the start. With ToolNames, a hook blocks the MCP tools that
 // ToolNames does not name.
 //
-// Start reads the agent files of Dirs and gives them to the CLI with
-// [Agents], so the Task tool of the CLI starts each one as a subagent.
-// A later folder wins for a name. An agent gets the model ID of its
-// spec only if the spec has the account of Spec. Any other model of a
-// file gives the subagent the model of the parent. An edit of an agent file reaches the
-// CLI at the next Start. The driver skips the skills and the AGENTS.md
-// files of Dirs, because the CLI loads its own.
-//
-// It rejects Skills, because the CLI loads its own skills. It runs the
+// The driver merges Dirs with [def.Resolve], as the harness does, and
+// writes the skills and the agents to a folder for each session. It
+// gives the folder to the CLI with --add-dir at each start of the CLI,
+// so an edit reaches the next process, and it removes the folder at
+// Close. [DefsRoot] picks the place. The CLI lists each skill and loads
+// its body, so the driver adds no text for Skills. A name of Skills that
+// no dir has fails the start, as in the harness. The driver does not
+// read the AGENTS.md of Dirs. The CLI also keeps the skills and the
+// agents of its own folders. A subagent gets the model ID of its spec
+// only if the spec has the account of Spec. Any other model of a file
+// gives the subagent the model of the parent. It runs the
 // hooks at the points of [Hooks]. Start rejects a hook at a model call,
 // in the options of the driver or in the config.
 func Driver(opts ...Option) agent.Driver {
@@ -62,9 +61,6 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 
 // Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
-	if len(c.Skills) > 0 {
-		return nil, unsupported("Skills")
-	}
 	tools, err := cliTools(c.Tools, c.ToolNames)
 	if err != nil {
 		return nil, fmt.Errorf("claude: %w", err)
@@ -73,6 +69,10 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	var own config
 	for _, opt := range d.opts {
 		opt(&own)
+	}
+	defs := clidefs.New(c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	if err := defs.Check(ctx, c.Skills); err != nil {
+		return nil, fmt.Errorf("claude: %w", err)
 	}
 	configHooks := slices.Clip(c.Hooks)
 	if c.ToolNames != nil {
@@ -91,6 +91,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 
 	opts := append([]Option(nil), d.opts...)
+	if len(c.Dirs) > 0 {
+		opts = append(opts, defsOf(defs))
+	}
 	if c.Store != nil {
 		opts = append(opts, Store(c.Store))
 	}
@@ -124,16 +127,6 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
-	agents, err := readAgents(ctx, c.Dirs)
-	if err != nil {
-		return nil, err
-	}
-	for i := range agents {
-		agents[i].Model = cliModel(c.Spec, agents[i].Model)
-	}
-	if len(agents) > 0 {
-		opts = append(opts, Agents(agents...))
-	}
 	if c.Approve != nil {
 		opts = append(opts, Approve(c.Approve))
 	}
@@ -147,37 +140,4 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
-}
-
-// cliModel returns the model of an agent file for the CLI of the parent
-// spec. A spec of the account of the parent, such as
-// "claude-code/claude-sonnet-5-5", gives its model ID. The CLI runs on
-// one account, so another spec, a bare model, and "inherit" give "",
-// and the subagent runs the model of the parent.
-func cliModel(parent, model string) string {
-	account, id, ok := strings.Cut(model, "/")
-	own, _, _ := strings.Cut(parent, "/")
-	if !ok || account != own {
-		return ""
-	}
-	return id
-}
-
-// readAgents returns the agents of each folder of dirs, in order.
-func readAgents(ctx context.Context, dirs []string) ([]def.Agent, error) {
-	var out []def.Agent
-	for _, d := range dirs {
-		agents, err := storefs.Dir(d).ReadAgents(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("claude: the agents of %s: %w", d, err)
-		}
-		out = append(out, agents...)
-	}
-	return out, nil
-}
-
-// unsupported returns the error of a config field that the driver
-// cannot honor.
-func unsupported(field string) error {
-	return fmt.Errorf("claude: the config field %s: %w", field, errors.ErrUnsupported)
 }

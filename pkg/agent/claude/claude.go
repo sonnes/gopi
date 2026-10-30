@@ -12,11 +12,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
@@ -113,9 +113,12 @@ type config struct {
 	approve    agent.ApproveFunc
 	hooks      []agent.Hook
 	mcp        []agent.MCPServer
-	agents     []def.Agent
 	idle       func(agent.Event)
 	wake       func()
+	// defsRoot holds the folder of a session. defs is set if the session
+	// has dirs.
+	defsRoot string
+	defs     *clidefs.Defs
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -243,19 +246,6 @@ func MCP(servers ...agent.MCPServer) Option {
 	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
 
-// Agents gives the CLI the agents, with --agents. The Task tool of the
-// CLI starts each agent as a subagent. A later agent wins for a name.
-// The CLI gets the description, the prompt, the tools, and the model of
-// each agent. It gets the tools only if the agent sets them. It gets
-// the model only if the model is a bare ID or alias other than
-// "inherit", such as "sonnet".
-// The CLI keeps the agents of its own folders. An agent of Agents
-// replaces an agent of those folders with the same name. Without
-// Agents, the agent adds no flag.
-func Agents(agents ...def.Agent) Option {
-	return func(c *config) { c.agents = append(c.agents, agents...) }
-}
-
 // Idle sets the function that gets the events between runs: the events
 // of a subagent in the background, wrapped as in a run. Without it, the
 // agent drops them, and the log of each child still gets its messages.
@@ -267,6 +257,18 @@ func Idle(fn func(agent.Event)) Option {
 // between runs. [Agent.Continue] runs that turn.
 func Wake(fn func()) Option {
 	return func(c *config) { c.wake = fn }
+}
+
+// DefsRoot sets the folder that holds the folder of each session, with
+// the skills and the agents of the dirs of the session. The default is
+// the folder gopi-defs in [os.TempDir].
+func DefsRoot(path string) Option {
+	return func(c *config) { c.defsRoot = path }
+}
+
+// defsOf sets the definitions of the session.
+func defsOf(d *clidefs.Defs) Option {
+	return func(c *config) { c.defs = d }
 }
 
 // PermissionMode sets the permission mode of the CLI. Without it, the
@@ -374,10 +376,14 @@ func (a *Agent) Close() error {
 	a.mu.Unlock()
 	// No child in the background outlives its CLI.
 	a.endBackground()
-	if proc == nil {
-		return nil
+	var stopErr error
+	if proc != nil {
+		stopErr = proc.stop()
 	}
-	return proc.stop()
+	if a.cfg.defs == nil {
+		return stopErr
+	}
+	return errors.Join(stopErr, a.cfg.defs.Remove())
 }
 
 // ensure returns the running CLI. It starts the CLI and initializes it
@@ -390,7 +396,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		return proc, nil
 	}
 
-	cmd, fresh, err := a.command()
+	cmd, fresh, err := a.command(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -485,63 +491,20 @@ func mcpConfig(servers []agent.MCPServer) (string, error) {
 	return string(data), nil
 }
 
-// inheritModel is the model of an agent file that uses the model of
-// the parent.
-const inheritModel = "inherit"
-
-// agentEntry is one agent of the --agents JSON, as the CLI reads it.
-// Tools has omitzero, so an empty list that is not nil gives the agent
-// no tools.
-type agentEntry struct {
-	Description string   `json:"description"`
-	Prompt      string   `json:"prompt"`
-	Tools       []string `json:"tools,omitzero"`
-	Model       string   `json:"model,omitempty"`
-}
-
-// agentsConfig returns agents as the JSON of --agents. A later agent
-// replaces an earlier agent with the same name.
-func agentsConfig(agents []def.Agent) (string, error) {
-	entries := make(map[string]agentEntry, len(agents))
-	for _, a := range agents {
-		var tools []string
-		if a.Tools != nil {
-			tools = claudeRules(a.Tools)
-		}
-		entries[a.Name] = agentEntry{
-			Description: a.Description,
-			Prompt:      a.Prompt,
-			Tools:       tools,
-			Model:       agentModel(a.Model),
-		}
-	}
-	data, err := json.Marshal(entries)
-	if err != nil {
-		return "", fmt.Errorf("claude: encode the agents: %w", err)
-	}
-	return string(data), nil
-}
-
-// agentModel returns the model of an agent file for the CLI, or "" so
-// that the agent uses the model of the parent. A spec with a provider,
-// such as "openai/gpt-5", names a model of gopi, and the CLI cannot run
-// it. So the CLI gets only a bare ID or alias.
-func agentModel(model string) string {
-	isInherit := strings.EqualFold(model, inheritModel)
-	hasProvider := strings.Contains(model, "/")
-	if isInherit || hasProvider {
-		return ""
-	}
-	return model
-}
-
 // command returns the command that starts the CLI. If the log has the
 // session of a CLI, the command resumes it. Otherwise a saved agent
 // gives the CLI the session ID of [cliSessionID], and fresh is that ID.
-func (a *Agent) command() (cmd *exec.Cmd, fresh string, err error) {
+func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, err error) {
 	args, err := cliArgs(a.cfg, sections.Text(a.log.Messages()))
 	if err != nil {
 		return nil, "", err
+	}
+	folder, err := writeDefs(ctx, a.cfg.defs)
+	if err != nil {
+		return nil, "", fmt.Errorf("claude: %w", err)
+	}
+	if folder != "" {
+		args = append(args, "--add-dir", folder)
 	}
 	id, err := conversation.Get(a.log)
 	if err != nil {
@@ -639,13 +602,6 @@ func cliArgs(c config, system string) ([]string, error) {
 			return nil, err
 		}
 		args = append(args, "--mcp-config", servers)
-	}
-	if len(c.agents) > 0 {
-		agents, err := agentsConfig(c.agents)
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, "--agents", agents)
 	}
 	return args, nil
 }

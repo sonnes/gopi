@@ -2,11 +2,11 @@ package codex
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 )
@@ -53,9 +53,19 @@ import (
 // A Deny rule, an Ask rule, a left-out tool, or ToolNames needs the
 // hook command of [HookCommand]. An Allow rule needs no hook.
 //
-// The driver rejects Skills, because the CLI loads its own skills. It
-// skips Dirs: the caller gives
-// the CLI its skills and agents. It runs the hooks at the points of
+// The driver merges Dirs with [def.Resolve], as the harness does, and
+// writes them to a folder for each session at each start of the CLI, so
+// an edit reaches the next process. It removes the folder at Close.
+// [DefsRoot] picks the place. It gives the skills to the CLI with
+// skills/extraRoots/set, and each agent as a role in the config of the
+// thread. A CLI with no skills/extraRoots/set fails with
+// [errors.ErrUnsupported]. A role has no key for the Tools, the
+// Disallowed, or the MaxTurns of an agent, so a role runs with each tool
+// of the session. The CLI lists each skill and loads its body, so the
+// driver adds no text for Skills. A name of Skills that no dir has fails
+// the start, as in the harness. The driver does not read the AGENTS.md
+// of Dirs. The CLI also keeps the skills and the agents of its own
+// folders. It runs the hooks at the points of
 // [Hooks]. Start rejects a hook at another point, from the config or
 // from an option.
 func Driver(opts ...Option) agent.Driver {
@@ -77,16 +87,10 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 
 // Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
-	rejected := []struct {
-		field string
-		set   bool
-	}{
-		{"Skills", len(c.Skills) > 0},
-	}
-	for _, r := range rejected {
-		if r.set {
-			return nil, unsupported(r.field)
-		}
+	own := newConfig(d.opts)
+	defs := clidefs.New(c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	if err := defs.Check(ctx, c.Skills); err != nil {
+		return nil, fmt.Errorf("codex: %w", err)
 	}
 	rules, err := ruleHooks(c)
 	if err != nil {
@@ -95,7 +99,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	configHooks := append(slices.Clip(c.Hooks), rules...)
 	// The hooks of the options come before the hooks of the config, as
 	// in the agent.
-	hooks := append(newConfig(d.opts).hooks, configHooks...)
+	hooks := append(own.hooks, configHooks...)
 	if err := agent.CheckHooks(hooks, hookPoints...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
@@ -108,6 +112,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Policy(ApprovalUntrusted))
 	}
 	opts = append(opts, d.opts...)
+	if len(c.Dirs) > 0 {
+		opts = append(opts, defsOf(defs))
+	}
 	if c.Store != nil {
 		opts = append(opts, Store(c.Store))
 	}
@@ -221,10 +228,4 @@ func modeOptions(m agent.Mode) []Option {
 	default:
 		return nil
 	}
-}
-
-// unsupported returns the error of a config field that the driver
-// cannot honor.
-func unsupported(field string) error {
-	return fmt.Errorf("codex: the config field %s: %w", field, errors.ErrUnsupported)
 }
