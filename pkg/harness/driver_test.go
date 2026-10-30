@@ -9,6 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/session"
@@ -265,6 +266,27 @@ func TestStartReadsTheDirs(t *testing.T) {
 
 	assert.Contains(t, section(a, "skills"), "Deploy from the dir.")
 	assert.Contains(t, section(a, "instructions"), "Use tabs.")
+}
+
+func TestStartReadsTheSkillsetBeforeTheDirs(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "skills/deploy/SKILL.md", skillFile("Deploy from the dir.", "body"))
+	p := &script{responses: []ai.Message{reply("done")}}
+	h := harness.New(base(t, p)...)
+
+	a := start(t, h, agent.Config{
+		SessionID: "s1",
+		Dirs:      []string{dir},
+		Skillset: []def.SkillsReader{
+			def.Skill{Name: "deploy", Description: "Deploy inline.", Body: "b"},
+			def.Skill{Name: "test", Description: "Test inline.", Body: "b"},
+		},
+	})
+	run(t, a, "hi")
+
+	assert.Contains(t, section(a, "skills"), "Deploy from the dir.", "a dir wins")
+	assert.NotContains(t, section(a, "skills"), "Deploy inline.")
+	assert.Contains(t, section(a, "skills"), "Test inline.")
 }
 
 func TestStartSetsTheEffort(t *testing.T) {

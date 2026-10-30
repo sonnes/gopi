@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 // writeDir writes one folder with one skill and one agent.
@@ -26,7 +27,7 @@ func writeDir(t *testing.T, skill, agent, text string) string {
 }
 
 func TestPrepare_NoDirsNeedsNoFolder(t *testing.T) {
-	d := clidefs.New(nil, t.TempDir(), "s1", "")
+	d := clidefs.New(nil, nil, t.TempDir(), "s1", "")
 
 	set, dir, err := d.Prepare(t.Context())
 
@@ -39,7 +40,7 @@ func TestPrepare_MergesTheDirsLaterWins(t *testing.T) {
 	low := writeDir(t, "deploy", "reviewer", "low")
 	high := writeDir(t, "deploy", "reviewer", "high")
 	root := t.TempDir()
-	d := clidefs.New([]string{low, high}, root, "s1", "")
+	d := clidefs.New(nil, []string{low, high}, root, "s1", "")
 
 	set, dir, err := d.Prepare(t.Context())
 
@@ -51,9 +52,37 @@ func TestPrepare_MergesTheDirsLaterWins(t *testing.T) {
 	assert.Equal(t, "high", set.Agents[0].Prompt)
 }
 
+func TestPrepare_ADirWinsOverASkillset(t *testing.T) {
+	inline := []def.SkillsReader{
+		def.Skill{Name: "deploy", Description: "D.", Body: "inline"},
+		def.Skill{Name: "kept", Description: "D.", Body: "inline"},
+	}
+	dir := writeDir(t, "deploy", "reviewer", "dir")
+	d := clidefs.New(inline, []string{dir}, t.TempDir(), "s1", "")
+
+	set, _, err := d.Prepare(t.Context())
+
+	require.NoError(t, err)
+	require.Len(t, set.Skills, 2)
+	assert.Equal(t, "dir", set.Skills[0].Body)
+	assert.Equal(t, "inline", set.Skills[1].Body)
+}
+
+func TestPrepare_ASkillsetNeedsNoDirs(t *testing.T) {
+	inline := []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "b"}}
+	root := t.TempDir()
+	d := clidefs.New(inline, nil, root, "s1", "")
+
+	require.NoError(t, d.Check(t.Context(), []string{"deploy"}))
+	_, dir, err := d.Prepare(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(root, "s1"), dir)
+}
+
 func TestPrepare_ClearsTheFolderOfTheLastProcess(t *testing.T) {
 	root := t.TempDir()
-	d := clidefs.New([]string{writeDir(t, "deploy", "reviewer", "x")}, root, "s1", "")
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, root, "s1", "")
 	_, dir, err := d.Prepare(t.Context())
 	require.NoError(t, err)
 	old := filepath.Join(dir, "old.md")
@@ -66,7 +95,7 @@ func TestPrepare_ClearsTheFolderOfTheLastProcess(t *testing.T) {
 }
 
 func TestPrepare_RejectsASessionThatLeavesTheRoot(t *testing.T) {
-	d := clidefs.New([]string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "../s1", "")
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "../s1", "")
 
 	_, _, err := d.Prepare(t.Context())
 
@@ -74,7 +103,7 @@ func TestPrepare_RejectsASessionThatLeavesTheRoot(t *testing.T) {
 }
 
 func TestRemove_RemovesTheFolder(t *testing.T) {
-	d := clidefs.New([]string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
 	_, dir, err := d.Prepare(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(dir, 0o700))
@@ -85,7 +114,7 @@ func TestRemove_RemovesTheFolder(t *testing.T) {
 }
 
 func TestCheck_FailsOnAnUnknownSkill(t *testing.T) {
-	d := clidefs.New([]string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
 
 	require.NoError(t, d.Check(t.Context(), []string{"deploy"}))
 	err := d.Check(t.Context(), []string{"missing"})
@@ -95,7 +124,7 @@ func TestCheck_FailsOnAnUnknownSkill(t *testing.T) {
 }
 
 func TestCheck_NoNamesReadsNothing(t *testing.T) {
-	d := clidefs.New([]string{"/does/not/exist"}, t.TempDir(), "s1", "")
+	d := clidefs.New(nil, []string{"/does/not/exist"}, t.TempDir(), "s1", "")
 
 	assert.NoError(t, d.Check(t.Context(), nil))
 }
@@ -110,7 +139,7 @@ func TestModel(t *testing.T) {
 		{"codex/gpt-6", "codex/gpt-7", "gpt-7"},
 	}
 	for _, tt := range tests {
-		d := clidefs.New(nil, "", "s1", tt.parent)
+		d := clidefs.New(nil, nil, "", "s1", tt.parent)
 		assert.Equal(t, tt.want, d.Model(tt.model), "%s on %s", tt.model, tt.parent)
 	}
 }

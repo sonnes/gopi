@@ -20,9 +20,6 @@ type fakeDir struct {
 
 func (d fakeDir) ReadAgents(context.Context) ([]def.Agent, error) { return d.agents, d.err }
 func (d fakeDir) ReadSkills(context.Context) ([]def.Skill, error) { return d.skills, d.err }
-func (d fakeDir) ReadInstructions(context.Context) ([]def.Instruction, error) {
-	return nil, d.err
-}
 
 func TestResolve_LaterDirWinsAtTheEarlierPosition(t *testing.T) {
 	low := fakeDir{
@@ -34,7 +31,7 @@ func TestResolve_LaterDirWinsAtTheEarlierPosition(t *testing.T) {
 		skills: []def.Skill{{Name: "x", Body: "high"}},
 	}
 
-	set, err := def.Resolve(t.Context(), low, high)
+	set, err := def.Resolve(t.Context(), []def.SkillsReader{low, high}, []def.AgentsReader{low, high})
 
 	require.NoError(t, err)
 	assert.Equal(t, []def.Agent{{Name: "a", Prompt: "high"}, {Name: "b", Prompt: "low"}}, set.Agents)
@@ -50,7 +47,7 @@ func TestResolve_LastSkillWithABareNameTakesIt(t *testing.T) {
 		},
 	}
 
-	set, err := def.Resolve(t.Context(), dir)
+	set, err := def.Resolve(t.Context(), []def.SkillsReader{dir}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ops:deploy", "deploy"}, set.Names)
@@ -59,15 +56,15 @@ func TestResolve_LastSkillWithABareNameTakesIt(t *testing.T) {
 func TestResolve_ReaderErrorFails(t *testing.T) {
 	boom := errors.New("boom")
 
-	_, err := def.Resolve(t.Context(), fakeDir{err: boom})
+	_, err := def.Resolve(t.Context(), []def.SkillsReader{fakeDir{err: boom}}, nil)
 
 	assert.ErrorIs(t, err, boom)
 }
 
 func TestSet_Find(t *testing.T) {
-	set, err := def.Resolve(t.Context(), fakeDir{
+	set, err := def.Resolve(t.Context(), []def.SkillsReader{fakeDir{
 		skills: []def.Skill{{Name: "deploy", Qualifier: "ops"}, {Name: "deploy"}},
-	})
+	}}, nil)
 	require.NoError(t, err)
 
 	assert.True(t, set.HasSkill("deploy"))

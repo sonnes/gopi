@@ -214,6 +214,28 @@ func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
 }
 
+func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	root := t.TempDir()
+
+	r, err := claude.Driver(claude.DefsRoot(root)).Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Skillset:  []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+	defer closeAgent(t, a)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	folder := filepath.Join(root, "s1")
+	assert.Contains(t, strings.Join(starts.Cmds()[0].Args, " "), "--add-dir "+folder)
+	assert.FileExists(t, filepath.Join(folder, ".claude", "skills", "deploy", "SKILL.md"))
+}
+
 func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
 

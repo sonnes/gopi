@@ -28,30 +28,23 @@ func (s Set) HasSkill(name string) bool {
 	return false
 }
 
-// Resolve reads the skills and the agents of each reader in order, and
-// merges them. The harness and the drivers of a CLI read a list of
-// folders with the same rules, so one list gives each driver the same
-// names and the same winner for a clash.
-func Resolve(ctx context.Context, readers ...Reader) (Set, error) {
-	skillReaders := make([]SkillsReader, len(readers))
-	agentReaders := make([]AgentsReader, len(readers))
-	for i, r := range readers {
-		skillReaders[i] = r
-		agentReaders[i] = r
-	}
-
-	skills, err := MergeSkills(ctx, skillReaders...)
+// Resolve reads skills and agents in order, and merges them. The
+// harness and the drivers of a CLI read their lists with the same rules,
+// so one list gives each driver the same names and the same winner for a
+// clash.
+func Resolve(ctx context.Context, skills []SkillsReader, agents []AgentsReader) (Set, error) {
+	merged, err := MergeSkills(ctx, skills...)
 	if err != nil {
 		return Set{}, err
 	}
-	agents, err := MergeAgents(ctx, agentReaders...)
+	mergedAgents, err := MergeAgents(ctx, agents...)
 	if err != nil {
 		return Set{}, err
 	}
 	return Set{
-		Skills: skills,
-		Names:  SkillNames(skills),
-		Agents: agents,
+		Skills: merged,
+		Names:  SkillNames(merged),
+		Agents: mergedAgents,
 	}, nil
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -51,6 +52,8 @@ type Host struct {
 	store Storer
 	hooks []agent.Hook
 	tools []tool.Tool
+	// skillset reads the skills of [Skillset].
+	skillset []def.SkillsReader
 	// sections returns the sections of a session, by ID.
 	sections SectionsFunc
 	// toolList reports a call of [Tools], also with no tools.
@@ -97,6 +100,16 @@ func Tools(ts ...tool.Tool) Option {
 		h.tools = append(h.tools, ts...)
 		h.toolList = true
 	}
+}
+
+// Skillset adds readers of skills to each session, such as skills that
+// ship in the program. Each driver gets them. They are lower than
+// [Config.Dirs], so a skill of a folder replaces a skill of Skillset with
+// the same name. A reader is code, so the config value of a session
+// cannot keep it, and a session that started earlier gets the skills at
+// its next start.
+func Skillset(readers ...def.SkillsReader) Option {
+	return func(h *Host) { h.skillset = append(h.skillset, readers...) }
 }
 
 // SectionsFunc returns the sections of the prompt of the session id, in

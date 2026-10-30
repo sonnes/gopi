@@ -1,7 +1,7 @@
 // Package clidefs gives the definitions of a list of folders to the
-// driver of a CLI. It merges the folders with [def.Resolve], as the
-// harness does, and it gives the driver a clean folder for the files
-// that the CLI reads.
+// driver of a CLI. It merges them with [def.Resolve], as the harness
+// does, and it gives the driver a clean folder for the files that the
+// CLI reads.
 //
 // A caller must obey these rules:
 //
@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/def"
@@ -30,24 +31,27 @@ const dirPerm = 0o700
 
 // Defs is the definitions of one session of a CLI.
 type Defs struct {
-	dirs    []string
-	root    string
-	session string
-	spec    string
+	skillset []def.SkillsReader
+	dirs     []string
+	root     string
+	session  string
+	spec     string
 }
 
-// New returns the definitions of dirs, lowest first. The folder of the
+// New returns the skills of skillset, then the definitions of dirs,
+// lowest first. The folder of the
 // session is <root>/<session>. If root is empty, the root is the folder
 // gopi-defs in [os.TempDir]. spec is the model spec of the session.
-func New(dirs []string, root, session, spec string) *Defs {
+func New(skillset []def.SkillsReader, dirs []string, root, session, spec string) *Defs {
 	if root == "" {
 		root = filepath.Join(os.TempDir(), rootName)
 	}
 	return &Defs{
-		dirs:    dirs,
-		root:    root,
-		session: session,
-		spec:    spec,
+		skillset: skillset,
+		dirs:     dirs,
+		root:     root,
+		session:  session,
+		spec:     spec,
 	}
 }
 
@@ -120,14 +124,18 @@ func OneElement(name string) bool {
 	return filepath.IsLocal(name) && filepath.Base(name) == name
 }
 
-// resolve merges the folders. A folder that does not exist gives
-// nothing.
+// resolve merges the skills of the skillset and the definitions of the
+// folders. A folder that does not exist gives nothing.
 func (d *Defs) resolve(ctx context.Context) (def.Set, error) {
-	readers := make([]def.Reader, len(d.dirs))
+	skillReaders := slices.Clone(d.skillset)
+	agentReaders := make([]def.AgentsReader, len(d.dirs))
 	for i, dir := range d.dirs {
-		readers[i] = storefs.Dir(dir)
+		folder := storefs.Dir(dir)
+		skillReaders = append(skillReaders, folder)
+		agentReaders[i] = folder
 	}
-	return def.Resolve(ctx, readers...)
+
+	return def.Resolve(ctx, skillReaders, agentReaders)
 }
 
 // Model returns the model of a definition for the CLI of the parent

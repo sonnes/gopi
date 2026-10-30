@@ -214,3 +214,14 @@ func TestTheToolsOfTheSpecWinOverTheAgentFile(t *testing.T) {
 
 	assert.Equal(t, []string{"bash"}, f.lastConfig(t).ToolNames)
 }
+
+func TestSkillsetReachesEachDriverStart(t *testing.T) {
+	inline := def.Skill{Name: "deploy", Description: "D.", Body: "b"}
+	f := newFixture(t, host.Skillset(inline))
+
+	f.create(t, host.Config{ID: "s1"})
+
+	c := f.lastConfig(t)
+	require.Len(t, c.Skillset, 1)
+	assert.Equal(t, inline, c.Skillset[0])
+}

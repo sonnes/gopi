@@ -53,7 +53,7 @@ import (
 // A Deny rule, an Ask rule, a left-out tool, or ToolNames needs the
 // hook command of [HookCommand]. An Allow rule needs no hook.
 //
-// The driver merges Dirs with [def.Resolve], as the harness does, and
+// The driver merges Skillset and Dirs, as the harness does, and
 // writes them to a folder for each session at each start of the CLI, so
 // an edit reaches the next process. It removes the folder at Close.
 // [DefsRoot] picks the place. It gives the skills to the CLI with
@@ -88,7 +88,7 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 // Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	own := newConfig(d.opts)
-	defs := clidefs.New(c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	defs := clidefs.New(c.Skillset, c.Dirs, own.defsRoot, c.SessionID, c.Spec)
 	if err := defs.Check(ctx, c.Skills); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
@@ -112,9 +112,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Policy(ApprovalUntrusted))
 	}
 	opts = append(opts, d.opts...)
-	if len(c.Dirs) > 0 {
-		opts = append(opts, defsOf(defs))
-	}
+	opts = append(opts, defsOf(defs))
 	if c.Store != nil {
 		opts = append(opts, Store(c.Store))
 	}

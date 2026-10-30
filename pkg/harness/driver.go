@@ -17,7 +17,7 @@ import (
 // model of each text provider.
 //
 // The harness honors each field of c, each mode, and each point of a
-// hook. It reads each folder of the Dirs of c, after the readers of h. The Mode of c replaces the [Mode] of h. The System of c goes
+// hook. It reads the Skillset of c, then each folder of the Dirs of c, after the readers of h. The Mode of c replaces the [Mode] of h. The System of c goes
 // after the [System] of h, as a CLI agent adds it to its own prompt.
 // The Skills of c are preloaded, as with [Preload]. The rules of c go
 // after the rules of h. The MCP servers of c go after those of [MCP].
@@ -43,6 +43,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	}
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
+	}
+	if len(c.Skillset) > 0 {
+		opts = append(opts, Skillset(c.Skillset...))
 	}
 	if len(c.Dirs) > 0 {
 		opts = append(opts, Defs(dirReaders(c.Dirs)...))

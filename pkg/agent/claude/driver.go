@@ -28,7 +28,7 @@ import (
 // fails the start. With ToolNames, a hook blocks the MCP tools that
 // ToolNames does not name.
 //
-// The driver merges Dirs with [def.Resolve], as the harness does, and
+// The driver merges Skillset and Dirs, as the harness does, and
 // writes the skills and the agents to a folder for each session. It
 // gives the folder to the CLI with --add-dir at each start of the CLI,
 // so an edit reaches the next process, and it removes the folder at
@@ -70,7 +70,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	for _, opt := range d.opts {
 		opt(&own)
 	}
-	defs := clidefs.New(c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	defs := clidefs.New(c.Skillset, c.Dirs, own.defsRoot, c.SessionID, c.Spec)
 	if err := defs.Check(ctx, c.Skills); err != nil {
 		return nil, fmt.Errorf("claude: %w", err)
 	}
@@ -91,9 +91,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 
 	opts := append([]Option(nil), d.opts...)
-	if len(c.Dirs) > 0 {
-		opts = append(opts, defsOf(defs))
-	}
+	opts = append(opts, defsOf(defs))
 	if c.Store != nil {
 		opts = append(opts, Store(c.Store))
 	}

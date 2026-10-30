@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -46,8 +47,13 @@ type Config struct {
 	// start of the conversation stays the same for the cache. If it is
 	// nil, the agent adds no prompt.
 	Sections SystemFunc
+	// Skillset holds readers of skills that are not in a folder, such as
+	// skills that ship in a program. They are lower than Dirs, so a skill
+	// of a folder replaces a skill of Skillset with the same name. Each
+	// driver gets the same skills.
+	Skillset []def.SkillsReader
 	// Skills names the skills that the agent loads at the start. A name
-	// that no folder of Dirs has fails the start. The harness adds the
+	// that Skillset and Dirs do not have fails the start. The harness adds the
 	// body of each skill to the prompt. A driver of a CLI adds no text,
 	// because the CLI lists each skill and loads its body.
 	Skills []string

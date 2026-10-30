@@ -16,6 +16,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -214,6 +215,19 @@ model_reasoning_effort = "xhigh"
 
 	require.NoError(t, a.Close())
 	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
+}
+
+func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
+	root := t.TempDir()
+	a := startAgent(t, Driver(DefsRoot(root)), agent.Config{
+		Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+	})
+
+	require.NoError(t, a.writeDefs(context.Background()))
+	p := a.threadParams("", nil, "")
+
+	assert.Equal(t, filepath.Join(root, "s1", "skills"), p.skillRoot)
+	assert.FileExists(t, filepath.Join(p.skillRoot, "deploy", "SKILL.md"))
 }
 
 func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
