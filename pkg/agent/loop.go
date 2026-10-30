@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 
 	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -17,6 +18,7 @@ import (
 //	  message_start, message_end...                     (interrupted results, turn 1 only)
 //	  message_start, message_end...                     (system change, if any)
 //	  message_start, message_end...                     (new messages)
+//	  compaction_start, compaction                      (if the view is over the limit)
 //	  message_start, message_update..., message_end     (assistant)
 //	  tool_execution_start...                           (each call, in order)
 //	  tool_execution_end, message_start, message_end... (each call and its result, as the call ends)
@@ -269,8 +271,17 @@ func (a *Agent) turn(
 		return out, false, err
 	}
 
+	if err := a.compactIfNeeded(ctx, em); err != nil {
+		return out, false, err
+	}
+
 	msgs = a.State().Messages()
-	assistant, err = a.call(ctx, msgs, em)
+	assistant, err = a.call(ctx, a.State().View(), em)
+	overflow := assistant == nil && errors.Is(err, ai.ErrContextExceeded)
+	if overflow {
+		assistant, err = a.callAfterOverflow(ctx, err, em)
+		msgs = a.State().Messages()
+	}
 	if assistant != nil {
 		out = append(out, *assistant)
 	}

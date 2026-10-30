@@ -30,6 +30,8 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | login file    | The JSON file of the signed-in accounts of gopi, one key for each provider. `gopi login` writes it | credentials file, token store |
 | message       | What one role adds to a conversation, with its content       | turn, entry                 |
 | content block | One part of a message: text, thinking, a tool call, a file, a section or its removal, or a tool change | part, chunk, segment        |
+| compaction    | A replacement of old messages in what the model reads. The log keeps the originals | truncation, pruning |
+| view          | The messages that the model reads: the history with the edits of each compaction | context |
 | tool          | One function that a model can call                           | function, action, skill     |
 | gopi name     | The one name of a tool in gopi. A well-known tool has a snake case name, such as `bash`. Each other tool keeps its own name, such as `mcp__<server>__<tool>` or `DesignSync` | canonical name, tool ID |
 | well-known tool | A tool in the registry of pkg/tool, with its gopi name, its Claude Code names, its kind, and its rule content | builtin name, standard tool |

@@ -185,6 +185,7 @@ func (p *Provider) openStream(
 
 	stream, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
 	if err != nil {
+		err = retry.MarkContextExceeded(err, retryStatus)
 		return nil, fmt.Errorf("openaichat: %w", err)
 	}
 	return stream, nil

@@ -225,3 +225,20 @@ func TestSkillsetReachesEachDriverStart(t *testing.T) {
 	require.Len(t, c.Skillset, 1)
 	assert.Equal(t, inline, c.Skillset[0])
 }
+
+// noCompactor is a strategy that makes no edits.
+type noCompactor struct{}
+
+func (noCompactor) Limit(ai.Model) int { return 0 }
+
+func (noCompactor) Compact(context.Context, agent.CompactInput) (agent.CompactResult, error) {
+	return agent.CompactResult{}, nil
+}
+
+func TestCompactionReachesEachDriverStart(t *testing.T) {
+	f := newFixture(t, host.Compaction(noCompactor{}))
+
+	f.create(t, host.Config{ID: "s1"})
+
+	assert.Equal(t, noCompactor{}, f.lastConfig(t).Compaction)
+}

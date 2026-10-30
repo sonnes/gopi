@@ -352,3 +352,17 @@ func TestStreamText_RetryHeadersAndPayload(t *testing.T) {
 	assert.Equal(t, "infra", last.Header.Get("X-Team"))
 	assert.Equal(t, 7.0, body["max_completion_tokens"], "the hook changes the request")
 }
+
+func TestStreamText_ContextExceeded(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, `{"error":{"code":"context_length_exceeded","message":"This model's maximum context length is 8192 tokens."}}`)
+	}))
+	t.Cleanup(srv.Close)
+	p := openaichat.New(openaichat.APIKey("test-key"), openaichat.BaseURL(srv.URL))
+
+	_, _, err := run(t, p)
+
+	assert.ErrorIs(t, err, ai.ErrContextExceeded)
+}

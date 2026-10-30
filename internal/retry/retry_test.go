@@ -144,3 +144,33 @@ func TestServerDelay(t *testing.T) {
 		assert.Positive(t, d)
 	}
 }
+
+func TestMarkContextExceeded(t *testing.T) {
+	status := func(code int) func(error) (Status, bool) {
+		return func(error) (Status, bool) { return Status{Code: code}, true }
+	}
+	notAPI := func(error) (Status, bool) { return Status{}, false }
+
+	tests := []struct {
+		name   string
+		err    string
+		status func(error) (Status, bool)
+		want   bool
+	}{
+		{"anthropic", "prompt is too long: 210000 tokens > 200000 maximum", status(400), true},
+		{"anthropic max tokens", "input length and max_tokens exceed context limit", status(400), true},
+		{"openai code", `"code":"context_length_exceeded"`, status(400), true},
+		{"a compatible server", "maximum context length is 8192", status(400), true},
+		{"a large body", "request entity too large", status(413), true},
+		{"other client error", "invalid model", status(400), false},
+		{"a server error with the words", "prompt is too long", status(500), false},
+		{"no status", "prompt is too long", notAPI, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := MarkContextExceeded(errors.New(tt.err), tt.status)
+			assert.Equal(t, tt.want, errors.Is(got, ai.ErrContextExceeded))
+			assert.ErrorContains(t, got, tt.err)
+		})
+	}
+}

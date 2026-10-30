@@ -11,8 +11,8 @@ import (
 	"github.com/sonnes/gopi/pkg/session"
 )
 
-// State is what an agent knows: the messages that the model reads, the
-// progress of the run, the queues, and the loaded tools. A run changes
+// State is what an agent knows: the full history, the view that the model
+// reads, the progress of the run, the queues, and the loaded tools. A run changes
 // the messages and the progress only through [State.Apply], one event
 // at a time. So a viewer that applies the same events to a snapshot
 // gets the same messages and progress.
@@ -28,13 +28,23 @@ import (
 // [State.Messages] returns. Every copy points to the queues of the
 // agent, so [State.Steer] on a copy queues for the agent.
 type State struct {
-	// messages are what the model reads: the messages of the log, and
-	// the ephemeral messages of the run. During a run the agent only
-	// appends to it.
+	// messages are the full history: the messages of the log, and the
+	// ephemeral messages of the run. During a run the agent only appends
+	// to it.
 	messages []ai.Message
+	// ids are the entry IDs of messages, in the same order. A message
+	// with no entry has an empty ID.
+	ids []string
 	// ephemeral are the indexes of the ephemeral messages of the run.
 	// agent_end removes them.
 	ephemeral []int
+	// edits are the edits of each compaction, in order. [State.View]
+	// applies them.
+	edits []session.Edit
+	// compactedAt is the index in messages of the first message after
+	// the last compaction. The usage of an earlier message reports the
+	// size before the compaction.
+	compactedAt int
 	// log is the log of the agent, without Append. A state that a
 	// viewer decoded has none.
 	log session.Writer
@@ -71,6 +81,7 @@ type State struct {
 //     provider rejects it.
 //   - tool_execution_start adds a pending tool call. tool_execution_end
 //     removes it.
+//   - compaction adds the usage of the strategy and its edits.
 //   - agent_end ends the run, clears what is open, removes the
 //     ephemeral messages, and sets the usage and the error. Then the
 //     messages are the messages of the log.
@@ -100,6 +111,14 @@ func (s *State) Apply(e Event) {
 			s.ephemeral = append(slices.Clip(s.ephemeral), len(s.messages))
 		}
 		s.messages = append(s.messages, e.Message)
+		s.ids = append(s.ids, e.EntryID)
+	case EventCompaction:
+		s.usage = s.usage.Add(e.Compaction.Usage)
+		if e.Error != "" || len(e.Compaction.Edits) == 0 {
+			return
+		}
+		s.edits = append(slices.Clip(s.edits), e.Compaction.Edits...)
+		s.compactedAt = len(s.messages)
 	case EventToolExecutionStart:
 		call := ai.ToolCall{
 			ID:    e.ToolCallID,
@@ -133,12 +152,21 @@ func (s *State) dropEphemeral() {
 		return
 	}
 	kept := make([]ai.Message, 0, len(s.messages)-len(s.ephemeral))
+	ids := make([]string, 0, len(s.messages)-len(s.ephemeral))
+	compactedAt := s.compactedAt
 	for i, m := range s.messages {
-		if !slices.Contains(s.ephemeral, i) {
-			kept = append(kept, m)
+		if slices.Contains(s.ephemeral, i) {
+			if i < s.compactedAt {
+				compactedAt--
+			}
+			continue
 		}
+		kept = append(kept, m)
+		ids = append(ids, s.ids[i])
 	}
 	s.messages = kept
+	s.ids = ids
+	s.compactedAt = compactedAt
 	s.ephemeral = nil
 }
 
@@ -155,15 +183,47 @@ func (s *State) stream(msg ai.Message) {
 // State returns one too.
 func (s State) Clip() State {
 	s.messages = slices.Clip(s.messages)
+	s.ids = slices.Clip(s.ids)
+	s.edits = slices.Clip(s.edits)
 	s.ephemeral = slices.Clip(s.ephemeral)
 	s.pending = slices.Clip(s.pending)
 	return s
 }
 
-// Messages returns what the model reads: the messages of the log, and
-// the ephemeral messages of the active run in their places. A caller
-// must not change them.
+// Messages returns the full history: the messages of the log, and the
+// ephemeral messages of the active run in their places. It does not show
+// the edits of a compaction. [State.View] returns what the model reads.
+// A caller must not change them.
 func (s State) Messages() []ai.Message { return s.messages }
+
+// View returns what the model reads: the messages with the edits of each
+// compaction, in order. With no compaction, it returns [State.Messages].
+// A system message in a range stays after the replacement, because the
+// sections and the tool changes are in it.
+func (s State) View() []ai.Message {
+	if len(s.edits) == 0 {
+		return s.messages
+	}
+	view := s.viewEntries()
+	msgs := make([]ai.Message, 0, len(view))
+	for _, e := range view {
+		msgs = append(msgs, e.Message)
+	}
+	return msgs
+}
+
+// viewEntries returns the entries of [State.View], with their IDs.
+func (s State) viewEntries() []session.Entry {
+	entries := make([]session.Entry, 0, len(s.messages))
+	for i, m := range s.messages {
+		entries = append(entries, session.Entry{
+			ID:        s.ids[i],
+			Ephemeral: slices.Contains(s.ephemeral, i),
+			Message:   m,
+		})
+	}
+	return session.Fold(entries, s.edits)
+}
 
 // Steer queues entries that the agent reads before its next model
 // call, as [Agent.Steer] does. A hook steers the run through its copy
@@ -238,26 +298,34 @@ func (s State) Err() error { return s.err }
 
 // stateJSON is the wire form of a [State].
 type stateJSON struct {
-	Messages  []ai.Message  `json:"messages,omitempty"`
-	Ephemeral []int         `json:"ephemeral,omitempty"`
-	Running   bool          `json:"running,omitempty"`
-	Turn      int           `json:"turn,omitempty"`
-	Streaming *ai.Message   `json:"streaming,omitempty"`
-	Pending   []ai.ToolCall `json:"pending,omitempty"`
-	Usage     ai.Usage      `json:"usage,omitzero"`
-	Error     string        `json:"error,omitempty"`
+	Messages  []ai.Message   `json:"messages,omitempty"`
+	IDs       []string       `json:"ids,omitempty"`
+	Ephemeral []int          `json:"ephemeral,omitempty"`
+	Edits     []session.Edit `json:"edits,omitempty"`
+	// CompactedAt is the index of the first message after the last
+	// compaction.
+	CompactedAt int           `json:"compacted_at,omitempty"`
+	Running     bool          `json:"running,omitempty"`
+	Turn        int           `json:"turn,omitempty"`
+	Streaming   *ai.Message   `json:"streaming,omitempty"`
+	Pending     []ai.ToolCall `json:"pending,omitempty"`
+	Usage       ai.Usage      `json:"usage,omitzero"`
+	Error       string        `json:"error,omitempty"`
 }
 
 // MarshalJSON encodes a snapshot of the state for a viewer.
 func (s State) MarshalJSON() ([]byte, error) {
 	w := stateJSON{
-		Messages:  s.messages,
-		Ephemeral: s.ephemeral,
-		Running:   s.running,
-		Turn:      s.turn,
-		Streaming: s.streaming,
-		Pending:   s.pending,
-		Usage:     s.usage,
+		Messages:    s.messages,
+		IDs:         s.ids,
+		Ephemeral:   s.ephemeral,
+		Edits:       s.edits,
+		CompactedAt: s.compactedAt,
+		Running:     s.running,
+		Turn:        s.turn,
+		Streaming:   s.streaming,
+		Pending:     s.pending,
+		Usage:       s.usage,
 	}
 	if s.err != nil {
 		w.Error = s.err.Error()
@@ -272,13 +340,21 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = State{
-		messages:  w.Messages,
-		ephemeral: w.Ephemeral,
-		running:   w.Running,
-		turn:      w.Turn,
-		streaming: w.Streaming,
-		pending:   w.Pending,
-		usage:     w.Usage,
+		messages:    w.Messages,
+		ids:         w.IDs,
+		ephemeral:   w.Ephemeral,
+		edits:       w.Edits,
+		compactedAt: w.CompactedAt,
+		running:     w.Running,
+		turn:        w.Turn,
+		streaming:   w.Streaming,
+		pending:     w.Pending,
+		usage:       w.Usage,
+	}
+	// A snapshot with no IDs has no edits to apply, and each message
+	// still needs its place.
+	if len(s.ids) != len(s.messages) {
+		s.ids = make([]string, len(s.messages))
 	}
 	if w.Error != "" {
 		s.err = errors.New(w.Error)

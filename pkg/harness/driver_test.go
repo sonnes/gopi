@@ -2,6 +2,7 @@ package harness_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -304,4 +305,82 @@ func TestStartSetsTheEffort(t *testing.T) {
 	level, ok := ai.GetOption(p.opts[0], ai.Thinking)
 	assert.True(t, ok)
 	assert.Equal(t, ai.ThinkingHigh, level)
+}
+
+// bigReply returns an answer of about 25k tokens that reports tokens of
+// context.
+func bigReply(tokens int) ai.Message {
+	m := reply(strings.Repeat("abcd", 25_000))
+	m.Usage = ai.Usage{Input: tokens}
+	return m
+}
+
+func TestDefaultCompactionSummarizes(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		bigReply(300_000),
+		bigReply(400_000),
+		reply("the summary"),
+		reply("done"),
+	}}
+	a, err := harness.New(base(t, p)...).New(context.Background())
+	require.NoError(t, err)
+
+	run(t, a, "first")
+	run(t, a, "second")
+	run(t, a, "third")
+
+	assert.Less(t,
+		ai.EstimateTokens(a.State().View()...),
+		ai.EstimateTokens(a.State().Messages()...),
+	)
+	var texts []string
+	for _, m := range a.State().View() {
+		texts = append(texts, m.Text())
+	}
+	assert.Contains(t, strings.Join(texts, "\n"), "the summary")
+}
+
+func TestCompactionNilTurnsItOff(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		bigReply(300_000),
+		bigReply(400_000),
+		reply("done"),
+	}}
+	a, err := harness.New(base(t, p)...).New(
+		context.Background(),
+		harness.AgentDefaults(agent.Compaction(nil)),
+	)
+	require.NoError(t, err)
+
+	run(t, a, "first")
+	run(t, a, "second")
+	run(t, a, "third")
+
+	assert.Len(t, a.State().View(), len(a.State().Messages()))
+}
+
+// countingCompactor counts its compactions and makes no edits.
+type countingCompactor struct{ count int }
+
+func (c *countingCompactor) Limit(ai.Model) int { return 1 }
+
+func (c *countingCompactor) Compact(
+	context.Context,
+	agent.CompactInput,
+) (agent.CompactResult, error) {
+	c.count++
+	return agent.CompactResult{}, nil
+}
+
+func TestStartUsesTheCompactionOfTheConfig(t *testing.T) {
+	p := &script{responses: []ai.Message{reply("done")}}
+	c := &countingCompactor{}
+	a := start(t, harness.New(base(t, p)...), agent.Config{
+		SessionID:  "s1",
+		Compaction: c,
+	})
+
+	run(t, a, strings.Repeat("abcd", 100))
+
+	assert.Equal(t, 1, c.count)
 }

@@ -210,6 +210,11 @@ func Approve(fn agent.ApproveFunc) Option {
 // prompt of the harness and the store of [Store] win. An
 // [agent.Toolset] here adds its tools after the tools of [Toolset], and
 // [Assembly.Tools] does not list them. Give the tools with Toolset.
+//
+// The harness uses the strategy Summarize of the package compact by
+// default. To use another
+// strategy, give [agent.Compaction] here. To turn compaction off, give
+// agent.Compaction(nil).
 func AgentDefaults(opts ...agent.Option) Option {
 	return func(h *Harness) { h.agentOpts = append(h.agentOpts, opts...) }
 }

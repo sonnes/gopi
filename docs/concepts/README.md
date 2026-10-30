@@ -50,6 +50,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [CLI Request](agent/cli-request.md) | How a CLI agent answers the requests of its CLI, an approval or a hook call, with the approve function and the hooks of gopi. |
 | [Driver](agent/driver.md)           | How one interface starts the harness, Claude Code, or Codex for a session, and what a driver does with a field or a hook point that its agent cannot honor. |
 | [Subagent](agent/subagent.md)       | How a subagent of any driver becomes a child session, and how the run stream of the parent shows its start, its events, and its end. |
+| [Compaction](agent/compaction.md)   | How an agent replaces old messages in what the model reads, while the log keeps each original message. |
 
 ## def
 

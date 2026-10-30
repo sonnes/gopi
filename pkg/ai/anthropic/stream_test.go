@@ -215,3 +215,25 @@ func TestStreamText_Effort(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "low", msg.Effort, "the message records the effort")
 }
+
+func TestStreamText_ContextExceeded(t *testing.T) {
+	tooLong := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"invalid_request_error","message":"prompt is too long: 210000 tokens > 200000 maximum"}}`)
+	}
+	p := newFakeProvider(t, &fakeAPI{handlers: []http.HandlerFunc{tooLong}})
+
+	_, err := p.StreamText(t.Context(), testModel, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+
+	assert.ErrorIs(t, err, ai.ErrContextExceeded)
+}
+
+func TestStreamText_OtherClientErrorIsNotContextExceeded(t *testing.T) {
+	p := newFakeProvider(t, &fakeAPI{handlers: []http.HandlerFunc{status(http.StatusBadRequest, nil)}})
+
+	_, err := p.StreamText(t.Context(), testModel, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
+
+	require.Error(t, err)
+	assert.NotErrorIs(t, err, ai.ErrContextExceeded)
+}

@@ -51,7 +51,9 @@ type Host struct {
 	cat   *catalog.Catalog
 	store Storer
 	hooks []agent.Hook
-	tools []tool.Tool
+	// compaction is the strategy of [Compaction], or nil.
+	compaction agent.Compactor
+	tools      []tool.Tool
 	// skillset reads the skills of [Skillset].
 	skillset []def.SkillsReader
 	// sections returns the sections of a session, by ID.
@@ -85,6 +87,13 @@ func Store(s Storer) Option {
 // of a hook fails the start of the agent.
 func Hooks(hs ...agent.Hook) Option {
 	return func(h *Host) { h.hooks = append(h.hooks, hs...) }
+}
+
+// Compaction sets the strategy that compacts the history of each session
+// of the harness. Without it, the harness uses its default strategy. A
+// driver of a CLI ignores it.
+func Compaction(c agent.Compactor) Option {
+	return func(h *Host) { h.compaction = c }
 }
 
 // Tools adds tools to the list of the host. The list is the full set of

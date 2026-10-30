@@ -28,6 +28,7 @@ func (p *Provider) openStream(
 
 	stream, err := retry.Do(ctx, policy, send, retryStatus)
 	if err != nil {
+		err = retry.MarkContextExceeded(err, retryStatus)
 		return nil, fmt.Errorf("anthropic: %w", err)
 	}
 	return stream, nil

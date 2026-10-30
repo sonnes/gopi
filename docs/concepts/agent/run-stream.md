@@ -39,6 +39,7 @@ flowchart TD
 - Each `tool_execution_end` comes as its call ends, so a consumer can show a call as done before the others. With calls in order, each call sends its start, its end, and its result before the next call starts.
 - `agent_end` carries the usage and no messages, because the state and the result of the stream have them.
 - A tool call that runs a [subagent](subagent.md) adds the subagent events. A consumer that does not show subagents skips them.
+- A compaction adds `compaction_start` and `compaction` before a model call, as [Compaction](compaction.md) says. `Agent.Compact` sends them between `agent_start` and `agent_end`.
 
 ## Map
 

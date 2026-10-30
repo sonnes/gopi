@@ -19,7 +19,8 @@ flowchart TD
   accDescr: Each turn adds the new messages, calls the model, and runs the tool calls. A steer, a tool call, a follow-up, or a BeforeStop entry starts the next turn.
   run([Run: agent_start]) --> turn[turn_start]
   turn --> add[add the interrupted results, the system change, the new messages]
-  add --> mc[BeforeCall, the model call, AfterCall]
+  add --> compact[compaction, if the view is at the limit]
+  compact --> mc[BeforeCall, the model call with the view, AfterCall]
   mc --> before[BeforeTool for each call, in call order]
   before --> tools[run the calls: AfterTool, then store each result]
   tools --> tend[turn_end, then AfterTurn]
@@ -55,6 +56,8 @@ flowchart TD
 | Add a hook or change its input                              | `pkg/agent/hooks.go`    |
 
 ## Related Concepts
+
+- [Compaction](compaction.md)
 
 - [Durability](durability.md)
 - [Run Stream](run-stream.md)

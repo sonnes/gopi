@@ -1,0 +1,494 @@
+httprr trace v1
+1313 2738
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 994
+Anthropic-Beta: inline-tools-2026-09-15
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"Name one city in France.","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-opus-5-5","output_config":{"effort":"high"},"system":[{"text":"Always think before every tool call.","cache_control":{"type":"ephemeral"},"type":"text"}],"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"tools":[{"input_schema":{"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object","additionalProperties":false},"name":"get_weather","eager_input_streaming":true,"description":"Get the current weather in a city","cache_control":{"type":"ephemeral"}},{"input_schema":{"properties":{},"type":"object"},"name":"__gopi_deferred_placeholder__","defer_loading":true,"description":"Reserved placeholder. Never available. Never call this."}],"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-30T12:21:09Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-30T12:21:09Z
+Anthropic-Ratelimit-Requests-Limit: 13000
+Anthropic-Ratelimit-Requests-Remaining: 12999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-30T12:21:09Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-30T12:21:09Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a52a60cc78720e6e-BOM
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Fri, 30 Oct 2026 12:21:10 GMT
+Request-Id: req_011CgYQri25tdSzRVaycj2kL
+Server: cloudflare
+Server-Timing: x-originResponse;dur=285
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-58453acdcf9faf6dfac3c8bb7961e58a-123e97dbf97499ee-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-opus-5-5","id":"msg_011CgYQrituzAwRzkCpryCow","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":493,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":5,"service_tier":"standard","inference_geo":"global","speed":"standard"},"input_transformations":[],"diagnostics":null}          }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}       }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Paris is a"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" city in France."}              }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0         }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":493,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":11,"output_tokens_details":{"thinking_tokens":0}}      }
+
+event: message_stop
+data: {"type":"message_stop"        }
+
+1666 11580
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1346
+Anthropic-Beta: inline-tools-2026-09-15
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"Name one city in France.","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"},{"content":[{"text":"Paris is a city in France.","type":"text"}],"role":"assistant"},{"content":[{"text":"First compute 982451653 multiplied by 961748941 in your head. If the last digit is odd, call get_weather for Paris. If it is even, call it for Lyon.","cache_control":{"type":"ephemeral"},"type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-opus-5-5","output_config":{"effort":"high"},"system":[{"text":"Always think before every tool call.","cache_control":{"type":"ephemeral"},"type":"text"}],"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"tools":[{"input_schema":{"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object","additionalProperties":false},"name":"get_weather","eager_input_streaming":true,"description":"Get the current weather in a city","cache_control":{"type":"ephemeral"}},{"input_schema":{"properties":{},"type":"object"},"name":"__gopi_deferred_placeholder__","defer_loading":true,"description":"Reserved placeholder. Never available. Never call this."}],"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-30T12:21:11Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-30T12:21:11Z
+Anthropic-Ratelimit-Requests-Limit: 13000
+Anthropic-Ratelimit-Requests-Remaining: 12999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-30T12:21:11Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-30T12:21:11Z
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a52a60d78cbe0e6e-BOM
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Fri, 30 Oct 2026 12:21:15 GMT
+Request-Id: req_011CgYQrqXXLZBXSqfDwweJZ
+Server: cloudflare
+Server-Timing: x-originResponse;dur=191
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-524e87b76ac9f319cbf521fa0c0a66c4-cb16d7eafa12729a-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-opus-5-5","id":"msg_011CgYQrr3HQemY6jmAqJ11x","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":4,"cache_creation_input_tokens":556,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":556,"ephemeral_1h_input_tokens":0},"output_tokens":6,"service_tier":"standard","inference_geo":"global","speed":"standard"},"input_transformations":[],"diagnostics":null}          }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}              }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I'm checking the last dig"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"it first"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":", which com"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"es out to 3 "} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"and so"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" od"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"d. Then I'm de"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ciding to compute the full product"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" of the two numbers, star"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ting by"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" writ"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ing the mult"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"iplication as a dif"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ference from"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" one bill"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ion."}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Working the"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" multiplication out in"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" p"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ieces now"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":": 38,251,059 "}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"times 17,548,347,"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" split into parts, then sub"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"tracted"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" from "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"38,251,059 bill"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ion."}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"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"}           }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0          }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"The product"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" "}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"ends in 3, which"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" is odd, so I'll"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" check the weather in"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" Paris.\n\n982"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":","}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"451,653 × 961,"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"748,941 = 944,"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"871,836,856,449,"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"473"}   }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1        }
+
+event: content_block_start
+data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"toolu_0144dzDnAXgGrWCTPVqsYFEz","name":"get_weather","input":{},"caller":{"type":"direct"}}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":""}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"{\"city\": \"Pa"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"ris"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":2,"delta":{"type":"input_json_delta","partial_json":"\"}"}  }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":2            }
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":4,"cache_creation_input_tokens":556,"cache_read_input_tokens":0,"output_tokens":680,"output_tokens_details":{"thinking_tokens":575}}       }
+
+event: message_stop
+data: {"type":"message_stop"       }
+
+4700 11343
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 4380
+Anthropic-Beta: inline-tools-2026-09-15
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"A summary of the earlier conversation: the user asked for a city in France.","type":"text"}],"role":"user"},{"content":[{"text":"First compute 982451653 multiplied by 961748941 in your head. If the last digit is odd, call get_weather for Paris. If it is even, call it for Lyon.","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"},{"content":[{"signature":"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","thinking":"I'm checking the last digit first, which comes out to 3 and so odd. Then I'm deciding to compute the full product of the two numbers, starting by writing the multiplication as a difference from one billion.\n\nWorking the multiplication out in pieces now: 38,251,059 times 17,548,347, split into parts, then subtracted from 38,251,059 billion.\n\n","type":"thinking"},{"text":"The product ends in 3, which is odd, so I'll check the weather in Paris.\n\n982,451,653 × 961,748,941 = 944,871,836,856,449,473","type":"text"},{"id":"toolu_0144dzDnAXgGrWCTPVqsYFEz","input":{"city":"Paris"},"name":"get_weather","type":"tool_use"}],"role":"assistant"},{"content":[{"tool_use_id":"toolu_0144dzDnAXgGrWCTPVqsYFEz","cache_control":{"type":"ephemeral"},"content":[{"text":"Sunny","type":"text"}],"type":"tool_result"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-opus-5-5","output_config":{"effort":"high"},"system":[{"text":"Always think before every tool call.","cache_control":{"type":"ephemeral"},"type":"text"}],"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"drop_block"}},"tools":[{"input_schema":{"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object","additionalProperties":false},"name":"get_weather","eager_input_streaming":true,"description":"Get the current weather in a city","cache_control":{"type":"ephemeral"}},{"input_schema":{"properties":{},"type":"object"},"name":"__gopi_deferred_placeholder__","defer_loading":true,"description":"Reserved placeholder. Never available. Never call this."}],"stream":true}HTTP/2.0 200 OK
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Ratelimit-Input-Tokens-Limit: 10000000
+Anthropic-Ratelimit-Input-Tokens-Remaining: 10000000
+Anthropic-Ratelimit-Input-Tokens-Reset: 2026-10-30T12:21:21Z
+Anthropic-Ratelimit-Output-Tokens-Limit: 2000000
+Anthropic-Ratelimit-Output-Tokens-Remaining: 2000000
+Anthropic-Ratelimit-Output-Tokens-Reset: 2026-10-30T12:21:21Z
+Anthropic-Ratelimit-Requests-Limit: 13000
+Anthropic-Ratelimit-Requests-Remaining: 12999
+Anthropic-Ratelimit-Requests-Reset: 2026-10-30T12:21:21Z
+Anthropic-Ratelimit-Tokens-Limit: 12000000
+Anthropic-Ratelimit-Tokens-Remaining: 12000000
+Anthropic-Ratelimit-Tokens-Reset: 2026-10-30T12:21:21Z
+Anthropic-Thinking-Prefix-Mismatch: kind=blocks_replaced; pattern=unknown; block=messages.3.content.0; sections=messages; changed_validated=messages.0.content.0; position=at; item=text; removed=5; inserted=1; modified=0; messages_delta=-2
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cache-Control: no-cache
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a52a6115da5e0e6e-BOM
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: text/event-stream; charset=utf-8
+Date: Fri, 30 Oct 2026 12:21:21 GMT
+Request-Id: req_011CgYQsaBortjiSTB5bedp2
+Server: cloudflare
+Server-Timing: x-originResponse;dur=168
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-836f1ea12ca9beedb193e662c9726cac-d845a9b501c47f7f-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+
+event: message_start
+data: {"type":"message_start","message":{"model":"claude-opus-5-5","id":"msg_011CgYQsadr5eWiWrQeVkHGV","type":"message","role":"assistant","content":[],"container":null,"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":2,"cache_creation_input_tokens":675,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":675,"ephemeral_1h_input_tokens":0},"output_tokens":6,"service_tier":"standard","inference_geo":"global","speed":"standard"},"input_transformations":[{"type":"thinking_dropped","path":"messages.3.content.0","reason":"prefix_binding_mismatch"}],"diagnostics":null}   }
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}    }
+
+event: ping
+data: {"type": "ping"}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"I'm checking the product I"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" g"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"ave ear"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"lier, since I"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" never"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" verified it. I'm spl"}              }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"itting 961"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"748941 as"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" a"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" billion minus 38,251"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":",059, and working out "}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"982451653 times"}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" "}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"38 "} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"million for"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" the first part of"}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" that subtraction."}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"} }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Still"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":" checking the mult"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"iplication..."}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"\n\n"}             }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"CAQS/gwKEAgTGAI4AUIIdGhpbmtpbmcSDGRHdYC1crdlswsR9xoMony5ob9KUk5SuLnoIjAjYnM9uEzxh5mfgMw4UJMwc4tvm9OLo++GWJb0jClNhU1xjW2rHbk/4rxUcV4XvFAqmwy0sl17+nFXCITTHZO06opdEceu55O+h4bd6+cbNyBX9BlTUtRTfcSaw4UvevKqJ+HJIaf7EK1LVBzxgmEVMJHewttjoe87I6JOv0We/ELtA8zCDRCdUpIMWiOtlOmi+wRFEGZ0vhRd3zE6W4pUXC5lu5dDA0IaE4m6Iitq5luN2TdG1fY6u/7ZBUj1qGQHF5uXYXL9ISPbIAii1jH1WBLHGTpEXsBIwgTQqYT5uZ8UHJ+hr8TthgO/o63PvHclK2elwJqGwlngu2hZQDReeJN+xq6XHdvTp+BwcyXeu+jaw5K/XG2s+jVM4ZL5E0od31aZCybyAvmPQp1ydinSXWmH1VG0gWnsWaEqkAQ35H6zNmaIMtrUfybgbee6qNN3DPBN8Sp2rNSKGwun0MseD52/eQmvEga9Cbi91CGPtU/kqjEjd8zyr6Aeak5VUnkg4pp2x1j6wOuNu+SxTol2jHFFkXrVVkc0MbM4YHzGB+u4B7M86/hjUIotQepEeGhcJvQOE9SbHBXp0Opxz+qq70vLZz5JXFRi1YEo1OfKEksT3E0ZQdK1uDEVu5H3XwgKsqmU8BYKr6+YwC0kpI0o/ukBx+0zNCO+8bs+HODaf125RkOHHM41sszCEedsgzZU1UtjDQklmA20oGsW0qaFWuDXCxTt0080mL5knXnyLXsYwlXUQ4ElJVCRJi11H8xNGjkJuT2nRi5iMganfZUrRkkg9YGFSFx7jQQdCkgY9tHLhe4syshsZ2jglhX2il1X/2WrzIg/c8cw+/KLzr23cCRa5GLjxkMSpJk5aF+M7N+HXK6On5/j0b0BuqwTVtceCKUCmEwsHynaDUhpHQ/iJuP745kdUEfnHOholeOF9/ZLWjbdB66JJ8dARynaWCHOlzVmunVaF5XJfryaLgUhsLpCg3oXac/yLHQ1qWTjQC4yLZciKsnlGqnkQWVZ9xhP5X9X9cmrtBNZWtcqGjrCPr8oDd4nD8for/Sa+8e2WfKBNbGNLFBc2l/LAW0GDIblV3RDQkDlHlcGX4xJ1yOjebN6YCpkLqDck43mFFVzHxWM956jCpCAGJ64G2LqG5RSgU09G+D0tIhqsTo0QQmnCja20lPp+uEIqM9X0VEYE5Qxw+0DFOO0wrYFNMj5eyckMX3f5c9hwmunbia4WYkuA6AC94E1HcZQTs9bvkLM8K+h9odmHruZIzSPyY1RvYitc5LJTFqsRXRXhjUJNPLavvxNwC8ZmOQqUPqfWSQPvZt5HKDigMAvsUwDeUP3Lf/PH8pFywowHzDXsa8Dc9dkqY89uvErpzMkqVvIhJItjbDj1CojIajkVrpbymPlUf++4AcTtTeaonMRWsWOZu34OUZssKHsArtSLSoLM9rdpocOEcPSmh/kOXQgOJNtBKLfuD0t1HONwq7U1CNPiWmt0wK1337m759MWOtW/nErMT6iuAuPrv+NCJ8LVTGbjKCPFn+sqyb8UITv0Fhddp3stcsywUsBY/Eg5TBFxhiDr2rgvb7RuH4qBtlZIKEhoNFNtVM38hW+I7rGgsdC/HLgX2qsF8MIP+OXtVE7WLS0+WDPHzVMACgKNAzmU4iUCjNPgQt7B5lnXut57URMsYEay47xqh2BwA5rPEfMLWcoZ94Pl6akM8USf1zEaqaA4Jh2P1ophc/gQxhKZacgiaxkMST0YeLtjzKE/Vd9ATeX7ajZZ3xUh0JPgkxoBojujbFKAAgn0EFHv4Ar2SH/HYPKub8IEydjfwsQY0WF8fB5UXw6dKRp6Nh24X6QQFKXNz8dtqeQ2/MAmFEq7Vk3OPLOE6Viq2j56mwEQrhsdbtHtLJC6W6J44Smk6XRGQiroGhkIVa8B0vecK/bTNs+8vqq8cCVaA2AYFebd/Jx6iaKr3E9q5i0vRHAfeBNXSBBAoLwxxwKSmMwMylq9mcuq7rbE1igld1/241wCEufvCuj7/J9S1mICYysNvv7k1zZ4X5mWmL3TPxu1bWYvtlp2IgZKZMEcz56a1eWAiAxPfkW0t8ZChjGYvQv+WFLIIc3yXt8h70bJQc7h7Ux4GQ26qKJhdEgphR+ZfOdRZKH1e0YAQ=="}          }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0             }
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}        }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"I checked the"}            }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" weather in Paris,"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" and it's **"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"sunny**.\n\n982,"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"451,653 × 961,"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"748,941 = **944,"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"871,836,856,449,"}               }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"473**. The last digit is"}       }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" 3, which is odd,"}         }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" so Paris was the right p"}     }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"ick under"}      }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" your rule."}           }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" You"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" can also"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" see this without"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" the full"}  }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" product: the"}   }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" two numbers end in 3"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" and 1"}    }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":", and 3 × 1"}          }
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":" = 3."}     }
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":null},"usage":{"input_tokens":2,"cache_creation_input_tokens":675,"cache_read_input_tokens":0,"output_tokens":647,"output_tokens_details":{"thinking_tokens":532}} }
+
+event: message_stop
+data: {"type":"message_stop"    }
+
+4695 1385
+POST https://api.anthropic.com/v1/messages HTTP/1.1
+Host: api.anthropic.com
+User-Agent: Go-http-client/1.1
+Content-Length: 4375
+Anthropic-Beta: inline-tools-2026-09-15
+Anthropic-Beta: mid-conversation-output-config-2026-07-01
+Anthropic-Beta: thinking-binding-controls-2026-08-01
+Content-Type: application/json
+
+{"max_tokens":128000,"messages":[{"content":[{"text":"A summary of the earlier conversation: the user asked for a city in France.","type":"text"}],"role":"user"},{"content":[{"text":"First compute 982451653 multiplied by 961748941 in your head. If the last digit is odd, call get_weather for Paris. If it is even, call it for Lyon.","type":"text"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"},{"content":[{"signature":"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","thinking":"I'm checking the last digit first, which comes out to 3 and so odd. Then I'm deciding to compute the full product of the two numbers, starting by writing the multiplication as a difference from one billion.\n\nWorking the multiplication out in pieces now: 38,251,059 times 17,548,347, split into parts, then subtracted from 38,251,059 billion.\n\n","type":"thinking"},{"text":"The product ends in 3, which is odd, so I'll check the weather in Paris.\n\n982,451,653 × 961,748,941 = 944,871,836,856,449,473","type":"text"},{"id":"toolu_0144dzDnAXgGrWCTPVqsYFEz","input":{"city":"Paris"},"name":"get_weather","type":"tool_use"}],"role":"assistant"},{"content":[{"tool_use_id":"toolu_0144dzDnAXgGrWCTPVqsYFEz","cache_control":{"type":"ephemeral"},"content":[{"text":"Sunny","type":"text"}],"type":"tool_result"}],"role":"user"},{"content":[],"output_config":{"effort":"high"},"role":"system"}],"model":"claude-opus-5-5","output_config":{"effort":"high"},"system":[{"text":"Always think before every tool call.","cache_control":{"type":"ephemeral"},"type":"text"}],"thinking":{"display":"summarized","type":"adaptive","block_binding":{"prefix_mismatch_behavior":"error"}},"tools":[{"input_schema":{"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object","additionalProperties":false},"name":"get_weather","eager_input_streaming":true,"description":"Get the current weather in a city","cache_control":{"type":"ephemeral"}},{"input_schema":{"properties":{},"type":"object"},"name":"__gopi_deferred_placeholder__","defer_loading":true,"description":"Reserved placeholder. Never available. Never call this."}],"stream":true}HTTP/2.0 400 Bad Request
+Connection: close
+Anthropic-Organization-Id: f8d53eba-6364-48bc-8698-174ec63038b3
+Anthropic-Thinking-Prefix-Mismatch: kind=blocks_replaced; pattern=unknown; block=messages.3.content.0; sections=messages; changed_validated=messages.0.content.0; position=at; item=text; removed=5; inserted=1; modified=0; messages_delta=-2; thinking_total=1; rejected_blocks=1; rejected_turns=1
+Anthropic-Workspace-Id: wrkspc_01JZm5CtrtUJv9naZe6XUBFT
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a52a613e5eae0e6e-BOM
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Content-Type: application/json
+Date: Fri, 30 Oct 2026 12:21:27 GMT
+Request-Id: req_011CgYQt3swiXexbNnLPAh3V
+Server: cloudflare
+Server-Timing: x-originResponse;dur=149
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Traceresponse: 00-3acdd8a91e9ed1777d625155d1dd13d8-ad8a1898870234c5-01
+Vary: Accept-Encoding
+X-Robots-Tag: none
+X-Should-Retry: false
+
+{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation. Remove the block, or set `thinking.block_binding.prefix_mismatch_behavior` to \"drop_block\". Content before this block was rewritten since it was created, first at `messages.0.content.0`."},"request_id":"req_011CgYQt3swiXexbNnLPAh3V"}

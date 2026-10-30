@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
 
@@ -23,7 +24,8 @@ type Stream = stream.Stream[Event, []ai.Message]
 // [EventTurnEnd], [EventMessageStart], [EventMessageUpdate],
 // [EventMessageEnd], [EventToolExecutionStart],
 // [EventToolExecutionEnd], [EventSubagentStart], [EventSubagent], and
-// [EventSubagentEnd]. Each event carries what [State.Apply] needs.
+// [EventSubagentEnd], [EventCompactionStart], and [EventCompaction].
+// Each event carries what [State.Apply] needs.
 // [State.Apply] ignores the subagent events, because the state of a
 // child is in its own session.
 //
@@ -90,6 +92,23 @@ type EventMessageEnd struct {
 	// it in this run, and the store does not keep it. [State.Apply]
 	// removes it at agent_end.
 	Ephemeral bool
+	// EntryID is the ID of the entry of the message. An edit of a
+	// compaction names it. It is empty if the message has no entry.
+	EntryID string
+}
+
+// EventCompactionStart marks the start of a compaction. The strategy can
+// make a model call, and no other event comes until [EventCompaction].
+type EventCompactionStart struct{}
+
+// EventCompaction ends one compaction. [State.Apply] adds the edits and
+// the usage. If Error is set, there are no edits, and the view does not
+// change.
+type EventCompaction struct {
+	Compaction session.Compaction
+	// Error is the error of a compaction that failed. It does not stop a
+	// run that the loop started the compaction in.
+	Error string
 }
 
 // EventToolExecutionStart marks the start of one tool call.
@@ -116,6 +135,8 @@ func (EventMessageUpdate) event()      {}
 func (EventMessageEnd) event()         {}
 func (EventToolExecutionStart) event() {}
 func (EventToolExecutionEnd) event()   {}
+func (EventCompactionStart) event()    {}
+func (EventCompaction) event()         {}
 
 // MarshalJSON encodes the event with its type.
 func (e EventAgentStart) MarshalJSON() ([]byte, error) { return marshalEvent(e) }
@@ -144,6 +165,12 @@ func (e EventToolExecutionStart) MarshalJSON() ([]byte, error) { return marshalE
 // MarshalJSON encodes the event with its type.
 func (e EventToolExecutionEnd) MarshalJSON() ([]byte, error) { return marshalEvent(e) }
 
+// MarshalJSON encodes the event with its type.
+func (e EventCompactionStart) MarshalJSON() ([]byte, error) { return marshalEvent(e) }
+
+// MarshalJSON encodes the event with its type.
+func (e EventCompaction) MarshalJSON() ([]byte, error) { return marshalEvent(e) }
+
 // The names of the events in JSON.
 const (
 	typeAgentStart         = "agent_start"
@@ -158,6 +185,8 @@ const (
 	typeSubagentStart      = "subagent_start"
 	typeSubagent           = "subagent"
 	typeSubagentEnd        = "subagent_end"
+	typeCompactionStart    = "compaction_start"
+	typeCompaction         = "compaction"
 )
 
 // eventJSON is the wire format of every event. Type tells the events
@@ -180,7 +209,11 @@ type eventJSON struct {
 	// message_update
 	AssistantEvent *ai.Event `json:"assistant_event,omitempty"`
 	// message_end
-	Ephemeral bool `json:"ephemeral,omitempty"`
+	Ephemeral bool   `json:"ephemeral,omitempty"`
+	EntryID   string `json:"entry_id,omitempty"`
+
+	// compaction, with error
+	Compaction *session.Compaction `json:"compaction,omitempty"`
 
 	// tool_execution_start and tool_execution_end
 	ToolCallID string          `json:"tool_call_id,omitempty"`
@@ -231,6 +264,15 @@ func marshalEvent(e Event) ([]byte, error) {
 			Type:      typeMessageEnd,
 			Message:   &v.Message,
 			Ephemeral: v.Ephemeral,
+			EntryID:   v.EntryID,
+		}
+	case EventCompactionStart:
+		w = eventJSON{Type: typeCompactionStart}
+	case EventCompaction:
+		w = eventJSON{
+			Type:       typeCompaction,
+			Compaction: &v.Compaction,
+			Error:      v.Error,
 		}
 	case EventToolExecutionStart:
 		w = eventJSON{
@@ -309,6 +351,14 @@ func UnmarshalEvent(data []byte) (Event, error) {
 		return EventMessageEnd{
 			Message:   deref(w.Message),
 			Ephemeral: w.Ephemeral,
+			EntryID:   w.EntryID,
+		}, nil
+	case typeCompactionStart:
+		return EventCompactionStart{}, nil
+	case typeCompaction:
+		return EventCompaction{
+			Compaction: deref(w.Compaction),
+			Error:      w.Error,
 		}, nil
 	case typeToolExecutionStart:
 		return EventToolExecutionStart{

@@ -13,6 +13,9 @@
 // of the run. So a viewer that applies the same events to a snapshot of
 // the state gets the same state. The hooks read the same state.
 //
+// [Compaction] sets the strategy that replaces old messages in
+// [State.View]. The log keeps each original message.
+//
 // A [Driver] starts an agent of one kind: the loop of the harness, or
 // an agent CLI. Each driver calls the hook points that its agent has,
 // and rejects a hook at another point:

@@ -18,6 +18,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sonnes/gopi/pkg/ai"
@@ -182,4 +183,40 @@ func backoff(attempt int) time.Duration {
 	doubled := float64(firstBackoff) * math.Pow(2, float64(attempt))
 	wait := min(doubled, float64(maxBackoff))
 	return time.Duration(wait * (1 - rand.Float64()*backoffJitter))
+}
+
+// contextExceededTexts are the words of a refused size in the errors of
+// the providers. The APIs give no shared code for it.
+var contextExceededTexts = []string{
+	"context_length_exceeded",
+	"context length",
+	"context limit",
+	"context window",
+	"prompt is too long",
+}
+
+// MarkContextExceeded wraps err with [ai.ErrContextExceeded] if the API
+// refused the size of the request: status 413, or status 400 with the
+// words of a refused size. Another error stays as it is.
+func MarkContextExceeded(err error, status func(error) (Status, bool)) error {
+	if err == nil {
+		return nil
+	}
+	s, ok := status(err)
+	if !ok {
+		return err
+	}
+	if s.Code == http.StatusRequestEntityTooLarge {
+		return fmt.Errorf("%w: %w", ai.ErrContextExceeded, err)
+	}
+	if s.Code != http.StatusBadRequest {
+		return err
+	}
+	text := strings.ToLower(err.Error())
+	for _, words := range contextExceededTexts {
+		if strings.Contains(text, words) {
+			return fmt.Errorf("%w: %w", ai.ErrContextExceeded, err)
+		}
+	}
+	return err
 }

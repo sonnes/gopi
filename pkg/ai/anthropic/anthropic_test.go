@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -305,4 +306,63 @@ func TestCountTokens(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.Greater(t, count.Total, 0)
+}
+
+// TestThinkingAfterSummary is a recorded call on a history that a
+// compaction edited: an old turn becomes a summary, and a later turn
+// keeps its thinking and its signature. The provider sends the drop_block
+// control, so the API accepts the request and drops the thinking of that
+// turn. The strict call shows what the control prevents. Run it with
+// make record PKG=anthropic RUN=TestThinkingAfterSummary.
+func TestThinkingAfterSummary(t *testing.T) {
+	p := newTestProvider(t)
+	model := modelstest.Model("anthropic", "claude-opus-5-5")
+	opts := ai.JoinOptions(
+		ai.SystemPrompt([]ai.Content{ai.Text{Text: "Always think before every tool call."}}),
+		ai.Tools([]ai.ToolInfo{weatherTool.Info()}),
+		ai.Thinking(ai.ThinkingHigh),
+	)
+
+	question := ai.UserMessage("Name one city in France.")
+	oldAnswer, err := p.StreamText(t.Context(), model, []ai.Message{question}, opts).Wait()
+	require.NoError(t, err)
+
+	request := ai.UserMessage("First compute 982451653 multiplied by 961748941 in your head. " +
+		"If the last digit is odd, call get_weather for Paris. If it is even, call it for Lyon.")
+	turn, err := p.StreamText(
+		t.Context(),
+		model,
+		[]ai.Message{question, *oldAnswer, request},
+		opts,
+	).Wait()
+	require.NoError(t, err)
+	calls := turn.ToolCalls()
+	require.NotEmpty(t, calls)
+	thinking := false
+	for _, c := range turn.Content {
+		if th, ok := c.(ai.ThinkingBlock); ok && th.Signature != "" {
+			thinking = true
+		}
+	}
+	require.True(t, thinking, "the kept turn must have signed thinking, or the test proves nothing")
+
+	edited := []ai.Message{
+		ai.UserMessage("A summary of the earlier conversation: the user asked for a city in France."),
+		request,
+		*turn,
+		ai.ToolResultMessage(calls[0].ID, ai.Text{Text: "Sunny"}),
+	}
+	last, err := p.StreamText(t.Context(), model, edited, opts).Wait()
+	require.NoError(t, err)
+	assert.NotEmpty(t, last.Text())
+
+	strict := anthropic.OnPayload(func(params *sdk.MessageNewParams) error {
+		params.Thinking.OfAdaptive.SetExtraFields(map[string]any{
+			"block_binding": map[string]any{"prefix_mismatch_behavior": "error"},
+		})
+		return nil
+	})
+	_, err = p.StreamText(t.Context(), model, edited, ai.JoinOptions(opts, strict)).Wait()
+	require.Error(t, err, "the summary changes the prefix of the kept thinking")
+	assert.Contains(t, err.Error(), "signature")
 }

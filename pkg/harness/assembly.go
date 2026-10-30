@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/compact"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/sandbox"
@@ -317,7 +318,11 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 
 	policy := a.h.policy
 	policy.Dir = a.Dir
-	opts := []agent.Option{agent.Hooks(policy.Hook())}
+	opts := []agent.Option{
+		agent.Hooks(policy.Hook()),
+		// The first option, so [AgentDefaults] can replace it.
+		agent.Compaction(compact.Summarize()),
+	}
 	if a.h.child != nil && a.h.child.sub.MaxTurns > 0 {
 		opts = append(opts, maxTurns(a.h.child.sub.MaxTurns))
 	}

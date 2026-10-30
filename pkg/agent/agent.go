@@ -27,6 +27,10 @@ type Agent struct {
 	state State
 	// closed is true after the first [Agent.Close].
 	closed bool
+	// compactRetryAt is the size of the view that starts the next
+	// compaction after one that did not bring the view under the limit.
+	// Only the active run reads it.
+	compactRetryAt int
 }
 
 // config holds the options of an agent that do not change after [New]
@@ -47,6 +51,8 @@ type config struct {
 	// log as they are.
 	system SystemFunc
 	hooks  []Hook
+	// compactor is the strategy of [Compaction], or nil.
+	compactor Compactor
 	// closers run once, at the first [Agent.Close].
 	closers []func() error
 }
@@ -263,7 +269,15 @@ func newAgent(lm ai.LanguageModel, opts []Option) (*Agent, error) {
 func (a *Agent) setLog(l *session.Log) {
 	a.log = l
 	a.state.log = l.Writer()
-	a.state.messages = l.Messages()
+	h := l.History()
+	a.state.messages = make([]ai.Message, 0, len(h.Entries))
+	a.state.ids = make([]string, 0, len(h.Entries))
+	for _, e := range h.Entries {
+		a.state.messages = append(a.state.messages, e.Message)
+		a.state.ids = append(a.state.ids, e.ID)
+	}
+	a.state.edits = h.Edits
+	a.state.compactedAt = h.CompactedAt
 }
 
 // Log returns the log of the agent: its entries, and the values of the
@@ -335,13 +349,19 @@ func (em *emitter) emit(e Event) {
 func (em *emitter) commit(ctx context.Context, entries []session.Entry, events ...Event) error {
 	em.order.Lock()
 	defer em.order.Unlock()
+	var stored []session.Entry
 	if len(entries) > 0 {
-		_, err := em.agent.log.Append(context.WithoutCancel(ctx), entries...)
+		var err error
+		stored, err = em.agent.log.Append(context.WithoutCancel(ctx), entries...)
 		if err != nil {
 			return err
 		}
 	}
 	for _, e := range events {
+		if end, ok := e.(EventMessageEnd); ok && len(stored) == 1 {
+			end.EntryID = stored[0].ID
+			e = end
+		}
 		em.apply(e)
 	}
 	return nil

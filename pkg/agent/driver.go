@@ -84,6 +84,10 @@ type Config struct {
 	Approve ApproveFunc
 	// Hooks change the loop of the agent.
 	Hooks []Hook
+	// Compaction is the strategy that compacts the history. Without it,
+	// the harness uses its default strategy. A driver of a CLI ignores
+	// it, because the CLI compacts its own session.
+	Compaction Compactor
 	// Tools is the full set of tools of the agent. Without Tools, the
 	// agent has no tool. A driver of a CLI reads only the name of each
 	// tool: it maps a well-known name to a tool of its CLI, and skips a

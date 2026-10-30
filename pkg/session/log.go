@@ -161,8 +161,9 @@ func (l *Log) Entries() []Entry {
 	return slices.Clone(l.entries)
 }
 
-// Messages returns the messages of the entries, in order. It is what
-// the model reads, so it skips each custom entry.
+// Messages returns the messages of the entries, in order: the full
+// history. It skips each custom entry, and it does not apply a
+// [Compaction]. [History] gives the IDs and the edits too.
 //
 // A crash or a canceled run between an assistant message and its tool
 // results leaves a tool call with no result. A provider rejects that.
@@ -170,46 +171,95 @@ func (l *Log) Entries() []Entry {
 // because a dangling call is a fact about the stored log, not about the
 // loop that reads it.
 func (l *Log) Messages() []ai.Message {
-	entries := l.Entries()
+	entries := l.History().Entries
 	msgs := make([]ai.Message, 0, len(entries))
 	for _, e := range entries {
-		if e.Kind != "" {
-			continue
-		}
 		msgs = append(msgs, e.Message)
 	}
-	return repairToolCalls(msgs)
+	return msgs
+}
+
+// History is what an agent reads to resume a session.
+type History struct {
+	// Entries are the message entries, in order, with the repairs of
+	// [Log.Messages]. A repaired result has the fixed ID
+	// "<entry of the call>/<ID of the call>", so an edit can name it.
+	Entries []Entry
+	// Edits are the edits of each [Compaction], in order. Apply them to
+	// Entries with [Fold].
+	Edits []Edit
+	// CompactedAt is the index in Entries of the first message after the
+	// last compaction. It is 0 if the log has no compaction. The usage
+	// of a message before it reports the size before the compaction.
+	CompactedAt int
+}
+
+// History returns the messages and the compactions of the log. It skips
+// a compaction that does not decode, because the full history is valid.
+func (l *Log) History() History {
+	var (
+		h        History
+		messages []Entry
+		// compacted is the number of stored messages before the last
+		// compaction.
+		compacted int
+	)
+	for _, e := range l.Entries() {
+		if e.Kind == "" {
+			messages = append(messages, e)
+			continue
+		}
+		if e.Kind != KindCompaction {
+			continue
+		}
+		var c Compaction
+		if err := json.Unmarshal(e.Data, &c); err != nil {
+			continue
+		}
+		h.Edits = append(h.Edits, c.Edits...)
+		compacted = len(messages)
+	}
+	h.Entries, h.CompactedAt = repairToolCalls(messages, compacted)
+	return h
 }
 
 // repairToolCalls appends an error result after each assistant message
-// for every tool call that has no result.
-func repairToolCalls(msgs []ai.Message) []ai.Message {
-	out := make([]ai.Message, 0, len(msgs))
-	for i := 0; i < len(msgs); i++ {
-		m := msgs[i]
-		out = append(out, m)
-		if m.Role != ai.RoleAssistant {
+// for every tool call that has no result. It returns the entries, and
+// the index that the entry at mark moves to.
+func repairToolCalls(entries []Entry, mark int) ([]Entry, int) {
+	out := make([]Entry, 0, len(entries))
+	moved := mark
+	for i := 0; i < len(entries); i++ {
+		e := entries[i]
+		out = append(out, e)
+		if e.Message.Role != ai.RoleAssistant {
 			continue
 		}
 
-		calls := m.ToolCalls()
+		calls := e.Message.ToolCalls()
 		if len(calls) == 0 {
 			continue
 		}
 		answered := make(map[string]bool, len(calls))
-		for i+1 < len(msgs) && msgs[i+1].Role == ai.RoleToolResult {
+		for i+1 < len(entries) && entries[i+1].Message.Role == ai.RoleToolResult {
 			i++
-			out = append(out, msgs[i])
-			answered[msgs[i].ToolCallID] = true
+			out = append(out, entries[i])
+			answered[entries[i].Message.ToolCallID] = true
 		}
 		for _, tc := range calls {
 			if answered[tc.ID] {
 				continue
 			}
-			out = append(out, Interrupted(tc.ID))
+			out = append(out, Entry{
+				ID:      e.ID + "/" + tc.ID,
+				Message: Interrupted(tc.ID),
+			})
+			if i < mark {
+				moved++
+			}
 		}
 	}
-	return out
+	return out, moved
 }
 
 // Append sets ID and CreatedAt on each entry, writes the entries to the

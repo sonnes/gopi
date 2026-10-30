@@ -183,6 +183,7 @@ func (p *Provider) openStream(
 
 	stream, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
 	if err != nil {
+		err = retry.MarkContextExceeded(err, retryStatus)
 		return nil, fmt.Errorf("openai: %w", err)
 	}
 	return stream, nil
