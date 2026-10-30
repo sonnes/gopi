@@ -104,9 +104,16 @@ Review the diff.
 	writeAgent(t, high, "penny.md", `---
 name: penny
 description: Counts coins
-model: sonnet
+model: claude-code/claude-sonnet-5-5
 ---
 Count the coins.
+`)
+	writeAgent(t, high, "bea.md", `---
+name: bea
+description: Names a bare model
+model: sonnet
+---
+Answer.
 `)
 	writeAgent(t, high, "otto.md", `---
 name: otto
@@ -120,6 +127,7 @@ Answer.
 	r, err := claude.Driver().Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
+		Spec:      "claude-code/claude-opus-5-5",
 		Dirs:      []string{low, high},
 	})
 	require.NoError(t, err)
@@ -135,8 +143,9 @@ Answer.
 	require.NotEqual(t, -1, at, "the CLI gets --agents")
 	require.Less(t, at+1, len(args))
 	assert.JSONEq(t, `{
+		"bea": {"description": "Names a bare model", "prompt": "Answer."},
 		"otto": {"description": "Runs on another provider", "prompt": "Answer."},
-		"penny": {"description": "Counts coins", "prompt": "Count the coins.", "model": "sonnet"},
+		"penny": {"description": "Counts coins", "prompt": "Count the coins.", "model": "claude-sonnet-5-5"},
 		"rex": {"description": "Reviews a diff", "prompt": "Review the diff.", "tools": ["Read", "Bash"]}
 	}`, args[at+1])
 	assert.NotContains(t, args, "--agent", "the host gives the prompt of the agent of the session")

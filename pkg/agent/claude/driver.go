@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -32,7 +33,9 @@ import (
 //
 // Start reads the agent files of Dirs and gives them to the CLI with
 // [Agents], so the Task tool of the CLI starts each one as a subagent.
-// A later folder wins for a name. An edit of an agent file reaches the
+// A later folder wins for a name. An agent gets the model ID of its
+// spec only if the spec has the account of Spec. Any other model of a
+// file gives the subagent the model of the parent. An edit of an agent file reaches the
 // CLI at the next Start. The driver skips the skills and the AGENTS.md
 // files of Dirs, because the CLI loads its own.
 //
@@ -125,6 +128,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if err != nil {
 		return nil, err
 	}
+	for i := range agents {
+		agents[i].Model = cliModel(c.Spec, agents[i].Model)
+	}
 	if len(agents) > 0 {
 		opts = append(opts, Agents(agents...))
 	}
@@ -141,6 +147,20 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
+}
+
+// cliModel returns the model of an agent file for the CLI of the parent
+// spec. A spec of the account of the parent, such as
+// "claude-code/claude-sonnet-5-5", gives its model ID. The CLI runs on
+// one account, so another spec, a bare model, and "inherit" give "",
+// and the subagent runs the model of the parent.
+func cliModel(parent, model string) string {
+	account, id, ok := strings.Cut(model, "/")
+	own, _, _ := strings.Cut(parent, "/")
+	if !ok || account != own {
+		return ""
+	}
+	return id
 }
 
 // readAgents returns the agents of each folder of dirs, in order.
