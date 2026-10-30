@@ -121,11 +121,11 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		h:            h,
 		sessionID:    id,
 	}
-	asm.Skills, err = readSkills(ctx, h.skills)
+	asm.Skills, err = def.MergeSkills(ctx, h.skills...)
 	if err != nil {
 		return nil, err
 	}
-	asm.names = skillNames(asm.Skills)
+	asm.names = def.SkillNames(asm.Skills)
 	if h.child == nil {
 		// A subagent preloads the skills of its file, in childSystem,
 		// and not the skills of its parent.
@@ -133,7 +133,7 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		if err != nil {
 			return nil, err
 		}
-		asm.Agents, err = readAgents(ctx, h.agents)
+		asm.Agents, err = def.MergeAgents(ctx, h.agents...)
 		if err != nil {
 			return nil, err
 		}
@@ -186,77 +186,6 @@ func readInstructions(ctx context.Context, readers []def.InstructionsReader) ([]
 			return nil, fmt.Errorf("harness: instructions reader %d (%T): %w", i, r, err)
 		}
 		out = append(out, texts...)
-	}
-	return out, nil
-}
-
-// readSkills reads each skills reader in order and merges the skills by
-// qualified name. A later skill replaces an earlier skill with the same
-// qualified name, at the position of the earlier one, so the list that
-// the model sees keeps its order. An error of a reader fails the
-// assembly.
-func readSkills(ctx context.Context, readers []def.SkillsReader) ([]def.Skill, error) {
-	var (
-		out []def.Skill
-		at  = make(map[string]int)
-	)
-	for i, r := range readers {
-		skills, err := r.ReadSkills(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("harness: skills reader %d (%T): %w", i, r, err)
-		}
-		for _, s := range skills {
-			key := s.QualifiedName()
-			if pos, ok := at[key]; ok {
-				out[pos] = s
-				continue
-			}
-			at[key] = len(out)
-			out = append(out, s)
-		}
-	}
-	return out, nil
-}
-
-// skillNames returns the name that the model sees for each skill. The
-// last skill with a bare name gets the bare name, and the others get
-// their qualified names. No skill is lost on a clash.
-func skillNames(skills []def.Skill) []string {
-	last := make(map[string]int, len(skills))
-	for i, s := range skills {
-		last[s.Name] = i
-	}
-	out := make([]string, len(skills))
-	for i, s := range skills {
-		if last[s.Name] == i {
-			out[i] = s.Name
-			continue
-		}
-		out[i] = s.QualifiedName()
-	}
-	return out
-}
-
-// readAgents reads each agents reader in order. A later subagent
-// replaces an earlier one with the same name, at its position.
-func readAgents(ctx context.Context, readers []def.AgentsReader) ([]def.Agent, error) {
-	var (
-		out []def.Agent
-		at  = make(map[string]int)
-	)
-	for i, r := range readers {
-		agents, err := r.ReadAgents(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("harness: agents reader %d (%T): %w", i, r, err)
-		}
-		for _, a := range agents {
-			if pos, ok := at[a.Name]; ok {
-				out[pos] = a
-				continue
-			}
-			at[a.Name] = len(out)
-			out = append(out, a)
-		}
 	}
 	return out, nil
 }
