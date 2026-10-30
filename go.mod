@@ -5,6 +5,7 @@ go 1.27
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.2
 	github.com/google/jsonschema-go v0.4.3
+	github.com/google/uuid v1.6.0
 	github.com/modelcontextprotocol/go-sdk v1.5.0
 	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v4 v4.0.0-rc.6

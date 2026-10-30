@@ -3,14 +3,14 @@ package host
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"iter"
 	"maps"
 	"slices"
 	"sync"
+
+	"github.com/google/uuid"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -55,6 +55,8 @@ type Host struct {
 	sections SectionsFunc
 	// toolList reports a call of [Tools], also with no tools.
 	toolList bool
+	// newID makes the ID of a session that the caller gives no ID.
+	newID func() string
 	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
@@ -111,6 +113,13 @@ func Sections(fn SectionsFunc) Option {
 	return func(h *Host) { h.sections = fn }
 }
 
+// IDs sets the function that makes the ID of a session that the caller
+// gives no ID. The store names a file with the ID, so fn must give an
+// ID with no path. Without IDs, the host makes a UUIDv4.
+func IDs(fn func() string) Option {
+	return func(h *Host) { h.newID = fn }
+}
+
 // Open returns a host that resolves the model spec of each session with
 // cat. The catalog must have a driver for each config, or a default
 // driver, before the agent of the config starts.
@@ -122,6 +131,7 @@ func Sections(fn SectionsFunc) Option {
 func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, error) {
 	h := &Host{
 		cat:      cat,
+		newID:    uuid.NewString,
 		sessions: make(map[string]*hosted),
 		hub: newHub(
 			State{Sessions: make(map[string]Session)},
@@ -159,7 +169,7 @@ func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, err
 // start of the agent reads it there.
 type Config struct {
 	// ID is the ID of the session. If it is empty, Create makes a new
-	// ID.
+	// ID with the function of [IDs].
 	ID string `json:"id,omitempty"`
 	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
 	// first. A later folder wins for a name. The host reads only the
@@ -219,7 +229,7 @@ type Config struct {
 // Create returns its error. The session then stays idle, with
 // [StopError], and the next message starts the agent again.
 func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
-	config.ID = cmp.Or(config.ID, newSessionID())
+	config.ID = cmp.Or(config.ID, h.newID())
 	fromFile := config.ToolNames == nil && config.Agent != ""
 	config, err := withAgent(ctx, config)
 	if err == nil {
@@ -406,14 +416,4 @@ func (h *Host) Close() error {
 	}
 	h.hub.close()
 	return errors.Join(errs...)
-}
-
-// sessionIDBytes is the number of random bytes in a new session ID.
-const sessionIDBytes = 8
-
-// newSessionID returns a random session ID with the prefix "s_".
-func newSessionID() string {
-	b := make([]byte, sessionIDBytes)
-	_, _ = rand.Read(b)
-	return "s_" + hex.EncodeToString(b)
 }

@@ -100,7 +100,7 @@ func ExampleHost_Stream() {
 	ctx := context.Background()
 	var h *host.Host // a host from Open
 
-	state, events, err := h.Stream(ctx, "s_1")
+	state, events, err := h.Stream(ctx, "s1")
 	if err != nil {
 		return
 	}

@@ -28,6 +28,7 @@ flowchart LR
 
 - The host gives its [tool list](../tool/tool-list.md) to each driver, and the config of a session picks a subset by name. The config keeps names and not tools, because a tool is code.
 - A session is a resource with an ID, and a caller holds no handle. The host knows each session of the store, also one with no agent, so a read never asks if one runs.
+- If a config has no ID, the host makes one with the function of `IDs`, or a UUIDv4 without it. A caller with its own form of ID gives its function, so its records and its sessions have one form.
 - The user events and the names of the session status come from [Claude Managed Agents](https://web.archive.org/web/20261017131318/https://platform.claude.com/docs/en/managed-agents/events-and-streaming).
 - `Create` keeps the session config, and each start of the agent reads it, so a session keeps its agent, its model, and its folder after a restart. The cost: an edit of an agent file, other than its prompt, reaches only a new session.
 - The session config holds no prompt. Before each run, the host reads the prompt of the agent file, and the driver sends only the [sections](../agent/section.md) that changed. A prompt depends on a state that changes during a session, so a stored copy goes stale.

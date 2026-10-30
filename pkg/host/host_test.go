@@ -3,9 +3,9 @@ package host_test
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -67,7 +67,20 @@ func TestCreateMakesAnID(t *testing.T) {
 
 	sess := f.create(t, host.Config{})
 
-	assert.True(t, strings.HasPrefix(sess.ID, "s_"), sess.ID)
+	id, err := uuid.Parse(sess.ID)
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Version(4), id.Version())
+	assert.Equal(t, id.String(), sess.ID)
+}
+
+func TestCreateMakesAnIDWithIDs(t *testing.T) {
+	f := newFixture(t, host.IDs(func() string { return "made" }))
+
+	made := f.create(t, host.Config{})
+	given := f.create(t, host.Config{ID: "given"})
+
+	assert.Equal(t, "made", made.ID)
+	assert.Equal(t, "given", given.ID)
 }
 
 func TestCreateATakenID(t *testing.T) {
