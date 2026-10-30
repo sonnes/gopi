@@ -3,6 +3,7 @@ package host_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,6 +49,26 @@ func TestUpdateAnIdleSession(t *testing.T) {
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
 	assert.Equal(t, agent.ModePlan, c.Mode)
 	assert.Equal(t, []string{"a", "b"}, f.model.texts(), "the agent resumes the log")
+}
+
+func TestUpdateThatChangesNothingKeepsTheAgent(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	f.create(t, host.Config{ID: "s1", Allow: []string{"echo"}})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	runEnd(t, events)
+
+	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
+		c.Allow = []string{"echo"}
+	})
+	require.NoError(t, err)
+
+	f.send(t, "s1", "b")
+	require.Eventually(t, func() bool {
+		return len(f.model.texts()) == 2
+	}, 5*time.Second, time.Millisecond, "the model did not read the second message")
+	assert.Equal(t, 1, f.driver.starts(), "the next run keeps its agent")
 }
 
 func TestUpdateDuringARun(t *testing.T) {

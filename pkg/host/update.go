@@ -14,7 +14,8 @@ import (
 //
 // The agent of an active run keeps its config to the end of the run. The
 // next run starts the agent again from the new config, and the driver
-// resumes the log.
+// resumes the log. A change that leaves the config the same keeps the
+// agent.
 //
 // Update returns [ErrInvalid] if change sets another ID, Dir, Dirs, or
 // Agent, or a model of another kind of agent, because the new agent
@@ -56,6 +57,14 @@ func (s *hosted) update(ctx context.Context, change func(*Config)) (Session, err
 	}
 	config, _, _ := configValue.Get(w)
 	change(&config)
+
+	// A change that changes nothing keeps the agent, so a caller can set
+	// the rules before each run with no new start of a CLI.
+	if reflect.DeepEqual(old, config) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.sess.clone(), nil
+	}
 
 	if err := s.host.checkChange(old, config); err != nil {
 		return Session{}, fmt.Errorf("host: session %s: %w", s.id, err)
