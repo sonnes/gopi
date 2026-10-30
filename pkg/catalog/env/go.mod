@@ -20,6 +20,7 @@ require (
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/modelcontextprotocol/go-sdk v1.5.0 // indirect
 	github.com/openai/openai-go/v3 v3.66.0 // indirect

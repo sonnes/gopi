@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -76,7 +77,7 @@ func TestRecordedSubagent(t *testing.T) {
 	require.NotEmpty(t, starts, "spawn_agent starts a child")
 	start := starts[0]
 	assert.Equal(t, "read_word", start.Name, "the name is the last part of the agent path")
-	assert.Regexp(t, `^s1\.read_word-\S+$`, start.SessionID)
+	assert.NoError(t, uuid.Validate(start.SessionID), "the child has a UUID")
 	assert.Empty(t, start.Prompt, "the server does not send the prompt of a spawn")
 	require.NotEmpty(t, ends)
 	assert.Equal(t, agent.SubagentCompleted, ends[len(ends)-1].Status)

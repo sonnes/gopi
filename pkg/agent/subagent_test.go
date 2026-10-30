@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -15,27 +16,16 @@ import (
 )
 
 func TestChildID(t *testing.T) {
-	tests := []struct {
-		name   string
-		parent string
-		want   string
-	}{
-		{
-			name:   "a saved parent names the child",
-			parent: "s1",
-			want:   "s1.reviewer-a1b2",
-		},
-		{
-			name:   "an unsaved parent has an unsaved child",
-			parent: "",
-			want:   "",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, agent.ChildID(tt.parent, "reviewer", "a1b2"))
-		})
-	}
+	id := agent.ChildID("s1", "reviewer", "a1b2")
+
+	u, err := uuid.Parse(id)
+	require.NoError(t, err)
+	assert.Equal(t, uuid.Version(5), u.Version())
+	assert.Equal(t, u.String(), id, "the ID is a canonical UUID")
+	assert.Equal(t, id, agent.ChildID("s1", "reviewer", "a1b2"), "one replay finds the same child")
+	assert.NotEqual(t, id, agent.ChildID("s2", "reviewer", "a1b2"))
+	assert.NotEqual(t, id, agent.ChildID("s1", "reviewer", "c3d4"))
+	assert.Empty(t, agent.ChildID("", "reviewer", "a1b2"), "an unsaved parent has an unsaved child")
 }
 
 // delegate is a tool that reports one subagent run on the run stream.

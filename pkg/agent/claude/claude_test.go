@@ -982,7 +982,7 @@ type childFailStore struct {
 }
 
 func (s childFailStore) Append(ctx context.Context, id string, entries ...session.Entry) error {
-	if strings.Contains(id, ".") {
+	if id != "s1" {
 		return errors.New("disk full")
 	}
 	return s.MemoryStore.Append(ctx, id, entries...)

@@ -171,12 +171,14 @@ func (t *agentTool) childID(ctx context.Context, sub def.Agent, resumeID string)
 		return newChildID(parentID, sub.Name)
 	}
 
-	ofParent := strings.HasPrefix(resumeID, parentID+".")
+	snap, err := t.asm.h.store.Load(ctx, resumeID)
+	if err != nil {
+		return "", fmt.Errorf("no subagent has the agent_id %q", resumeID)
+	}
+	parent, ok, err := agent.Parent.Read(snap)
+	ofParent := err == nil && ok && parent.SessionID == parentID
 	if !ofParent {
 		return "", fmt.Errorf("the agent_id %q is not a subagent of this session", resumeID)
-	}
-	if _, err := t.asm.h.store.Load(ctx, resumeID); err != nil {
-		return "", fmt.Errorf("no subagent has the agent_id %q", resumeID)
 	}
 	return resumeID, nil
 }

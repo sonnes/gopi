@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -28,16 +30,22 @@ type ParentRef struct {
 	ToolCallID string `json:"tool_call_id"`
 }
 
-// ChildID returns the ID of a child session of parent: the parent ID,
-// ".", name, "-", and suffix. A driver takes the suffix from the native
+// childSpace is the UUID namespace of the ID of each child session.
+var childSpace = uuid.NewSHA1(uuid.NameSpaceURL, []byte("gopi://sessions"))
+
+// ChildID returns the ID of a child session of parent: a UUIDv5 of the
+// parent ID, name, and suffix. A driver takes the suffix from the native
 // ID of the subagent if it has one, so that a replay of the same output
-// finds the same child. If parent is "", the parent is unsaved, and
-// ChildID returns "": the child is unsaved too.
+// finds the same child. The ID has the form of the ID of any session, so
+// a caller that names its records by session ID takes it. The [Parent]
+// value of the child names its parent. If parent is "", the parent is
+// unsaved, and ChildID returns "": the child is unsaved too.
 func ChildID(parentID, name, suffix string) string {
 	if parentID == "" {
 		return ""
 	}
-	return parentID + "." + name + "-" + suffix
+	key := parentID + "." + name + "-" + suffix
+	return uuid.NewSHA1(childSpace, []byte(key)).String()
 }
 
 // The status values of [EventSubagentEnd].

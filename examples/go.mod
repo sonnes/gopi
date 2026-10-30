@@ -18,6 +18,7 @@ require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.2 // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
 	github.com/modelcontextprotocol/go-sdk v1.5.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect

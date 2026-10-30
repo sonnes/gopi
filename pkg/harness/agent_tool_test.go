@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -70,7 +71,7 @@ func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
 	assert.Contains(t, result.Text(), "2 problems")
 	assert.Contains(t, result.Text(), "<usage>total_tokens: 15, tool_uses: 0, duration_ms: ")
 	id := childID(t, result)
-	assert.Regexp(t, `^s1\.reviewer-[0-9a-f]{6}$`, id)
+	assert.NoError(t, uuid.Validate(id), "the child has a UUID")
 
 	snap, err := store.Load(ctx, id)
 	require.NoError(t, err)
@@ -125,6 +126,33 @@ func TestTaskResumesAChild(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"first", "second"}, inputs)
+}
+
+func TestTaskResumesOnlyItsOwnChild(t *testing.T) {
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	p := &script{responses: []ai.Message{
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"first"}`),
+		reply("one"),
+		reply("ok"),
+	}}
+	h := taskHarness(t, p, store, reviewer)
+	other, err := h.Durable(ctx, "s2")
+	require.NoError(t, err)
+	run(t, other, "go")
+	id := childID(t, toolResult(t, other))
+
+	p.responses = []ai.Message{
+		callTool("c2", "agent", `{"agent":"reviewer","prompt":"second","resume":"`+id+`"}`),
+		reply("ok"),
+	}
+	a, err := h.Durable(ctx, "s1")
+	require.NoError(t, err)
+	run(t, a, "go")
+
+	result := toolResult(t, a)
+	assert.True(t, result.IsError)
+	assert.Contains(t, result.Text(), "is not a subagent of this session")
 }
 
 func TestTaskErrors(t *testing.T) {

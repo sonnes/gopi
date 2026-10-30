@@ -18,7 +18,7 @@ sequenceDiagram
   accDescr: The parent stream carries each event of the child in a subagent event, between subagent_start and subagent_end of the tool call c1.
   participant T as tool call c1
   participant P as parent stream
-  participant C as child s1.reviewer-a1b2
+  participant C as child c7a1-...
   T->>P: tool_execution_start
   T->>P: subagent_start: name, title, prompt
   C->>P: subagent: agent_start
@@ -31,7 +31,7 @@ sequenceDiagram
 ## Design
 
 - A child keeps its messages in its own session, and its parent session and tool call in the `Parent` value. The link is data, so a store needs no folder layout to keep it.
-- The ID of a child is the parent ID, ".", the name, "-", and a suffix. A driver takes the suffix from the native ID of the subagent if it has one, so that a replay of the same output finds the same child.
+- The ID of a child is a UUIDv5 of the parent ID, the name, and a suffix. A driver takes the suffix from the native ID of the subagent if it has one, so that a replay of the same output finds the same child. The ID has the form of the ID of a session, so a caller that names a record by the session ID takes a child too, and the `Parent` value names the parent.
 - The parent stream wraps each event of a child in a `subagent` event, so a viewer of the parent sees the child live, with no second stream. The order rules of a run apply inside each child, and not across the parent and the child.
 - The host makes each child a read-only [child session](../host/child-session.md).
 - Each `subagent_start` has one `subagent_end` in the same run: a run that stops ends each open child as `interrupted`, so a viewer never keeps a child open.

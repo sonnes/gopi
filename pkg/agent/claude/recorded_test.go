@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -335,7 +336,7 @@ func TestRecordedSubagent(t *testing.T) {
 	require.Len(t, ends, 1)
 	start := starts[0]
 	assert.Equal(t, "general-purpose", start.Name)
-	assert.Regexp(t, `^s1\.general-purpose-\S+$`, start.SessionID)
+	assert.NoError(t, uuid.Validate(start.SessionID), "the child has a UUID")
 	assert.NotEmpty(t, start.Prompt)
 	assert.Equal(t, start.ToolCallID, ends[0].ToolCallID)
 	assert.Equal(t, agent.SubagentCompleted, ends[0].Status)
@@ -492,7 +493,7 @@ type laterFailStore struct {
 }
 
 func (s *laterFailStore) Append(ctx context.Context, id string, entries ...session.Entry) error {
-	if s.fail.Load() && strings.Contains(id, ".") {
+	if s.fail.Load() && id != "s1" {
 		return errors.New("disk full")
 	}
 	return s.MemoryStore.Append(ctx, id, entries...)
