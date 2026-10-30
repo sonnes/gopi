@@ -29,6 +29,7 @@ flowchart LR
 - Each CLI has its own package and its own type, and a [driver](driver.md) starts each agent. An option that both packages have has the same name in both.
 - The CLI owns the conversation. The [emitter](cli-emitter.md) writes a mirror of it to the log, for display and replay, and the model never reads the log.
 - The ID of the CLI conversation is a session value, so `Durable` resumes the same conversation. Each agent reads and writes it only through `internal/resume`, and a caller never sees it.
+- A saved Claude Code agent starts a new CLI session with `--session-id`, and the ID is a UUIDv5 of the gopi session ID. So one gopi session always gives the same CLI session. If an earlier CLI made that session and exited before the agent stored the ID, the CLI reports that the ID is in use. Then the agent stores the ID and resumes the session.
 - If the CLI cannot find the stored conversation, the run fails with `ErrNoConversation`, and the agent clears the ID. The next run starts a new conversation of the CLI, and the log keeps its messages.
 - The CLI runs only its own tools, so a CLI agent has no `Toolset` option.
 - One process lives as long as the agent: the first run starts it, and `Close` stops it. Each run after the first then starts with no handshake.

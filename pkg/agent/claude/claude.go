@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
@@ -388,7 +390,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		return proc, nil
 	}
 
-	cmd, err := a.command()
+	cmd, fresh, err := a.command()
 	if err != nil {
 		return nil, err
 	}
@@ -401,8 +403,17 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 	}
 	if _, err := proc.initialize(ctx); err != nil {
 		proc.terminate()
-		if errors.Is(err, ErrNoConversation) {
+		switch {
+		case errors.Is(err, ErrNoConversation):
 			err = errors.Join(err, conversation.Clear(ctx, a.log))
+		case fresh != "" && takenSession(err):
+			// An earlier CLI made the conversation and exited before the
+			// agent stored its ID. The agent stores the ID now, so the
+			// next start resumes the conversation.
+			if err := conversation.Save(ctx, a.log, fresh); err != nil {
+				return nil, err
+			}
+			return a.ensure(ctx)
 		}
 		return nil, err
 	}
@@ -524,21 +535,47 @@ func agentModel(model string) string {
 	return model
 }
 
-// command returns the command that starts the CLI, and resumes the
-// session of the CLI if the log has one.
-func (a *Agent) command() (*exec.Cmd, error) {
+// command returns the command that starts the CLI. If the log has the
+// session of a CLI, the command resumes it. Otherwise a saved agent
+// gives the CLI the session ID of [cliSessionID], and fresh is that ID.
+func (a *Agent) command() (cmd *exec.Cmd, fresh string, err error) {
 	args, err := cliArgs(a.cfg, sections.Text(a.log.Messages()))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	id, err := conversation.Get(a.log)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	if id != "" {
+	switch {
+	case id != "":
 		args = append(args, "--resume="+id)
+	case a.sessionID() != "":
+		fresh = cliSessionID(a.sessionID())
+		args = append(args, "--session-id="+fresh)
 	}
-	return cliCommand(a.cfg, args), nil
+	return cliCommand(a.cfg, args), fresh, nil
+}
+
+// cliSpace is the UUID namespace of the session IDs that the agent
+// gives the CLI.
+var cliSpace = uuid.NewSHA1(uuid.NameSpaceURL, []byte("gopi://claude"))
+
+// cliSessionID returns the session ID of the CLI for the gopi session
+// id: a UUIDv5, because the CLI takes only a UUID. One gopi session
+// always gives the same session of the CLI.
+func cliSessionID(id string) string {
+	return uuid.NewSHA1(cliSpace, []byte(id)).String()
+}
+
+// takenSessionText is in the error of a CLI whose new session ID has a
+// conversation already.
+const takenSessionText = "is already in use"
+
+// takenSession reports whether err says that the new session ID of the
+// CLI has a conversation already.
+func takenSession(err error) bool {
+	return strings.Contains(err.Error(), takenSessionText)
 }
 
 // cliCommand returns the command that starts the CLI of c with args.

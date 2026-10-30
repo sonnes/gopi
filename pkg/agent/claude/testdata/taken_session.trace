@@ -1,0 +1,3 @@
+stdiorr trace v1
+# The new session ID of the CLI has a conversation already. The CLI writes the error to stderr and exits with no output.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}

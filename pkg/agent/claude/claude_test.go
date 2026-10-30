@@ -280,11 +280,55 @@ func TestDurableResumes(t *testing.T) {
 	assert.False(t, slices.ContainsFunc(cmds[0].Args, func(s string) bool {
 		return strings.HasPrefix(s, "--resume")
 	}), "a new session does not resume")
+	assert.Contains(t, cmds[0].Args, "--session-id="+cliSessionS1, "a new session gives the CLI the UUIDv5 of the gopi session")
 	assert.Contains(t, cmds[1].Args, "--resume=sess-1")
+	assert.False(t, slices.ContainsFunc(cmds[1].Args, func(s string) bool {
+		return strings.HasPrefix(s, "--session-id")
+	}), "a resume gives no new session ID")
 
 	msgs := second.Log().Messages()
 	require.Len(t, msgs, 4, "the second agent continues the stored log")
 	checkLog(t, second)
+}
+
+// cliSessionS1 is the session ID of the CLI for the gopi session "s1":
+// the UUIDv5 of "s1" in the namespace of "gopi://claude".
+const cliSessionS1 = "b169ccbc-740a-5437-ae7b-ac2973e42de2"
+
+func TestNewGivesNoSessionID(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+	a := claude.New()
+	defer closeAgent(t, a)
+	_, _, err := run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	cmds := starts.Cmds()
+	require.Len(t, cmds, 1)
+	assert.False(t, slices.ContainsFunc(cmds[0].Args, func(s string) bool {
+		return strings.HasPrefix(s, "--session-id")
+	}), "an agent with no store lets the CLI pick its session ID")
+}
+
+func TestRunTakenSession(t *testing.T) {
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	starts := claude.ReplayStderr(t,
+		[]string{"Error: Session ID " + cliSessionS1 + " is already in use."},
+		"testdata/taken_session.trace",
+		"testdata/text.trace",
+	)
+	a, err := claude.Durable(ctx, "s1", claude.Store(store))
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+	events, _, err := run(ctx, a, "Say hello")
+	require.NoError(t, err, "the agent resumes the conversation that has the ID")
+	emittest.CheckEvents(t, events)
+
+	cmds := starts.Cmds()
+	require.Len(t, cmds, 2)
+	assert.Contains(t, cmds[0].Args, "--session-id="+cliSessionS1)
+	assert.Contains(t, cmds[1].Args, "--resume="+cliSessionS1)
+	checkLog(t, a)
 }
 
 func TestRunCancel(t *testing.T) {

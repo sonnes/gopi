@@ -84,6 +84,28 @@ func ReplayExitError(t *testing.T, err error, files ...string) *Starts {
 	return s
 }
 
+// ReplayStderr is [Replay], but start n of the CLI has stderr[n] as the
+// text of its stderr, as a CLI does that writes an error and exits.
+func ReplayStderr(t *testing.T, stderr []string, files ...string) *Starts {
+	t.Helper()
+	s := Replay(t, nil, files...)
+	replay := start
+	n := 0
+	start = func(cmd *exec.Cmd) (cliproc.Pipes, error) {
+		p, err := replay(cmd)
+		if err != nil {
+			return p, err
+		}
+		if n < len(stderr) {
+			text := stderr[n]
+			p.Stderr = func() string { return text }
+		}
+		n++
+		return p, nil
+	}
+	return s
+}
+
 // Start starts the CLI of a, as the first run does, with no run.
 func Start(ctx context.Context, a *Agent) error {
 	_, err := a.ensure(ctx)

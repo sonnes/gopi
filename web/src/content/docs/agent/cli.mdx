@@ -92,7 +92,7 @@ Do not use `SandboxDangerFullAccess` or `PermissionBypass` outside a sandbox. Wi
 
 ## Sessions
 
-`Durable` keeps the ID of the CLI conversation as a [value](../session/index.mdx), so a second `Durable` resumes it. If the CLI cannot find it, the run fails with `ErrNoConversation`, and the next run starts a new conversation. The model reads the transcript of the CLI, not the log.
+`Durable` keeps the ID of the CLI conversation as a [value](../session/index.mdx), so a second `Durable` resumes it. For a new session, the Claude Code agent gives the CLI a session ID: the UUIDv5 of the gopi session ID. If the CLI cannot find it, the run fails with `ErrNoConversation`, and the next run starts a new conversation. The model reads the transcript of the CLI, not the log.
 
 `Steer` and `FollowUp` on the [state](events.mdx#state) of a CLI agent do nothing. The Claude Code agent has its own `Steer` and `TakeSteer`. Between runs, [`claude.Idle`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Idle) gets the events of a subagent in the background, and [`claude.Wake`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Wake) reports a turn that `Continue` runs.
 
