@@ -142,7 +142,10 @@ The log only appends. A custom entry keeps application state in its place among 
 A host runs the lifecycle of each session. It starts the agent, runs one message at a time, waits for a person when a tool call needs an approval, and recovers each session after a restart. Each session pairs an agent with a workspace: the folder that it works in, and the folders of its AGENTS.md, skills, and subagents.
 
 ```go
-h, err := host.Open(ctx, cat, host.Store(store))
+h, err := host.Open(ctx, cat,
+	host.Store(store),
+	host.Tools(harness.Coding()...),
+)
 if err != nil {
 	log.Fatal(err)
 }
@@ -247,7 +250,7 @@ An agent is a value in your Go program. It runs where your code runs, with the t
 |---|---|---|
 | A coding agent | a terminal | `harness.New` |
 | Issue triage | a nightly job | `agent.Durable` |
-| A code reviewer | a CI step | `harness.Builtin(harness.ReadOnly)` |
+| A code reviewer | a CI step | `harness.Mode(permission.Plan)` |
 | A support agent | an HTTP handler | `h.Stream` |
 | Claude Code or Codex | a page of your app | the `claude-code/` and `codex/` specs |
 

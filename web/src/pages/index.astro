@@ -38,7 +38,7 @@ const bands = [
 const covers = [
   ["coding agent", "a terminal", "harness.New"],
   ["issue triage", "a nightly job", "agent.Durable"],
-  ["code reviewer", "a CI step", "harness.Builtin(harness.ReadOnly)"],
+  ["code reviewer", "a CI step", "harness.Mode(permission.Plan)"],
   ["support agent", "an HTTP handler", "h.Stream"],
   ["Claude Code or Codex", "a page of your app", "claude-code/, codex/"],
 ];

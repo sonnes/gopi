@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/host"
 )
 
@@ -16,7 +17,10 @@ func Manage(
 	store host.Storer,
 ) error {
 	// snippet:host
-	h, err := host.Open(ctx, cat, host.Store(store))
+	h, err := host.Open(ctx, cat,
+		host.Store(store),
+		host.Tools(harness.Coding()...),
+	)
 	if err != nil {
 		return err
 	}
