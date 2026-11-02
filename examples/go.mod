@@ -9,8 +9,8 @@ replace (
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/sonnes/gopi v0.0.1
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.1
+	github.com/sonnes/gopi v0.0.2
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.2
 )
 
 require (

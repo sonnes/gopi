@@ -5,8 +5,8 @@ go 1.27
 require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/openai/openai-go/v3 v3.66.0
-	github.com/sonnes/gopi v0.0.1
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.1
+	github.com/sonnes/gopi v0.0.2
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.2
 	github.com/stretchr/testify v1.11.1
 )
 
