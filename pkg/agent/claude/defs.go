@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
+	"github.com/sonnes/gopi/pkg/ai"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
@@ -43,6 +44,10 @@ func writeDefs(ctx context.Context, d *clidefs.Defs) (string, error) {
 			a.Tools = claudeRules(a.Tools)
 		}
 		a.Disallowed = claudeRules(a.Disallowed)
+		// An agent file has no value for off.
+		if a.Effort == ai.ThinkingOff {
+			a.Effort = ""
+		}
 	}
 
 	settings := filepath.Join(folder, settingsDir)

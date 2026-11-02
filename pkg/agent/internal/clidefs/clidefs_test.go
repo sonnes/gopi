@@ -26,8 +26,17 @@ func writeDir(t *testing.T, skill, agent, text string) string {
 	return dir
 }
 
+// useRoot gives the test its own temporary directory, and returns the
+// folder that holds the folder of each session.
+func useRoot(t *testing.T) string {
+	t.Helper()
+	t.Setenv("TMPDIR", t.TempDir())
+	return filepath.Join(os.TempDir(), "gopi-defs")
+}
+
 func TestPrepare_NoDirsNeedsNoFolder(t *testing.T) {
-	d := clidefs.New(nil, nil, t.TempDir(), "s1", "")
+	useRoot(t)
+	d := clidefs.New(nil, nil, "s1", "")
 
 	set, dir, err := d.Prepare(t.Context())
 
@@ -39,8 +48,8 @@ func TestPrepare_NoDirsNeedsNoFolder(t *testing.T) {
 func TestPrepare_MergesTheDirsLaterWins(t *testing.T) {
 	low := writeDir(t, "deploy", "reviewer", "low")
 	high := writeDir(t, "deploy", "reviewer", "high")
-	root := t.TempDir()
-	d := clidefs.New(nil, []string{low, high}, root, "s1", "")
+	root := useRoot(t)
+	d := clidefs.New(nil, []string{low, high}, "s1", "")
 
 	set, dir, err := d.Prepare(t.Context())
 
@@ -53,12 +62,13 @@ func TestPrepare_MergesTheDirsLaterWins(t *testing.T) {
 }
 
 func TestPrepare_ADirWinsOverASkillset(t *testing.T) {
+	useRoot(t)
 	inline := []def.SkillsReader{
 		def.Skill{Name: "deploy", Description: "D.", Body: "inline"},
 		def.Skill{Name: "kept", Description: "D.", Body: "inline"},
 	}
 	dir := writeDir(t, "deploy", "reviewer", "dir")
-	d := clidefs.New(inline, []string{dir}, t.TempDir(), "s1", "")
+	d := clidefs.New(inline, []string{dir}, "s1", "")
 
 	set, _, err := d.Prepare(t.Context())
 
@@ -70,8 +80,8 @@ func TestPrepare_ADirWinsOverASkillset(t *testing.T) {
 
 func TestPrepare_ASkillsetNeedsNoDirs(t *testing.T) {
 	inline := []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "b"}}
-	root := t.TempDir()
-	d := clidefs.New(inline, nil, root, "s1", "")
+	root := useRoot(t)
+	d := clidefs.New(inline, nil, "s1", "")
 
 	require.NoError(t, d.Check(t.Context(), []string{"deploy"}))
 	_, dir, err := d.Prepare(t.Context())
@@ -81,8 +91,8 @@ func TestPrepare_ASkillsetNeedsNoDirs(t *testing.T) {
 }
 
 func TestPrepare_ClearsTheFolderOfTheLastProcess(t *testing.T) {
-	root := t.TempDir()
-	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, root, "s1", "")
+	useRoot(t)
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, "s1", "")
 	_, dir, err := d.Prepare(t.Context())
 	require.NoError(t, err)
 	old := filepath.Join(dir, "old.md")
@@ -94,16 +104,59 @@ func TestPrepare_ClearsTheFolderOfTheLastProcess(t *testing.T) {
 	assert.NoFileExists(t, old)
 }
 
-func TestPrepare_RejectsASessionThatLeavesTheRoot(t *testing.T) {
-	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "../s1", "")
+func TestPrepare_RejectsASessionThatIsNotAFolderName(t *testing.T) {
+	tests := []string{
+		"",
+		".",
+		"..",
+		"../s1",
+		"a/b",
+	}
+	for _, session := range tests {
+		t.Run(session, func(t *testing.T) {
+			useRoot(t)
+			d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, session, "")
+
+			_, _, err := d.Prepare(t.Context())
+
+			assert.ErrorContains(t, err, "is not a folder name")
+		})
+	}
+}
+
+func TestPrepare_AnEmptySetRemovesTheFolder(t *testing.T) {
+	root := useRoot(t)
+	dir := writeDir(t, "deploy", "reviewer", "x")
+	d := clidefs.New(nil, []string{dir}, "s1", "")
+	_, folder, err := d.Prepare(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(root, "s1"), folder)
+	require.DirExists(t, folder)
+	require.NoError(t, os.RemoveAll(dir))
+
+	_, empty, err := d.Prepare(t.Context())
+
+	require.NoError(t, err)
+	assert.Empty(t, empty)
+	assert.NoDirExists(t, folder)
+}
+
+func TestPrepare_FailsOnASkillNameWithASlash(t *testing.T) {
+	useRoot(t)
+	inline := []def.SkillsReader{
+		def.Skill{Name: "deploy", Qualifier: "apps/web", Description: "D.", Body: "web"},
+		def.Skill{Name: "deploy", Description: "D.", Body: "plain"},
+	}
+	d := clidefs.New(inline, nil, "s1", "")
 
 	_, _, err := d.Prepare(t.Context())
 
-	assert.Error(t, err)
+	assert.ErrorContains(t, err, `the skill "apps/web:deploy" is not a folder name`)
 }
 
 func TestRemove_RemovesTheFolder(t *testing.T) {
-	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
+	useRoot(t)
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, "s1", "")
 	_, dir, err := d.Prepare(t.Context())
 	require.NoError(t, err)
 	require.NoError(t, os.MkdirAll(dir, 0o700))
@@ -114,7 +167,8 @@ func TestRemove_RemovesTheFolder(t *testing.T) {
 }
 
 func TestCheck_FailsOnAnUnknownSkill(t *testing.T) {
-	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, t.TempDir(), "s1", "")
+	useRoot(t)
+	d := clidefs.New(nil, []string{writeDir(t, "deploy", "reviewer", "x")}, "s1", "")
 
 	require.NoError(t, d.Check(t.Context(), []string{"deploy"}))
 	err := d.Check(t.Context(), []string{"missing"})
@@ -124,7 +178,8 @@ func TestCheck_FailsOnAnUnknownSkill(t *testing.T) {
 }
 
 func TestCheck_NoNamesReadsNothing(t *testing.T) {
-	d := clidefs.New(nil, []string{"/does/not/exist"}, t.TempDir(), "s1", "")
+	useRoot(t)
+	d := clidefs.New(nil, []string{"/does/not/exist"}, "s1", "")
 
 	assert.NoError(t, d.Check(t.Context(), nil))
 }
@@ -139,7 +194,7 @@ func TestModel(t *testing.T) {
 		{"codex/gpt-6", "codex/gpt-7", "gpt-7"},
 	}
 	for _, tt := range tests {
-		d := clidefs.New(nil, nil, "", "s1", tt.parent)
+		d := clidefs.New(nil, nil, "s1", tt.parent)
 		assert.Equal(t, tt.want, d.Model(tt.model), "%s on %s", tt.model, tt.parent)
 	}
 }

@@ -256,7 +256,9 @@ type Config struct {
 // Create returns its error. The session then stays idle, with
 // [StopError], and the next message starts the agent again.
 func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
-	config.ID = cmp.Or(config.ID, h.newID())
+	if config.ID == "" {
+		config.ID = h.newID()
+	}
 	fromFile := config.ToolNames == nil && config.Agent != ""
 	config, err := withAgent(ctx, config)
 	if err == nil {

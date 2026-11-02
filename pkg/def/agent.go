@@ -33,7 +33,15 @@ type Agent struct {
 	// Model is the model of the agent, as the file writes it. The
 	// frontmatter key is "model". It is "inherit", "", a bare model ID,
 	// or a "provider/id" spec. If it is "" or "inherit", the agent uses
-	// the model of the parent.
+	// the model of the parent. Other values depend on the reader:
+	//
+	//   - An agent file of a session: the host gives the value to the
+	//     catalog, and an unknown value fails Create.
+	//   - A subagent of the harness: a value that the catalog does not
+	//     know gives the model of the parent.
+	//   - A subagent of a CLI: only a spec with the account of the parent
+	//     gives its model. A value such as "haiku" gives the model of the
+	//     parent with no message, because the CLI runs on one account.
 	Model string
 	// Effort is the thinking level of the agent, as the file writes it.
 	// The frontmatter key is "effort". If it is empty, the agent uses

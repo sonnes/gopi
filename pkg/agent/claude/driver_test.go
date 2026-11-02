@@ -124,9 +124,9 @@ model: openai/gpt-5
 Answer.
 `)
 
-	root := t.TempDir()
+	root := defsRoot(t)
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	r, err := claude.Driver(claude.DefsRoot(root)).Start(context.Background(), agent.Config{
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
 		Spec:      "claude-code/claude-opus-5-5",
@@ -183,10 +183,45 @@ func defsDir(t *testing.T) string {
 	return dir
 }
 
+// defsRoot gives the test its own temporary directory, and returns the
+// folder that holds the folder of each session.
+func defsRoot(t *testing.T) string {
+	t.Helper()
+	t.Setenv("TMPDIR", t.TempDir())
+	return filepath.Join(os.TempDir(), "gopi-defs")
+}
+
+func TestDriverWritesNoEffortForOff(t *testing.T) {
+	claude.Replay(t, nil, "testdata/text.trace")
+	root := defsRoot(t)
+	dir := t.TempDir()
+	agents := filepath.Join(dir, "agents")
+	require.NoError(t, os.MkdirAll(agents, 0o755))
+	text := "---\nname: quiet\ndescription: D.\neffort: off\n---\nAnswer.\n"
+	require.NoError(t, os.WriteFile(filepath.Join(agents, "quiet.md"), []byte(text), 0o644))
+
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		Dirs:      []string{dir},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+	defer closeAgent(t, a)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(root, "s1", ".claude", "agents", "quiet.md"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "effort")
+}
+
 func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	root := t.TempDir()
-	d := claude.Driver(claude.DefsRoot(root))
+	root := defsRoot(t)
+	d := claude.Driver()
 
 	r, err := d.Start(context.Background(), agent.Config{
 		SessionID: "s1",
@@ -216,9 +251,9 @@ func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 
 func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	root := t.TempDir()
+	root := defsRoot(t)
 
-	r, err := claude.Driver(claude.DefsRoot(root)).Start(context.Background(), agent.Config{
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
 		Skillset:  []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},

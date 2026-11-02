@@ -65,12 +65,11 @@ func (a *Assembly) SkillName(i int) string {
 // skill returns the skill that has the name or the qualified name, and
 // reports whether it exists.
 func (a *Assembly) skill(name string) (def.Skill, bool) {
-	for i, s := range a.Skills {
-		if name == a.SkillName(i) || name == s.QualifiedName() {
-			return s, true
-		}
+	set := def.Set{
+		Skills: a.Skills,
+		Names:  a.names,
 	}
-	return def.Skill{}, false
+	return set.Find(name)
 }
 
 // withSkills returns text with the body of each named skill after it.
@@ -122,19 +121,22 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 		h:            h,
 		sessionID:    id,
 	}
-	asm.Skills, err = def.MergeSkills(ctx, h.skills...)
+	// A subagent gets no agents of its parent.
+	agents := h.agents
+	if h.child != nil {
+		agents = nil
+	}
+	set, err := def.Resolve(ctx, h.skills, agents)
 	if err != nil {
 		return nil, err
 	}
-	asm.names = def.SkillNames(asm.Skills)
+	asm.Skills = set.Skills
+	asm.names = set.Names
+	asm.Agents = set.Agents
 	if h.child == nil {
 		// A subagent preloads the skills of its file, in childSystem,
 		// and not the skills of its parent.
 		asm.System, err = asm.withSkills(asm.System, h.preload)
-		if err != nil {
-			return nil, err
-		}
-		asm.Agents, err = def.MergeAgents(ctx, h.agents...)
 		if err != nil {
 			return nil, err
 		}

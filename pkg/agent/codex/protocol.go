@@ -13,9 +13,13 @@ const (
 	clientVersion = "0.0.0"
 )
 
-// errMethodNotFound is the JSON-RPC error code for a request that the
-// agent does not handle.
-const errMethodNotFound = -32601
+// The JSON-RPC error codes. The agent gives errMethodNotFound for a
+// request that it does not handle. Codex 0.163 gives errInvalidRequest
+// for a method that it does not have.
+const (
+	errInvalidRequest = -32600
+	errMethodNotFound = -32601
+)
 
 // message is one line from the server: a response, a notification, or
 // a request.
@@ -32,6 +36,9 @@ type rpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
+
+// Error returns the message of the response.
+func (e *rpcError) Error() string { return e.Message }
 
 // request is one request from the agent.
 type request struct {
@@ -74,9 +81,6 @@ type threadParams struct {
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
 	// Config overrides the config of the CLI for the thread.
 	Config map[string]any `json:"config,omitempty"`
-	// skillRoot is the folder of the skills of the session, for
-	// skills/extraRoots/set. It does not go in the request.
-	skillRoot string
 }
 
 // skillRootsParams is the parameters of skills/extraRoots/set.

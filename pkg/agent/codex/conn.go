@@ -324,7 +324,7 @@ func (c *conn) call(ctx context.Context, method string, params, result any) erro
 			continue
 		}
 		if m.Error != nil {
-			return fmt.Errorf("codex: %s: %s", method, m.Error.Message)
+			return fmt.Errorf("codex: %s: %w", method, m.Error)
 		}
 		return json.Unmarshal(m.Result, result)
 	}
@@ -369,18 +369,35 @@ func (c *conn) inject(ctx context.Context, thread, text string) error {
 // CLI does not have it.
 const methodSkillRoots = "skills/extraRoots/set"
 
+// unknownMethod reports whether err says that the CLI has no method.
+// Codex 0.163 gives errInvalidRequest and the text "unknown variant" for
+// such a method.
+func unknownMethod(err error, method string) bool {
+	var rpc *rpcError
+	if !errors.As(err, &rpc) {
+		return false
+	}
+	text := "unknown variant `" + method + "`"
+	invalid := rpc.Code == errInvalidRequest && strings.Contains(rpc.Message, text)
+	return rpc.Code == errMethodNotFound || invalid
+}
+
 // handshake initializes the connection, then starts the thread, or
 // resumes it if params has a thread ID.
-func (c *conn) handshake(ctx context.Context, params threadParams) (threadResult, error) {
+func (c *conn) handshake(ctx context.Context, params threadParams, skillRoot string) (threadResult, error) {
 	var res threadResult
 	if err := c.initialize(ctx); err != nil {
 		return res, err
 	}
-	if params.skillRoot != "" {
-		roots := skillRootsParams{ExtraRoots: []string{params.skillRoot}}
+	if skillRoot != "" {
+		roots := skillRootsParams{ExtraRoots: []string{skillRoot}}
 		var result json.RawMessage
-		if err := c.call(ctx, methodSkillRoots, roots, &result); err != nil {
-			return res, fmt.Errorf("%w: the config field Dirs: %w", errors.ErrUnsupported, err)
+		err := c.call(ctx, methodSkillRoots, roots, &result)
+		if unknownMethod(err, methodSkillRoots) {
+			return res, fmt.Errorf("%w: the config fields Skillset and Dirs: %w", errors.ErrUnsupported, err)
+		}
+		if err != nil {
+			return res, fmt.Errorf("codex: set the skill roots: %w", err)
 		}
 	}
 	method := "thread/start"

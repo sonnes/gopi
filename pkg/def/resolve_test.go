@@ -67,7 +67,14 @@ func TestSet_Find(t *testing.T) {
 	}}, nil)
 	require.NoError(t, err)
 
-	assert.True(t, set.HasSkill("deploy"))
-	assert.True(t, set.HasSkill("ops:deploy"))
-	assert.False(t, set.HasSkill("missing"))
+	bare, ok := set.Find("deploy")
+	assert.True(t, ok)
+	assert.Empty(t, bare.Qualifier)
+
+	qualified, ok := set.Find("ops:deploy")
+	assert.True(t, ok)
+	assert.Equal(t, "ops", qualified.Qualifier)
+
+	_, ok = set.Find("missing")
+	assert.False(t, ok)
 }

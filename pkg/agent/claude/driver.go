@@ -32,9 +32,12 @@ import (
 // writes the skills and the agents to a folder for each session. It
 // gives the folder to the CLI with --add-dir at each start of the CLI,
 // so an edit reaches the next process, and it removes the folder at
-// Close. [DefsRoot] picks the place. The CLI lists each skill and loads
-// its body, so the driver adds no text for Skills. A name of Skills that
-// no dir has fails the start, as in the harness. The driver does not
+// Close. A process that dies leaves its folder until the next start. The
+// folder of each session is in the folder gopi-defs of [os.TempDir]. The
+// CLI lists each skill and loads its body, so the driver adds no text for
+// Skills. A name of Skills that Skillset and Dirs do not have fails the
+// start, as in the harness. A skill name with a slash also fails the
+// start, because the name is a folder name. The driver does not
 // read the AGENTS.md of Dirs. The CLI also keeps the skills and the
 // agents of its own folders. A subagent gets the model ID of its spec
 // only if the spec has the account of Spec. Any other model of a file
@@ -66,11 +69,8 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		return nil, fmt.Errorf("claude: %w", err)
 	}
 	// The hooks of the driver come first, as its options do.
-	var own config
-	for _, opt := range d.opts {
-		opt(&own)
-	}
-	defs := clidefs.New(c.Skillset, c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	own := newConfig(d.opts)
+	defs := clidefs.New(c.Skillset, c.Dirs, c.SessionID, c.Spec)
 	if err := defs.Check(ctx, c.Skills); err != nil {
 		return nil, fmt.Errorf("claude: %w", err)
 	}

@@ -33,7 +33,7 @@ const (
 func WriteSkills(dir string, skills []def.Skill, names []string) error {
 	for i, s := range skills {
 		name := names[i]
-		if !staysInFolder(name) {
+		if !OneElement(name) {
 			continue
 		}
 		folder := filepath.Join(dir, name)
@@ -65,7 +65,7 @@ func WriteAgents(dir string, agents []def.Agent) error {
 		return fmt.Errorf("fs: write the agents: %w", err)
 	}
 	for _, a := range agents {
-		if !staysInFolder(a.Name) {
+		if !OneElement(a.Name) {
 			continue
 		}
 		data, err := agentData(a)
@@ -80,8 +80,10 @@ func WriteAgents(dir string, agents []def.Agent) error {
 	return nil
 }
 
-// staysInFolder reports whether name is one path element.
-func staysInFolder(name string) bool {
+// OneElement reports whether name is one element of a path, so a file
+// with this name stays in its folder. A name can come from a file of a
+// folder that a person can clone.
+func OneElement(name string) bool {
 	if name == "" || name == "." || name == ".." {
 		return false
 	}

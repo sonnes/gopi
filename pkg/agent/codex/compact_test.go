@@ -83,7 +83,7 @@ func TestCompactThatFails(t *testing.T) {
 func TestAutoCompactGoesInTheThreadConfig(t *testing.T) {
 	a := newAgent(t, AutoCompact(300000))
 
-	p := a.threadParams("", nil, "")
+	p := a.threadParams("", nil, "", nil)
 
 	assert.Equal(t, 300000, p.Config["model_auto_compact_token_limit"])
 }

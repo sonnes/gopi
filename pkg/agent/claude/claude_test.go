@@ -331,6 +331,39 @@ func TestRunTakenSession(t *testing.T) {
 	checkLog(t, a)
 }
 
+func TestRunOtherInUseErrorFailsTheStart(t *testing.T) {
+	tests := []struct {
+		name   string
+		stderr string
+	}{
+		{
+			name:   "a taken port",
+			stderr: "Error: port 4000 is already in use",
+		},
+		{
+			name:   "another session ID",
+			stderr: "Error: Session ID 00000000-0000-0000-0000-000000000000 is already in use.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			starts := claude.ReplayStderr(t,
+				[]string{tt.stderr},
+				"testdata/taken_session.trace",
+			)
+			a, err := claude.Durable(ctx, "s1", claude.Store(session.NewMemoryStore()))
+			require.NoError(t, err)
+			defer closeAgent(t, a)
+
+			_, _, err = run(ctx, a, "Say hello")
+
+			assert.ErrorContains(t, err, tt.stderr)
+			assert.Len(t, starts.Cmds(), 1, "the agent starts no other CLI")
+		})
+	}
+}
+
 func TestRunCancel(t *testing.T) {
 	claude.Replay(t, nil, "testdata/cancel.trace")
 	a := claude.New()

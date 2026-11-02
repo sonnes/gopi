@@ -23,7 +23,7 @@ import (
 )
 
 // rootName is the folder in the temporary directory that holds the
-// folder of each session, if the driver has no root.
+// folder of each session.
 const rootName = "gopi-defs"
 
 // dirPerm keeps the folder of a session private to the user.
@@ -39,13 +39,10 @@ type Defs struct {
 }
 
 // New returns the skills of skillset, then the definitions of dirs,
-// lowest first. The folder of the
-// session is <root>/<session>. If root is empty, the root is the folder
-// gopi-defs in [os.TempDir]. spec is the model spec of the session.
-func New(skillset []def.SkillsReader, dirs []string, root, session, spec string) *Defs {
-	if root == "" {
-		root = filepath.Join(os.TempDir(), rootName)
-	}
+// lowest first. The folder of the session is <session> in the folder
+// gopi-defs of [os.TempDir]. spec is the model spec of the session.
+func New(skillset []def.SkillsReader, dirs []string, session, spec string) *Defs {
+	root := filepath.Join(os.TempDir(), rootName)
 	return &Defs{
 		skillset: skillset,
 		dirs:     dirs,
@@ -66,7 +63,7 @@ func (d *Defs) Check(ctx context.Context, names []string) error {
 		return err
 	}
 	for _, name := range names {
-		if !set.HasSkill(name) {
+		if _, ok := set.Find(name); !ok {
 			return fmt.Errorf("clidefs: the skill %q: no skill has this name", name)
 		}
 	}
@@ -76,18 +73,25 @@ func (d *Defs) Check(ctx context.Context, names []string) error {
 // Prepare merges the folders and clears the folder of the session, so
 // that a definition that went away leaves no file. It returns the
 // merged set and the path of the folder. The path is empty if the set
-// is empty: the CLI then needs no folder.
+// is empty: the CLI then needs no folder, and the folder of an earlier
+// start goes away. A skill name that is not a folder name fails, because
+// the CLI reads the name of a skill from its folder.
 func (d *Defs) Prepare(ctx context.Context) (def.Set, string, error) {
 	set, err := d.resolve(ctx)
 	if err != nil {
 		return def.Set{}, "", err
 	}
 	if len(set.Skills) == 0 && len(set.Agents) == 0 {
-		return set, "", nil
+		return set, "", d.Remove()
 	}
 
 	if !d.validSession() {
 		return def.Set{}, "", fmt.Errorf("clidefs: the session %q is not a folder name", d.session)
+	}
+	for _, name := range set.Names {
+		if !storefs.OneElement(name) {
+			return def.Set{}, "", fmt.Errorf("clidefs: the skill %q is not a folder name", name)
+		}
 	}
 	dir := filepath.Join(d.root, d.session)
 	if err := os.RemoveAll(dir); err != nil {
@@ -114,14 +118,7 @@ func (d *Defs) Remove() error {
 // validSession reports whether the folder of the session stays in the
 // root.
 func (d *Defs) validSession() bool {
-	return OneElement(d.session)
-}
-
-// OneElement reports whether name is one element of a path, so a file
-// with this name stays in its folder. A name can come from a file of a
-// folder that a person can clone.
-func OneElement(name string) bool {
-	return filepath.IsLocal(name) && filepath.Base(name) == name
+	return storefs.OneElement(d.session)
 }
 
 // resolve merges the skills of the skillset and the definitions of the

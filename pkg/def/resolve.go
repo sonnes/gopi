@@ -8,24 +8,27 @@ import (
 // Set is the merged definitions of a list of readers. [Resolve] returns
 // one.
 type Set struct {
-	// Skills holds the skills, as [MergeSkills] merges them.
+	// Skills holds the skills. A later skill replaces an earlier skill
+	// with the same qualified name, at the position of the earlier one.
 	Skills []Skill
-	// Names holds the name that the model sees for each skill of Skills,
-	// as [SkillNames] gives it.
+	// Names holds the name that the model sees for each skill of Skills.
+	// The last skill with a bare name gets the bare name, and the others
+	// get their qualified names. No skill is lost on a clash.
 	Names []string
-	// Agents holds the agents, as [MergeAgents] merges them.
+	// Agents holds the agents. A later agent replaces an earlier one with
+	// the same name, at its position.
 	Agents []Agent
 }
 
-// HasSkill reports whether a skill has the name that the model sees, or
-// the qualified name.
-func (s Set) HasSkill(name string) bool {
+// Find returns the skill with the name that the model sees, or with the
+// qualified name, and reports whether it exists.
+func (s Set) Find(name string) (Skill, bool) {
 	for i, skill := range s.Skills {
 		if name == s.Names[i] || name == skill.QualifiedName() {
-			return true
+			return skill, true
 		}
 	}
-	return false
+	return Skill{}, false
 }
 
 // Resolve reads skills and agents in order, and merges them. The
@@ -33,26 +36,26 @@ func (s Set) HasSkill(name string) bool {
 // so one list gives each driver the same names and the same winner for a
 // clash.
 func Resolve(ctx context.Context, skills []SkillsReader, agents []AgentsReader) (Set, error) {
-	merged, err := MergeSkills(ctx, skills...)
+	merged, err := mergeSkills(ctx, skills...)
 	if err != nil {
 		return Set{}, err
 	}
-	mergedAgents, err := MergeAgents(ctx, agents...)
+	mergedAgents, err := mergeAgents(ctx, agents...)
 	if err != nil {
 		return Set{}, err
 	}
 	return Set{
 		Skills: merged,
-		Names:  SkillNames(merged),
+		Names:  skillNames(merged),
 		Agents: mergedAgents,
 	}, nil
 }
 
-// MergeSkills reads each reader in order and merges the skills by
+// mergeSkills reads each reader in order and merges the skills by
 // qualified name. A later skill replaces an earlier skill with the same
 // qualified name, at the position of the earlier one, so the list that
 // the model sees keeps its order. An error of a reader fails the merge.
-func MergeSkills(ctx context.Context, readers ...SkillsReader) ([]Skill, error) {
+func mergeSkills(ctx context.Context, readers ...SkillsReader) ([]Skill, error) {
 	var (
 		out []Skill
 		at  = make(map[string]int)
@@ -75,10 +78,10 @@ func MergeSkills(ctx context.Context, readers ...SkillsReader) ([]Skill, error) 
 	return out, nil
 }
 
-// SkillNames returns the name that the model sees for each skill. The
+// skillNames returns the name that the model sees for each skill. The
 // last skill with a bare name gets the bare name, and the others get
 // their qualified names. No skill is lost on a clash.
-func SkillNames(skills []Skill) []string {
+func skillNames(skills []Skill) []string {
 	last := make(map[string]int, len(skills))
 	for i, s := range skills {
 		last[s.Name] = i
@@ -94,10 +97,10 @@ func SkillNames(skills []Skill) []string {
 	return out
 }
 
-// MergeAgents reads each reader in order. A later agent replaces an
+// mergeAgents reads each reader in order. A later agent replaces an
 // earlier one with the same name, at its position. An error of a reader
 // fails the merge.
-func MergeAgents(ctx context.Context, readers ...AgentsReader) ([]Agent, error) {
+func mergeAgents(ctx context.Context, readers ...AgentsReader) ([]Agent, error) {
 	var (
 		out []Agent
 		at  = make(map[string]int)

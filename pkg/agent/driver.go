@@ -35,7 +35,8 @@ type Config struct {
 	// Spec is the model spec of the agent, such as
 	// "claude-code/claude-opus-5-5". Model is the model that the
 	// catalog resolved from it. A driver that resolves models reads
-	// Spec. A driver of a CLI reads the ID of Model.
+	// Spec. A driver of a CLI reads the ID of Model for its own model,
+	// and the account of Spec for the model of each subagent.
 	Spec  string
 	Model ai.Model
 	// Dir is the working directory of the agent.

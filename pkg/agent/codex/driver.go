@@ -55,15 +55,20 @@ import (
 //
 // The driver merges Skillset and Dirs, as the harness does, and
 // writes them to a folder for each session at each start of the CLI, so
-// an edit reaches the next process. It removes the folder at Close.
-// [DefsRoot] picks the place. It gives the skills to the CLI with
+// an edit reaches the next process. It removes the folder at Close. A
+// process that dies leaves its folder until the next start. The folder of
+// each session is in the folder gopi-defs of [os.TempDir]. It gives the
+// skills to the CLI with
 // skills/extraRoots/set, and each agent as a role in the config of the
 // thread. A CLI with no skills/extraRoots/set fails with
 // [errors.ErrUnsupported]. A role has no key for the Tools, the
 // Disallowed, or the MaxTurns of an agent, so a role runs with each tool
-// of the session. The CLI lists each skill and loads its body, so the
-// driver adds no text for Skills. A name of Skills that no dir has fails
-// the start, as in the harness. The driver does not read the AGENTS.md
+// of the session. The Mode of an agent file has no effect, because Codex
+// 0.163 runs a role with the sandbox of the session. The CLI lists each
+// skill and loads its body, so the driver adds no text for Skills. A name
+// of Skills that Skillset and Dirs do not have fails the start, as in the
+// harness. A skill name with a slash also fails the start, because the
+// name is a folder name. The driver does not read the AGENTS.md
 // of Dirs. The CLI also keeps the skills and the agents of its own
 // folders. It runs the hooks at the points of
 // [Hooks]. Start rejects a hook at another point, from the config or
@@ -88,7 +93,7 @@ func (d driver) ListModels(ctx context.Context) ([]ai.Model, error) {
 // Start starts the durable agent of the session c.SessionID.
 func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	own := newConfig(d.opts)
-	defs := clidefs.New(c.Skillset, c.Dirs, own.defsRoot, c.SessionID, c.Spec)
+	defs := clidefs.New(c.Skillset, c.Dirs, c.SessionID, c.Spec)
 	if err := defs.Check(ctx, c.Skills); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}

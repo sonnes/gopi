@@ -117,10 +117,8 @@ type config struct {
 	mcp         []agent.MCPServer
 	idle        func(agent.Event)
 	wake        func()
-	// defsRoot holds the folder of a session. defs is set if the session
-	// has dirs.
-	defsRoot string
-	defs     *clidefs.Defs
+	// defs is set by [Driver].
+	defs *clidefs.Defs
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same options.
@@ -266,13 +264,6 @@ func Idle(fn func(agent.Event)) Option {
 // between runs. [Agent.Continue] runs that turn.
 func Wake(fn func()) Option {
 	return func(c *config) { c.wake = fn }
-}
-
-// DefsRoot sets the folder that holds the folder of each session, with
-// the skills and the agents of the dirs of the session. The default is
-// the folder gopi-defs in [os.TempDir].
-func DefsRoot(path string) Option {
-	return func(c *config) { c.defsRoot = path }
 }
 
 // defsOf sets the definitions of the session.
@@ -421,7 +412,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		switch {
 		case errors.Is(err, ErrNoConversation):
 			err = errors.Join(err, conversation.Clear(ctx, a.log))
-		case fresh != "" && takenSession(err):
+		case fresh != "" && takenSession(err, fresh):
 			// An earlier CLI made the conversation and exited before the
 			// agent stored its ID. The agent stores the ID now, so the
 			// next start resumes the conversation.
@@ -542,12 +533,12 @@ func cliSessionID(id string) string {
 
 // takenSessionText is in the error of a CLI whose new session ID has a
 // conversation already.
-const takenSessionText = "is already in use"
+const takenSessionText = "Session ID %s is already in use"
 
-// takenSession reports whether err says that the new session ID of the
+// takenSession reports whether err says that the session ID fresh of the
 // CLI has a conversation already.
-func takenSession(err error) bool {
-	return strings.Contains(err.Error(), takenSessionText)
+func takenSession(err error, fresh string) bool {
+	return strings.Contains(err.Error(), fmt.Sprintf(takenSessionText, fresh))
 }
 
 // cliCommand returns the command that starts the CLI of c with args.

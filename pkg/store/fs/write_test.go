@@ -146,3 +146,23 @@ func TestWrite_SkipsANameThatLeavesTheFolder(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(root, "evil-skill"))
 	assert.FileExists(t, filepath.Join(dir, "good.md"))
 }
+
+func TestOneElement(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{name: "deploy", want: true},
+		{name: "ops:deploy", want: true},
+		{name: "", want: false},
+		{name: ".", want: false},
+		{name: "..", want: false},
+		{name: "a/b", want: false},
+		{name: `a\b`, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, storefs.OneElement(tt.name))
+		})
+	}
+}

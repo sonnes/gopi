@@ -27,40 +27,45 @@ const (
 	roleFilePerm = 0o600
 )
 
-// writeDefs writes the skills and the roles of the session, and keeps
-// what the next thread needs. A thread reads a role from its file, so
-// each role needs a file.
-func (a *Agent) writeDefs(ctx context.Context) error {
-	a.skillRoot = ""
-	a.roles = nil
+// writeDefs writes the skills and the roles of the session. It returns
+// the folder of the skills and the agents table of the next thread. A
+// thread reads a role from its file, so each role needs a file. A skill
+// file of Codex has no key for the model or the allowed tools.
+func (a *Agent) writeDefs(ctx context.Context) (string, map[string]any, error) {
 	if a.cfg.defs == nil {
-		return nil
+		return "", nil, nil
 	}
 	set, folder, err := a.cfg.defs.Prepare(ctx)
 	if err != nil || folder == "" {
-		return err
+		return "", nil, err
 	}
 
+	var skillRoot string
 	if len(set.Skills) > 0 {
-		root := filepath.Join(folder, skillsDir)
-		if err := storefs.WriteSkills(root, set.Skills, set.Names); err != nil {
-			return err
+		skillRoot = filepath.Join(folder, skillsDir)
+		for i := range set.Skills {
+			set.Skills[i].Model = ""
+			set.Skills[i].AllowedTools = nil
 		}
-		a.skillRoot = root
+		if err := storefs.WriteSkills(skillRoot, set.Skills, set.Names); err != nil {
+			return "", nil, err
+		}
 	}
 	roles, err := writeRoles(filepath.Join(folder, filepath.FromSlash(rolesDir)), set.Agents, a.cfg.defs)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
-	a.roles = roles
-	return nil
+	return skillRoot, roles, nil
 }
 
 // writeRoles writes a role file for each agent to dir, and returns the
 // agents table of the config of a thread. A role has no key for the
 // Tools, the Disallowed, or the MaxTurns of an agent, so it runs with
-// each tool of the session. It has no key for the Skills of an agent:
-// the CLI lists each skill to the role. It skips a name that leaves dir.
+// each tool of the session. The role file has no key for the Mode of an
+// agent, because Codex 0.163 runs a role with the sandbox of the session
+// even if the file sets sandbox_mode. It has no key for the Skills of an
+// agent: the CLI lists each skill to the role. It skips a name that
+// leaves dir.
 func writeRoles(dir string, agents []def.Agent, d *clidefs.Defs) (map[string]any, error) {
 	if len(agents) == 0 {
 		return nil, nil
@@ -71,7 +76,7 @@ func writeRoles(dir string, agents []def.Agent, d *clidefs.Defs) (map[string]any
 
 	roles := make(map[string]any, len(agents))
 	for _, a := range agents {
-		if !clidefs.OneElement(a.Name) {
+		if !storefs.OneElement(a.Name) {
 			continue
 		}
 		file := filepath.Join(dir, a.Name+roleExt)

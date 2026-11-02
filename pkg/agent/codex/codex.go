@@ -119,10 +119,6 @@ type Agent struct {
 	conn *conn
 	// model is the model of the thread, from the CLI.
 	model string
-	// skillRoot and roles are what [Agent.writeDefs] wrote for the next
-	// thread. The start of a process sets them, before the thread.
-	skillRoot string
-	roles     map[string]any
 }
 
 // config collects the options before [New] or [Durable] builds the
@@ -144,10 +140,8 @@ type config struct {
 	mcp         []agent.MCPServer
 	// hookCommand is the gopi binary that relays a hook.
 	hookCommand string
-	// defsRoot holds the folder of a session. defs is set if the session
-	// has dirs.
-	defsRoot string
-	defs     *clidefs.Defs
+	// defs is set by [Driver].
+	defs *clidefs.Defs
 }
 
 // Option configures an [Agent]. [New] and [Durable] take the same
@@ -260,13 +254,6 @@ func MCP(servers ...agent.MCPServer) Option {
 // field for the Message of a decision, so the model does not read it.
 func Approve(fn agent.ApproveFunc) Option {
 	return func(c *config) { c.approve = fn }
-}
-
-// DefsRoot sets the folder that holds the folder of each session, with
-// the skills and the agents of the dirs of the session. The default is
-// the folder gopi-defs in [os.TempDir].
-func DefsRoot(path string) Option {
-	return func(c *config) { c.defsRoot = path }
 }
 
 // defsOf sets the definitions of the session.
@@ -485,7 +472,8 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
 		return nil, "", fmt.Errorf("codex: %w", err)
 	}
-	if err := a.writeDefs(ctx); err != nil {
+	skillRoot, roles, err := a.writeDefs(ctx)
+	if err != nil {
 		return nil, "", fmt.Errorf("codex: %w", err)
 	}
 	var (
@@ -513,7 +501,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	}
 	c = dial(p, a.cfg.approve)
 	c.hooks = hooks
-	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand))
+	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand, roles), skillRoot)
 	if err != nil {
 		c.kill()
 		if threadID != "" && lostThread(err) {
@@ -608,8 +596,9 @@ func appServer(c config) *exec.Cmd {
 // threadParams returns the parameters of thread/start, or of
 // thread/resume if thread is set. With a hook server, the config adds
 // the hooks of the agent to the thread, and each hook runs the program
-// hookCommand.
-func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand string) threadParams {
+// hookCommand. roles is the agents table of the config, from
+// [Agent.writeDefs].
+func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand string, roles map[string]any) threadParams {
 	p := threadParams{
 		ThreadID:              threadID,
 		Model:                 a.cfg.model,
@@ -617,7 +606,6 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 		ApprovalPolicy:        a.cfg.approval,
 		Sandbox:               a.cfg.sandbox,
 		DeveloperInstructions: sections.Text(a.log.Messages()),
-		skillRoot:             a.skillRoot,
 	}
 	if hooks != nil {
 		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
@@ -634,11 +622,11 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 		}
 		p.Config["mcp_servers"] = mcpServers(a.cfg.mcp)
 	}
-	if len(a.roles) > 0 {
+	if len(roles) > 0 {
 		if p.Config == nil {
 			p.Config = make(map[string]any)
 		}
-		p.Config["agents"] = a.roles
+		p.Config["agents"] = roles
 	}
 	return p
 }

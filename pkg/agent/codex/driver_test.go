@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -141,7 +142,7 @@ func TestDriverMode(t *testing.T) {
 				Approve: approve,
 			})
 
-			p := a.threadParams("", nil, "")
+			p := a.threadParams("", nil, "", nil)
 			assert.Equal(t, tt.wantPolicy, p.ApprovalPolicy)
 			assert.Equal(t, tt.wantSandbox, p.Sandbox)
 		})
@@ -181,19 +182,102 @@ func defsDir(t *testing.T) string {
 	return dir
 }
 
+// defsRoot gives the test its own temporary directory, and returns the
+// folder that holds the folder of each session.
+func defsRoot(t *testing.T) string {
+	t.Helper()
+	t.Setenv("TMPDIR", t.TempDir())
+	return filepath.Join(os.TempDir(), "gopi-defs")
+}
+
+func TestDriverWritesOnlyTheSkillKeysOfCodex(t *testing.T) {
+	defsRoot(t)
+	skill := def.Skill{
+		Name:         "deploy",
+		Description:  "D.",
+		Body:         "Do it.",
+		Model:        "gpt-6",
+		AllowedTools: []string{"bash"},
+	}
+	a := startAgent(t, Driver(), agent.Config{
+		Skillset: []def.SkillsReader{skill},
+	})
+
+	skillRoot, _, err := a.writeDefs(context.Background())
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(skillRoot, "deploy", "SKILL.md"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "model")
+	assert.NotContains(t, string(data), "allowed-tools")
+}
+
+func TestDriverStartErrorOfTheSkillRoots(t *testing.T) {
+	const (
+		initialize = "read line\nprintf '{\"id\":1,\"result\":{}}\\n'\nread line\nread line\n"
+		unknown    = "unknown variant `skills/extraRoots/set`"
+	)
+	reply := func(code int, message string) string {
+		return initialize + fmt.Sprintf("printf '{\"id\":2,\"error\":{\"code\":%d,\"message\":\"%s\"}}\\n'\nsleep 5\n", code, message)
+	}
+	tests := []struct {
+		name        string
+		body        string
+		unsupported bool
+		text        string
+	}{
+		{
+			name:        "Codex 0.163 has no method",
+			body:        reply(errInvalidRequest, "Invalid request: "+unknown),
+			unsupported: true,
+			text:        "the config fields Skillset and Dirs",
+		},
+		{
+			name:        "the method-not-found code",
+			body:        reply(errMethodNotFound, "no method"),
+			unsupported: true,
+			text:        "the config fields Skillset and Dirs",
+		},
+		{
+			name: "an invalid request for another reason",
+			body: reply(errInvalidRequest, "Invalid request: a bad root"),
+			text: "codex: set the skill roots",
+		},
+		{
+			name: "the CLI stops",
+			body: initialize + "exit 1\n",
+			text: "codex: set the skill roots",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defsRoot(t)
+			a := startAgent(t, Driver(Binary(fakeCLI(t, tt.body))), agent.Config{
+				Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+			})
+
+			_, _, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
+
+			assert.ErrorContains(t, err, tt.text)
+			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
+		})
+	}
+}
+
 func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
-	root := t.TempDir()
-	a := startAgent(t, Driver(DefsRoot(root)), agent.Config{
+	root := defsRoot(t)
+	a := startAgent(t, Driver(), agent.Config{
 		Spec:   "codex/gpt-5",
 		Dirs:   []string{defsDir(t)},
 		Skills: []string{"deploy"},
 	})
 	folder := filepath.Join(root, "s1")
 
-	require.NoError(t, a.writeDefs(context.Background()))
-	p := a.threadParams("", nil, "")
+	skillRoot, roles, err := a.writeDefs(context.Background())
+	require.NoError(t, err)
+	p := a.threadParams("", nil, "", roles)
 
-	assert.Equal(t, filepath.Join(folder, "skills"), p.skillRoot)
+	assert.Equal(t, filepath.Join(folder, "skills"), skillRoot)
 	assert.FileExists(t, filepath.Join(folder, "skills", "deploy", "SKILL.md"))
 
 	roleFile := filepath.Join(folder, "codex", "agents", "reviewer.toml")
@@ -218,25 +302,26 @@ model_reasoning_effort = "xhigh"
 }
 
 func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
-	root := t.TempDir()
-	a := startAgent(t, Driver(DefsRoot(root)), agent.Config{
+	root := defsRoot(t)
+	a := startAgent(t, Driver(), agent.Config{
 		Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
 	})
 
-	require.NoError(t, a.writeDefs(context.Background()))
-	p := a.threadParams("", nil, "")
+	skillRoot, _, err := a.writeDefs(context.Background())
+	require.NoError(t, err)
 
-	assert.Equal(t, filepath.Join(root, "s1", "skills"), p.skillRoot)
-	assert.FileExists(t, filepath.Join(p.skillRoot, "deploy", "SKILL.md"))
+	assert.Equal(t, filepath.Join(root, "s1", "skills"), skillRoot)
+	assert.FileExists(t, filepath.Join(skillRoot, "deploy", "SKILL.md"))
 }
 
 func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
 	a := startAgent(t, Driver(), agent.Config{})
 
-	require.NoError(t, a.writeDefs(context.Background()))
-	p := a.threadParams("", nil, "")
+	skillRoot, roles, err := a.writeDefs(context.Background())
+	require.NoError(t, err)
+	p := a.threadParams("", nil, "", roles)
 
-	assert.Empty(t, p.skillRoot)
+	assert.Empty(t, skillRoot)
 	assert.NotContains(t, p.Config, "agents")
 }
 
@@ -506,14 +591,14 @@ func TestDriverMCP(t *testing.T) {
 	t.Run("the config of the thread holds the servers", func(t *testing.T) {
 		a := startAgent(t, Driver(), agent.Config{MCP: servers})
 
-		p := a.threadParams("", nil, "")
+		p := a.threadParams("", nil, "", nil)
 		assert.Equal(t, wantServers, p.Config["mcp_servers"])
 	})
 
 	t.Run("the servers go next to the hooks", func(t *testing.T) {
 		a := startAgent(t, Driver(Hooks(stopHook{})), agent.Config{MCP: servers})
 
-		p := a.threadParams("", &hookServer{socket: "/tmp/hooks.sock"}, "gopi-hook")
+		p := a.threadParams("", &hookServer{socket: "/tmp/hooks.sock"}, "gopi-hook", nil)
 		assert.Equal(t, wantServers, p.Config["mcp_servers"])
 		assert.Contains(t, p.Config, "hooks")
 	})
