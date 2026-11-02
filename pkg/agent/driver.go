@@ -88,6 +88,10 @@ type Config struct {
 	// the harness uses its default strategy. A driver of a CLI ignores
 	// it, because the CLI compacts its own session.
 	Compaction Compactor
+	// AutoCompact is the size of the context, in tokens, that starts a
+	// compaction. 0 keeps the default of the driver. Each driver honors it.
+	// On the harness, a strategy of Compaction wins.
+	AutoCompact int
 	// Tools is the full set of tools of the agent. Without Tools, the
 	// agent has no tool. A driver of a CLI reads only the name of each
 	// tool: it maps a well-known name to a tool of its CLI, and skips a
@@ -172,6 +176,15 @@ type Runner interface {
 	Run(ctx context.Context, entries ...session.Entry) *Stream
 	Log() *session.Log
 	State() State
+}
+
+// ManualCompactor is a [Runner] that compacts when a caller asks. [Agent],
+// the Claude Code agent, and the Codex agent implement it. The stream has
+// agent_start, the events of the compaction, and agent_end. If a run is
+// active, the stream fails with no event. The Codex agent ignores the
+// instructions, because its CLI does not take them.
+type ManualCompactor interface {
+	Compact(ctx context.Context, instructions string) *Stream
 }
 
 // Steerer is a [Runner] that reads entries during a run, before its

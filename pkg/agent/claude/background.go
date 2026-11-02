@@ -56,7 +56,7 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 	// input to carry a change.
 	var change *ai.Message
 	if entries != nil {
-		base, c, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages())
+		base, c, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages(), a.log.History().CompactedAt)
 		if err != nil {
 			return em.Finish(ctx, ai.Usage{}, fmt.Errorf("claude: %w", err))
 		}
@@ -69,6 +69,18 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 		}
 		change = c
 	}
+	return a.drive(ctx, em, entries, change, false)
+}
+
+// drive runs entries on the CLI, after the lines that the idle reader
+// kept. With command, entries are a command of the CLI.
+func (a *Agent) drive(
+	ctx context.Context,
+	em *emit.Emitter,
+	entries []session.Entry,
+	change *ai.Message,
+	command bool,
+) ([]ai.Message, error) {
 	kept := a.pauseIdle()
 	// Start the CLI before the input, so that a failed start stores
 	// no input that the CLI never got.
@@ -80,6 +92,7 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 	// The error of a hook belongs to the run that called it.
 	proc.hookErr = nil
 	r := newRunner(a, proc, em)
+	r.command = command
 	if change != nil {
 		r.reminder = transcript.Reminder(transcript.SystemText(change.Content))
 		entries = append([]session.Entry{session.NewEntry(*change)}, entries...)

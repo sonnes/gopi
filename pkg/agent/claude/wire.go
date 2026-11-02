@@ -1,6 +1,9 @@
 package claude
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // The types in this file are the parts of the stream-json protocol that
 // the agent reads and writes. The agent ignores every other field.
@@ -30,6 +33,13 @@ type line struct {
 	Status      string `json:"status"`
 	Summary     string `json:"summary"`
 
+	// system status and compact_boundary. IsSynthetic is set on the user
+	// line with the summary that follows a boundary.
+	CompactResult   string           `json:"compact_result"`
+	CompactError    string           `json:"compact_error"`
+	CompactMetadata *compactMetadata `json:"compact_metadata"`
+	IsSynthetic     bool             `json:"isSynthetic"`
+
 	// stream_event
 	Event *streamEvent `json:"event"`
 
@@ -51,6 +61,13 @@ type line struct {
 
 	// control_response
 	Response *controlResponse `json:"response"`
+}
+
+// compactMetadata is the data of a compact_boundary line.
+type compactMetadata struct {
+	Trigger    string `json:"trigger"`
+	PreTokens  int    `json:"pre_tokens"`
+	PostTokens int    `json:"post_tokens"`
 }
 
 // streamEvent is one raw event of the Messages API stream.
@@ -90,6 +107,21 @@ func (m *wireMessage) blocks() []wireBlock {
 		return nil
 	}
 	return blocks
+}
+
+// text returns the text of m: a string, or the text of its blocks.
+func (m *wireMessage) text() string {
+	var s string
+	if err := json.Unmarshal(m.Content, &s); err == nil {
+		return s
+	}
+	var parts []string
+	for _, b := range m.blocks() {
+		if b.Type == "text" {
+			parts = append(parts, b.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // wireBlock is one content block.

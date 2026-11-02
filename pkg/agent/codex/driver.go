@@ -125,6 +125,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.Sections != nil {
 		opts = append(opts, Sections(c.Sections))
 	}
+	if c.AutoCompact > 0 {
+		opts = append(opts, AutoCompact(c.AutoCompact))
+	}
 	if c.Effort != "" {
 		opts = append(opts, Thinking(c.Effort))
 	}

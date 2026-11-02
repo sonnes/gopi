@@ -92,6 +92,11 @@ type threadResult struct {
 	Model string `json:"model"`
 }
 
+// compactStartParams are the parameters of thread/compact/start.
+type compactStartParams struct {
+	ThreadID string `json:"threadId"`
+}
+
 // injectParams are the parameters of thread/inject_items. Items are raw
 // items of the Responses API that the thread appends to its history.
 type injectParams struct {
@@ -219,12 +224,13 @@ type item struct {
 
 // The item types that the agent maps.
 const (
-	itemAgentMessage     = "agentMessage"
-	itemReasoning        = "reasoning"
-	itemCommandExecution = "commandExecution"
-	itemFileChange       = "fileChange"
-	itemMcpToolCall      = "mcpToolCall"
-	itemWebSearch        = "webSearch"
+	itemAgentMessage      = "agentMessage"
+	itemContextCompaction = "contextCompaction"
+	itemReasoning         = "reasoning"
+	itemCommandExecution  = "commandExecution"
+	itemFileChange        = "fileChange"
+	itemMcpToolCall       = "mcpToolCall"
+	itemWebSearch         = "webSearch"
 	// itemCollabAgentToolCall is a call of the model to a subagent,
 	// such as wait.
 	itemCollabAgentToolCall = "collabAgentToolCall"

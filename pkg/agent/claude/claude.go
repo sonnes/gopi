@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -97,24 +98,25 @@ type Agent struct {
 
 // config collects the options before [New] or [Durable] builds the agent.
 type config struct {
-	store      session.Storer
-	name       string
-	binary     string
-	dir        string
-	model      string
-	sections   agent.SystemFunc
-	thinking   ai.ThinkingLevel
-	env        []string
-	permission Permission
-	allowed    []string
-	disallowed []string
-	ask        []string
-	only       []string
-	approve    agent.ApproveFunc
-	hooks      []agent.Hook
-	mcp        []agent.MCPServer
-	idle       func(agent.Event)
-	wake       func()
+	store       session.Storer
+	name        string
+	binary      string
+	dir         string
+	model       string
+	sections    agent.SystemFunc
+	thinking    ai.ThinkingLevel
+	autoCompact int
+	env         []string
+	permission  Permission
+	allowed     []string
+	disallowed  []string
+	ask         []string
+	only        []string
+	approve     agent.ApproveFunc
+	hooks       []agent.Hook
+	mcp         []agent.MCPServer
+	idle        func(agent.Event)
+	wake        func()
 	// defsRoot holds the folder of a session. defs is set if the session
 	// has dirs.
 	defsRoot string
@@ -171,6 +173,13 @@ func System(s string) Option {
 // prompt.
 func Sections(fn agent.SystemFunc) Option {
 	return func(c *config) { c.sections = fn }
+}
+
+// AutoCompact sets the size of the context, in tokens, that starts a
+// compaction. The CLI takes 100k to 1M. Without it, the CLI uses its
+// default.
+func AutoCompact(tokens int) Option {
+	return func(c *config) { c.autoCompact = tokens }
 }
 
 // Thinking sets the effort level of the CLI. [ai.ThinkingOff] turns
@@ -564,6 +573,9 @@ func cliArgs(c config, system string) ([]string, error) {
 	}
 	if c.model != "" {
 		args = append(args, "--model", c.model)
+	}
+	if c.autoCompact > 0 {
+		args = append(args, "--autocompact", strconv.Itoa(c.autoCompact))
 	}
 	if system != "" {
 		args = append(args, "--append-system-prompt", system)

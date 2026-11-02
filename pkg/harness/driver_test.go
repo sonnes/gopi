@@ -384,3 +384,26 @@ func TestStartUsesTheCompactionOfTheConfig(t *testing.T) {
 
 	assert.Equal(t, 1, c.count)
 }
+
+func TestStartGivesTheAutoCompactSizeToTheDefaultStrategy(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		bigReply(150_000),
+		bigReply(170_000),
+		reply("the summary"),
+		reply("done"),
+	}}
+	a := start(t, harness.New(base(t, p)...), agent.Config{
+		SessionID:   "s1",
+		AutoCompact: 100_000,
+	})
+
+	run(t, a, "first")
+	run(t, a, "second")
+	run(t, a, "third")
+
+	assert.Less(t,
+		ai.EstimateTokens(a.State().View()...),
+		ai.EstimateTokens(a.State().Messages()...),
+		"the default limit of 200k does not start this compaction",
+	)
+}

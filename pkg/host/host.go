@@ -31,6 +31,8 @@ var (
 	ErrClosed = errors.New("host: closed")
 	// ErrInvalid reports an input that the host cannot take.
 	ErrInvalid = errors.New("host: invalid input")
+	// ErrBusy reports that the session has an active run.
+	ErrBusy = errors.New("host: the session has an active run")
 	// ErrChild reports a message, an update, or an interrupt for the
 	// session of a subagent. The run of its parent writes it.
 	ErrChild = errors.New("host: the session is a subagent")
@@ -240,6 +242,9 @@ type Config struct {
 	// session file with the rest of the config, so a header such as a
 	// bearer token is on disk.
 	MCP []agent.MCPServer `json:"mcp,omitempty"`
+	// AutoCompact is the size of the context, in tokens, that starts a
+	// compaction. 0 keeps the default of the driver.
+	AutoCompact int `json:"auto_compact,omitempty"`
 }
 
 // Create makes the session of config, keeps config in it, and starts its

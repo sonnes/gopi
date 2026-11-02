@@ -205,7 +205,8 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Hooks:     h.hooks,
 		Tools:     h.tools,
 
-		Compaction: h.compaction,
+		Compaction:  h.compaction,
+		AutoCompact: config.AutoCompact,
 	})
 	if err != nil {
 		return nil, agent.State{}, fmt.Errorf("host: start session %s: %w", s.id, err)

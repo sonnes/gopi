@@ -137,6 +137,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		agent.Store(c.Store),
 		agent.Toolset(append([]tool.Tool{echo}, c.Tools...)...),
 		agent.Hooks(c.Hooks...),
+		agent.Compaction(c.Compaction),
 	}
 	if c.Sections != nil {
 		opts = append(opts, agent.System(c.Sections))

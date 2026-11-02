@@ -134,6 +134,10 @@ func Text(msgs []ai.Message) string {
 // sections of msgs to the sections of fn. It returns nil messages if
 // the sections are the same, or if fn is nil.
 //
+// A compaction of the CLI can drop a change that the driver sent, so the
+// comparison reads only msgs from compactedAt. After a compaction, the
+// change is each section.
+//
 // An empty history has no conversation yet, so the CLI starts in this
 // run and gets the base as its system prompt, with [Text]. A CLI takes
 // no system message in a conversation, so the driver sends a change in
@@ -142,6 +146,7 @@ func ForCLI(
 	ctx context.Context,
 	fn func(context.Context) ([]ai.Section, error),
 	msgs []ai.Message,
+	compactedAt int,
 ) (base, change *ai.Message, err error) {
 	if fn == nil {
 		return nil, nil, nil
@@ -150,7 +155,7 @@ func ForCLI(
 	if err != nil {
 		return nil, nil, fmt.Errorf("build the system prompt: %w", err)
 	}
-	blocks, err := Change(Current(msgs), want)
+	blocks, err := Change(Current(msgs[compactedAt:]), want)
 	if err != nil || len(blocks) == 0 {
 		return nil, nil, err
 	}

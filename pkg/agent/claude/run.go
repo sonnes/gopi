@@ -72,6 +72,14 @@ type runner struct {
 	moves        map[string]bool
 	held         []session.Entry
 	moveDeadline <-chan time.Time
+
+	// command is true if the input is a command of the CLI, such as
+	// /compact. The log does not keep it.
+	command bool
+	// compacting is true between the status line of a compaction and its
+	// end. boundary is the compaction that waits for its summary line.
+	compacting bool
+	boundary   *session.Compaction
 }
 
 // isChild reports whether r is the runner of a child. The runner of a
@@ -208,8 +216,10 @@ func (r *runner) run(
 
 // sendInput stores the input of the run, and sends it to the CLI.
 func (r *runner) sendInput(ctx context.Context, entries []session.Entry) error {
-	if err := r.em.Input(ctx, entries); err != nil {
-		return err
+	if !r.command {
+		if err := r.em.Input(ctx, entries); err != nil {
+			return err
+		}
 	}
 	input := emit.Input(entries)
 	if r.reminder != "" {
@@ -336,6 +346,13 @@ func (r *runner) handle(
 		return nil, false, r.subs.line(ctx, *l.ParentToolUseID, l)
 	}
 
+	if r.boundary != nil {
+		summary, err := r.endBoundary(ctx, l)
+		if summary || err != nil {
+			return nil, false, err
+		}
+	}
+
 	switch l.Type {
 	case "control_request":
 		return nil, false, r.proc.answer(ctx, l)
@@ -347,6 +364,12 @@ func (r *runner) handle(
 		switch l.Subtype {
 		case "init":
 			return nil, false, r.saveSession(ctx, l.SessionID)
+		case "status":
+			r.compactStatus(l)
+			return nil, false, nil
+		case "compact_boundary":
+			r.compactBoundary(l)
+			return nil, false, nil
 		case "task_started":
 			return nil, false, r.subs.taskStarted(ctx, l)
 		case "task_notification":

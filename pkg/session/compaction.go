@@ -11,6 +11,12 @@ import (
 // KindCompaction is the kind of a custom entry that holds a [Compaction].
 const KindCompaction = "gopi.compaction"
 
+// The values of [Compaction.Trigger].
+const (
+	TriggerManual = "manual"
+	TriggerAuto   = "auto"
+)
+
 // Edit replaces the entries from First to Last with Messages. The edits
 // of a compaction apply in order, and each edit reads the view that the
 // edit before it leaves. To trim one tool result, set First and Last to
@@ -32,11 +38,17 @@ type Edit struct {
 type Compaction struct {
 	// Strategy names the strategy that made the edits.
 	Strategy string `json:"strategy,omitempty"`
+	// Trigger is "manual" or "auto" for a compaction of a CLI. It is empty
+	// for a compaction of the harness.
+	Trigger string `json:"trigger,omitempty"`
 	// Edits apply in order.
 	Edits []Edit `json:"edits"`
 	// Before and After are the estimated tokens of the view.
 	Before int `json:"before"`
 	After  int `json:"after"`
+	// Summary is the summary text of a CLI that gives it. A CLI keeps its
+	// own session, so a compaction of a CLI has no edits.
+	Summary string `json:"summary,omitempty"`
 	// Usage is the usage of the model calls of the strategy.
 	Usage ai.Usage `json:"usage,omitzero"`
 }

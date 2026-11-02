@@ -101,6 +101,8 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 			key := ev.ToolCallID + "/" + ev.SessionID
 			assert.True(t, subs[key], "event %d: subagent_end of %q, which is not open", i, key)
 			delete(subs, key)
+		case agent.EventCompactionStart, agent.EventCompaction:
+			// A compaction can come at any point of a run.
 		default:
 			assert.Fail(t, "unknown event type", "event %d: %T", i, ev)
 		}

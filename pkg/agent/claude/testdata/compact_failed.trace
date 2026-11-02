@@ -1,0 +1,8 @@
+stdiorr trace v1
+# Hand-written. The compaction fails, and the result ends the run.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"/compact"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"status","status":"compacting","session_id":"sess-1"}
+< {"type":"system","subtype":"status","status":null,"compact_result":"failed","compact_error":"the context is too small","session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"session_id":"sess-1","num_turns":0,"stop_reason":null,"usage":{"input_tokens":0,"output_tokens":0}}

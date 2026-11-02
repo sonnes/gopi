@@ -73,6 +73,46 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 	return nil
 }
 
+// Compact compacts the session id now, in a run of its own. The events of
+// the run go to the agent stream, as the events of each run do. A held
+// message runs after it. The instructions go to the strategy or the CLI of
+// the agent. A Codex agent ignores them.
+//
+// If a run is active, Compact returns [ErrBusy]. If the session has no
+// message, Compact returns [ErrInvalid]. If the agent cannot compact,
+// Compact returns an error that wraps [errors.ErrUnsupported].
+func (h *Host) Compact(ctx context.Context, id, instructions string) error {
+	s, err := h.session(id)
+	if err != nil {
+		return err
+	}
+	if err := s.writable(); err != nil {
+		return err
+	}
+	if err := s.startAgent(ctx); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closing {
+		return fmt.Errorf("host: session %s: %w", s.id, ErrClosed)
+	}
+	if s.run != nil {
+		return fmt.Errorf("host: session %s: %w", s.id, ErrBusy)
+	}
+	if _, ok := s.runner.(agent.ManualCompactor); !ok {
+		return fmt.Errorf("host: session %s: the agent cannot compact: %w", s.id, errors.ErrUnsupported)
+	}
+	if len(s.runner.Log().Messages()) == 0 {
+		return fmt.Errorf("host: session %s: nothing to compact: %w", s.id, ErrInvalid)
+	}
+	s.beginRunLocked(func(ctx context.Context, runner agent.Runner) *agent.Stream {
+		return runner.(agent.ManualCompactor).Compact(ctx, instructions)
+	})
+	return nil
+}
+
 // Interrupt cancels the active run of the session id. The log keeps its
 // entries, and a held message runs next. If no run is active, Interrupt
 // does nothing. It is the user.interrupt event of Claude Managed Agents.
@@ -103,25 +143,32 @@ func (s *hosted) startRunLocked(m Message) {
 	if m != nil {
 		s.wakePending = false
 	}
+	s.beginRunLocked(func(ctx context.Context, runner agent.Runner) *agent.Stream {
+		return s.stream(ctx, runner, m)
+	})
+}
+
+// beginRunLocked sets the session running, and runs the stream of start in
+// a new goroutine.
+func (s *hosted) beginRunLocked(start func(context.Context, agent.Runner) *agent.Stream) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	s.run = ctx
 	s.cancelRun = cancel
 	s.sess.StopReason = ""
 	s.sess.Error = ""
 	s.updateLocked()
-	s.runs.Go(func() { s.execute(ctx, m) })
+	s.runs.Go(func() { s.execute(ctx, start) })
 }
 
-// execute runs the agent on m, and sends each agent event to the agent
-// stream. Then it ends the run. With no m, it continues the turn that
-// the agent started on its own.
-func (s *hosted) execute(ctx context.Context, m Message) {
+// execute runs the stream of start, and sends each agent event to the
+// agent stream. Then it ends the run.
+func (s *hosted) execute(ctx context.Context, start func(context.Context, agent.Runner) *agent.Stream) {
 	runner, err := s.freshRunner(ctx)
 	if err != nil {
 		s.finish(ctx, ai.Usage{}, err)
 		return
 	}
-	stream := s.stream(ctx, runner, m)
+	stream := start(ctx, runner)
 	var usage ai.Usage
 	for ev, err := range stream.Events() {
 		if err != nil {

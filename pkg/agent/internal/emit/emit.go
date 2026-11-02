@@ -166,6 +166,26 @@ func (e *Emitter) Input(ctx context.Context, input []session.Entry) error {
 	return nil
 }
 
+// CompactionStart sends compaction_start.
+func (e *Emitter) CompactionStart() {
+	e.emit(agent.EventCompactionStart{})
+}
+
+// Compaction stores the compaction that the CLI did, and sends its event.
+func (e *Emitter) Compaction(ctx context.Context, data session.Compaction) error {
+	entry, err := session.Custom(session.KindCompaction, data)
+	if err != nil {
+		return err
+	}
+	return e.commit(ctx, entry, agent.EventCompaction{Compaction: data})
+}
+
+// CompactionFailed sends the event of a compaction that the CLI did not
+// finish. The log stores nothing.
+func (e *Emitter) CompactionFailed(data session.Compaction, msg string) {
+	e.emit(agent.EventCompaction{Compaction: data, Error: msg})
+}
+
 // Update applies one model event to the open assistant message and
 // sends message_update. If no assistant message is open, Update opens
 // one first. See [Emitter.Begin].

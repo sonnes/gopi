@@ -64,7 +64,7 @@ func TestForCLI(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			base, change, err := sections.ForCLI(context.Background(), tt.fn, tt.msgs)
+			base, change, err := sections.ForCLI(context.Background(), tt.fn, tt.msgs, 0)
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.wantBase, base)
@@ -76,10 +76,10 @@ func TestForCLI(t *testing.T) {
 func TestForCLIErrors(t *testing.T) {
 	failed := func(context.Context) ([]ai.Section, error) { return nil, errors.New("no project") }
 
-	_, _, err := sections.ForCLI(context.Background(), failed, nil)
+	_, _, err := sections.ForCLI(context.Background(), failed, nil, 0)
 	assert.ErrorContains(t, err, "no project")
 
-	_, _, err = sections.ForCLI(context.Background(), want(memory, noted), nil)
+	_, _, err = sections.ForCLI(context.Background(), want(memory, noted), nil, 0)
 	assert.ErrorContains(t, err, `two sections are named "memory"`)
 }
 
@@ -96,4 +96,24 @@ func TestText(t *testing.T) {
 		"the text is the base, and a later change does not alter it",
 	)
 	assert.Empty(t, sections.Text([]ai.Message{ai.UserMessage("Hi")}))
+}
+
+func TestForCLIAfterACompaction(t *testing.T) {
+	memory := []ai.Section{{Name: "memory", Text: "the facts"}}
+	msgs := []ai.Message{
+		ai.SystemMessage(memory[0]),
+		ai.UserMessage("hi"),
+	}
+	fn := func(context.Context) ([]ai.Section, error) { return memory, nil }
+
+	base, change, err := sections.ForCLI(context.Background(), fn, msgs, 0)
+	require.NoError(t, err)
+	assert.Nil(t, base)
+	assert.Nil(t, change, "with no compaction, the log holds the sections")
+
+	base, change, err = sections.ForCLI(context.Background(), fn, msgs, len(msgs))
+	require.NoError(t, err)
+	assert.Nil(t, base, "the conversation exists, so the sections are a change")
+	require.NotNil(t, change, "after a compaction, the CLI gets the sections again")
+	assert.Contains(t, sections.Text([]ai.Message{*change}), "the facts")
 }

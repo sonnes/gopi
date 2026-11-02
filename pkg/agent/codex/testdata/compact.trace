@@ -1,0 +1,21 @@
+stdiorr trace v1
+# Hand-written from a live capture of codex-cli 0.163.0. A run with an automatic compaction, then thread/compact/start.
+> {"id":1,"method":"initialize","params":{"clientInfo":{"name":"gopi","title":"gopi","version":"0.0.0"},"capabilities":null}}
+< {"id":1,"result":{"userAgent":"gopi/0.153.0","codexHome":"/home/me/.codex","platformFamily":"unix","platformOs":"macos"}}
+> {"method":"initialized"}
+> {"id":2,"method":"thread/start","params":{"cwd":"/work","approvalPolicy":"never"}}
+< {"id":2,"result":{"thread":{"id":"th1","turns":[]},"model":"gpt-5-codex","cwd":"/work","approvalPolicy":"never"}}
+> {"id":3,"method":"turn/start","params":{"threadId":"th1","input":[{"type":"text","text":"Hi."}]}}
+< {"id":3,"result":{"turn":{"id":"tu1","items":[],"status":"inProgress","error":null}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"contextCompaction","id":"c1"}}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"contextCompaction","id":"c1"}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":""}}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu1","item":{"type":"agentMessage","id":"m1","text":"Hello"}}}
+< {"method":"turn/completed","params":{"threadId":"th1","turn":{"id":"tu1","items":[],"status":"completed","error":null}}}
+> {"id":4,"method":"thread/compact/start","params":{"threadId":"th1"}}
+< {"id":4,"result":{}}
+< {"method":"thread/status/changed","params":{"threadId":"th1","status":{"type":"active","activeFlags":[]}}}
+< {"method":"turn/started","params":{"threadId":"th1","turn":{"id":"tu2","items":[],"status":"inProgress","error":null}}}
+< {"method":"item/started","params":{"threadId":"th1","turnId":"tu2","item":{"type":"contextCompaction","id":"c2"}}}
+< {"method":"item/completed","params":{"threadId":"th1","turnId":"tu2","item":{"type":"contextCompaction","id":"c2"}}}
+< {"method":"turn/completed","params":{"threadId":"th1","turn":{"id":"tu2","items":[],"status":"completed","error":null}}}

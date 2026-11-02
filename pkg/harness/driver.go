@@ -6,10 +6,15 @@ import (
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/compact"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
+
+// autoCompactFraction is the part of the context window that also starts
+// a compaction, so the setting never passes a small window.
+const autoCompactFraction = 0.8
 
 // Start starts the durable agent of the session c.SessionID, as
 // [Harness.Durable] does, with the fields of c on top of the options of
@@ -68,6 +73,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	}
 	if c.Compaction != nil {
 		opts = append(opts, AgentDefaults(agent.Compaction(c.Compaction)))
+	} else if c.AutoCompact > 0 {
+		strategy := compact.Summarize(compact.Limit(c.AutoCompact, autoCompactFraction))
+		opts = append(opts, AgentDefaults(agent.Compaction(strategy)))
 	}
 	if len(c.Tools) > 0 {
 		opts = append(opts, Toolset(Tools(c.Tools...)))

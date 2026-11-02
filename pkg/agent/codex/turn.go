@@ -10,6 +10,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -123,6 +124,13 @@ type turn struct {
 	// completed is true after the turn of the run completed while a
 	// child still ran. The run then waits for the children.
 	completed bool
+
+	// manual is true if the turn is a compaction that a caller asked for.
+	// It has no turn ID until turn/started.
+	manual bool
+	// compacting is true between the start and the end of a compaction
+	// item.
+	compacting bool
 }
 
 // note is one notification of the turn.
@@ -153,13 +161,26 @@ type part struct {
 // context that is not cancelled, so that a finished tool keeps its
 // result.
 func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
-	store := ctx
-	t.reset()
-	startID, err := t.conn.request("turn/start", turnStartParams{
+	return t.read(ctx, "turn/start", turnStartParams{
 		ThreadID: t.threadID,
 		Input:    input,
 		Effort:   t.effort,
 	})
+}
+
+// compact asks the server to compact the thread, and reads until its turn
+// completes.
+func (t *turn) compact(ctx context.Context) (ai.Usage, error) {
+	t.manual = true
+	return t.read(ctx, "thread/compact/start", compactStartParams{ThreadID: t.threadID})
+}
+
+// read sends the request that starts a turn, and reads until the turn
+// completes.
+func (t *turn) read(ctx context.Context, method string, request any) (ai.Usage, error) {
+	store := ctx
+	t.reset()
+	startID, err := t.conn.request(method, request)
 	if err != nil {
 		t.dead = true
 		return t.usage, err
@@ -174,6 +195,14 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 	finish := func(err error) (ai.Usage, error) {
 		if err == nil && cancelled {
 			err = ctx.Err()
+		}
+		if t.compacting {
+			t.compacting = false
+			msg := "the turn ended before the compaction"
+			if err != nil {
+				msg = err.Error()
+			}
+			t.emitter.CompactionFailed(t.compaction(), msg)
 		}
 		return t.usage, err
 	}
@@ -203,7 +232,12 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 
 		if m.isResponse(startID) {
 			if m.Error != nil {
-				return t.usage, fmt.Errorf("codex: turn/start: %s", m.Error.Message)
+				return t.usage, fmt.Errorf("codex: %s: %s", method, m.Error.Message)
+			}
+			// The response of a compaction has no turn. Its ID comes with
+			// turn/started.
+			if t.manual {
+				continue
 			}
 			var res turnResult
 			if err := json.Unmarshal(m.Result, &res); err != nil {
@@ -223,6 +257,21 @@ func (t *turn) run(ctx context.Context, input []userInput) (ai.Usage, error) {
 				done, err := t.dispatch(store, em, cancelled)
 				if t.settled(done, err) {
 					return finish(err)
+				}
+			}
+			continue
+		}
+		if t.turnID == "" && t.manual && m.Method == methodTurnStarted {
+			var p params
+			if err := json.Unmarshal(m.Params, &p); err != nil || p.Turn == nil {
+				t.dead = true
+				return t.usage, fmt.Errorf("codex: %s: no turn in the notification", m.Method)
+			}
+			t.turnID = p.Turn.ID
+			if cancelled {
+				if err := t.interrupt(); err != nil {
+					t.dead = true
+					return t.usage, ctx.Err()
 				}
 			}
 			continue
@@ -449,7 +498,7 @@ func (t *turn) handle(ctx context.Context, n note) error {
 // item of another type never becomes active, so it cannot hold back
 // the items that follow it.
 func mapped(it item) bool {
-	if it.Type == itemAgentMessage || it.Type == itemReasoning {
+	if it.Type == itemAgentMessage || it.Type == itemReasoning || it.Type == itemContextCompaction {
 		return true
 	}
 	_, ok := toolCall(it)
@@ -494,10 +543,25 @@ func (t *turn) apply(ctx context.Context, n note) error {
 	return nil
 }
 
+// compaction returns the data of a compaction of the turn. The item of
+// the CLI has no sizes and no summary.
+func (t *turn) compaction() session.Compaction {
+	trigger := session.TriggerAuto
+	if t.manual {
+		trigger = session.TriggerManual
+	}
+	return session.Compaction{Strategy: strategyName, Trigger: trigger}
+}
+
 // itemStarted opens a text block for an agent message, or starts the
 // tool of a tool item. A reasoning item gets its block with its first
 // text, because it often has none.
 func (t *turn) itemStarted(ctx context.Context, it item) error {
+	if it.Type == itemContextCompaction {
+		t.compacting = true
+		t.emitter.CompactionStart()
+		return nil
+	}
 	if it.Type == itemAgentMessage {
 		t.block(it.ID, ai.EventTextStart)
 		return nil
@@ -520,6 +584,9 @@ func (t *turn) itemStarted(ctx context.Context, it item) error {
 // the deltas built.
 func (t *turn) itemCompleted(ctx context.Context, it item) error {
 	switch it.Type {
+	case itemContextCompaction:
+		t.compacting = false
+		return t.emitter.Compaction(ctx, t.compaction())
 	case itemAgentMessage:
 		i := t.block(it.ID, ai.EventTextStart)
 		t.emitter.Update(ai.Event{

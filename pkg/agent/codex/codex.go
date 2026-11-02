@@ -128,19 +128,20 @@ type Agent struct {
 // config collects the options before [New] or [Durable] builds the
 // agent.
 type config struct {
-	store    session.Storer
-	name     string
-	binary   string
-	dir      string
-	model    string
-	sections agent.SystemFunc
-	thinking ai.ThinkingLevel
-	env      []string
-	sandbox  SandboxMode
-	approval ApprovalPolicy
-	approve  agent.ApproveFunc
-	hooks    []agent.Hook
-	mcp      []agent.MCPServer
+	store       session.Storer
+	name        string
+	binary      string
+	dir         string
+	model       string
+	sections    agent.SystemFunc
+	autoCompact int
+	thinking    ai.ThinkingLevel
+	env         []string
+	sandbox     SandboxMode
+	approval    ApprovalPolicy
+	approve     agent.ApproveFunc
+	hooks       []agent.Hook
+	mcp         []agent.MCPServer
 	// hookCommand is the gopi binary that relays a hook.
 	hookCommand string
 	// defsRoot holds the folder of a session. defs is set if the session
@@ -201,6 +202,12 @@ func System(s string) Option {
 // developer instructions.
 func Sections(fn agent.SystemFunc) Option {
 	return func(c *config) { c.sections = fn }
+}
+
+// AutoCompact sets the size of the context, in tokens, that starts a
+// compaction. Without it, the CLI uses its default.
+func AutoCompact(tokens int) Option {
+	return func(c *config) { c.autoCompact = tokens }
 }
 
 // Thinking sets the reasoning effort of each turn. [ai.ThinkingMax]
@@ -371,7 +378,7 @@ func (a *Agent) run(
 	if err := e.Start(); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
-	base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages())
+	base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages(), a.log.History().CompactedAt)
 	if err != nil {
 		return e.Finish(ctx, ai.Usage{}, fmt.Errorf("codex: %w", err))
 	}
@@ -398,17 +405,7 @@ func (a *Agent) run(
 	if err := e.Input(ctx, stored); err != nil {
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
-	t := &turn{
-		conn:     c,
-		emitter:  e,
-		threadID: threadID,
-		model:    a.model,
-		effort:   effort(a.cfg.thinking),
-	}
-	if a.store != nil {
-		t.sessionID = a.log.Session().ID
-	}
-	t.subs = newSubagents(a, t)
+	t := a.newTurn(c, e, threadID)
 	// The error of a hook belongs to the run that called it.
 	_ = c.hookErr()
 	c.bindHooks(ctx)
@@ -435,6 +432,28 @@ func (a *Agent) run(
 		_ = t.subs.interrupt()
 		t.dead = true
 	}
+	return e.Finish(ctx, usage, a.endTurns(ctx, c, t, err))
+}
+
+// newTurn returns the turn of a run on the thread.
+func (a *Agent) newTurn(c *conn, e *emit.Emitter, threadID string) *turn {
+	t := &turn{
+		conn:     c,
+		emitter:  e,
+		threadID: threadID,
+		model:    a.model,
+		effort:   effort(a.cfg.thinking),
+	}
+	if a.store != nil {
+		t.sessionID = a.log.Session().ID
+	}
+	t.subs = newSubagents(a, t)
+	return t
+}
+
+// endTurns ends the children and the hooks of a run, and returns err with
+// the error of a hook.
+func (a *Agent) endTurns(ctx context.Context, c *conn, t *turn, err error) error {
 	t.subs.endAll(context.WithoutCancel(ctx))
 	c.bindHooks(nil)
 	if err == nil {
@@ -443,7 +462,7 @@ func (a *Agent) run(
 	if t.dead {
 		a.drop(c)
 	}
-	return e.Finish(ctx, usage, err)
+	return err
 }
 
 // connect returns the open process and the thread ID. If no process
@@ -602,6 +621,12 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 	}
 	if hooks != nil {
 		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
+	}
+	if a.cfg.autoCompact > 0 {
+		if p.Config == nil {
+			p.Config = make(map[string]any)
+		}
+		p.Config["model_auto_compact_token_limit"] = a.cfg.autoCompact
 	}
 	if len(a.cfg.mcp) > 0 {
 		if p.Config == nil {
