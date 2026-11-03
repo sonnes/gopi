@@ -33,6 +33,7 @@ flowchart LR
 - If the CLI cannot find the stored conversation, the run fails with `ErrNoConversation`, and the agent clears the ID. The next run starts a new conversation of the CLI, and the log keeps its messages.
 - The CLI runs only its own tools, so a CLI agent has no `Toolset` option.
 - One process lives as long as the agent: the first run starts it, and `Close` stops it. Each run after the first then starts with no handshake.
+- On Unix, the CLI leads a process group of its own, and a stop or a kill signals the whole group. A command that a tool started, such as a sleep in the background, then ends with the CLI. A signal to the CLI only lost, because its children stayed alive after it. The group is a new session, so a command that opens the terminal gets an error and does not stop.
 - The packages speak the protocols of the IDE extensions, `codex app-server` and the stream-json mode of `claude`. These protocols interrupt a turn and carry the [requests of the CLI](cli-request.md).
 - A cancel interrupts the turn and waits for the end of the turn, so the next run starts from a known state. The agent kills the process only after a timeout.
 - A CLI that is not logged in fails the run with `ErrAuth`, so a caller can ask the user to log in.

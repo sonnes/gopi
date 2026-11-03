@@ -2,7 +2,9 @@
 // Each CLI agent writes JSON lines to stdin and reads JSON lines from
 // stdout. A [Proc] owns the process: one goroutine reads stdout into
 // [Proc.Lines], and [Proc.Stop] ends the process in steps, so that the
-// CLI can write its session file.
+// CLI can write its session file. On a Unix system, the CLI leads a
+// process group of its own, so a stop or a kill also ends each command
+// that the CLI started.
 package cliproc
 
 import (
@@ -44,6 +46,9 @@ type Pipes struct {
 	Wait   func() error
 	// Term asks the process to stop, or is nil if it cannot.
 	Term func() error
+	// Kill kills the process and each process that it started. [Proc]
+	// also calls it after the process exits, to end the processes that
+	// it left, so a call after the exit must be safe.
 	Kill func() error
 	// Stderr returns the last text of stderr, or is nil for no stderr.
 	Stderr func() string
@@ -52,8 +57,10 @@ type Pipes struct {
 // Start starts cmd with pipes on its stdin, stdout, and stderr. It
 // keeps the end of stderr for the error of a CLI that exits, such as
 // one that rejects a flag. It does not write stderr to the terminal,
-// which a TUI owns.
+// which a TUI owns. The process leads a process group, and Term and
+// Kill signal the whole group.
 func Start(cmd *exec.Cmd) (Pipes, error) {
+	ownGroup(cmd)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return Pipes{}, err
@@ -74,8 +81,8 @@ func Start(cmd *exec.Cmd) (Pipes, error) {
 		Stdin:  stdin,
 		Stdout: stdout,
 		Wait:   cmd.Wait,
-		Term:   func() error { return cmd.Process.Signal(syscall.SIGTERM) },
-		Kill:   cmd.Process.Kill,
+		Term:   func() error { return signalGroup(cmd, syscall.SIGTERM) },
+		Kill:   func() error { return signalGroup(cmd, syscall.SIGKILL) },
 		Stderr: func() string { return errTail.Text(stderrGrace) },
 	}, nil
 }
@@ -155,13 +162,16 @@ func (pr *Proc) Write(data []byte) error {
 // the remaining lines, so that the CLI does not block on a full pipe.
 // If the CLI does not exit in [exitGrace], Stop sends SIGTERM, so that
 // the CLI can write its session file. If it does not exit in
-// [killTimeout] after that, Stop kills it.
+// [killTimeout] after that, Stop kills it. After the CLI exits, Stop
+// kills each process that the CLI left, such as a command of a tool
+// that runs in the background.
 func (pr *Proc) Stop() error {
 	pr.stopOnce.Do(func() {
 		pr.pipes.Stdin.Close()
 		go pr.drain()
 		done := make(chan error, 1)
 		go func() { done <- pr.pipes.Wait() }()
+		defer pr.pipes.Kill()
 		select {
 		case pr.stopErr = <-done:
 			return
