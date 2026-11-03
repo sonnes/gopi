@@ -203,7 +203,7 @@ func TestDriverWritesOnlyTheSkillKeysOfCodex(t *testing.T) {
 		Skillset: []def.SkillsReader{skill},
 	})
 
-	skillRoot, _, err := a.writeDefs(context.Background())
+	_, skillRoot, _, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 
 	data, err := os.ReadFile(filepath.Join(skillRoot, "deploy", "SKILL.md"))
@@ -273,7 +273,7 @@ func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 	})
 	folder := filepath.Join(root, "s1")
 
-	skillRoot, roles, err := a.writeDefs(context.Background())
+	_, skillRoot, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 	p := a.threadParams("", nil, "", roles)
 
@@ -307,7 +307,7 @@ func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
 		Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
 	})
 
-	skillRoot, _, err := a.writeDefs(context.Background())
+	_, skillRoot, _, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 
 	assert.Equal(t, filepath.Join(root, "s1", "skills"), skillRoot)
@@ -317,7 +317,7 @@ func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
 func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
 	a := startAgent(t, Driver(), agent.Config{})
 
-	skillRoot, roles, err := a.writeDefs(context.Background())
+	_, skillRoot, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 	p := a.threadParams("", nil, "", roles)
 

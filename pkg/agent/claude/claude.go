@@ -18,6 +18,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
@@ -396,7 +397,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		return proc, nil
 	}
 
-	cmd, fresh, err := a.command(ctx)
+	cmd, fresh, skills, err := a.command(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -407,6 +408,7 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 	if err != nil {
 		return nil, err
 	}
+	proc.skills = skills
 	if _, err := proc.initialize(ctx); err != nil {
 		proc.terminate()
 		switch {
@@ -491,24 +493,25 @@ func mcpConfig(servers []agent.MCPServer) (string, error) {
 	return string(data), nil
 }
 
-// command returns the command that starts the CLI. If the log has the
-// session of a CLI, the command resumes it. Otherwise a saved agent
-// gives the CLI the session ID of [cliSessionID], and fresh is that ID.
-func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, err error) {
+// command returns the command that starts the CLI, and the skills that
+// the CLI gets. If the log has the session of a CLI, the command resumes
+// it. Otherwise a saved agent gives the CLI the session ID of
+// [cliSessionID], and fresh is that ID.
+func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, skills def.Set, err error) {
 	args, err := cliArgs(a.cfg, sections.Text(a.log.Messages()))
 	if err != nil {
-		return nil, "", err
+		return nil, "", def.Set{}, err
 	}
-	folder, err := writeDefs(ctx, a.cfg.defs)
+	skills, folder, err := writeDefs(ctx, a.cfg.defs)
 	if err != nil {
-		return nil, "", fmt.Errorf("claude: %w", err)
+		return nil, "", def.Set{}, fmt.Errorf("claude: %w", err)
 	}
 	if folder != "" {
 		args = append(args, "--add-dir", folder)
 	}
 	id, err := conversation.Get(a.log)
 	if err != nil {
-		return nil, "", err
+		return nil, "", def.Set{}, err
 	}
 	switch {
 	case id != "":
@@ -517,7 +520,7 @@ func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, err e
 		fresh = cliSessionID(a.sessionID())
 		args = append(args, "--session-id="+fresh)
 	}
-	return cliCommand(a.cfg, args), fresh, nil
+	return cliCommand(a.cfg, args), fresh, skills, nil
 }
 
 // cliSpace is the UUID namespace of the session IDs that the agent

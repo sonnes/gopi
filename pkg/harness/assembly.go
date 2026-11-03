@@ -88,7 +88,12 @@ func (a *Assembly) withSkills(text string, names []string) (string, error) {
 
 // skillText is the text of a preloaded skill in the prompt.
 func skillText(name string, s def.Skill) string {
-	return "## Skill: " + name + "\n\n" + s.Body
+	return skillHeading(name) + s.Body
+}
+
+// skillHeading is the heading of the body of the skill name in a text.
+func skillHeading(name string) string {
+	return "## Skill: " + name + "\n\n"
 }
 
 // agentTool reports if the assembly gives the model the agent tool.
@@ -285,9 +290,9 @@ func uniqueNames(tools []tool.Tool) error {
 }
 
 // prepare resolves the language model. It returns the agent options in
-// the order that the harness promises: the permission hook, the agent
-// options of the baseline and of the call, then the prompt and the
-// tools. The agent builds the prompt before each model call, through
+// the order that the harness promises: the permission hook, the hook
+// that loads the skill of a slash call, the agent options of the
+// baseline and of the call, then the prompt and the tools. The agent builds the prompt before each model call, through
 // [agent.System]: the section of [Assembly.System], the sections of the
 // prompt builder, then the sections of [Sections].
 func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
@@ -327,6 +332,11 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 	}
 	if a.h.child != nil && a.h.child.sub.MaxTurns > 0 {
 		opts = append(opts, maxTurns(a.h.child.sub.MaxTurns))
+	}
+	// Only a user writes the input of a parent. A subagent gets the
+	// text of the model, and the model cannot load a skill this way.
+	if a.h.child == nil && len(a.Skills) > 0 {
+		opts = append(opts, a.slashSkills())
 	}
 	opts = append(opts, a.h.agentOpts...)
 	opts = append(opts, agent.System(system))

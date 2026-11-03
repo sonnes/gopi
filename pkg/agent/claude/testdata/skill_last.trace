@@ -1,0 +1,8 @@
+stdiorr trace v1
+# Hand-written. The text calls the skill deploy, so it goes after the image.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"cG5n"}},{"type":"text","text":"/deploy now"}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","cwd":"/work","session_id":"sess-1","model":"claude-haiku-4-5","tools":["Bash"]}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-4-5","role":"assistant","content":[{"type":"text","text":"Deployed."}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"Deployed.","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":10,"output_tokens":5}}

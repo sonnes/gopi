@@ -65,7 +65,9 @@ import (
 // Disallowed, or the MaxTurns of an agent, so a role runs with each tool
 // of the session. The Mode of an agent file has no effect, because Codex
 // 0.163 runs a role with the sandbox of the session. The CLI lists each
-// skill and loads its body, so the driver adds no text for Skills. A name
+// skill and loads its body, so the driver adds no text for Skills. If
+// the first text of a turn is a slash call of a skill, the driver writes
+// "$" for "/", because Codex loads a skill from a mention. A name
 // of Skills that Skillset and Dirs do not have fails the start, as in the
 // harness. A skill name with a slash also fails the start, because the
 // name is a folder name. The driver does not read the AGENTS.md

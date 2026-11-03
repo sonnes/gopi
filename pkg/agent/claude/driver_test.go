@@ -477,3 +477,40 @@ func TestToolsIsEachToolOfClaudeCode(t *testing.T) {
 	}
 	assert.NotContains(t, names, tool.ApplyPatch, "Claude Code has no apply_patch")
 }
+
+func TestDriverMovesTheTextOfASkillCallLast(t *testing.T) {
+	tests := []struct {
+		name  string
+		trace string
+		text  string
+	}{
+		{name: "a skill", trace: "testdata/skill_last.trace", text: "/deploy now"},
+		{name: "no skill", trace: "testdata/skill_unknown.trace", text: "/missing now"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claude.Replay(t, nil, tt.trace)
+			defsRoot(t)
+
+			r, err := claude.Driver().Start(context.Background(), agent.Config{
+				SessionID: "s1",
+				Store:     session.NewMemoryStore(),
+				Skillset:  []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+			})
+			require.NoError(t, err)
+			a, ok := r.(*claude.Agent)
+			require.True(t, ok)
+			defer closeAgent(t, a)
+
+			input := session.NewEntry(ai.Message{
+				Role: ai.RoleUser,
+				Content: []ai.Content{
+					ai.Text{Text: tt.text},
+					ai.File{MediaType: "image/png", Data: []byte("png")},
+				},
+			})
+			_, err = a.Run(context.Background(), input).Wait()
+			require.NoError(t, err, "the trace matches the order of the blocks")
+		})
+	}
+}

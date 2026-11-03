@@ -65,6 +65,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | skill         | A named body of instructions that the model loads on demand with the skill tool | prompt, recipe, command |
 | skill tool    | The tool of the harness that gives the model the body of one skill and the paths of its support files | skill loader, skill command |
 | qualified name | The qualifier of a skill, ":", and its name, such as `ops:deploy` | full name, path name |
+| slash call    | A user message whose first text starts with "/" and the qualified name of a skill, such as `/deploy now`. It loads the skill | slash command, skill command |
 | subagent      | An agent that one tool call of a parent starts: the agent tool, the Agent tool of Claude Code, or spawn_agent of Codex | worker, delegate, sub-task |
 | agent tool    | The tool of the harness that runs a subagent in a child session, and gives the parent the last text of the subagent | task tool, subagent tool |
 | session config | The config that a session started with, with the fields of its agent file, which the host keeps in a session value | saved agent, agent snapshot |

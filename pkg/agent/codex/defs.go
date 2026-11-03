@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
 	"github.com/sonnes/gopi/pkg/def"
@@ -28,34 +29,36 @@ const (
 )
 
 // writeDefs writes the skills and the roles of the session. It returns
-// the folder of the skills and the agents table of the next thread. A
-// thread reads a role from its file, so each role needs a file. A skill
-// file of Codex has no key for the model or the allowed tools.
-func (a *Agent) writeDefs(ctx context.Context) (string, map[string]any, error) {
+// the merged set, the folder of the skills, and the agents table of the
+// next thread. A thread reads a role from its file, so each role needs a
+// file. A skill file of Codex has no key for the model or the allowed
+// tools.
+func (a *Agent) writeDefs(ctx context.Context) (def.Set, string, map[string]any, error) {
 	if a.cfg.defs == nil {
-		return "", nil, nil
+		return def.Set{}, "", nil, nil
 	}
 	set, folder, err := a.cfg.defs.Prepare(ctx)
 	if err != nil || folder == "" {
-		return "", nil, err
+		return set, "", nil, err
 	}
 
 	var skillRoot string
 	if len(set.Skills) > 0 {
 		skillRoot = filepath.Join(folder, skillsDir)
-		for i := range set.Skills {
-			set.Skills[i].Model = ""
-			set.Skills[i].AllowedTools = nil
+		files := slices.Clone(set.Skills)
+		for i := range files {
+			files[i].Model = ""
+			files[i].AllowedTools = nil
 		}
-		if err := storefs.WriteSkills(skillRoot, set.Skills, set.Names); err != nil {
-			return "", nil, err
+		if err := storefs.WriteSkills(skillRoot, files, set.Names); err != nil {
+			return def.Set{}, "", nil, err
 		}
 	}
 	roles, err := writeRoles(filepath.Join(folder, filepath.FromSlash(rolesDir)), set.Agents, a.cfg.defs)
 	if err != nil {
-		return "", nil, err
+		return def.Set{}, "", nil, err
 	}
-	return skillRoot, roles, nil
+	return set, skillRoot, roles, nil
 }
 
 // writeRoles writes a role file for each agent to dir, and returns the

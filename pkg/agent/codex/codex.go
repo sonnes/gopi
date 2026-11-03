@@ -54,6 +54,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
@@ -396,7 +397,7 @@ func (a *Agent) run(
 	// The error of a hook belongs to the run that called it.
 	_ = c.hookErr()
 	c.bindHooks(ctx)
-	usage, err := t.run(ctx, userInputs(emit.Input(entries)))
+	usage, err := t.run(ctx, userInputs(emit.Input(entries), c.skills))
 	// Codex does not start a turn when a child ends after the turn of
 	// the run completed, so the run gives the model the result itself.
 	// A report turn can start more children, so the run repeats until
@@ -410,7 +411,7 @@ func (a *Agent) run(
 		if err = e.Input(ctx, []session.Entry{entry}); err != nil {
 			break
 		}
-		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry})))
+		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry}), def.Set{}))
 	}
 	// A run that ends with a child that runs, such as a turn that failed,
 	// stops the child on the server. The server can still send its
@@ -472,7 +473,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
 		return nil, "", fmt.Errorf("codex: %w", err)
 	}
-	skillRoot, roles, err := a.writeDefs(ctx)
+	skills, skillRoot, roles, err := a.writeDefs(ctx)
 	if err != nil {
 		return nil, "", fmt.Errorf("codex: %w", err)
 	}
@@ -501,6 +502,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	}
 	c = dial(p, a.cfg.approve)
 	c.hooks = hooks
+	c.skills = skills
 	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand, roles), skillRoot)
 	if err != nil {
 		c.kill()
@@ -521,19 +523,41 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	return c, res.Thread.ID, nil
 }
 
+// skillMention is the start of a mention of a skill that Codex loads.
+const skillMention = "$"
+
 // userInputs returns the inputs of a turn. An image goes as a data URL.
-// A file of another type becomes a text note.
-func userInputs(input []ai.Content) []userInput {
+// A file of another type becomes a text note. If the first text calls a
+// skill of skills, as [def.Set.Slash] reads it, its "/" and the name
+// become "$" and the name that Codex knows. Codex loads a skill from a
+// mention, and it reads "/" as text.
+func userInputs(input []ai.Content, skills def.Set) []userInput {
 	out := make([]userInput, 0, len(input))
+	first := true
 	for _, c := range input {
 		switch c := c.(type) {
 		case ai.Text:
+			if first {
+				c = mentionSkill(c, skills)
+				first = false
+			}
 			out = append(out, textInput(c))
 		case ai.File:
 			out = append(out, fileInput(c))
 		}
 	}
 	return out
+}
+
+// mentionSkill returns t with its call of a skill of skills as a
+// mention. Otherwise it returns t.
+func mentionSkill(t ai.Text, skills def.Set) ai.Text {
+	name, rest, ok := skills.Slash(t.Text)
+	if !ok {
+		return t
+	}
+	t.Text = skillMention + name + rest
+	return t
 }
 
 // textInput returns the text input of t.

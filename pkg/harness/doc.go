@@ -12,7 +12,9 @@
 // skill for the model, [AgentTool] runs a subagent in a child session,
 // and a tool of [Sandboxed] runs in the sandbox of the assembly. The
 // permission mode and the rules of package permission decide which tool
-// calls run.
+// calls run. A user message that starts with "/" and the name of a
+// skill, such as "/deploy now", loads the skill with no tool, as
+// [def.Set.Slash] reads it.
 //
 // A caller must obey these rules:
 //

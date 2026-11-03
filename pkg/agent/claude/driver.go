@@ -35,7 +35,9 @@ import (
 // Close. A process that dies leaves its folder until the next start. The
 // folder of each session is in the folder gopi-defs of [os.TempDir]. The
 // CLI lists each skill and loads its body, so the driver adds no text for
-// Skills. A name of Skills that Skillset and Dirs do not have fails the
+// Skills. If the first text of a user turn is a slash call of a skill,
+// the driver moves that text after the files of the turn, because the
+// CLI loads a skill only from the last text block. A name of Skills that Skillset and Dirs do not have fails the
 // start, as in the harness. A skill name with a slash also fails the
 // start, because the name is a folder name. The driver does not
 // read the AGENTS.md of Dirs. The CLI also keeps the skills and the

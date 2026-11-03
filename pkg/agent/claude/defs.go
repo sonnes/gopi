@@ -6,6 +6,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
@@ -19,17 +20,17 @@ const (
 )
 
 // writeDefs writes the skills and the agents of d for the CLI, and
-// returns the folder for --add-dir. It writes a copy of each agent file,
-// because the CLI does not load an agent file that is a symbolic link.
-// The tool names of a file become Claude Code names. It returns "" if
-// there is nothing to write.
-func writeDefs(ctx context.Context, d *clidefs.Defs) (string, error) {
+// returns the merged set and the folder for --add-dir. It writes a copy
+// of each agent file, because the CLI does not load an agent file that
+// is a symbolic link. The tool names of a file become Claude Code
+// names. The folder is "" if there is nothing to write.
+func writeDefs(ctx context.Context, d *clidefs.Defs) (def.Set, string, error) {
 	if d == nil {
-		return "", nil
+		return def.Set{}, "", nil
 	}
 	set, folder, err := d.Prepare(ctx)
 	if err != nil || folder == "" {
-		return "", err
+		return set, "", err
 	}
 
 	for i := range set.Skills {
@@ -53,11 +54,11 @@ func writeDefs(ctx context.Context, d *clidefs.Defs) (string, error) {
 	settings := filepath.Join(folder, settingsDir)
 	skills := filepath.Join(settings, skillsDir)
 	if err := storefs.WriteSkills(skills, set.Skills, set.Names); err != nil {
-		return "", err
+		return def.Set{}, "", err
 	}
 	agents := filepath.Join(settings, agentsDir)
 	if err := storefs.WriteAgents(agents, set.Agents); err != nil {
-		return "", err
+		return def.Set{}, "", err
 	}
-	return folder, nil
+	return set, folder, nil
 }

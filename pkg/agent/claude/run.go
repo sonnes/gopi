@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -222,6 +223,9 @@ func (r *runner) sendInput(ctx context.Context, entries []session.Entry) error {
 		}
 	}
 	input := emit.Input(entries)
+	if !r.command {
+		input = skillLast(input, r.proc.skills)
+	}
 	if r.reminder != "" {
 		input = append([]ai.Content{ai.Text{Text: r.reminder}}, input...)
 	}
@@ -240,6 +244,29 @@ var (
 	imageTypes = []string{"image/jpeg", "image/png", "image/gif", "image/webp"}
 	pdfType    = "application/pdf"
 )
+
+// skillLast returns input with its first text block last, and with the
+// name that the CLI knows, if that text calls a skill of skills, as
+// [def.Set.Slash] reads it. The CLI loads a skill only from "/" and the
+// name at the start of the last text block of a user line, so a call
+// with files after its text must move. Otherwise it returns input.
+func skillLast(input []ai.Content, skills def.Set) []ai.Content {
+	at := slices.IndexFunc(input, func(c ai.Content) bool {
+		_, ok := c.(ai.Text)
+		return ok
+	})
+	if at == -1 {
+		return input
+	}
+	text := input[at].(ai.Text)
+	name, rest, ok := skills.Slash(text.Text)
+	if !ok {
+		return input
+	}
+	text.Text = "/" + name + rest
+	out := slices.Concat(input[:at], input[at+1:])
+	return append(out, text)
+}
 
 // blocks returns the content blocks of a user line for the input. A
 // file that the CLI does not read becomes a text note.

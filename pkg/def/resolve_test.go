@@ -78,3 +78,41 @@ func TestSet_Find(t *testing.T) {
 	_, ok = set.Find("missing")
 	assert.False(t, ok)
 }
+
+func TestSet_Slash(t *testing.T) {
+	set, err := def.Resolve(t.Context(), []def.SkillsReader{fakeDir{
+		skills: []def.Skill{
+			{Name: "deploy", Qualifier: "ops"},
+			{Name: "deploy"},
+			{Name: "lw-tasks", NoModelCall: true},
+		},
+	}}, nil)
+	require.NoError(t, err)
+
+	tests := []struct {
+		text string
+		name string
+		rest string
+		ok   bool
+	}{
+		{text: "/lw-tasks File a task", name: "lw-tasks", rest: " File a task", ok: true},
+		{text: "/lw-tasks", name: "lw-tasks", ok: true},
+		{text: "/lw-tasks\nFile a task", name: "lw-tasks", rest: "\nFile a task", ok: true},
+		{text: "/deploy now", name: "deploy", rest: " now", ok: true},
+		{text: "/ops:deploy now", name: "ops:deploy", rest: " now", ok: true},
+		{text: "/missing now"},
+		{text: "/lw-tasks, now"},
+		{text: "lw-tasks now"},
+		{text: " /lw-tasks now"},
+		{text: "/"},
+		{text: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.text, func(t *testing.T) {
+			name, rest, ok := set.Slash(tt.text)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.name, name)
+			assert.Equal(t, tt.rest, rest)
+		})
+	}
+}

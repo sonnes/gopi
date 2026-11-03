@@ -15,6 +15,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -37,6 +38,8 @@ type process struct {
 	state func() agent.State
 	// hookErr is the error of a hook that stopped the CLI in this run.
 	hookErr error
+	// skills are the skills that the CLI of the process got.
+	skills def.Set
 }
 
 // launch starts cmd and its reader goroutine. approve answers the

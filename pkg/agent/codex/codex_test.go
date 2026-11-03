@@ -20,6 +20,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -1115,4 +1116,54 @@ func TestRecordedApproval(t *testing.T) {
 	emittest.CheckEvents(t, events)
 	checkLog(t, a)
 	assert.Contains(t, asked, "bash", "the policy asks before the command")
+}
+
+func TestUserInputsMentionASkill(t *testing.T) {
+	skills, err := def.Resolve(context.Background(), []def.SkillsReader{
+		def.Skill{Name: "deploy", Qualifier: "ops"},
+		def.Skill{Name: "lw-tasks"},
+	}, nil)
+	require.NoError(t, err)
+	image := ai.File{MediaType: "image/png", Data: []byte("png")}
+
+	tests := []struct {
+		name  string
+		input []ai.Content
+		want  []string
+	}{
+		{
+			name:  "a skill",
+			input: []ai.Content{ai.Text{Text: "/lw-tasks File a task"}},
+			want:  []string{"$lw-tasks File a task"},
+		},
+		{
+			name:  "a skill after an image",
+			input: []ai.Content{image, ai.Text{Text: "/lw-tasks"}},
+			want:  []string{"", "$lw-tasks"},
+		},
+		{
+			name:  "the name that Codex knows",
+			input: []ai.Content{ai.Text{Text: "/ops:deploy now"}},
+			want:  []string{"$deploy now"},
+		},
+		{
+			name:  "no skill",
+			input: []ai.Content{ai.Text{Text: "/missing now"}},
+			want:  []string{"/missing now"},
+		},
+		{
+			name:  "only the first text",
+			input: []ai.Content{ai.Text{Text: "Hi"}, image, ai.Text{Text: "/lw-tasks"}},
+			want:  []string{"Hi", "", "/lw-tasks"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []string
+			for _, in := range userInputs(tt.input, skills) {
+				got = append(got, in.Text)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

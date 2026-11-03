@@ -12,6 +12,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/def"
 )
 
 // inboxSize is the number of messages that the reader holds for the
@@ -72,6 +73,8 @@ type conn struct {
 
 	// hooks serves the hooks of the agent for the process, or is nil.
 	hooks *hookServer
+	// skills are the skills that the process got.
+	skills def.Set
 }
 
 // bindHooks gives the hooks of the process the context of a run, or

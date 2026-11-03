@@ -92,3 +92,80 @@ func TestSkillToolErrors(t *testing.T) {
 		})
 	}
 }
+
+// lastUser returns the texts of the last user message that p received.
+func lastUser(t *testing.T, p *script) []string {
+	t.Helper()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	require.NotEmpty(t, p.calls)
+	msgs := p.calls[len(p.calls)-1]
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role != ai.RoleUser {
+			continue
+		}
+		var out []string
+		for _, c := range msgs[i].Content {
+			if text, ok := c.(ai.Text); ok {
+				out = append(out, text.Text)
+			}
+		}
+		return out
+	}
+	t.Fatal("no user message")
+	return nil
+}
+
+func TestASlashCallLoadsTheSkillBeforeTheText(t *testing.T) {
+	userOnly := def.Skill{
+		Name:        "lw-tasks",
+		Description: "File a task.",
+		Body:        "File one task.",
+		NoModelCall: true,
+	}
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "a skill",
+			input: "/review the diff",
+			want:  []string{"## Skill: review\n\nRead the diff.", "/review the diff"},
+		},
+		{
+			name:  "the body of the skill tool",
+			input: "/deploy",
+			want:  []string{"## Skill: deploy\n\nRun scripts/run.sh.\n\nSupport files of this skill. To read one, call this tool with the file input:\n\n- scripts/run.sh", "/deploy"},
+		},
+		{
+			name:  "a skill that the model cannot call",
+			input: "/lw-tasks File a task for each decision",
+			want:  []string{"## Skill: lw-tasks\n\nFile one task.", "/lw-tasks File a task for each decision"},
+		},
+		{
+			name:  "no skill",
+			input: "/missing now",
+			want:  []string{"/missing now"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &script{responses: []ai.Message{reply("done")}}
+			h := harness.New(with(base(t, p), harness.Skillset(deploy, review, userOnly))...)
+			a, err := h.New(context.Background())
+			require.NoError(t, err)
+
+			run(t, a, tt.input)
+
+			assert.Equal(t, tt.want, lastUser(t, p))
+			var logged []string
+			for _, m := range a.Log().Messages() {
+				if m.Role == ai.RoleUser {
+					logged = append(logged, m.Text())
+				}
+			}
+			assert.Equal(t, []string{tt.input}, logged, "the log keeps the text of the user")
+		})
+	}
+}
