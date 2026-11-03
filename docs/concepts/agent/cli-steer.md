@@ -29,6 +29,7 @@ sequenceDiagram
 
 - A steer goes to the CLI at once, with the priority `now`. A tool that runs in the foreground ends first, and the steer takes effect before the next model call.
 - A result line that a steer causes does not end the run. The usage of the run is the sum of its result lines: one for each segment that a steer ended, and the last line.
+- The `modelUsage` of a result line sums each model over the life of the CLI, and a resumed CLI starts from the sums of its conversation. So the usage of each model of a run is the difference from the last result line before the run. The agent keeps those sums in the session, for the next CLI.
 - The agent starts the CLI with `--replay-user-messages`, so the CLI echoes the UUID of a steer when it takes it. The log stores the steer at the echo, which is the point where the model reads it.
 - A steer cancels a subagent that runs in the foreground, so the agent first moves each open subagent call to the background with a `background_tasks` request. The steer waits for the answers until `moveTimeout` ends.
 - If a run ends before the CLI takes a steer, the agent stops the CLI, so the CLI does not run the steer after the run. `TakeSteer` returns the steer, and the [host](../host/host.md) runs it next.

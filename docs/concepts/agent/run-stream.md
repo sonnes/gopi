@@ -38,6 +38,7 @@ flowchart TD
 - A failure that cuts an assistant message short sends its `message_end` with the part that arrived, without the tool calls that did not finish. Its stop reason is `error`, or `aborted` if the caller canceled. If the part has content, the log keeps it.
 - Each `tool_execution_end` comes as its call ends, so a consumer can show a call as done before the others. With calls in order, each call sends its start, its end, and its result before the next call starts.
 - `agent_end` carries the usage and no messages, because the state and the result of the stream have them.
+- `agent_end` also splits the usage by the model ID of each call, because one run can call more than one model, and each model has its own price. An agent that does not know the model of a call gives no split.
 - A tool call that runs a [subagent](subagent.md) adds the subagent events. A consumer that does not show subagents skips them.
 - A compaction adds `compaction_start` and `compaction` before a model call, as [Compaction](compaction.md) says. `Agent.Compact` sends them between `agent_start` and `agent_end`.
 
