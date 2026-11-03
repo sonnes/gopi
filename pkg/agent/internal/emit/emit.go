@@ -313,6 +313,27 @@ func (e *Emitter) ToolEnd(ctx context.Context, id string, result ai.ToolResult) 
 // It returns the messages that the run stored, without the input, and
 // err joined with any error of the store.
 func (e *Emitter) Finish(ctx context.Context, usage ai.Usage, err error) ([]ai.Message, error) {
+	return e.finish(ctx, usage, nil, err)
+}
+
+// FinishByModel is [Emitter.Finish] for a driver that knows the model
+// of its usage. The usage of agent_end is the sum of byModel.
+func (e *Emitter) FinishByModel(ctx context.Context, byModel map[string]ai.Usage, err error) ([]ai.Message, error) {
+	var usage ai.Usage
+	for model, u := range byModel {
+		if u == (ai.Usage{}) {
+			delete(byModel, model)
+			continue
+		}
+		usage = usage.Add(u)
+	}
+	if len(byModel) == 0 {
+		byModel = nil
+	}
+	return e.finish(ctx, usage, byModel, err)
+}
+
+func (e *Emitter) finish(ctx context.Context, usage ai.Usage, byModel map[string]ai.Usage, err error) ([]ai.Message, error) {
 	e.Drop()
 	for len(e.tools) > 0 {
 		tc := e.tools[0]
@@ -334,7 +355,7 @@ func (e *Emitter) Finish(ctx context.Context, usage ai.Usage, err error) ([]ai.M
 		e.endTurn()
 	}
 
-	end := agent.EventAgentEnd{Usage: usage}
+	end := agent.EventAgentEnd{Usage: usage, UsageByModel: byModel}
 	if err != nil {
 		end.Error = err.Error()
 	}

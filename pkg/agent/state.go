@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"slices"
 
 	"github.com/sonnes/gopi/internal/transcript"
@@ -59,6 +60,9 @@ type State struct {
 	// replaces the slice and never changes it in place.
 	pending []ai.ToolCall
 	usage   ai.Usage
+	// byModel is usage, split by the model ID of each call. Apply
+	// replaces the map and never changes it in place.
+	byModel map[string]ai.Usage
 	err     error
 
 	// queues are the queues of the agent. Every copy points to them. A
@@ -91,6 +95,7 @@ func (s *State) Apply(e Event) {
 		s.running = true
 		s.turn = 0
 		s.usage = ai.Usage{}
+		s.byModel = nil
 		s.err = nil
 		s.streaming = nil
 		s.pending = nil
@@ -103,6 +108,7 @@ func (s *State) Apply(e Event) {
 	case EventMessageEnd:
 		s.streaming = nil
 		s.usage = s.usage.Add(e.Message.Usage)
+		s.byModel = addUsage(s.byModel, e.Message.Model, e.Message.Usage)
 		empty := e.Message.Role == ai.RoleAssistant && len(e.Message.Content) == 0
 		if empty {
 			return
@@ -114,6 +120,7 @@ func (s *State) Apply(e Event) {
 		s.ids = append(s.ids, e.EntryID)
 	case EventCompaction:
 		s.usage = s.usage.Add(e.Compaction.Usage)
+		s.byModel = addUsage(s.byModel, e.Compaction.Model, e.Compaction.Usage)
 		if e.Error != "" || len(e.Compaction.Edits) == 0 {
 			return
 		}
@@ -138,6 +145,7 @@ func (s *State) Apply(e Event) {
 		s.pending = nil
 		s.dropEphemeral()
 		s.usage = e.Usage
+		s.byModel = e.UsageByModel
 		s.err = nil
 		if e.Error != "" {
 			s.err = errors.New(e.Error)
@@ -293,6 +301,24 @@ func (s State) Pending() []ai.ToolCall { return s.pending }
 // Usage returns the usage of the run, summed.
 func (s State) Usage() ai.Usage { return s.usage }
 
+// UsageByModel returns [State.Usage], split by the model ID of each
+// call. The caller can change the map.
+func (s State) UsageByModel() map[string]ai.Usage { return maps.Clone(s.byModel) }
+
+// addUsage returns a copy of m with u added to the usage of model. A
+// zero u, or a call with no model ID, leaves m as it is.
+func addUsage(m map[string]ai.Usage, model string, u ai.Usage) map[string]ai.Usage {
+	if model == "" || u == (ai.Usage{}) {
+		return m
+	}
+	out := maps.Clone(m)
+	if out == nil {
+		out = map[string]ai.Usage{}
+	}
+	out[model] = out[model].Add(u)
+	return out
+}
+
 // Err returns the error of the last run, or nil if it did not fail.
 func (s State) Err() error { return s.err }
 
@@ -310,22 +336,25 @@ type stateJSON struct {
 	Streaming   *ai.Message   `json:"streaming,omitempty"`
 	Pending     []ai.ToolCall `json:"pending,omitempty"`
 	Usage       ai.Usage      `json:"usage,omitzero"`
-	Error       string        `json:"error,omitempty"`
+	// UsageByModel is Usage, split by the model ID of each call.
+	UsageByModel map[string]ai.Usage `json:"usage_by_model,omitempty"`
+	Error        string              `json:"error,omitempty"`
 }
 
 // MarshalJSON encodes a snapshot of the state for a viewer.
 func (s State) MarshalJSON() ([]byte, error) {
 	w := stateJSON{
-		Messages:    s.messages,
-		IDs:         s.ids,
-		Ephemeral:   s.ephemeral,
-		Edits:       s.edits,
-		CompactedAt: s.compactedAt,
-		Running:     s.running,
-		Turn:        s.turn,
-		Streaming:   s.streaming,
-		Pending:     s.pending,
-		Usage:       s.usage,
+		Messages:     s.messages,
+		IDs:          s.ids,
+		Ephemeral:    s.ephemeral,
+		Edits:        s.edits,
+		CompactedAt:  s.compactedAt,
+		Running:      s.running,
+		Turn:         s.turn,
+		Streaming:    s.streaming,
+		Pending:      s.pending,
+		Usage:        s.usage,
+		UsageByModel: s.byModel,
 	}
 	if s.err != nil {
 		w.Error = s.err.Error()
@@ -350,6 +379,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 		streaming:   w.Streaming,
 		pending:     w.Pending,
 		usage:       w.Usage,
+		byModel:     w.UsageByModel,
 	}
 	// A snapshot with no IDs has no edits to apply, and each message
 	// still needs its place.

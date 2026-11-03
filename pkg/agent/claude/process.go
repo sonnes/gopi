@@ -40,6 +40,8 @@ type process struct {
 	hookErr error
 	// skills are the skills that the CLI of the process got.
 	skills def.Set
+	// models is the modelUsage of the last result line of the run before.
+	models map[string]wireModelUsage
 }
 
 // launch starts cmd and its reader goroutine. approve answers the

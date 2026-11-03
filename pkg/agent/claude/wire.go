@@ -51,6 +51,9 @@ type line struct {
 	Result  string    `json:"result"`
 	Errors  []string  `json:"errors"`
 	Usage   wireUsage `json:"usage"`
+	// ModelUsage is the usage of each model over the life of the
+	// process.
+	ModelUsage map[string]wireModelUsage `json:"modelUsage"`
 	// TerminalReason says why the segment ended, such as "completed" or
 	// "aborted_tools".
 	TerminalReason string `json:"terminal_reason"`

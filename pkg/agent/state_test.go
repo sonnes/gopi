@@ -215,3 +215,31 @@ func TestStateClipKeepsTheOriginal(t *testing.T) {
 	assert.Equal(t, []string{"one", "two", "three", "copy"}, msgTexts(c.Messages()))
 	assert.Equal(t, []string{"one", "two", "three", "original"}, msgTexts(st.Messages()))
 }
+
+func TestStateSplitsUsageByModel(t *testing.T) {
+	var st agent.State
+	msg := func(model string, in int) ai.Message {
+		m := ai.AssistantMessage(ai.Text{Text: "x"})
+		m.Model = model
+		m.Usage = ai.Usage{Input: in, Output: 1}
+		return m
+	}
+	st.Apply(agent.EventAgentStart{})
+	st.Apply(agent.EventMessageEnd{Message: msg("a", 10)})
+	st.Apply(agent.EventMessageEnd{Message: msg("b", 20)})
+	copied := st
+	st.Apply(agent.EventMessageEnd{Message: msg("a", 5)})
+	st.Apply(agent.EventCompaction{Compaction: session.Compaction{Model: "a", Usage: ai.Usage{Input: 7}}})
+
+	assert.Equal(t, map[string]ai.Usage{
+		"a": {Input: 22, Output: 2},
+		"b": {Input: 20, Output: 1},
+	}, st.UsageByModel())
+	assert.Equal(t, map[string]ai.Usage{
+		"a": {Input: 10, Output: 1},
+		"b": {Input: 20, Output: 1},
+	}, copied.UsageByModel(), "a copy keeps its own split")
+
+	st.Apply(agent.EventAgentStart{})
+	assert.Nil(t, st.UsageByModel(), "a new run starts from zero")
+}

@@ -95,7 +95,8 @@ func (a *Agent) Compact(ctx context.Context, instructions string) *Stream {
 // tool calls leaves calls with no result, so their results go first.
 func (a *Agent) compactNow(ctx context.Context, instructions string, em *emitter) (err error) {
 	defer func() {
-		end := EventAgentEnd{Usage: a.State().Usage()}
+		st := a.State()
+		end := EventAgentEnd{Usage: st.Usage(), UsageByModel: st.UsageByModel()}
 		if err != nil {
 			end.Error = err.Error()
 		}
@@ -195,6 +196,7 @@ func (a *Agent) compact(
 	})
 	data := session.Compaction{
 		Strategy: res.Strategy,
+		Model:    a.lm.Model.ID,
 		Usage:    res.Usage,
 	}
 	if ctx.Err() != nil {

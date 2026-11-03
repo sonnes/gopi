@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -68,6 +69,9 @@ type Session struct {
 	Error string `json:"error,omitempty"`
 	// Usage is the usage of every model call of the last run, summed.
 	Usage ai.Usage `json:"usage,omitzero"`
+	// UsageByModel is Usage, split by the model ID of each call. It is
+	// nil if the agent does not know the model of its calls.
+	UsageByModel map[string]ai.Usage `json:"usage_by_model,omitempty"`
 	// Model is the model spec of the session.
 	Model string `json:"model,omitempty"`
 	// Effort is the thinking level of the config, or empty.
@@ -83,6 +87,7 @@ type Session struct {
 // clone returns a copy of i that shares no slice with i.
 func (i Session) clone() Session {
 	i.Waiting = slices.Clone(i.Waiting)
+	i.UsageByModel = maps.Clone(i.UsageByModel)
 	if i.Parent != nil {
 		p := *i.Parent
 		i.Parent = &p

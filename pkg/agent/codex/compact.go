@@ -32,6 +32,6 @@ func (a *Agent) Compact(ctx context.Context, _ string) *agent.Stream {
 		_ = c.hookErr()
 		c.bindHooks(ctx)
 		usage, err := t.compact(ctx)
-		return e.Finish(ctx, usage, a.endTurns(ctx, c, t, err))
+		return e.FinishByModel(ctx, map[string]ai.Usage{t.model: usage}, a.endTurns(ctx, c, t, err))
 	})
 }

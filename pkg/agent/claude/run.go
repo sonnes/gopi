@@ -63,6 +63,9 @@ type runner struct {
 	pending  []pendingSteer
 	steered  bool
 	segments ai.Usage
+	// byModel is the usage of each model of the run, from its result
+	// line. It is nil before the result line.
+	byModel map[string]ai.Usage
 
 	// input is the input of a run that waits for the end of the turn
 	// that the CLI started by itself.
@@ -327,6 +330,16 @@ func (r *runner) fail(ctx context.Context, err error) ([]ai.Message, error) {
 // messages that the run stored are still its result.
 func (r *runner) abort(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
 	err = errors.Join(err, r.subs.release(ctx, true))
+	return r.end(ctx, u, err)
+}
+
+// end sends agent_end with the usage of each model, if the result line
+// gave it. The modelUsage of the CLI also counts the calls that the CLI
+// makes by itself and the calls of its subagents.
+func (r *runner) end(ctx context.Context, u ai.Usage, err error) ([]ai.Message, error) {
+	if len(r.byModel) > 0 {
+		return r.em.FinishByModel(ctx, r.byModel, err)
+	}
 	return r.em.Finish(ctx, u, err)
 }
 
@@ -775,6 +788,12 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if err := r.saveSession(ctx, l.SessionID); err != nil {
 		return r.abort(ctx, u, err)
 	}
+	if l.ModelUsage != nil {
+		r.byModel = r.proc.runUsage(l.ModelUsage)
+		if err := saveBase(ctx, r.a.log, l.SessionID, l.ModelUsage); err != nil {
+			return r.abort(ctx, u, err)
+		}
+	}
 	if err := r.finish(ctx); err != nil {
 		return r.abort(ctx, u, err)
 	}
@@ -792,7 +811,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if failed {
 		return r.abort(ctx, u, resultError(l))
 	}
-	return r.em.Finish(ctx, u, nil)
+	return r.end(ctx, u, nil)
 }
 
 // loginText is in the result of a CLI that is not logged in.

@@ -51,7 +51,8 @@ func (a *Agent) run(
 	em *emitter,
 ) (produced []ai.Message, err error) {
 	defer func() {
-		end := EventAgentEnd{Usage: a.State().Usage()}
+		st := a.State()
+		end := EventAgentEnd{Usage: st.Usage(), UsageByModel: st.UsageByModel()}
 		if err != nil {
 			end.Error = err.Error()
 		}

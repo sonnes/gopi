@@ -409,6 +409,10 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		return nil, err
 	}
 	proc.skills = skills
+	if proc.models, err = a.usageBase(); err != nil {
+		proc.terminate()
+		return nil, err
+	}
 	if _, err := proc.initialize(ctx); err != nil {
 		proc.terminate()
 		switch {
@@ -521,6 +525,16 @@ func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, skill
 		args = append(args, "--session-id="+fresh)
 	}
 	return cliCommand(a.cfg, args), fresh, skills, nil
+}
+
+// usageBase returns the modelUsage that a CLI that resumes the stored
+// conversation starts from.
+func (a *Agent) usageBase() (map[string]wireModelUsage, error) {
+	id, err := conversation.Get(a.log)
+	if err != nil {
+		return nil, err
+	}
+	return loadBase(a.log, id)
 }
 
 // cliSpace is the UUID namespace of the session IDs that the agent

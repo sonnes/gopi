@@ -253,7 +253,8 @@ func (s *subagents) end(ctx context.Context, c *child, p params) error {
 // owner. The text of the end is the last text of c, or the error of a
 // child that failed.
 func (s *subagents) finish(ctx context.Context, c *child, status string, err error) {
-	msgs, _ := c.turn.emitter.Finish(ctx, c.turn.usage, err)
+	byModel := map[string]ai.Usage{c.turn.model: c.turn.usage}
+	msgs, _ := c.turn.emitter.FinishByModel(ctx, byModel, err)
 	c.running = false
 	c.status = status
 	c.text = agent.LastText(msgs)

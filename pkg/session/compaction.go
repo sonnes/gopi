@@ -49,6 +49,9 @@ type Compaction struct {
 	// Summary is the summary text of a CLI that gives it. A CLI keeps its
 	// own session, so a compaction of a CLI has no edits.
 	Summary string `json:"summary,omitempty"`
+	// Model is the model ID of the calls of the strategy, or empty if
+	// the strategy made no call.
+	Model string `json:"model,omitempty"`
 	// Usage is the usage of the model calls of the strategy.
 	Usage ai.Usage `json:"usage,omitzero"`
 }

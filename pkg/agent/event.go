@@ -43,6 +43,10 @@ type EventAgentStart struct{}
 type EventAgentEnd struct {
 	// Usage is the usage of every model call of the run, summed.
 	Usage ai.Usage
+	// UsageByModel is Usage, split by the model ID of each call. Its
+	// values sum to Usage. It is nil if the agent does not know the
+	// model of its calls.
+	UsageByModel map[string]ai.Usage
 	// Error is the error of a run that failed. It is a string, so that
 	// the event round-trips through JSON.
 	Error string
@@ -198,8 +202,9 @@ type eventJSON struct {
 	Turn int `json:"turn,omitempty"`
 
 	// agent_end
-	Usage ai.Usage `json:"usage,omitzero"`
-	Error string   `json:"error,omitempty"`
+	Usage        ai.Usage            `json:"usage,omitzero"`
+	UsageByModel map[string]ai.Usage `json:"usage_by_model,omitempty"`
+	Error        string              `json:"error,omitempty"`
 
 	// turn_end
 	ToolResults []ai.Message `json:"tool_results,omitempty"`
@@ -239,9 +244,10 @@ func marshalEvent(e Event) ([]byte, error) {
 		w = eventJSON{Type: typeAgentStart}
 	case EventAgentEnd:
 		w = eventJSON{
-			Type:  typeAgentEnd,
-			Usage: v.Usage,
-			Error: v.Error,
+			Type:         typeAgentEnd,
+			Usage:        v.Usage,
+			UsageByModel: v.UsageByModel,
+			Error:        v.Error,
 		}
 	case EventTurnStart:
 		w = eventJSON{Type: typeTurnStart, Turn: v.Turn}
@@ -335,7 +341,7 @@ func UnmarshalEvent(data []byte) (Event, error) {
 	case typeAgentStart:
 		return EventAgentStart{}, nil
 	case typeAgentEnd:
-		return EventAgentEnd{Usage: w.Usage, Error: w.Error}, nil
+		return EventAgentEnd{Usage: w.Usage, UsageByModel: w.UsageByModel, Error: w.Error}, nil
 	case typeTurnStart:
 		return EventTurnStart{Turn: w.Turn}, nil
 	case typeTurnEnd:

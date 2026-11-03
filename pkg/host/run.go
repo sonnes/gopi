@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -162,17 +161,17 @@ func (s *hosted) beginRunLocked(start func(context.Context, agent.Runner) *agent
 func (s *hosted) execute(ctx context.Context, start func(context.Context, agent.Runner) *agent.Stream) {
 	runner, err := s.freshRunner(ctx)
 	if err != nil {
-		s.finish(ctx, ai.Usage{}, err)
+		s.finish(ctx, agent.EventAgentEnd{}, err)
 		return
 	}
 	stream := start(ctx, runner)
-	var usage ai.Usage
+	var end agent.EventAgentEnd
 	for ev, err := range stream.Events() {
 		if err != nil {
 			break
 		}
-		if end, ok := ev.(agent.EventAgentEnd); ok {
-			usage = end.Usage
+		if e, ok := ev.(agent.EventAgentEnd); ok {
+			end = e
 		}
 		// The child exists before a reader of the parent sees its start.
 		s.host.relay(s.id, ev)
@@ -188,7 +187,7 @@ func (s *hosted) execute(ctx context.Context, start func(context.Context, agent.
 		reason = StopRestarted
 	}
 	s.host.endChildren(s.id, reason, closed)
-	s.finish(ctx, usage, err)
+	s.finish(ctx, end, err)
 }
 
 // stream starts the run of m on runner. With no m, it continues the
@@ -203,7 +202,7 @@ func (s *hosted) stream(ctx context.Context, runner agent.Runner, m Message) *ag
 
 // finish ends the active run, and starts the run of the next held
 // message.
-func (s *hosted) finish(ctx context.Context, usage ai.Usage, err error) {
+func (s *hosted) finish(ctx context.Context, end agent.EventAgentEnd, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// A session that ends its last run waits for its idle time.
@@ -221,7 +220,8 @@ func (s *hosted) finish(ctx context.Context, usage ai.Usage, err error) {
 	s.calls = nil
 	s.sess.StopReason = reason
 	s.sess.Error = msg
-	s.sess.Usage = usage
+	s.sess.Usage = end.Usage
+	s.sess.UsageByModel = end.UsageByModel
 	s.updateLocked()
 	if s.closing {
 		return

@@ -420,7 +420,7 @@ func (a *Agent) run(
 		_ = t.subs.interrupt()
 		t.dead = true
 	}
-	return e.Finish(ctx, usage, a.endTurns(ctx, c, t, err))
+	return e.FinishByModel(ctx, map[string]ai.Usage{t.model: usage}, a.endTurns(ctx, c, t, err))
 }
 
 // newTurn returns the turn of a run on the thread.
