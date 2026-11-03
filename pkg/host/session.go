@@ -143,6 +143,32 @@ func (s *hosted) log(ctx context.Context) (session.Writer, error) {
 func (s *hosted) startAgent(ctx context.Context) error {
 	s.startMu.Lock()
 	defer s.startMu.Unlock()
+	return s.startAgentLocked(ctx)
+}
+
+// afterStart runs in [hosted.lockStarted] right after the start of the
+// agent. A test sets it to run a release in that place.
+var afterStart = func() {}
+
+// lockStarted starts the agent of the session, if no agent runs, and
+// returns with mu held. It takes mu before it lets go of startMu, so a
+// release cannot take the agent before the caller starts its run. The
+// caller unlocks mu. If the start fails, lockStarted returns the error
+// with no lock held.
+func (s *hosted) lockStarted(ctx context.Context) error {
+	s.startMu.Lock()
+	defer s.startMu.Unlock()
+	if err := s.startAgentLocked(ctx); err != nil {
+		return err
+	}
+	afterStart()
+	s.mu.Lock()
+	return nil
+}
+
+// startAgentLocked is [hosted.startAgent] for a caller that holds
+// startMu.
+func (s *hosted) startAgentLocked(ctx context.Context) error {
 	if s.closing {
 		return fmt.Errorf("host: session %s: %w", s.id, ErrClosed)
 	}
@@ -362,7 +388,8 @@ func (s *hosted) idleRelease() {
 
 // freshRunner returns the agent for a run. If [Host.Update] changed the
 // config after the agent started, freshRunner stops the agent and starts
-// it again from the new config. The driver resumes the log. While the
+// it again from the new config. If the session has no agent, freshRunner
+// starts one. The driver resumes the log. While the
 // agent starts, runner is nil, so a message to the session waits.
 func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	s.startMu.Lock()
@@ -373,7 +400,7 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 
 	s.mu.Lock()
 	old := s.runner
-	if !s.stale {
+	if !s.stale && old != nil {
 		s.mu.Unlock()
 		return old, nil
 	}
@@ -381,8 +408,12 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	s.stale = false
 	s.mu.Unlock()
 
-	if err := closeRunner(old); err != nil {
-		return nil, fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
+	// A session with no agent, such as one that a release stopped,
+	// starts it here.
+	if old != nil {
+		if err := closeRunner(old); err != nil {
+			return nil, fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
+		}
 	}
 	runner, state, err := s.newRunner(ctx)
 	if err != nil {

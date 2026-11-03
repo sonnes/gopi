@@ -85,3 +85,47 @@ func TestIdleTimeoutKeepsTheAgentOfARun(t *testing.T) {
 	close(gate)
 	runEnd(t, events)
 }
+
+func TestReleaseDuringTheStartOfASend(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	released := make(chan error, 1)
+	restore := host.SetAfterStart(func() {
+		go func() { released <- f.h.Release(context.Background(), "s1") }()
+		// A release that can run here finishes in this time.
+		time.Sleep(50 * time.Millisecond)
+	})
+	t.Cleanup(restore)
+
+	f.send(t, "s1", "a")
+
+	sess := runEnd(t, events)
+	assert.Equal(t, host.StopEndTurn, sess.StopReason, "the run has an agent")
+	err := <-released
+	if err != nil {
+		assert.ErrorIs(t, err, host.ErrBusy, "the release waits for the run")
+	}
+}
+
+func TestReleaseDuringTheStartOfACompact(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	runEnd(t, events)
+	released := make(chan error, 1)
+	restore := host.SetAfterStart(func() {
+		go func() { released <- f.h.Release(context.Background(), "s1") }()
+		time.Sleep(50 * time.Millisecond)
+	})
+	t.Cleanup(restore)
+
+	require.NoError(t, f.h.Compact(context.Background(), "s1", ""))
+
+	runEnd(t, events)
+	err := <-released
+	if err != nil {
+		assert.ErrorIs(t, err, host.ErrBusy, "the release waits for the compaction")
+	}
+}

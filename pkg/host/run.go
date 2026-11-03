@@ -52,11 +52,9 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 	if err := s.writable(); err != nil {
 		return err
 	}
-	if err := s.startAgent(ctx); err != nil {
+	if err := s.lockStarted(ctx); err != nil {
 		return err
 	}
-
-	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
 		return fmt.Errorf("host: session %s: %w", s.id, ErrClosed)
@@ -89,11 +87,9 @@ func (h *Host) Compact(ctx context.Context, id, instructions string) error {
 	if err := s.writable(); err != nil {
 		return err
 	}
-	if err := s.startAgent(ctx); err != nil {
+	if err := s.lockStarted(ctx); err != nil {
 		return err
 	}
-
-	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closing {
 		return fmt.Errorf("host: session %s: %w", s.id, ErrClosed)
