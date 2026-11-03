@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/session"
@@ -61,6 +62,9 @@ type hosted struct {
 	// wakePending is true when the agent woke during a run, so a run of
 	// the turn of the agent follows the run.
 	wakePending bool
+	// idleTimer stops the agent after the [IdleTimeout] of the host. It
+	// runs only while the session is idle and has an agent.
+	idleTimer *time.Timer
 }
 
 func newHosted(h *Host, sess Session) *hosted {
@@ -157,6 +161,7 @@ func (s *hosted) startAgent(ctx context.Context) error {
 	}
 	s.runner = runner
 	s.agents.reset(state)
+	s.armIdleLocked()
 	return nil
 }
 
@@ -242,6 +247,7 @@ func (s *hosted) stop() error {
 	s.mu.Lock()
 	s.closing = true
 	s.queue = nil
+	s.stopIdleLocked()
 	if s.cancelRun != nil {
 		s.cancelRun(ErrClosed)
 	}
@@ -263,6 +269,95 @@ func (s *hosted) stop() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return errors.Join(err, s.writeErr)
+}
+
+// Release stops the agent of the idle session id, so the agent of a CLI
+// frees its process. The session and its log stay. The next message
+// starts the agent again from the config of the session, and the driver
+// resumes the log. A session with no agent has nothing to release.
+//
+// If the session runs, holds a message, or runs a child in the
+// background, Release returns [ErrBusy], and the agent stays. If the host
+// does not know the session, Release returns [ErrNotFound]. A child has
+// no agent of its own, so Release returns [ErrChild].
+func (h *Host) Release(_ context.Context, id string) error {
+	s, err := h.session(id)
+	if err != nil {
+		return err
+	}
+	if err := s.writable(); err != nil {
+		return err
+	}
+	return s.release()
+}
+
+// release stops the agent of s if s is idle. It holds startMu to the end
+// of the stop, so a message waits, and then starts a new agent.
+func (s *hosted) release() error {
+	s.startMu.Lock()
+	defer s.startMu.Unlock()
+	// The host lock comes before the lock of s, so the check of the
+	// children comes first.
+	children := s.host.RunsChildren(s.id)
+
+	s.mu.Lock()
+	busy := s.run != nil ||
+		len(s.queue) > 0 ||
+		s.wakePending ||
+		children
+	switch {
+	case s.closing || s.runner == nil:
+		s.mu.Unlock()
+		return nil
+	case busy:
+		s.mu.Unlock()
+		return fmt.Errorf("host: session %s: %w", s.id, ErrBusy)
+	}
+	runner := s.runner
+	s.runner = nil
+	s.stale = false
+	s.stopIdleLocked()
+	s.mu.Unlock()
+
+	if err := closeRunner(runner); err != nil {
+		return fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
+	}
+	return nil
+}
+
+// armIdleLocked starts the idle timer of s again, if the host has an
+// [IdleTimeout]. The caller holds mu.
+func (s *hosted) armIdleLocked() {
+	d := s.host.idleTimeout
+	if d <= 0 || s.closing {
+		return
+	}
+	s.stopIdleLocked()
+	s.idleTimer = time.AfterFunc(d, s.idleRelease)
+}
+
+// stopIdleLocked stops the idle timer of s. The caller holds mu.
+func (s *hosted) stopIdleLocked() {
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+}
+
+// idleRelease stops the agent of s at the end of its idle time. A
+// session that is busy with no run, such as one with a child in the
+// background, waits one more idle time. A run starts the timer again at
+// its end.
+func (s *hosted) idleRelease() {
+	err := s.release()
+	if !errors.Is(err, ErrBusy) {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.run == nil {
+		s.armIdleLocked()
+	}
 }
 
 // freshRunner returns the agent for a run. If [Host.Update] changed the

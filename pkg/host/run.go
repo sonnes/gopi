@@ -154,6 +154,7 @@ func (s *hosted) beginRunLocked(start func(context.Context, agent.Runner) *agent
 	ctx, cancel := context.WithCancelCause(context.Background())
 	s.run = ctx
 	s.cancelRun = cancel
+	s.stopIdleLocked()
 	s.sess.StopReason = ""
 	s.sess.Error = ""
 	s.updateLocked()
@@ -209,6 +210,12 @@ func (s *hosted) stream(ctx context.Context, runner agent.Runner, m Message) *ag
 func (s *hosted) finish(ctx context.Context, usage ai.Usage, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// A session that ends its last run waits for its idle time.
+	defer func() {
+		if s.run == nil {
+			s.armIdleLocked()
+		}
+	}()
 	reason, msg := stopOf(context.Cause(ctx), err)
 	s.cancelRun(nil)
 	s.run = nil

@@ -120,9 +120,13 @@ type fakeDriver struct {
 	// config, as the Claude Code agent has. The runner of the last start is in wake.
 	wakes bool
 	wake  *wakeRunner
+	// counts gives each runner a Close that counts in closed, as the
+	// agent of a CLI stops its process.
+	counts bool
 
 	mu      sync.Mutex
 	configs []agent.Config
+	closed  int
 }
 
 func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
@@ -172,7 +176,30 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 	if d.plain {
 		return plainRunner{Runner: r}, nil
 	}
+	if d.counts {
+		return &countRunner{Runner: r, d: d}, nil
+	}
 	return r, nil
+}
+
+// countRunner counts each Close in the closed field of its driver.
+type countRunner struct {
+	agent.Runner
+	d *fakeDriver
+}
+
+func (r *countRunner) Close() error {
+	r.d.mu.Lock()
+	defer r.d.mu.Unlock()
+	r.d.closed++
+	return nil
+}
+
+// closes returns the number of closes of the runners of the driver.
+func (d *fakeDriver) closes() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.closed
 }
 
 // wakeRunner is a runner that wakes, as the Claude Code agent does. Its

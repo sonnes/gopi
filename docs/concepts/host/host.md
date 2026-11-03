@@ -33,6 +33,7 @@ flowchart LR
 - `Create` keeps the session config, and each start of the agent reads it, so a session keeps its agent, its model, and its folder after a restart. The cost: an edit of an agent file, other than its prompt, reaches only a new session.
 - The session config holds no prompt. Before each run, the host reads the prompt of the agent file, and the driver sends only the [sections](../agent/section.md) that changed. A prompt depends on a state that changes during a session, so a stored copy goes stale.
 - `Open` makes each session that ran or waited idle, with the stop reason `restarted`, because no agent outlives a restart.
+- `Release` stops the agent of an idle session, and `IdleTimeout` does it after an idle time. The agent of a CLI then frees its process, and the next message starts the agent again from the session config. An agent that ran to `Close` lost, because each idle session then kept a CLI process alive. A session that runs a child in the background keeps its agent.
 - A message to a running session steers it, if the agent is a steerer. Otherwise the host holds the message for the end of the run, so a message is never lost.
 - A call waits for its confirmation on a channel of its own, so calls wait at the same time and end in any order.
 - Each event of `Events` has the whole session, so a reader needs no history.

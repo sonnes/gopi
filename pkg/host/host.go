@@ -9,6 +9,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -64,6 +65,8 @@ type Host struct {
 	toolList bool
 	// newID makes the ID of a session that the caller gives no ID.
 	newID func() string
+	// idleTimeout is the time of [IdleTimeout], or 0.
+	idleTimeout time.Duration
 	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
@@ -142,6 +145,15 @@ func Sections(fn SectionsFunc) Option {
 // ID with no path. Without IDs, the host makes a UUIDv4.
 func IDs(fn func() string) Option {
 	return func(h *Host) { h.newID = fn }
+}
+
+// IdleTimeout stops the agent of a session that stays idle for d, as
+// [Host.Release] does, so the agent of a CLI frees its process. The next
+// message starts the agent again, and the driver resumes the log. A
+// session that runs a child in the background keeps its agent. Without
+// IdleTimeout, an agent runs until [Host.Close].
+func IdleTimeout(d time.Duration) Option {
+	return func(h *Host) { h.idleTimeout = d }
 }
 
 // Open returns a host that resolves the model spec of each session with
