@@ -264,6 +264,19 @@ func TestDriverStartErrorOfTheSkillRoots(t *testing.T) {
 	}
 }
 
+func TestDriverGivesTheAddDirsAsWritableRoots(t *testing.T) {
+	a := startAgent(t, Driver(), agent.Config{
+		Spec:    "codex/gpt-5",
+		AddDirs: []string{"/lw/repos"},
+	})
+
+	p := a.threadParams("", nil, "", nil)
+
+	assert.Equal(t, map[string]any{
+		"writable_roots": []string{"/lw/repos"},
+	}, p.Config["sandbox_workspace_write"])
+}
+
 func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 	root := defsRoot(t)
 	a := startAgent(t, Driver(), agent.Config{

@@ -35,6 +35,7 @@ type Harness struct {
 	spec         string
 	store        session.Storer
 	dir          string
+	addDirs      []string
 	instructions []def.InstructionsReader
 	skills       []def.SkillsReader
 	agents       []def.AgentsReader

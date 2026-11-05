@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -203,11 +204,17 @@ const workspaceCache = "gopi-cache"
 //   - It has no network.
 //   - It gets only a short list of environment variables.
 //
+// Each directory in more is a root too: the command can write to it and
+// read it, with the same rules for git as root. For example, more can
+// hold a directory of git clones, so the command can add a worktree of
+// a clone in root.
+//
 // To change the policy, add options after it:
 //
 //	fence.New(append(fence.Workspace(root), fence.Network(true))...)
-func Workspace(root string) []Option {
-	write := []string{root, os.TempDir()}
+func Workspace(root string, more ...string) []Option {
+	roots := append([]string{root}, more...)
+	write := append(slices.Clone(roots), os.TempDir())
 	cache := filepath.Join(os.TempDir(), workspaceCache)
 
 	var hide []string
@@ -216,23 +223,26 @@ func Workspace(root string) []Option {
 		for _, p := range workspaceHide {
 			hide = append(hide, filepath.Join(home, p))
 		}
-		keep := []string{root}
+		keep := slices.Clone(roots)
 		for _, p := range workspaceKeep {
 			keep = append(keep, filepath.Join(home, p))
 		}
 		opts = append(opts, HideExcept(home, keep...))
 	}
 
-	git := filepath.Join(root, ".git")
-	readOnly := []string{filepath.Join(git, "modules")}
-	if info, err := os.Stat(git); err != nil || !info.IsDir() {
-		readOnly = append(readOnly, git)
+	var readOnly []string
+	for _, r := range roots {
+		git := filepath.Join(r, ".git")
+		readOnly = append(readOnly, filepath.Join(git, "modules"))
+		if info, err := os.Stat(git); err != nil || !info.IsDir() {
+			readOnly = append(readOnly, git)
+		}
+		opts = append(opts, ReadOnlyNames(r, workspaceNames...))
 	}
 
 	return append(opts,
 		Write(write...),
 		ReadOnly(readOnly...),
-		ReadOnlyNames(root, workspaceNames...),
 		Hide(hide...),
 		Network(false),
 		Env(workspaceEnv...),

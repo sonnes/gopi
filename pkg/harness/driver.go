@@ -49,6 +49,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
 	}
+	if len(c.AddDirs) > 0 {
+		opts = append(opts, AddDirs(c.AddDirs...))
+	}
 	if len(c.Skillset) > 0 {
 		opts = append(opts, Skillset(c.Skillset...))
 	}

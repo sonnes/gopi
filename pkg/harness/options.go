@@ -47,6 +47,12 @@ func Dir(path string) Option {
 	return func(h *Harness) { h.dir = path }
 }
 
+// AddDirs gives the default sandbox more folders that the agent can
+// read and write, as it does [Dir]. A sandbox of [Sandbox] ignores them.
+func AddDirs(paths ...string) Option {
+	return func(h *Harness) { h.addDirs = append(h.addDirs, paths...) }
+}
+
 // Defs adds readers of instructions, skills, and subagents, such as a
 // folder of package github.com/sonnes/gopi/pkg/store/fs. It adds each reader to the lists of
 // [Instructions], [Skillset], and [Agents]. Without Defs and these

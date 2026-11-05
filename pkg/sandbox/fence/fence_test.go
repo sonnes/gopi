@@ -70,6 +70,17 @@ func TestWorkspaceWithAGitDirectory(t *testing.T) {
 	assert.Equal(t, []string{filepath.Join(root, ".git", "modules")}, c.readOnly)
 }
 
+func TestWorkspaceWithMoreRoots(t *testing.T) {
+	c := newConfig(Workspace("/work/app", "/lw/repos")...)
+
+	assert.Equal(t, []string{"/work/app", "/lw/repos", os.TempDir()}, c.write)
+	require.Len(t, c.names, 2)
+	assert.Equal(t, "/lw/repos", c.names[1].root)
+	assert.Contains(t, c.names[1].names, ".git/hooks")
+	require.Len(t, c.hideExcept, 1)
+	assert.Contains(t, c.hideExcept[0].keep, "/lw/repos")
+}
+
 func TestWorkspaceThenAnOption(t *testing.T) {
 	opts := append(Workspace("/work/app"), Network(true))
 

@@ -289,6 +289,27 @@ func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
 	assert.NotContains(t, starts.Cmds()[0].Args, "--add-dir")
 }
 
+func TestDriverGivesEachAddDirToTheCLI(t *testing.T) {
+	starts := claude.Replay(t, nil, "testdata/text.trace")
+
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
+		SessionID: "s1",
+		Store:     session.NewMemoryStore(),
+		AddDirs:   []string{"/lw/repos", "/lw/shared"},
+	})
+	require.NoError(t, err)
+	a, ok := r.(*claude.Agent)
+	require.True(t, ok)
+	defer closeAgent(t, a)
+
+	_, _, err = run(context.Background(), a, "Say hello")
+	require.NoError(t, err)
+
+	args := strings.Join(starts.Cmds()[0].Args, " ")
+	assert.Contains(t, args, "--add-dir /lw/repos")
+	assert.Contains(t, args, "--add-dir /lw/shared")
+}
+
 func TestDriverRejects(t *testing.T) {
 	tests := []struct {
 		name string

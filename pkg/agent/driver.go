@@ -41,6 +41,10 @@ type Config struct {
 	Model ai.Model
 	// Dir is the working directory of the agent.
 	Dir string
+	// AddDirs are directories outside Dir that the agent can read and
+	// write, as it does Dir. The mode still decides which calls ask
+	// first. A driver of a CLI gives them to the sandbox of the CLI.
+	AddDirs []string
 	// Sections returns the sections that the agent adds to its own
 	// prompt, in order. A native agent calls it before each model call,
 	// and an agent CLI calls it before each run. A change of the

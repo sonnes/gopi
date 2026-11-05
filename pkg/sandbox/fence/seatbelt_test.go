@@ -310,6 +310,34 @@ func TestWorkspaceRunsGit(t *testing.T) {
 	assert.Equal(t, "first\n", out)
 }
 
+func TestWorkspaceAddsAWorktreeOfAnotherRoot(t *testing.T) {
+	needSeatbelt(t)
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	ws := t.TempDir()
+	repo := filepath.Join(t.TempDir(), "app")
+	require.NoError(t, exec.Command("git", "init", "-q", repo).Run())
+	commit := exec.Command(
+		"git",
+		"-C", repo,
+		"-c", "user.name=a",
+		"-c", "user.email=a@b",
+		"-c", "commit.gpgsign=false",
+		"commit", "-q", "--allow-empty", "-m", "first",
+	)
+	require.NoError(t, commit.Run())
+	f, err := New(Workspace(ws, repo)...)
+	require.NoError(t, err)
+
+	out, err := run(t, f, ws, "git -C "+repo+" worktree add -q \"$PWD/app\" -b work && git -C app log --format=%s")
+
+	require.NoError(t, err, out)
+	assert.Equal(t, "first\n", out)
+	out, err = run(t, f, ws, "echo x > "+filepath.Join(repo, ".git", "hooks", "pre-commit"))
+	require.Error(t, err, out, "the hooks of the other root stay read-only")
+}
+
 func TestWorkspaceProtectsGit(t *testing.T) {
 	needSeatbelt(t)
 

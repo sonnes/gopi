@@ -129,6 +129,7 @@ type config struct {
 	name        string
 	binary      string
 	dir         string
+	addDirs     []string
 	model       string
 	sections    agent.SystemFunc
 	autoCompact int
@@ -170,6 +171,14 @@ func Binary(path string) Option {
 // Without it, the process uses the working directory of the caller.
 func Dir(path string) Option {
 	return func(c *config) { c.dir = path }
+}
+
+// AddDirs makes each directory a writable root of the sandbox of the
+// thread, as [Dir] is. Only [SandboxWorkspaceWrite] reads them: the
+// read-only sandbox stays read-only, and the full access sandbox has
+// no limits.
+func AddDirs(dirs ...string) Option {
+	return func(c *config) { c.addDirs = append(c.addDirs, dirs...) }
 }
 
 // Model sets the model of the thread. Without it, the CLI uses its
@@ -651,6 +660,14 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 			p.Config = make(map[string]any)
 		}
 		p.Config["agents"] = roles
+	}
+	if len(a.cfg.addDirs) > 0 {
+		if p.Config == nil {
+			p.Config = make(map[string]any)
+		}
+		p.Config["sandbox_workspace_write"] = map[string]any{
+			"writable_roots": a.cfg.addDirs,
+		}
 	}
 	return p
 }

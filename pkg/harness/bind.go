@@ -154,7 +154,7 @@ func (a *Assembly) sandbox() (sandbox.Sandbox, error) {
 		a.box = a.h.box
 		return a.box, nil
 	}
-	box, err := sandbox.Local(a.Dir, sandbox.Policy(fence.Workspace(a.Dir)...))
+	box, err := sandbox.Local(a.Dir, sandbox.Policy(fence.Workspace(a.Dir, a.h.addDirs...)...))
 	if errors.Is(err, errors.ErrUnsupported) {
 		return nil, fmt.Errorf("%w: the fence of the default sandbox runs only on macOS. Give a sandbox with harness.Sandbox", err)
 	}

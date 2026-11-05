@@ -88,6 +88,7 @@ func (s *hosted) update(ctx context.Context, change func(*Config)) (Session, err
 func (h *Host) checkChange(old, config Config) error {
 	fixed := old.ID == config.ID &&
 		old.Dir == config.Dir &&
+		slices.Equal(old.AddDirs, config.AddDirs) &&
 		old.Agent == config.Agent &&
 		slices.Equal(old.Dirs, config.Dirs)
 	if !fixed {

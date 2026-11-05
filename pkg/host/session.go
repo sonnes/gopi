@@ -220,6 +220,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Model:     model,
 		Mode:      config.Mode,
 		Dir:       config.Dir,
+		AddDirs:   config.AddDirs,
 		Sections:  sectionsOf(config, s.id, h.sections),
 		Skillset:  h.skillset,
 		Skills:    config.Skills,

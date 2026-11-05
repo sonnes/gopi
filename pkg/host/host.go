@@ -233,6 +233,9 @@ type Config struct {
 	Mode agent.Mode `json:"mode,omitempty"`
 	// Dir is the working directory of the agent.
 	Dir string `json:"dir,omitempty"`
+	// AddDirs are folders outside Dir that the agent can read and write,
+	// as it does Dir. The mode still decides which calls ask first.
+	AddDirs []string `json:"add_dirs,omitempty"`
 	// Skills names the skills that the agent loads at the start.
 	Skills []string `json:"skills,omitempty"`
 	// ToolNames names the tools of the host that the agent can call, as

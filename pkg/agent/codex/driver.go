@@ -129,6 +129,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.Dir != "" {
 		opts = append(opts, Dir(c.Dir))
 	}
+	if len(c.AddDirs) > 0 {
+		opts = append(opts, AddDirs(c.AddDirs...))
+	}
 	if c.Sections != nil {
 		opts = append(opts, Sections(c.Sections))
 	}

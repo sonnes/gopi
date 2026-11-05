@@ -104,6 +104,30 @@ func TestSandboxedToolBindsToTheSandboxOfTheSession(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
+func TestTheSandboxWritesInEachAddDir(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("the fence of the default sandbox runs only on macOS")
+	}
+	extra := t.TempDir()
+	var boxes []sandbox.Sandbox
+	build := func(box sandbox.Sandbox) tool.Tool {
+		boxes = append(boxes, box)
+		return read.New(box)
+	}
+	opts := with(bare(t),
+		harness.AddDirs(extra),
+		harness.Toolset(harness.Tools(harness.Sandboxed(build))),
+	)
+
+	assemblyOf(t, opts)
+
+	require.NotEmpty(t, boxes)
+	bound := boxes[len(boxes)-1]
+	err := bound.WriteFile(context.Background(), filepath.Join(extra, "a.txt"), []byte("x"))
+	require.NoError(t, err)
+	assert.FileExists(t, filepath.Join(extra, "a.txt"))
+}
+
 func TestTheHarnessSkipsANamedTool(t *testing.T) {
 	opts := with(bare(t), harness.Toolset(harness.Tools(
 		tool.Named(tool.ApplyPatch),

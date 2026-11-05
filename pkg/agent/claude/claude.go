@@ -103,6 +103,7 @@ type config struct {
 	name        string
 	binary      string
 	dir         string
+	addDirs     []string
 	model       string
 	sections    agent.SystemFunc
 	thinking    ai.ThinkingLevel
@@ -146,6 +147,12 @@ func Binary(path string) Option {
 // in the working directory of this process.
 func Dir(path string) Option {
 	return func(c *config) { c.dir = path }
+}
+
+// AddDirs gives the CLI one --add-dir for each directory, so its tools
+// can read and write there, as they do in [Dir].
+func AddDirs(dirs ...string) Option {
+	return func(c *config) { c.addDirs = append(c.addDirs, dirs...) }
 }
 
 // Model sets the model of the CLI, as an alias such as "sonnet" or a
@@ -512,6 +519,9 @@ func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, skill
 	}
 	if folder != "" {
 		args = append(args, "--add-dir", folder)
+	}
+	for _, dir := range a.cfg.addDirs {
+		args = append(args, "--add-dir", dir)
 	}
 	id, err := conversation.Get(a.log)
 	if err != nil {
