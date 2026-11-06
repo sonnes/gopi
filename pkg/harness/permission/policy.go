@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -56,6 +58,16 @@ type Policy struct {
 	// relative path in the input of a tool. The default is the working
 	// directory of the process when [Policy.Hook] is called.
 	Dir string
+	// Roots are the folders where a read runs without a question, and
+	// where an edit runs in [AcceptEdits]. A relative root is relative to
+	// Dir. The default is Dir alone.
+	Roots []string
+	// BlockReadsOutside denies a read of a file tool outside Roots, in
+	// each mode, also in [Bypass].
+	BlockReadsOutside bool
+	// BlockWritesOutside denies an edit of a file tool outside Roots, in
+	// each mode, also in [Bypass].
+	BlockWritesOutside bool
 }
 
 // Allows reports if an Allow rule of p matches c, as the hook of
@@ -116,7 +128,8 @@ func (p Policy) compile() (compiled, error) {
 }
 
 // Hook returns an [agent.Hook] that checks each tool call with the
-// policy in its BeforeTool method. The hook reads the fields of the
+// policy in its BeforeTool method. The hook resolves the symlinks of the
+// roots once, in this call, and the symlinks of each path on each call. The hook reads the fields of the
 // policy once, in this call. A later change to a field does not change
 // the hook. Each hook starts with no rules of the Always decisions, and
 // keeps them for its life.
@@ -134,17 +147,20 @@ func (p Policy) Hook() agent.Hook {
 	// match no path.
 	home, _ := os.UserHomeDir()
 
-	kinds := make(map[string]tool.Kind, len(p.Kinds))
-	for name, k := range p.Kinds {
-		kinds[name] = k
+	roots := p.Roots
+	if len(roots) == 0 {
+		roots = []string{dir}
 	}
 	return &hook{
-		compiled: c,
-		err:      err,
-		approve:  p.Approve,
-		kinds:    kinds,
-		dir:      dir,
-		home:     home,
+		compiled:    c,
+		err:         err,
+		approve:     p.Approve,
+		kinds:       maps.Clone(p.Kinds),
+		dir:         dir,
+		home:        home,
+		roots:       newRootSet(roots, dir),
+		blockReads:  p.BlockReadsOutside,
+		blockWrites: p.BlockWritesOutside,
 	}
 }
 
@@ -171,6 +187,10 @@ type hook struct {
 	kinds   map[string]tool.Kind
 	dir     string
 	home    string
+	roots   rootSet
+	// blockReads and blockWrites are the hard limits of the policy.
+	blockReads  bool
+	blockWrites bool
 
 	mu sync.Mutex
 	// kept are the Allow rules of the Always decisions.
@@ -238,11 +258,23 @@ func (h *hook) BeforeTool(
 		return c, agent.Deny(h.err.Error())
 	}
 	in := decodeInput(c.Input)
+	targets, resolved := h.targets(c.Name, in)
+	if !resolved {
+		reason := fmt.Sprintf(
+			"the tool call %q has a path with symlinks that do not resolve. Give the real path",
+			c.Name,
+		)
+		return c, agent.Deny(reason)
+	}
 
 	denyRule := h.firstMatch(h.deny, c.Name, in)
 	if denyRule != nil {
 		reason := fmt.Sprintf("the rule %q denies the tool call %q", denyRule.text, c.Name)
 		return c, agent.Deny(reason)
+	}
+	kind := kindOf(c.Name, h.kinds)
+	if err := h.checkLimits(c.Name, kind, targets); err != nil {
+		return c, err
 	}
 	askRule := h.firstMatch(h.ask, c.Name, in)
 	if askRule != nil {
@@ -252,20 +284,90 @@ func (h *hook) BeforeTool(
 		return c, nil
 	}
 
-	kind := kindOf(c.Name, h.kinds)
+	inRoots := h.inRoots(targets)
 	switch {
-	case kind == tool.KindRead || h.mode == Bypass:
+	case h.mode == Bypass:
 		return c, nil
+	case kind == tool.KindRead && inRoots:
+		return c, nil
+	case kind == tool.KindRead:
+		return h.requestApproval(ctx, c, in)
 	case h.mode == Plan:
 		reason := fmt.Sprintf(
 			"plan mode blocks the tool call %q, because the tool can change the workspace",
 			c.Name,
 		)
 		return c, agent.Deny(reason)
-	case h.mode == AcceptEdits && kind == tool.KindEdit:
+	case kind == tool.KindEdit && protected(targets):
+		return h.requestApproval(ctx, c, in)
+	case h.mode == AcceptEdits && kind == tool.KindEdit && inRoots:
 		return c, nil
 	}
 	return h.requestApproval(ctx, c, in)
+}
+
+// targets returns the spellings of each path of a call of a file tool.
+// A call of another tool has no targets. ok is false if the symlinks of
+// a path do not resolve.
+func (h *hook) targets(name string, in toolInput) (targets [][]string, ok bool) {
+	if contentOf(name) != tool.ContentPath || !in.ok {
+		return nil, true
+	}
+	for _, p := range in.paths(name) {
+		spellings, ok := spellingsOf(resolvePath(p, h.dir, h.home))
+		if !ok {
+			return nil, false
+		}
+		targets = append(targets, spellings)
+	}
+	return targets, true
+}
+
+// inRoots reports if each spelling of each target is in a root.
+func (h *hook) inRoots(targets [][]string) bool {
+	for _, spellings := range targets {
+		if !h.roots.contains(spellings) {
+			return false
+		}
+	}
+	return true
+}
+
+// checkLimits returns an [agent.DenyError] if a hard limit of the policy
+// blocks a call of the kind with the targets.
+func (h *hook) checkLimits(name string, kind tool.Kind, targets [][]string) error {
+	var limit string
+	switch {
+	case kind == tool.KindRead && h.blockReads:
+		limit = "reads"
+	case kind == tool.KindEdit && h.blockWrites:
+		limit = "writes"
+	default:
+		return nil
+	}
+	for _, spellings := range targets {
+		if h.roots.contains(spellings) {
+			continue
+		}
+		reason := fmt.Sprintf(
+			"the tool call %q is denied: the path %q is outside the roots of the session, and the policy blocks %s outside them",
+			name,
+			spellings[0],
+			limit,
+		)
+		return agent.Deny(reason)
+	}
+	return nil
+}
+
+// protected reports if a spelling of a target is a protected path.
+func protected(targets [][]string) bool {
+	for _, spellings := range targets {
+		if slices.ContainsFunc(spellings, isProtected) {
+			return true
+		}
+	}
+	return false
 }
 
 // requestApproval gets a decision on c from the approver. If the
@@ -357,8 +459,9 @@ func (h *hook) firstMatch(rules []rule, name string, in toolInput) *rule {
 
 // contentMatches reports if the content of r matches the input of the
 // call. A path rule matches a call with several paths if it matches one
-// path, and a call with no path. So a Deny rule and an Ask rule cannot
-// miss a path. [hook.allowed] needs each path instead.
+// spelling of one path, and a call with no path. So a Deny rule and an
+// Ask rule cannot miss a path, a symlink, or a change of letter case.
+// [hook.allowed] needs each spelling of each path instead.
 func (h *hook) contentMatches(r *rule, name string, in toolInput) bool {
 	if contentOf(name) == tool.ContentCommand {
 		return commandMatches(in.Command, r.command)
@@ -368,25 +471,40 @@ func (h *hook) contentMatches(r *rule, name string, in toolInput) bool {
 		return true
 	}
 	for _, p := range paths {
-		abs := resolvePath(p, h.dir, h.home)
-		if r.path.matches(abs, h.dir, h.home) {
-			return true
+		spellings, _ := spellingsOf(resolvePath(p, h.dir, h.home))
+		for _, s := range spellings {
+			for _, f := range forms(s) {
+				if r.path.matches(f, h.dir, h.home, true) {
+					return true
+				}
+			}
 		}
 	}
 	return false
 }
 
-// eachPathMatches reports if the content of r matches each path of the
-// input. A call with no path matches no Allow rule.
+// eachPathMatches reports if the content of r matches each spelling of
+// each path of the input. A call with no path, or with a path whose
+// symlinks do not resolve, matches no Allow rule. A spelling matches if
+// one of its [forms] matches, so a rule on /tmp matches /private/tmp on
+// macOS.
 func (h *hook) eachPathMatches(r *rule, name string, in toolInput) bool {
 	paths := in.paths(name)
 	if len(paths) == 0 {
 		return false
 	}
 	for _, p := range paths {
-		abs := resolvePath(p, h.dir, h.home)
-		if !r.path.matches(abs, h.dir, h.home) {
+		spellings, ok := spellingsOf(resolvePath(p, h.dir, h.home))
+		if !ok {
 			return false
+		}
+		for _, s := range spellings {
+			matches := slices.ContainsFunc(forms(s), func(f string) bool {
+				return r.path.matches(f, h.dir, h.home, false)
+			})
+			if !matches {
+				return false
+			}
 		}
 	}
 	return true

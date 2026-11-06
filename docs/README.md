@@ -73,6 +73,10 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
 | permission policy | The permission mode and the permission rules of a harness, as one value that becomes one BeforeTool hook | policy, approval config |
+| root          | A folder where the permission policy runs a read, and an edit in acceptEdits, with no question: Dir and each folder of AddDirs | working directory, workspace |
+| spelling      | One name of a path on disk: the path of the input, the target of each symlink on the way, or the real path | alias, resolved path |
+| protected path | A path that git, a shell, or an editor runs, such as `.git/hooks` or `.bashrc`. An edit of it asks in default and acceptEdits mode | sensitive file, dangerous path |
+| hard limit    | A check of the permission policy that denies a read or an edit outside the roots in each mode | block, restriction |
 | tool kind     | What a tool can do: read, edit, exec, or other. The permission mode decides by it for a call that no rule matches | tool type, category |
 | run           | One call of the loop, from a prompt to a result              | invocation, request, turn   |
 | turn          | One model call of a run, with the tool calls that it makes   | step, iteration, round      |

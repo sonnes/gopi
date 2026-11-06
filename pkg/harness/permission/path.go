@@ -103,8 +103,10 @@ func gitignoreGlob(pattern string) pathRule {
 
 // matches reports if the rule matches the absolute path abs. dir is
 // the working directory, and home is the home directory. If home is
-// empty, a rule relative to the home directory matches no path.
-func (r pathRule) matches(abs, dir, home string) bool {
+// empty, a rule relative to the home directory matches no path. If fold
+// is true, the match ignores the letter case, so that a Deny rule on
+// ~/.ssh also matches ~/.SSH on a disk that ignores the case.
+func (r pathRule) matches(abs, dir, home string, fold bool) bool {
 	var root string
 	switch r.root {
 	case rootFS:
@@ -118,6 +120,10 @@ func (r pathRule) matches(abs, dir, home string) bool {
 		return false
 	}
 
+	if fold {
+		root = strings.ToLower(root)
+		abs = strings.ToLower(abs)
+	}
 	rel, err := filepath.Rel(root, abs)
 	if err != nil {
 		return false
@@ -134,8 +140,13 @@ func (r pathRule) matches(abs, dir, home string) bool {
 		return false
 	}
 
-	exact, _ := doublestar.Match(r.glob, rel)
-	inDir, _ := doublestar.Match(r.glob+inside, rel)
+	glob := r.glob
+	if fold {
+		glob = strings.ToLower(glob)
+		rel = strings.ToLower(rel)
+	}
+	exact, _ := doublestar.Match(glob, rel)
+	inDir, _ := doublestar.Match(glob+inside, rel)
 	return exact || inDir
 }
 

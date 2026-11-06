@@ -10,15 +10,17 @@ import (
 type Mode string
 
 const (
-	// Default runs the read tools. Each other call asks.
+	// Default runs the read tools in the roots. Each other call asks.
 	Default Mode = "default"
-	// AcceptEdits runs the read tools and the edit tools. Each other
-	// call asks.
+	// AcceptEdits runs the read tools in the roots, and the edit tools
+	// in the roots, except on a protected path. Each other call asks.
 	AcceptEdits Mode = "acceptEdits"
-	// Plan runs the read tools. Each other call is blocked, so the agent
-	// can examine the work but not change it.
+	// Plan runs the read tools in the roots, and a read outside the
+	// roots asks. Each other call is blocked, so the agent can examine
+	// the work but not change it.
 	Plan Mode = "plan"
-	// Bypass runs each call. A Deny rule and an Ask rule still apply.
+	// Bypass runs each call. A Deny rule, an Ask rule, and a hard limit
+	// still apply.
 	Bypass Mode = "bypassPermissions"
 )
 

@@ -2,6 +2,8 @@ package harness_test
 
 import (
 	"context"
+	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // callEcho runs an agent whose model calls echo once, with opts on top
@@ -88,4 +91,46 @@ func TestASubagentRunsInTheStricterMode(t *testing.T) {
 	child, err := h.Durable(context.Background(), childID(t, toolResult(t, a)))
 	require.NoError(t, err)
 	assert.True(t, toolResult(t, child).IsError, "plan mode denies echo in the child")
+}
+
+// readIn runs an agent whose model reads path once with a read_file
+// tool, with opts on top of the base, and returns the tool result.
+func readIn(t *testing.T, path string, opts ...harness.Option) ai.Message {
+	t.Helper()
+	input, err := json.Marshal(map[string]string{"path": path})
+	require.NoError(t, err)
+	p := &script{responses: []ai.Message{
+		callTool("c1", tool.ReadFile, string(input)),
+		reply("done"),
+	}}
+	readFile := tool.Func(tool.ReadFile, func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+		return ai.ToolResult{}, nil
+	})
+	all := with(base(t, p), harness.Toolset(harness.Tools(readFile)))
+	a, err := harness.New(with(all, opts...)...).New(context.Background())
+	require.NoError(t, err)
+	run(t, a, "go")
+	return toolResult(t, a)
+}
+
+func TestTheRootsAreDirAndAddDirs(t *testing.T) {
+	dir := t.TempDir()
+	extra := t.TempDir()
+	outside := t.TempDir()
+	tests := []struct {
+		name   string
+		path   string
+		denied bool
+	}{
+		{name: "Dir", path: filepath.Join(dir, "a.txt")},
+		{name: "an AddDir", path: filepath.Join(extra, "a.txt")},
+		{name: "outside", path: filepath.Join(outside, "a.txt"), denied: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := readIn(t, tt.path, harness.Dir(dir), harness.AddDirs(extra))
+
+			assert.Equal(t, tt.denied, m.IsError, m.Text())
+		})
+	}
 }

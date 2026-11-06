@@ -5,13 +5,33 @@
 //
 // For one call, the hook uses the first step that applies:
 //
-//  1. If a Deny rule matches the call, the hook blocks the call.
-//  2. If an Ask rule matches the call, the hook asks [Policy.Approve].
-//  3. If an Allow rule matches the call, the call runs.
-//  4. The mode and the [tool.Kind] of the tool decide. The result is to run
-//     the call, to ask, or to block the call.
+//  1. If a path of a file tool has symlinks that do not resolve, the
+//     hook blocks the call.
+//  2. If a Deny rule matches the call, the hook blocks the call.
+//  3. If a hard limit applies and a path is outside the roots, the hook
+//     blocks the call. The limits are [Policy.BlockReadsOutside] and
+//     [Policy.BlockWritesOutside].
+//  4. If an Ask rule matches the call, the hook asks [Policy.Approve].
+//  5. If an Allow rule matches the call, the call runs.
+//  6. The mode, the [tool.Kind] of the tool, and its paths decide. The
+//     result is to run the call, to ask, or to block the call.
 //
-// A Deny rule and an Ask rule apply in every mode, also in [Bypass].
+// A Deny rule, an Ask rule, and a hard limit apply in every mode, also
+// in [Bypass].
+//
+// In the mode step, the roots are [Policy.Roots], or [Policy.Dir] if
+// Roots is empty. A read tool runs if each of its paths is in a root.
+// An edit tool on a protected path asks. A protected path has a folder
+// such as .git, .claude, or .vscode in it, or ends in a file name such
+// as .bashrc or .envrc. The lists come from Claude Code 2.1.316. In
+// [AcceptEdits], an edit tool runs if each of its paths is in a root. A
+// tool that is not a file tool has no paths, so each root check passes.
+//
+// A path has more than one spelling when it goes through a symlink: the
+// path of the input, the target of each symlink, and the real path. A
+// root check and an Allow rule need each spelling. A Deny rule and an
+// Ask rule need one spelling, and ignore the letter case. On macOS,
+// /private/tmp and /private/var are the same paths as /tmp and /var.
 //
 // A rule has the format of the permission rules in the settings of
 // Claude Code: "Tool" or "Tool(content)". The rule format and the match

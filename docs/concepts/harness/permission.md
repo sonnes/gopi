@@ -15,14 +15,16 @@ A permission policy decides, for each tool call, if the call runs, asks a person
 ```mermaid
 flowchart TD
   accTitle: The decision for one tool call
-  accDescr: A Deny rule denies the call. An Ask rule sends it to Approve. An Allow rule runs it. With no matching rule, the mode and the tool kind decide.
+  accDescr: A Deny rule denies the call. A hard limit denies a path outside the roots. An Ask rule sends it to Approve. An Allow rule runs it. With no matching rule, the mode, the tool kind, and the roots decide.
   call([tool call]) --> deny{Deny rule?}
   deny -- yes --> denied[denied, the model gets the rule]
-  deny -- no --> ask{Ask rule?}
+  deny -- no --> limit{hard limit, path outside the roots?}
+  limit -- yes --> denied
+  limit -- no --> ask{Ask rule?}
   ask -- yes --> approve[Approve: run, or denied]
   ask -- no --> allow{Allow rule?}
   allow -- yes --> run[run]
-  allow -- no --> mode[the mode and the tool kind decide]
+  allow -- no --> mode[the mode, the tool kind, and the roots decide]
 ```
 
 ## Design
@@ -37,7 +39,11 @@ flowchart TD
 - An `Always` decision keeps an allow rule in the hook, and a new hook starts with no kept rules. An approval then lasts as long as one agent and does not reach the next session.
 - If a decision edits the input, the edited input runs. The Deny rules check it, and an `Always` rule is for it, because the person approved the edited call and not the call of the model.
 - The permission policy is a plain value, and the state of a run lives in its hook. The harness then copies the policy for each call and each child with no shared lock.
-- A command rule matches the text of the command, not a parsed shell program. So a command rule is not a security boundary, and the [fence](../sandbox/fence.md) limits what a command can touch.
+- The mode step runs a read only in a root, and an edit in `acceptEdits` only in a root. The harness gives `Dir` and `AddDirs` as the roots. A call outside the roots asks, so an agent in `default` mode does not read the home folder of the user without a question.
+- A path has one spelling for each symlink on the way, and one for its real path. A root check and an allow rule need each spelling, and a deny rule or an ask rule needs one, so a symlink in a root cannot take an allowed call out of it. A path whose symlinks do not resolve is denied in each mode.
+- An edit of a protected path asks in `default` and `acceptEdits` mode. Git, a shell, or an editor runs these files outside the agent. The lists of protected paths come from Claude Code 2.1.316.
+- The hard limits deny a read or an edit outside the roots in each mode, also in `bypassPermissions`. They are off by default, so the caller picks between an agent that reaches each path and one that cannot leave its roots.
+- A command rule matches the text of the command, not a parsed shell program. So a command rule is not a security boundary. Only the [fence](../sandbox/fence.md) of `harness.Fence` limits what a command can touch.
 - An invalid rule fails the assembly, so a typo in a Deny rule cannot let every call through.
 
 ## Map
@@ -49,6 +55,7 @@ flowchart TD
 | Change how a rule is parsed                  | `pkg/harness/permission/rule.go`    |
 | Change how a command rule matches            | `pkg/harness/permission/shell.go`   |
 | Change how a path rule matches               | `pkg/harness/permission/path.go`    |
+| Change the roots, the symlinks, or the protected paths | `pkg/harness/permission/roots.go` |
 | Change how the CLI asks a person             | `cmd/gopi/ask.go`                   |
 
 ## Related Concepts
