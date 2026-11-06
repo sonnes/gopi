@@ -205,7 +205,7 @@ func main() {
 			&cli.StringFlag{
 				Name:  "permission-mode",
 				Value: string(permission.Default),
-				Usage: "the permission mode of the tool calls: default, acceptEdits, plan, or bypassPermissions. A call that needs an approval asks on the terminal",
+				Usage: "the permission mode of the tool calls: default, acceptEdits, or bypassPermissions. A call that needs an approval asks on the terminal",
 			},
 			&cli.StringSliceFlag{
 				Name:  "allow",

@@ -89,7 +89,7 @@ func TestWriteAgents_RoundTrip(t *testing.T) {
 		Disallowed:  []string{"Bash"},
 		Model:       "opus",
 		Effort:      ai.ThinkingHigh,
-		Mode:        "plan",
+		Mode:        "acceptEdits",
 		MaxTurns:    3,
 		Skills:      []string{"deploy"},
 		Prompt:      "Read the diff.",

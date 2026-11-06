@@ -14,7 +14,7 @@
 //  4. If an Ask rule matches the call, the hook asks [Policy.Approve].
 //  5. If an edit tool has a protected path, the hook asks
 //     [Policy.Approve]. An Allow rule does not approve this edit. This
-//     step does not apply in [Bypass] and [Plan].
+//     step does not apply in [Bypass].
 //  6. If an Allow rule matches the call, the call runs.
 //  7. The mode, the [tool.Kind] of the tool, and its paths decide. The
 //     result is to run the call, to ask, or to block the call.

@@ -49,7 +49,7 @@ func TestDriverStart(t *testing.T) {
 		Model:     ai.Model{ID: "haiku"},
 		Dir:       "/work",
 		Sections:  agent.SystemText("Be brief."),
-		Mode:      agent.ModePlan,
+		Mode:      agent.ModeAcceptEdits,
 		Allow:     []string{"read_file"},
 		Ask:       []string{"bash(gh pr comment:*)"},
 		Deny:      []string{"web_fetch"},
@@ -76,7 +76,7 @@ func TestDriverStart(t *testing.T) {
 		"--allowedTools Read",
 		"--disallowedTools WebFetch",
 		`--settings {"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
-		"--permission-mode plan",
+		"--permission-mode acceptEdits",
 		"--effort high",
 		`--mcp-config {"mcpServers":{"local":{"command":"lw-mcp"}}}`,
 	} {

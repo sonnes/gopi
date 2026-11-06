@@ -46,7 +46,6 @@ func TestPermissions(t *testing.T) {
 		{"bypass mode", []harness.Option{harness.Mode(permission.Bypass)}, false},
 		{"an allow rule", []harness.Option{harness.Allow("echo")}, false},
 		{"a deny rule in bypass mode", []harness.Option{harness.Mode(permission.Bypass), harness.Deny("echo")}, true},
-		{"plan mode with an approver", []harness.Option{harness.Mode(permission.Plan), harness.Approve(approve)}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -68,8 +67,8 @@ func TestABadRuleFailsTheAssembly(t *testing.T) {
 }
 
 func TestASubagentRunsInTheStricterMode(t *testing.T) {
-	planner := reviewer
-	planner.Mode = "plan"
+	strict := reviewer
+	strict.Mode = "default"
 	p := &script{responses: []ai.Message{
 		callTool("c1", "agent", `{"agent":"reviewer","prompt":"go"}`),
 		callTool("c2", "echo", `{"s":"hi"}`),
@@ -79,7 +78,7 @@ func TestASubagentRunsInTheStricterMode(t *testing.T) {
 	store := session.NewMemoryStore()
 	h := harness.New(with(base(t, p),
 		harness.Store(store),
-		harness.Agents(planner),
+		harness.Agents(strict),
 		harness.Toolset(harness.Tools(echo)),
 		harness.Mode(permission.Bypass),
 	)...)
@@ -90,7 +89,7 @@ func TestASubagentRunsInTheStricterMode(t *testing.T) {
 
 	child, err := h.Durable(context.Background(), childID(t, toolResult(t, a)))
 	require.NoError(t, err)
-	assert.True(t, toolResult(t, child).IsError, "plan mode denies echo in the child")
+	assert.True(t, toolResult(t, child).IsError, "the default mode asks for echo in the child, and no approver answers")
 }
 
 // readIn runs an agent whose model reads path once with a read_file

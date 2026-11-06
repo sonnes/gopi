@@ -110,12 +110,6 @@ func TestDriverMode(t *testing.T) {
 			wantSandbox: SandboxWorkspaceWrite,
 		},
 		{
-			name:        "the plan mode reads and never asks",
-			mode:        agent.ModePlan,
-			wantPolicy:  ApprovalNever,
-			wantSandbox: SandboxReadOnly,
-		},
-		{
 			name:        "the default mode reads, and asks before a write or an unsafe command",
 			mode:        agent.ModeDefault,
 			wantPolicy:  ApprovalUntrusted,
@@ -174,8 +168,8 @@ func TestDriverLimits(t *testing.T) {
 			wantSandbox: SandboxWorkspaceWrite,
 		},
 		{
-			name:        "the plan mode keeps its sandbox",
-			mode:        agent.ModePlan,
+			name:        "the default mode keeps its sandbox",
+			mode:        agent.ModeDefault,
 			limits:      agent.Limits{BlockWritesOutside: true, Fence: true},
 			wantSandbox: SandboxReadOnly,
 		},

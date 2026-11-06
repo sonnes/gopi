@@ -66,7 +66,7 @@ func ExampleHost_Update() {
 
 	s, err := h.Update(ctx, s.ID, func(c *host.Config) {
 		c.Model = "claude-code/claude-sonnet-5-5"
-		c.Mode = agent.ModePlan
+		c.Mode = agent.ModeAcceptEdits
 	})
 	if err != nil {
 		return

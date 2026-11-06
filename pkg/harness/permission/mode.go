@@ -16,9 +16,6 @@ const (
 	// AcceptEdits runs what Default runs, and the edit tools in the
 	// roots, except on a protected path. Each other call asks.
 	AcceptEdits Mode = "acceptEdits"
-	// Plan runs what Default runs, and a read outside the roots asks. Each other call is blocked, so the agent can examine
-	// the work but not change it.
-	Plan Mode = "plan"
 	// Bypass runs each call. A Deny rule, an Ask rule, and a hard limit
 	// still apply.
 	Bypass Mode = "bypassPermissions"
@@ -39,16 +36,15 @@ func ParseMode(s string) (Mode, error) {
 
 // modeOrder lists the modes from the strictest to the least strict.
 var modeOrder = []Mode{
-	Plan,
 	Default,
 	AcceptEdits,
 	Bypass,
 }
 
-// Stricter returns the stricter mode of a and b. The order is [Plan],
+// Stricter returns the stricter mode of a and b. The order is
 // [Default], [AcceptEdits], [Bypass], from the strictest. An empty mode
-// is [Default]. An unknown mode is as strict as [Plan], so an error in
-// a name does not give more access.
+// is [Default]. An unknown mode is as strict as [Default], so an error
+// in a name does not give more access.
 func Stricter(a, b Mode) Mode {
 	a = normalMode(a)
 	b = normalMode(b)
@@ -59,14 +55,11 @@ func Stricter(a, b Mode) Mode {
 	return b
 }
 
-// normalMode returns [Default] for an empty mode and [Plan] for an
-// unknown mode.
+// normalMode returns [Default] for an empty mode and for an unknown
+// mode.
 func normalMode(m Mode) Mode {
-	if m == "" {
-		return Default
-	}
 	if !slices.Contains(modeOrder, m) {
-		return Plan
+		return Default
 	}
 	return m
 }

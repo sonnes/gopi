@@ -186,9 +186,11 @@ func TestStartAddsTheRules(t *testing.T) {
 			wantRan: true,
 		},
 		{
-			name:   "the plan mode blocks a call that the harness asks for",
-			mode:   permission.Default,
-			config: agent.Config{Mode: agent.ModePlan},
+			name:      "the default mode of the config asks for a call that the mode of the harness runs",
+			mode:      permission.Bypass,
+			config:    agent.Config{Mode: agent.ModeDefault},
+			wantAsked: true,
+			wantRan:   true,
 		},
 	}
 	for _, tt := range tests {

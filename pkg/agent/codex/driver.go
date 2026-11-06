@@ -22,8 +22,6 @@ import (
 // [Policy], so that the CLI asks before a command that is not known to
 // be safe. The mode replaces the policy and the sandbox of the options:
 //
-//   - The plan mode is [SandboxReadOnly] with [ApprovalNever]. A write
-//     fails in the sandbox.
 //   - The default mode is [SandboxReadOnly] with [ApprovalUntrusted]. A
 //     command that is not known to be safe asks, and so does each file
 //     change, because the sandbox does not let it write.
@@ -231,11 +229,6 @@ func allowFirst(c agent.Config) agent.ApproveFunc {
 // so the commands write only in the roots.
 func modeOptions(m agent.Mode, l agent.Limits) []Option {
 	switch m {
-	case agent.ModePlan:
-		return []Option{
-			Policy(ApprovalNever),
-			Sandbox(SandboxReadOnly),
-		}
 	case agent.ModeDefault:
 		return []Option{
 			Policy(ApprovalUntrusted),

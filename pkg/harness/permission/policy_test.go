@@ -47,10 +47,6 @@ func TestModeByKind(t *testing.T) {
 			want: map[string]outcome{"read": ran, "edit": ran, "exec": asked, "other": asked},
 		},
 		{
-			mode: permission.Plan,
-			want: map[string]outcome{"read": ran, "edit": denied, "exec": denied, "other": denied},
-		},
-		{
 			mode: permission.Bypass,
 			want: map[string]outcome{"read": ran, "edit": ran, "exec": ran, "other": ran},
 		},
@@ -162,8 +158,8 @@ func TestKindsOverride(t *testing.T) {
 	assert.Equal(t, ran, decide(t, p, call(t, "patch", map[string]any{})))
 	assert.Equal(t, ran, decide(t, p, bashCall(t, "ls")))
 
-	p.Mode = permission.Plan
-	assert.Equal(t, denied, decide(t, p, call(t, "patch", map[string]any{})))
+	p.Mode = permission.Default
+	assert.Equal(t, asked, decide(t, p, call(t, "patch", map[string]any{})))
 }
 
 func TestRuleOrder(t *testing.T) {
@@ -206,15 +202,6 @@ func TestRuleOrder(t *testing.T) {
 			policy: &permission.Policy{Allow: []string{"bash(go test:*)"}},
 			call:   func(t *testing.T) ai.ToolCall { return bashCall(t, "go test ./...") },
 			want:   ran,
-		},
-		{
-			name: "allow beats plan",
-			policy: &permission.Policy{
-				Mode:  permission.Plan,
-				Allow: []string{"bash(go test:*)"},
-			},
-			call: func(t *testing.T) ai.ToolCall { return bashCall(t, "go test ./...") },
-			want: ran,
 		},
 		{
 			name: "deny in bypass",
@@ -325,7 +312,7 @@ func TestAlways(t *testing.T) {
 func TestPolicyIsAValue(t *testing.T) {
 	p := permission.Policy{Mode: permission.Bypass}
 	child := p
-	child.Mode = permission.Stricter(child.Mode, permission.Plan)
+	child.Mode = permission.Stricter(child.Mode, permission.Default)
 
 	assert.NoError(t, child.Validate())
 	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "make build")))
@@ -454,12 +441,6 @@ func TestNilApproveDenies(t *testing.T) {
 	assert.Contains(t, reason, "approve")
 
 	assert.Equal(t, ran, runHook(t, p, pathCall(t, "read_file", "a.txt")))
-}
-
-func TestPlanReason(t *testing.T) {
-	p := &permission.Policy{Mode: permission.Plan}
-	reason := denyReason(t, p, pathCall(t, "write_file", "a.txt"))
-	assert.Contains(t, reason, "plan")
 }
 
 func TestValidate(t *testing.T) {

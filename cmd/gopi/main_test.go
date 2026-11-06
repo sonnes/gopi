@@ -641,14 +641,14 @@ func TestWithAgent(t *testing.T) {
 			opts: options{
 				model:    "openai/gpt-5",
 				thinking: "low",
-				mode:     "plan",
+				mode:     "bypassPermissions",
 			},
 			agent: reviewer,
 			want: options{
 				model:      "openai/gpt-5",
 				agentModel: "anthropic/claude-opus-5-5",
 				thinking:   "low",
-				mode:       "plan",
+				mode:       "bypassPermissions",
 				system:     "You review.",
 				deny:       []string{"bash"},
 				skills:     []string{"deploy"},

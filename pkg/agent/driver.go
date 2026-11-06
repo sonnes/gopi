@@ -301,8 +301,6 @@ type Mode string
 
 // The permission modes, from the strictest.
 const (
-	// ModePlan runs the read tools and blocks each other call.
-	ModePlan Mode = "plan"
 	// ModeDefault runs the read tools. Each other call asks.
 	ModeDefault Mode = "default"
 	// ModeAcceptEdits runs the read tools and the edit tools. Each
@@ -314,7 +312,6 @@ const (
 
 // AllModes lists each [Mode], from the strictest.
 var AllModes = []Mode{
-	ModePlan,
 	ModeDefault,
 	ModeAcceptEdits,
 	ModeBypass,

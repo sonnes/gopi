@@ -51,9 +51,6 @@ const (
 	PermissionDefault Permission = "default"
 	// PermissionAcceptEdits allows file edits without a prompt.
 	PermissionAcceptEdits Permission = "acceptEdits"
-	// PermissionPlan lets the model read and plan, and run no tool that
-	// changes a file.
-	PermissionPlan Permission = "plan"
 	// PermissionAuto lets a classifier of the CLI allow or deny each
 	// prompt.
 	PermissionAuto Permission = "auto"
