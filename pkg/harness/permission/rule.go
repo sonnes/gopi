@@ -35,6 +35,8 @@ type rule struct {
 	command shellRule
 	// path is the content for a file tool.
 	path pathRule
+	// domain is the content for web_fetch.
+	domain domainRule
 }
 
 // matchesName reports if the rule names the tool.
@@ -101,6 +103,11 @@ func parseRuleText(text string) (rule, error) {
 		r.command = parseShellRule(content)
 	case tool.ContentPath:
 		r.path, err = parsePathRule(content)
+		if err != nil {
+			return rule{}, err
+		}
+	case tool.ContentDomain:
+		r.domain, err = parseDomainRule(content)
 		if err != nil {
 			return rule{}, err
 		}

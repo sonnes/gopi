@@ -1,6 +1,7 @@
 package permission
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -198,12 +199,18 @@ type hook struct {
 	kept []rule
 }
 
-// toolInput holds the inputs that the rules read.
+// toolInput holds the inputs that the rules read. A file tool of
+// Claude Code names its path file_path or notebook_path, and a tool of
+// gopi names it path.
 type toolInput struct {
 	// ok is false if the input is not a JSON object.
-	ok      bool
-	Command string `json:"command"`
-	Path    string `json:"path"`
+	ok           bool
+	Command      string `json:"command"`
+	Path         string `json:"path"`
+	FilePath     string `json:"file_path"`
+	NotebookPath string `json:"notebook_path"`
+	// URL is the input of web_fetch.
+	URL string `json:"url"`
 	// Changes are the file changes of an apply_patch call, as the Codex
 	// agent gives them.
 	Changes []struct {
@@ -221,10 +228,11 @@ var patchHeaders = []string{
 
 // paths returns the paths that a call of the tool name reads or
 // changes. An apply_patch call has a path for each file of its changes
-// or of its patch text. Each other tool has its "path" input.
+// or of its patch text. Each other tool has its path input.
 func (in toolInput) paths(name string) []string {
 	if name != tool.ApplyPatch {
-		return []string{in.Path}
+		p := cmp.Or(in.Path, in.FilePath, in.NotebookPath)
+		return []string{p}
 	}
 	var out []string
 	for _, c := range in.Changes {
@@ -501,10 +509,15 @@ func (h *hook) firstMatch(rules []rule, name string, in toolInput) *rule {
 // call. A path rule matches a call with several paths if it matches one
 // spelling of one path, and a call with no path. So a Deny rule and an
 // Ask rule cannot miss a path, a symlink, or a change of letter case.
-// [hook.allowed] needs each spelling of each path instead.
+// [hook.allowed] needs each spelling of each path instead. A domain
+// rule matches a URL with no host, for the same reason.
 func (h *hook) contentMatches(r *rule, name string, in toolInput) bool {
-	if contentOf(name) == tool.ContentCommand {
+	switch contentOf(name) {
+	case tool.ContentCommand:
 		return commandMatches(in.Command, r.command)
+	case tool.ContentDomain:
+		host, ok := hostOf(in.URL)
+		return !ok || host == r.domain.host
 	}
 	paths := in.paths(name)
 	if len(paths) == 0 {
@@ -571,8 +584,15 @@ func (h *hook) allowed(name string, in toolInput) bool {
 		if !in.ok {
 			continue
 		}
-		if contentOf(name) == tool.ContentCommand {
+		switch contentOf(name) {
+		case tool.ContentCommand:
 			commands = append(commands, r.command)
+			continue
+		case tool.ContentDomain:
+			host, ok := hostOf(in.URL)
+			if ok && host == r.domain.host {
+				return true
+			}
 			continue
 		}
 		if h.eachPathMatches(r, name, in) {

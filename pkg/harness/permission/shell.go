@@ -44,13 +44,16 @@ type shellRule struct {
 
 // parseShellRule parses the content of a bash rule. A content that ends
 // in ":*" is a prefix rule. A content with a * that no backslash escapes
-// is a wildcard rule. Each other content is an exact rule.
+// is a wildcard rule. Each other content is an exact rule. In each
+// kind, \* is a literal * and \\ is a literal backslash. Claude Code
+// unescapes only a wildcard rule. gopi unescapes each kind, so an exact
+// rule can match a command with a *.
 func parseShellRule(content string) shellRule {
 	prefix, isPrefix := strings.CutSuffix(content, legacyPrefixMark)
 	if isPrefix && prefix != "" {
 		return shellRule{
 			kind: shellPrefix,
-			text: prefix,
+			text: unescapeCommand(prefix),
 		}
 	}
 	if hasWildcard(content) {
@@ -61,8 +64,25 @@ func parseShellRule(content string) shellRule {
 	}
 	return shellRule{
 		kind: shellExact,
-		text: content,
+		text: unescapeCommand(content),
 	}
+}
+
+// unescapeCommand returns the command of an exact rule or a prefix
+// rule. A backslash before a * or a backslash escapes it, as in
+// [compileWildcard]. Each other backslash stays.
+func unescapeCommand(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		escapes := c == '\\' && i+1 < len(s) && (s[i+1] == wildcard || s[i+1] == '\\')
+		if escapes {
+			i++
+			c = s[i]
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 // hasWildcard reports if pattern has a * that no backslash escapes.

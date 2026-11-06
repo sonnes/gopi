@@ -30,4 +30,7 @@ const (
 	// ContentPath is the "path" input of a file tool, or each path that
 	// a patch changes.
 	ContentPath
+	// ContentDomain is the host of the "url" input of web_fetch, as in
+	// "WebFetch(domain:go.dev)".
+	ContentDomain
 )
