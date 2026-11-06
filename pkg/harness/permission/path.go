@@ -104,8 +104,8 @@ func gitignoreGlob(pattern string) pathRule {
 // matches reports if the rule matches the absolute path abs. dir is
 // the working directory, and home is the home directory. If home is
 // empty, a rule relative to the home directory matches no path. If fold
-// is true, the match ignores the letter case, so that a Deny rule on
-// ~/.ssh also matches ~/.SSH on a disk that ignores the case.
+// is true, the match ignores the letter case. Then a Deny rule on ~/.ssh
+// also matches ~/.SSH, which is the same folder on the disk of macOS.
 func (r pathRule) matches(abs, dir, home string, fold bool) bool {
 	var root string
 	switch r.root {

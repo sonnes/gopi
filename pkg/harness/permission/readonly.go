@@ -345,8 +345,9 @@ var numberFlagPattern = regexp.MustCompile(`^-[0-9]+$`)
 // and returns the absolute path of each file or folder that the command
 // reads. dir is the folder that the command starts in, and home is the
 // home folder. A cd in one part changes the folder of the later parts.
-// A relative path resolves in each folder that a cd can give, so a pipe,
-// which runs each part in its own shell, cannot hide a path.
+// A relative path resolves in each folder that a cd can give. A pipe
+// runs each part in its own shell, so a cd before a pipe cannot hide a
+// path.
 func readOnlyPaths(command, dir, home string) (paths []string, ok bool) {
 	parts, substitution := splitCommand(command)
 	if substitution || len(parts) == 0 {

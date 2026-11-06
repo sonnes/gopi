@@ -42,8 +42,8 @@ flowchart TD
 - The mode step runs a read only in a root, and an edit in `acceptEdits` only in a root. The harness gives `Dir` and `AddDirs` as the roots. A call outside the roots asks, so an agent in `default` mode does not read the home folder of the user without a question.
 - A path has one spelling for each symlink on the way, and one for its real path. A root check and an allow rule need each spelling, and a deny rule or an ask rule needs one, so a symlink in a root cannot take an allowed call out of it. A path whose symlinks do not resolve is denied in each mode.
 - An edit of a protected path asks in `default` and `acceptEdits` mode. Git, a shell, or an editor runs these files outside the agent. The lists of protected paths come from Claude Code 2.1.316.
-- A bash command whose parts are all read-only commands, such as `ls`, `cat`, `grep`, or `git status`, runs as a read: in a root with no question, and outside with a question. The parser asks when it cannot read a part, so an unknown flag or a `$` costs a question and not a wrong run. The list of commands comes from Claude Code 2.1.316.
-- The hard limits deny a read or an edit outside the roots in each mode, also in `bypassPermissions`. They are off by default, so the caller picks between an agent that reaches each path and one that cannot leave its roots.
+- A bash command whose parts are all read-only commands, such as `ls`, `cat`, `grep`, or `git status`, runs as a read: in a root with no question, and outside with a question. The parser asks when it cannot read a part, such as an unknown flag or a `$`, because a wrong guess runs a command with no question. The list of commands comes from Claude Code 2.1.316.
+- The hard limits deny a read or an edit outside the roots in each mode, also in `bypassPermissions`. They are off by default, and a caller turns on each one by name.
 - A command rule matches the text of the command, not a parsed shell program. So a command rule is not a security boundary. Only the [fence](../sandbox/fence.md) of `harness.Fence` limits what a command can touch.
 - An invalid rule fails the assembly, so a typo in a Deny rule cannot let every call through.
 

@@ -142,8 +142,8 @@ func Sandbox(box sandbox.Sandbox) Option {
 	return func(h *Harness) { h.box = box }
 }
 
-// Fence puts the default sandbox in the [fence.Workspace] policy: a
-// command writes only in [Dir], [AddDirs], and the temp folder, and it
+// Fence puts the default sandbox in the [fence.Workspace] policy. A
+// command then writes only in [Dir], [AddDirs], and the temp folder. It
 // cannot read the credential folders of the home folder. opts go after
 // the Workspace policy, so they can change it. Each Fence adds its opts.
 // Without Fence, the default sandbox has no fence, and the permission

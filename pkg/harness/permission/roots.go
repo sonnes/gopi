@@ -27,9 +27,9 @@ var macAliases = [][2]string{
 }
 
 // spellingsOf returns the spellings of the absolute path abs: abs, the
-// target of each symlink on the way, and the real path. For a path that
-// does not exist yet, the real path is the real path of the folder that
-// exists, with the rest of abs added. ok is false if a symlink loops,
+// target of each symlink on the way, and the real path. A path that does
+// not exist yet gets the real path of its nearest folder that exists,
+// with the rest of abs added. ok is false if a symlink loops,
 // goes more than maxLinkHops hops, or cannot be read.
 func spellingsOf(abs string) (out []string, ok bool) {
 	out = []string{abs}
