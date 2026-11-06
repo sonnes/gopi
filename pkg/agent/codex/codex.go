@@ -509,7 +509,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		}
 		return nil, "", fmt.Errorf("codex: start %s: %w", cmd.Path, err)
 	}
-	c = dial(p, a.cfg.approve)
+	c = dial(p, a.cfg.approve, a.cfg.dir)
 	c.hooks = hooks
 	c.skills = skills
 	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand, roles), skillRoot)

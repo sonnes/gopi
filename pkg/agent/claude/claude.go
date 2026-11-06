@@ -240,9 +240,7 @@ func OnlyTools(names ...string) Option {
 // Approve sets the function that answers each permission prompt of the
 // CLI. The call of the request has the tool_use_id, the tool name, and
 // the input of the prompt. The request has the reason of the CLI. It
-// has NoAlways if the CLI offers no "allow always" for the call,
-// because the rule that "allow always" writes allows more than the
-// call. Without Approve, the agent denies every prompt. If fn
+// has Safety for an edit of a protected path. Without Approve, the agent denies every prompt. If fn
 // returns an error, the agent sends the error to the CLI, which denies
 // the call.
 //
@@ -252,7 +250,8 @@ func OnlyTools(names ...string) Option {
 // suggestion to the session, so the CLI writes no rule to a settings
 // file. A suggestion can change the mode of the CLI for the session,
 // such as to acceptEdits after an edit. If the CLI offers no
-// suggestions, or if the prompt has NoAlways, Always does nothing. The
+// suggestions, or if its rule for "allow always" allows more than the
+// call, Always does nothing. The
 // suggestions describe the original input, so an Always decision with
 // a new Input allows only this call. An Input that holds the same JSON
 // value as the input of the prompt is not a new Input.

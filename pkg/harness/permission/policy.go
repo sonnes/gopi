@@ -287,16 +287,16 @@ func (h *hook) BeforeTool(
 	}
 	askRule := h.firstMatch(h.ask, c.Name, in)
 	if askRule != nil {
-		return h.requestApproval(ctx, c, in)
+		return h.requestApproval(ctx, c, in, false)
 	}
 	command := h.readOnly(c.Name, kind, in)
 	if h.blockReads && command == readsOutside {
-		return h.requestApproval(ctx, c, in)
+		return h.requestApproval(ctx, c, in, false)
 	}
 	// An Allow rule does not approve an edit of a protected path.
 	editsProtected := kind == tool.KindEdit && protected(targets)
 	if editsProtected && h.mode != Bypass {
-		return h.requestApproval(ctx, c, in)
+		return h.requestApproval(ctx, c, in, true)
 	}
 	if h.allowed(c.Name, in) {
 		return c, nil
@@ -309,15 +309,15 @@ func (h *hook) BeforeTool(
 	case kind == tool.KindRead && inRoots:
 		return c, nil
 	case kind == tool.KindRead:
-		return h.requestApproval(ctx, c, in)
+		return h.requestApproval(ctx, c, in, false)
 	case command == readsInside:
 		return c, nil
 	case command == readsOutside:
-		return h.requestApproval(ctx, c, in)
+		return h.requestApproval(ctx, c, in, false)
 	case h.mode == AcceptEdits && kind == tool.KindEdit && inRoots:
 		return c, nil
 	}
-	return h.requestApproval(ctx, c, in)
+	return h.requestApproval(ctx, c, in, false)
 }
 
 // targets returns the spellings of each path of a call of a file tool.
@@ -408,6 +408,28 @@ func (h *hook) checkLimits(name string, kind tool.Kind, targets [][]string) erro
 	return nil
 }
 
+// EditsProtected reports if the call c edits a protected path, as the
+// hook of [Policy.Hook] finds it. The package doc gives the protected
+// paths. dir is the folder of a relative path. A driver whose agent asks
+// on its own, such as Claude Code, uses it to set
+// [agent.ApprovalRequest.Safety].
+func EditsProtected(c ai.ToolCall, dir string) bool {
+	if kindOf(c.Name, nil) != tool.KindEdit {
+		return false
+	}
+	abs, err := absDir(dir)
+	if err != nil {
+		return false
+	}
+	home, _ := os.UserHomeDir()
+	h := &hook{
+		dir:  abs,
+		home: home,
+	}
+	targets, _ := h.targets(c.Name, decodeInput(c.Input))
+	return protected(targets)
+}
+
 // protected reports if a spelling of a target is a protected path.
 func protected(targets [][]string) bool {
 	for _, spellings := range targets {
@@ -418,14 +440,15 @@ func protected(targets [][]string) bool {
 	return false
 }
 
-// requestApproval gets a decision on c from the approver. If the
-// decision edits the input, the Deny rules check the edited input, and
-// an Always decision keeps a rule for the edited input. The edited input
-// is the input that runs.
+// requestApproval gets a decision on c from the approver. safety
+// marks the request as a safety check. If the decision edits the input,
+// the Deny rules check the edited input, and an Always decision keeps a
+// rule for the edited input. The edited input is the input that runs.
 func (h *hook) requestApproval(
 	ctx context.Context,
 	c ai.ToolCall,
 	in toolInput,
+	safety bool,
 ) (ai.ToolCall, error) {
 	if h.approve == nil {
 		reason := fmt.Sprintf(
@@ -434,7 +457,11 @@ func (h *hook) requestApproval(
 		)
 		return c, agent.Deny(reason)
 	}
-	d, err := h.approve(ctx, agent.ApprovalRequest{Call: c})
+	req := agent.ApprovalRequest{
+		Call:   c,
+		Safety: safety,
+	}
+	d, err := h.approve(ctx, req)
 	if err != nil {
 		return c, fmt.Errorf("permission: approve the tool call %q: %w", c.Name, err)
 	}

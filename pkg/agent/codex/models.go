@@ -27,7 +27,7 @@ func listModels(ctx context.Context, c config) ([]ai.Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("codex: list models: %w", err)
 	}
-	conn := dial(pipes, nil)
+	conn := dial(pipes, nil, "")
 	models, err := listPages(ctx, conn)
 	if err != nil {
 		conn.kill()

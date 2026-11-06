@@ -218,9 +218,9 @@ type outResponseBody struct {
 	Error     string `json:"error,omitempty"`
 }
 
-// permission is the answer to a can_use_tool request. An allow has
+// promptAnswer is the answer to a can_use_tool request. An allow has
 // the input of the call, and a deny has a message.
-type permission struct {
+type promptAnswer struct {
 	Behavior     string          `json:"behavior"`
 	Message      string          `json:"message,omitempty"`
 	UpdatedInput json.RawMessage `json:"updatedInput,omitempty"`
