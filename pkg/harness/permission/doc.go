@@ -27,6 +27,17 @@
 // [AcceptEdits], an edit tool runs if each of its paths is in a root. A
 // tool that is not a file tool has no paths, so each root check passes.
 //
+// A bash command is a read when each of its parts is a read-only
+// command, such as ls, cat, grep, find, or git status. Then it runs if
+// each path that it reads is in a root, and asks if a path is outside.
+// The parser asks in each case that it cannot read: an unknown command
+// or flag, a $ or a backtick, a redirect to a file, a heredoc, or a
+// glob that can match "..". A cd into a root is read-only, and the later
+// parts resolve their paths in each folder that the cd can give. With
+// [Policy.BlockReadsOutside], a read-only command with a path outside
+// the roots asks in each mode. The list of commands comes from Claude
+// Code 2.1.316.
+//
 // A path has more than one spelling when it goes through a symlink: the
 // path of the input, the target of each symlink, and the real path. A
 // root check and an Allow rule need each spelling. A Deny rule and an
@@ -56,7 +67,8 @@
 // another tool.
 //
 // The command rules match text, not the parsed shell program. So a
-// command rule is not a security boundary:
+// command rule is not a security boundary, and neither is the parser of
+// the read-only commands:
 //
 //   - The hook splits a command at &&, ||, ;, |, &, and a newline
 //     outside quotes. A Deny rule or an Ask rule matches if it matches

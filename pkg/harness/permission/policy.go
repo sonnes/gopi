@@ -52,7 +52,8 @@ type Policy struct {
 	// Kinds gives the kind of a tool, for a custom tool or to change the
 	// kind of a built-in tool. A tool that is not in Kinds gets its kind
 	// from the registry of [tool.Lookup], and a tool that is in
-	// neither is [tool.KindOther].
+	// neither is [tool.KindOther]. The policy finds the read-only
+	// commands only for a bash tool of the kind [tool.KindExec].
 	Kinds map[string]tool.Kind
 	// Dir is the working directory for the path rules and for a
 	// relative path in the input of a tool. The default is the working
@@ -280,6 +281,10 @@ func (h *hook) BeforeTool(
 	if askRule != nil {
 		return h.requestApproval(ctx, c, in)
 	}
+	command := h.readOnly(c.Name, kind, in)
+	if h.blockReads && command == readsOutside {
+		return h.requestApproval(ctx, c, in)
+	}
 	if h.allowed(c.Name, in) {
 		return c, nil
 	}
@@ -291,6 +296,10 @@ func (h *hook) BeforeTool(
 	case kind == tool.KindRead && inRoots:
 		return c, nil
 	case kind == tool.KindRead:
+		return h.requestApproval(ctx, c, in)
+	case command == readsInside:
+		return c, nil
+	case command == readsOutside:
 		return h.requestApproval(ctx, c, in)
 	case h.mode == Plan:
 		reason := fmt.Sprintf(
@@ -321,6 +330,40 @@ func (h *hook) targets(name string, in toolInput) (targets [][]string, ok bool) 
 		targets = append(targets, spellings)
 	}
 	return targets, true
+}
+
+// readOnlyResult is what [hook.readOnly] finds in a bash command.
+type readOnlyResult int
+
+const (
+	// notReadOnly is a command that can change something, or a command
+	// that the parser does not know.
+	notReadOnly readOnlyResult = iota
+	// readsInside is a read-only command whose paths are in the roots.
+	readsInside
+	// readsOutside is a read-only command with a path outside the roots.
+	readsOutside
+)
+
+// readOnly reports if a call of the bash tool is a read-only command,
+// and if each path that it reads is in the roots. A path whose symlinks
+// do not resolve is outside. A tool of another name or kind is
+// notReadOnly.
+func (h *hook) readOnly(name string, kind tool.Kind, in toolInput) readOnlyResult {
+	if name != bash.Name || kind != tool.KindExec || !in.ok {
+		return notReadOnly
+	}
+	paths, ok := readOnlyPaths(in.Command, h.dir, h.home)
+	if !ok {
+		return notReadOnly
+	}
+	for _, p := range paths {
+		spellings, ok := spellingsOf(p)
+		if !ok || !h.roots.contains(spellings) {
+			return readsOutside
+		}
+	}
+	return readsInside
 }
 
 // inRoots reports if each spelling of each target is in a root.

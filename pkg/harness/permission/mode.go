@@ -10,13 +10,13 @@ import (
 type Mode string
 
 const (
-	// Default runs the read tools in the roots. Each other call asks.
+	// Default runs the read tools and the read-only bash commands in the
+	// roots. Each other call asks.
 	Default Mode = "default"
-	// AcceptEdits runs the read tools in the roots, and the edit tools
-	// in the roots, except on a protected path. Each other call asks.
+	// AcceptEdits runs what Default runs, and the edit tools in the
+	// roots, except on a protected path. Each other call asks.
 	AcceptEdits Mode = "acceptEdits"
-	// Plan runs the read tools in the roots, and a read outside the
-	// roots asks. Each other call is blocked, so the agent can examine
+	// Plan runs what Default runs, and a read outside the roots asks. Each other call is blocked, so the agent can examine
 	// the work but not change it.
 	Plan Mode = "plan"
 	// Bypass runs each call. A Deny rule, an Ask rule, and a hard limit

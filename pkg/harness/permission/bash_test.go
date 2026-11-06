@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 func TestBashAllow(t *testing.T) {
@@ -63,7 +64,12 @@ func TestBashAllow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.rule+"/"+tt.command, func(t *testing.T) {
-			p := &permission.Policy{Allow: []string{tt.rule}}
+			// The kind other turns off the check of the read-only
+			// commands, so only the rule decides.
+			p := &permission.Policy{
+				Allow: []string{tt.rule},
+				Kinds: map[string]tool.Kind{"bash": tool.KindOther},
+			}
 			got := decide(t, p, bashCall(t, tt.command)) == ran
 			assert.Equal(t, tt.want, got)
 		})

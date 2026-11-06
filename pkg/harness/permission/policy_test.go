@@ -24,7 +24,7 @@ func TestModeByKind(t *testing.T) {
 			return pathCall(t, "edit_file", "main.go")
 		},
 		"exec": func(t *testing.T) ai.ToolCall {
-			return bashCall(t, "ls")
+			return bashCall(t, "make build")
 		},
 		"other": func(t *testing.T) ai.ToolCall {
 			return call(t, "mcp__github__create_issue", map[string]any{})
@@ -328,8 +328,8 @@ func TestPolicyIsAValue(t *testing.T) {
 	child.Mode = permission.Stricter(child.Mode, permission.Plan)
 
 	assert.NoError(t, child.Validate())
-	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "ls")))
-	assert.Equal(t, denied, runOn(t, child.Hook(), bashCall(t, "ls")))
+	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "make build")))
+	assert.Equal(t, denied, runOn(t, child.Hook(), bashCall(t, "make build")))
 }
 
 func TestAlwaysDoesNotBeatDeny(t *testing.T) {
@@ -429,11 +429,11 @@ func TestDenyChecksTheEditedInput(t *testing.T) {
 	}
 	h := p.Hook()
 
-	_, out := runEdited(t, h, bashCall(t, "ls"))
+	_, out := runEdited(t, h, bashCall(t, "make build"))
 	assert.Equal(t, denied, out)
 
 	a.decision = allow
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "ls")))
+	assert.Equal(t, ran, runOn(t, h, bashCall(t, "make build")))
 	assert.Len(t, a.calls, 2, "a denied edit keeps no rule")
 }
 
@@ -444,13 +444,13 @@ func TestApproveError(t *testing.T) {
 			return allow, boom
 		},
 	}
-	_, err := beforeTool(t, p.Hook()).BeforeTool(context.Background(), agent.State{}, bashCall(t, "ls"))
+	_, err := beforeTool(t, p.Hook()).BeforeTool(context.Background(), agent.State{}, bashCall(t, "make build"))
 	assert.ErrorIs(t, err, boom)
 }
 
 func TestNilApproveDenies(t *testing.T) {
 	p := &permission.Policy{}
-	reason := denyReason(t, p, bashCall(t, "ls"))
+	reason := denyReason(t, p, bashCall(t, "make build"))
 	assert.Contains(t, reason, "approve")
 
 	assert.Equal(t, ran, runHook(t, p, pathCall(t, "read_file", "a.txt")))
