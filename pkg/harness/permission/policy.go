@@ -130,10 +130,10 @@ func (p Policy) compile() (compiled, error) {
 
 // Hook returns an [agent.Hook] that checks each tool call with the
 // policy in its BeforeTool method. The hook resolves the symlinks of the
-// roots once, in this call, and the symlinks of each path on each call. The hook reads the fields of the
-// policy once, in this call. A later change to a field does not change
-// the hook. Each hook starts with no rules of the Always decisions, and
-// keeps them for its life.
+// roots once, in this call, and the symlinks of each path on each call.
+// The hook reads the fields of the policy once, in this call. A later
+// change to a field does not change the hook. Each hook starts with no
+// rules of the Always decisions, and keeps them for its life.
 //
 // If the policy is not valid, or Dir is empty and the working
 // directory is unknown, the hook blocks each call with the error.
@@ -285,6 +285,12 @@ func (h *hook) BeforeTool(
 	if h.blockReads && command == readsOutside {
 		return h.requestApproval(ctx, c, in)
 	}
+	// An Allow rule does not approve an edit of a protected path. Plan
+	// mode keeps its own rule for edits.
+	editsProtected := kind == tool.KindEdit && protected(targets)
+	if editsProtected && h.mode != Bypass && h.mode != Plan {
+		return h.requestApproval(ctx, c, in)
+	}
 	if h.allowed(c.Name, in) {
 		return c, nil
 	}
@@ -307,8 +313,6 @@ func (h *hook) BeforeTool(
 			c.Name,
 		)
 		return c, agent.Deny(reason)
-	case kind == tool.KindEdit && protected(targets):
-		return h.requestApproval(ctx, c, in)
 	case h.mode == AcceptEdits && kind == tool.KindEdit && inRoots:
 		return c, nil
 	}

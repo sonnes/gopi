@@ -12,8 +12,11 @@
 //     blocks the call. The limits are [Policy.BlockReadsOutside] and
 //     [Policy.BlockWritesOutside].
 //  4. If an Ask rule matches the call, the hook asks [Policy.Approve].
-//  5. If an Allow rule matches the call, the call runs.
-//  6. The mode, the [tool.Kind] of the tool, and its paths decide. The
+//  5. If an edit tool has a protected path, the hook asks
+//     [Policy.Approve]. An Allow rule does not approve this edit. This
+//     step does not apply in [Bypass] and [Plan].
+//  6. If an Allow rule matches the call, the call runs.
+//  7. The mode, the [tool.Kind] of the tool, and its paths decide. The
 //     result is to run the call, to ask, or to block the call.
 //
 // A Deny rule, an Ask rule, and a hard limit apply in every mode, also
@@ -21,7 +24,7 @@
 //
 // In the mode step, the roots are [Policy.Roots], or [Policy.Dir] if
 // Roots is empty. A read tool runs if each of its paths is in a root.
-// An edit tool on a protected path asks. A protected path has a folder
+// A protected path has a folder
 // such as .git, .claude, or .vscode in it, or ends in a file name such
 // as .bashrc or .envrc. The lists come from Claude Code 2.1.316. In
 // [AcceptEdits], an edit tool runs if each of its paths is in a root. A

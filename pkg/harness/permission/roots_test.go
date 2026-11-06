@@ -341,3 +341,22 @@ func TestADenyRuleIgnoresTheLetterCase(t *testing.T) {
 
 	assert.Equal(t, denied, decide(t, p, pathCall(t, "read_file", "~/.SSH/id_ed25519")))
 }
+
+func TestAnAllowRuleDoesNotApproveAProtectedEdit(t *testing.T) {
+	root, _ := folders(t)
+	c := pathCall(t, "edit_file", ".git/hooks/pre-commit")
+	tests := []struct {
+		mode permission.Mode
+		want outcome
+	}{
+		{mode: permission.Default, want: asked},
+		{mode: permission.AcceptEdits, want: asked},
+		{mode: permission.Bypass, want: ran},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.mode), func(t *testing.T) {
+			p := &permission.Policy{Mode: tt.mode, Dir: root, Allow: []string{"Edit"}}
+			assert.Equal(t, tt.want, decide(t, p, c))
+		})
+	}
+}
