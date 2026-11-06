@@ -128,36 +128,34 @@ func needFence(t *testing.T) {
 	}
 }
 
-// secretInHome makes a home folder with a key in ~/.ssh, and returns
-// the path of the key.
-func secretInHome(t *testing.T) string {
+// gitHook makes a folder with a .git folder, and returns the folder and
+// the path of a hook in it. The fence keeps .git/hooks read-only.
+func gitHook(t *testing.T) (dir, hook string) {
 	t.Helper()
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	key := filepath.Join(home, ".ssh", "id_ed25519")
-	require.NoError(t, os.MkdirAll(filepath.Dir(key), 0o700))
-	require.NoError(t, os.WriteFile(key, []byte("s3cret"), 0o600))
-	return key
+	dir = t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git", "hooks"), 0o755))
+	return dir, filepath.Join(dir, ".git", "hooks", "pre-commit")
 }
 
 func TestTheDefaultSandboxHasNoFence(t *testing.T) {
-	key := secretInHome(t)
-	box := boundSandbox(t, bare(t))
+	dir, hook := gitHook(t)
+	box := boundSandbox(t, with(bare(t), harness.Dir(dir)))
 
-	got, err := box.ReadFile(context.Background(), key)
+	err := box.WriteFile(context.Background(), hook, []byte("x"))
 
 	require.NoError(t, err)
-	assert.Equal(t, "s3cret", string(got))
+	assert.FileExists(t, hook)
 }
 
-func TestFenceHidesTheCredentials(t *testing.T) {
+func TestFenceKeepsTheGitHooks(t *testing.T) {
 	needFence(t)
-	key := secretInHome(t)
-	box := boundSandbox(t, with(bare(t), harness.Fence()))
+	dir, hook := gitHook(t)
+	box := boundSandbox(t, with(bare(t), harness.Dir(dir), harness.Fence()))
 
-	_, err := box.ReadFile(context.Background(), key)
+	err := box.WriteFile(context.Background(), hook, []byte("x"))
 
 	require.Error(t, err)
+	assert.NoFileExists(t, hook)
 }
 
 func TestFenceWritesInEachAddDir(t *testing.T) {

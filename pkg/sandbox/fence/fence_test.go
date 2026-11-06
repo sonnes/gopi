@@ -31,8 +31,6 @@ func TestOptions(t *testing.T) {
 }
 
 func TestWorkspace(t *testing.T) {
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
 	cache := filepath.Join(os.TempDir(), "gopi-cache")
 
 	c := newConfig(Workspace("/work/app")...)
@@ -50,8 +48,7 @@ func TestWorkspace(t *testing.T) {
 	assert.Contains(t, c.names[0].names, ".gitmodules")
 	assert.Contains(t, c.names[0].names, ".bashrc")
 	assert.Empty(t, c.hideExcept, "the command reads the home directory")
-	assert.Contains(t, c.hide, filepath.Join(home, ".ssh"))
-	assert.Contains(t, c.hide, filepath.Join(home, ".aws"))
+	assert.Empty(t, c.hide, "the command reads each path")
 	assert.True(t, c.network)
 	assert.Empty(t, c.env, "the command gets the whole environment")
 	assert.Contains(t, c.setEnv, "XDG_CACHE_HOME="+cache)

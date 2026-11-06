@@ -454,7 +454,7 @@ func TestStartAppliesTheLimits(t *testing.T) {
 
 func TestStartFencesTheSandbox(t *testing.T) {
 	needFence(t)
-	key := secretInHome(t)
+	dir, hook := gitHook(t)
 	var boxes []sandbox.Sandbox
 	build := func(box sandbox.Sandbox) tool.Tool {
 		boxes = append(boxes, box)
@@ -464,11 +464,12 @@ func TestStartFencesTheSandbox(t *testing.T) {
 
 	start(t, h, agent.Config{
 		SessionID: "s1",
+		Dir:       dir,
 		Tools:     []tool.Tool{harness.Sandboxed(build)},
 		Limits:    agent.Limits{Fence: true},
 	})
 
 	require.NotEmpty(t, boxes)
-	_, err := boxes[len(boxes)-1].ReadFile(context.Background(), key)
+	err := boxes[len(boxes)-1].WriteFile(context.Background(), hook, []byte("x"))
 	require.Error(t, err)
 }
