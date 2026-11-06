@@ -140,8 +140,9 @@ var knownNames = []Known{
 		Claude: []string{"WebSearch"},
 	},
 	{
-		Name:   WebFetch,
-		Claude: []string{"WebFetch"},
+		Name:    WebFetch,
+		Claude:  []string{"WebFetch"},
+		Content: ContentDomain,
 	},
 	{
 		Name:   TodoWrite,

@@ -73,7 +73,7 @@ func TestLookup(t *testing.T) {
 		{in: "Glob", name: "find", claude: "Glob", kind: tool.KindRead, content: tool.ContentPath},
 		{in: "apply_patch", name: "apply_patch", claude: "", kind: tool.KindEdit, content: tool.ContentPath},
 		{in: "Task", name: "agent", claude: "Agent", kind: tool.KindRead, content: tool.ContentNone},
-		{in: "web_fetch", name: "web_fetch", claude: "WebFetch", kind: tool.KindOther, content: tool.ContentNone},
+		{in: "web_fetch", name: "web_fetch", claude: "WebFetch", kind: tool.KindOther, content: tool.ContentDomain},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {

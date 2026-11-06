@@ -33,7 +33,10 @@ func TestBashAllow(t *testing.T) {
 		{rule: "bash(*--version)", command: "go --version", want: true},
 		{rule: `bash(echo \* *)`, command: "echo * now", want: true},
 		{rule: `bash(echo \* *)`, command: "echo hi now", want: false},
-		{rule: `bash(echo \*)`, command: `echo \*`, want: true},
+		{rule: `bash(echo \*)`, command: "echo *", want: true},
+		{rule: `bash(echo \*)`, command: `echo \*`, want: false},
+		{rule: `bash(echo \\\\\*)`, command: `echo \*`, want: true},
+		{rule: `bash(echo \\\\\*)`, command: `echo \x`, want: false},
 
 		// A trailing " *" makes the arguments optional, if it is the only *.
 		{rule: "bash(git push *)", command: "git push origin", want: true},

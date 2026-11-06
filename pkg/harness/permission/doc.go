@@ -3,6 +3,11 @@
 // Allow. [Policy.Hook] turns the policy into one [agent.Hook] that
 // checks each call before it runs.
 //
+// [Rules] holds the rules of one layer, such as a workspace or a
+// session, and [Merge] joins the layers. [Rules.Check] matches one call
+// against the rules with no mode. [Exact] gives the narrowest rule that
+// allows one call.
+//
 // For one call, the hook uses the first step that applies:
 //
 //  1. If a path of a file tool has symlinks that do not resolve, the
@@ -62,12 +67,15 @@
 //   - A prefix that ends in "*", such as "mcp__github__*".
 //   - "mcp__server", which is each tool of the MCP server "server".
 //
-// Only the bash tool and the file tools accept content. For bash, the
-// content is a pattern for the command. For read_file, write_file,
-// edit_file, grep, and find, the content is a glob for the "path"
-// input. For apply_patch, the content is a glob for each path that the
-// patch changes. [Policy.Validate] gives an error for content on
-// another tool.
+// Only the bash tool, the file tools, and web_fetch accept content. For
+// bash, the content is a pattern for the command. In the pattern, \* is
+// a literal * and \\ is a literal backslash. For read_file,
+// write_file, edit_file, grep, and find, the content is a glob for the
+// path input: "path", or "file_path" of Claude Code. For apply_patch,
+// the content is a glob for each path that the patch changes. For
+// web_fetch, the content is "domain:" and a host, and it matches the
+// host of the "url" input. [Policy.Validate] gives an error for content
+// on another tool.
 //
 // The command rules match text, not the parsed shell program. So a
 // command rule is not a security boundary, and neither is the parser of
