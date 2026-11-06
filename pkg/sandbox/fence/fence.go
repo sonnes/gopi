@@ -106,24 +106,6 @@ func HideExcept(dir string, keep ...string) Option {
 	}
 }
 
-// workspaceHide are the directories and files under the home directory
-// that hold credentials.
-var workspaceHide = []string{
-	".ssh",
-	".aws",
-	".azure",
-	".config/gcloud",
-	".config/gh",
-	".docker",
-	".gnupg",
-	".kube",
-	".netrc",
-	".npmrc",
-	".pypirc",
-	".git-credentials",
-	"Library/Keychains",
-}
-
 // workspaceNames are the files and directories that a program outside
 // the fence loads and runs, at the root of a [Workspace] and in each
 // directory under it. The list comes from sandbox-runtime
@@ -168,7 +150,7 @@ const workspaceCache = "gopi-cache"
 //     config of each submodule.
 //   - If root has no .git directory, it cannot create or change .git. A
 //     .git file points git to another directory, which can hold a hook.
-//   - It can read each path, except the credentials in workspaceHide.
+//   - It can read each path. To hide a path, add [Hide] after the policy.
 //   - It has the network and the whole environment of the caller.
 //
 // The policy follows the sandbox of Claude Code: it limits the writes
@@ -188,13 +170,6 @@ func Workspace(root string, more ...string) []Option {
 	write := append(slices.Clone(roots), os.TempDir())
 	cache := filepath.Join(os.TempDir(), workspaceCache)
 
-	var hide []string
-	if home, err := os.UserHomeDir(); err == nil {
-		for _, p := range workspaceHide {
-			hide = append(hide, filepath.Join(home, p))
-		}
-	}
-
 	var opts []Option
 
 	var readOnly []string
@@ -210,7 +185,6 @@ func Workspace(root string, more ...string) []Option {
 	return append(opts,
 		Write(write...),
 		ReadOnly(readOnly...),
-		Hide(hide...),
 		Network(true),
 		SetEnv("XDG_CACHE_HOME", cache),
 		SetEnv("GOCACHE", filepath.Join(cache, "go-build")),
