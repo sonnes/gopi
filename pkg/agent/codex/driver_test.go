@@ -149,6 +149,50 @@ func TestDriverMode(t *testing.T) {
 	}
 }
 
+func TestDriverLimits(t *testing.T) {
+	tests := []struct {
+		name        string
+		mode        agent.Mode
+		limits      agent.Limits
+		wantSandbox SandboxMode
+	}{
+		{
+			name:        "the bypass mode with no limit turns the sandbox off",
+			mode:        agent.ModeBypass,
+			wantSandbox: SandboxDangerFullAccess,
+		},
+		{
+			name:        "the bypass mode with a block on writes writes in the workspace",
+			mode:        agent.ModeBypass,
+			limits:      agent.Limits{BlockWritesOutside: true},
+			wantSandbox: SandboxWorkspaceWrite,
+		},
+		{
+			name:        "the bypass mode with the fence writes in the workspace",
+			mode:        agent.ModeBypass,
+			limits:      agent.Limits{Fence: true},
+			wantSandbox: SandboxWorkspaceWrite,
+		},
+		{
+			name:        "the plan mode keeps its sandbox",
+			mode:        agent.ModePlan,
+			limits:      agent.Limits{BlockWritesOutside: true, Fence: true},
+			wantSandbox: SandboxReadOnly,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := startAgent(t, Driver(), agent.Config{
+				Mode:   tt.mode,
+				Limits: tt.limits,
+			})
+
+			p := a.threadParams("", nil, "", nil)
+			assert.Equal(t, tt.wantSandbox, p.Sandbox)
+		})
+	}
+}
+
 func TestDriverAllowAnswersAnApproval(t *testing.T) {
 	useTraces(t, []string{"approval_accept.trace"})
 	var asked []string
@@ -383,6 +427,12 @@ func TestDriverRejects(t *testing.T) {
 			name:    "an unknown mode",
 			config:  agent.Config{Mode: "auto"},
 			errText: `codex: agent: unknown mode "auto"`,
+		},
+		{
+			name:        "a block on reads outside the roots",
+			config:      agent.Config{Limits: agent.Limits{BlockReadsOutside: true}},
+			unsupported: true,
+			errText:     "codex: the limit BlockReadsOutside: Codex has no control for reads outside the roots: unsupported operation",
 		},
 	}
 	for _, tt := range tests {

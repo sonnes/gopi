@@ -26,6 +26,7 @@ const autoCompactFraction = 0.8
 // after the [System] of h, as a CLI agent adds it to its own prompt.
 // The Skills of c are preloaded, as with [Preload]. The rules of c go
 // after the rules of h. The MCP servers of c go after those of [MCP].
+// The Limits of c apply as [Limits] does.
 func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	if err := agent.CheckHooks(c.Hooks, agent.AllPoints...); err != nil {
 		return nil, fmt.Errorf("harness: %w", err)
@@ -51,6 +52,9 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 	}
 	if len(c.AddDirs) > 0 {
 		opts = append(opts, AddDirs(c.AddDirs...))
+	}
+	if c.Limits != (agent.Limits{}) {
+		opts = append(opts, Limits(c.Limits))
 	}
 	if len(c.Skillset) > 0 {
 		opts = append(opts, Skillset(c.Skillset...))

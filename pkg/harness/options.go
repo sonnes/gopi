@@ -159,6 +159,20 @@ func Fence(opts ...fence.Option) Option {
 	}
 }
 
+// Limits sets the hard limits of the permission policy and the
+// sandbox. BlockReadsOutside and BlockWritesOutside set the fields of
+// [permission.Policy] with the same names. Fence turns on [Fence] with
+// no options. Without Limits, the harness sets no limit.
+func Limits(l agent.Limits) Option {
+	return func(h *Harness) {
+		h.policy.BlockReadsOutside = l.BlockReadsOutside
+		h.policy.BlockWritesOutside = l.BlockWritesOutside
+		if l.Fence {
+			h.fenced = true
+		}
+	}
+}
+
 // System sets the base text of the system prompt. The harness sends it
 // as the first section, named [SystemSection], and the prompt builder
 // reads it as [Assembly.System].

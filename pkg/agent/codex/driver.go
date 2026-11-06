@@ -2,6 +2,7 @@ package codex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -31,6 +32,12 @@ import (
 //     directory run with no question. A command that needs more asks.
 //     So the mode asks less than the accept edits mode of Claude Code.
 //   - The bypass mode is [SandboxDangerFullAccess] with [ApprovalNever].
+//     With the limit BlockWritesOutside or Fence, it is
+//     [SandboxWorkspaceWrite] with [ApprovalNever].
+//
+// Codex has no control for reads outside the roots, so a config with
+// the limit BlockReadsOutside fails the start with
+// [errors.ErrUnsupported].
 //
 // Codex has no rules for each tool, so the driver applies the rules of
 // the config itself, as the harness reads them:
@@ -113,6 +120,12 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if err := agent.CheckMode(c.Mode, agent.AllModes...); err != nil {
 		return nil, fmt.Errorf("codex: %w", err)
 	}
+	if c.Limits.BlockReadsOutside {
+		return nil, fmt.Errorf(
+			"codex: the limit BlockReadsOutside: Codex has no control for reads outside the roots: %w",
+			errors.ErrUnsupported,
+		)
+	}
 
 	var opts []Option
 	if c.Approve != nil {
@@ -141,7 +154,7 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	if c.Effort != "" {
 		opts = append(opts, Thinking(c.Effort))
 	}
-	opts = append(opts, modeOptions(c.Mode)...)
+	opts = append(opts, modeOptions(c.Mode, c.Limits)...)
 	if len(c.MCP) > 0 {
 		opts = append(opts, MCP(c.MCP...))
 	}
@@ -213,8 +226,10 @@ func allowFirst(c agent.Config) agent.ApproveFunc {
 }
 
 // modeOptions returns the policy and the sandbox of the mode m. The doc
-// of [Driver] gives the reason for each pair.
-func modeOptions(m agent.Mode) []Option {
+// of [Driver] gives the reason for each pair. In [agent.ModeBypass], a
+// limit on writes or the fence of l gives the workspace-write sandbox,
+// so the commands write only in the roots.
+func modeOptions(m agent.Mode, l agent.Limits) []Option {
 	switch m {
 	case agent.ModePlan:
 		return []Option{
@@ -232,9 +247,13 @@ func modeOptions(m agent.Mode) []Option {
 			Sandbox(SandboxWorkspaceWrite),
 		}
 	case agent.ModeBypass:
+		sandbox := SandboxDangerFullAccess
+		if l.BlockWritesOutside || l.Fence {
+			sandbox = SandboxWorkspaceWrite
+		}
 		return []Option{
 			Policy(ApprovalNever),
-			Sandbox(SandboxDangerFullAccess),
+			Sandbox(sandbox),
 		}
 	default:
 		return nil

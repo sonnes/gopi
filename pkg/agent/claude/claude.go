@@ -113,6 +113,7 @@ type config struct {
 	allowed     []string
 	disallowed  []string
 	ask         []string
+	limits      agent.Limits
 	only        []string
 	approve     agent.ApproveFunc
 	hooks       []agent.Hook
@@ -219,6 +220,15 @@ func DisallowedTools(names ...string) Option {
 // the CLI adds them to the ask rules of its own settings.
 func AskTools(names ...string) Option {
 	return func(c *config) { c.ask = append(c.ask, names...) }
+}
+
+// Limits gives the CLI the hard limits l in the settings of --settings:
+// permissions.blockReadsOutsideWorkingDirectories,
+// permissions.blockWritesOutsideWorkingDirectories, and
+// sandbox.enabled. The CLI adds them to its own settings. Without
+// Limits, the settings of the CLI decide.
+func Limits(l agent.Limits) Option {
+	return func(c *config) { c.limits = l }
 }
 
 // OnlyTools gives the CLI only the named built-in tools, with the
@@ -454,20 +464,40 @@ func (a *Agent) drop(proc *process) {
 	a.mu.Unlock()
 }
 
-// askSettings returns the settings of the CLI, as JSON, that hold the
-// ask rules.
-func askSettings(rules []string) (string, error) {
-	var s struct {
-		Permissions struct {
-			Ask []string `json:"ask"`
-		} `json:"permissions"`
+// cliSettings are the settings of the CLI that the agent gives with
+// --settings.
+type cliSettings struct {
+	Permissions struct {
+		Ask                []string `json:"ask,omitempty"`
+		BlockReadsOutside  bool     `json:"blockReadsOutsideWorkingDirectories,omitempty"`
+		BlockWritesOutside bool     `json:"blockWritesOutsideWorkingDirectories,omitempty"`
+	} `json:"permissions"`
+	Sandbox *sandboxSettings `json:"sandbox,omitempty"`
+}
+
+// sandboxSettings are the sandbox settings of the CLI.
+type sandboxSettings struct {
+	Enabled bool `json:"enabled"`
+}
+
+// settings returns the settings of the CLI, as JSON, that hold the ask
+// rules and the limits. ok is false if there is nothing to give.
+func settings(rules []string, l agent.Limits) (string, bool, error) {
+	if len(rules) == 0 && l == (agent.Limits{}) {
+		return "", false, nil
 	}
+	var s cliSettings
 	s.Permissions.Ask = rules
+	s.Permissions.BlockReadsOutside = l.BlockReadsOutside
+	s.Permissions.BlockWritesOutside = l.BlockWritesOutside
+	if l.Fence {
+		s.Sandbox = &sandboxSettings{Enabled: true}
+	}
 	data, err := json.Marshal(s)
 	if err != nil {
-		return "", fmt.Errorf("claude: encode the ask rules: %w", err)
+		return "", false, fmt.Errorf("claude: encode the settings: %w", err)
 	}
-	return string(data), nil
+	return string(data), true, nil
 }
 
 // mcpEntry is one server of an mcp.json file, as the CLI reads it.
@@ -616,12 +646,16 @@ func cliArgs(c config, system string) ([]string, error) {
 		rules := claudeRules(c.disallowed)
 		args = append(args, "--disallowedTools", strings.Join(rules, ","))
 	}
+	var ask []string
 	if len(c.ask) > 0 {
-		settings, err := askSettings(claudeRules(c.ask))
-		if err != nil {
-			return nil, err
-		}
-		args = append(args, "--settings", settings)
+		ask = claudeRules(c.ask)
+	}
+	s, ok, err := settings(ask, c.limits)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
+		args = append(args, "--settings", s)
 	}
 	if c.only != nil {
 		args = append(args, "--tools", strings.Join(builtinTools(c.only), ","))

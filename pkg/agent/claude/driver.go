@@ -17,7 +17,7 @@ import (
 //
 // The driver maps Model to the ID of the model, Dir, System, Effort to
 // [Thinking], Mode to [PermissionMode], Allow to [AllowedTools], Ask to
-// [AskTools], Deny to [DisallowedTools], MCP to [MCP], Idle to
+// [AskTools], Limits to [Limits], Deny to [DisallowedTools], MCP to [MCP], Idle to
 // [Idle], Wake to [Wake], and Approve.
 //
 // The driver maps the names of the Tools that ToolNames keeps to
@@ -124,6 +124,9 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 	}
 	if len(c.Ask) > 0 {
 		opts = append(opts, AskTools(c.Ask...))
+	}
+	if c.Limits != (agent.Limits{}) {
+		opts = append(opts, Limits(c.Limits))
 	}
 	if len(c.Deny) > 0 {
 		opts = append(opts, DisallowedTools(c.Deny...))

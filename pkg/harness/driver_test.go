@@ -2,6 +2,8 @@ package harness_test
 
 import (
 	"context"
+	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +15,8 @@ import (
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -406,4 +410,65 @@ func TestStartGivesTheAutoCompactSizeToTheDefaultStrategy(t *testing.T) {
 		ai.EstimateTokens(a.State().Messages()...),
 		"the default limit of 200k does not start this compaction",
 	)
+}
+
+func TestStartAppliesTheLimits(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "a.txt")
+	tests := []struct {
+		name    string
+		tool    string
+		limits  agent.Limits
+		wantRan bool
+	}{
+		{name: "no limit writes outside in bypass", tool: tool.WriteFile, wantRan: true},
+		{name: "a block on writes", tool: tool.WriteFile, limits: agent.Limits{BlockWritesOutside: true}},
+		{name: "a block on reads", tool: tool.ReadFile, limits: agent.Limits{BlockReadsOutside: true}},
+		{name: "a block on writes reads outside", tool: tool.ReadFile, limits: agent.Limits{BlockWritesOutside: true}, wantRan: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input, err := json.Marshal(map[string]string{"path": outside})
+			require.NoError(t, err)
+			p := &script{responses: []ai.Message{
+				callTool("c1", tt.tool, string(input)),
+				reply("done"),
+			}}
+			fileTool := tool.Func(tt.tool, func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
+				return ai.ToolResult{}, nil
+			})
+			h := harness.New(base(t, p)...)
+
+			a := start(t, h, agent.Config{
+				SessionID: "s1",
+				Dir:       t.TempDir(),
+				Mode:      agent.ModeBypass,
+				Tools:     []tool.Tool{fileTool},
+				Limits:    tt.limits,
+			})
+			run(t, a, "hi")
+
+			assert.Equal(t, tt.wantRan, !toolResult(t, a).IsError, toolResult(t, a).Text())
+		})
+	}
+}
+
+func TestStartFencesTheSandbox(t *testing.T) {
+	needFence(t)
+	key := secretInHome(t)
+	var boxes []sandbox.Sandbox
+	build := func(box sandbox.Sandbox) tool.Tool {
+		boxes = append(boxes, box)
+		return read.New(box)
+	}
+	h := harness.New(base(t, &script{})...)
+
+	start(t, h, agent.Config{
+		SessionID: "s1",
+		Tools:     []tool.Tool{harness.Sandboxed(build)},
+		Limits:    agent.Limits{Fence: true},
+	})
+
+	require.NotEmpty(t, boxes)
+	_, err := boxes[len(boxes)-1].ReadFile(context.Background(), key)
+	require.Error(t, err)
 }

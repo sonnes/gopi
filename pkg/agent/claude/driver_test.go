@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -308,6 +309,50 @@ func TestDriverGivesEachAddDirToTheCLI(t *testing.T) {
 	args := strings.Join(starts.Cmds()[0].Args, " ")
 	assert.Contains(t, args, "--add-dir /lw/repos")
 	assert.Contains(t, args, "--add-dir /lw/shared")
+}
+
+func TestDriverGivesTheLimitsToTheCLI(t *testing.T) {
+	tests := []struct {
+		name   string
+		config agent.Config
+		want   string
+	}{
+		{
+			name: "each limit",
+			config: agent.Config{
+				Limits: agent.Limits{BlockReadsOutside: true, BlockWritesOutside: true, Fence: true},
+			},
+			want: `{"permissions":{"blockReadsOutsideWorkingDirectories":true,"blockWritesOutsideWorkingDirectories":true},"sandbox":{"enabled":true}}`,
+		},
+		{
+			name: "a limit and an ask rule",
+			config: agent.Config{
+				Ask:    []string{"bash(git push *)"},
+				Limits: agent.Limits{BlockWritesOutside: true},
+			},
+			want: `{"permissions":{"ask":["Bash(git push *)"],"blockWritesOutsideWorkingDirectories":true}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			starts := claude.Replay(t, nil, "testdata/text.trace")
+			tt.config.SessionID = "s1"
+			tt.config.Store = session.NewMemoryStore()
+
+			r, err := claude.Driver().Start(context.Background(), tt.config)
+			require.NoError(t, err)
+			a, ok := r.(*claude.Agent)
+			require.True(t, ok)
+			defer closeAgent(t, a)
+			_, _, err = run(context.Background(), a, "Say hello")
+			require.NoError(t, err)
+
+			args := starts.Cmds()[0].Args
+			i := slices.Index(args, "--settings")
+			require.GreaterOrEqual(t, i, 0, "the CLI gets --settings")
+			assert.JSONEq(t, tt.want, args[i+1])
+		})
+	}
 }
 
 func TestDriverRejects(t *testing.T) {

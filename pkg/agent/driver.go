@@ -45,6 +45,9 @@ type Config struct {
 	// write, as it does Dir. The mode still decides which calls ask
 	// first. A driver of a CLI gives them to the sandbox of the CLI.
 	AddDirs []string
+	// Limits are hard limits on the paths of the agent. The zero Limits
+	// sets no limit, so the mode and the rules decide each call.
+	Limits Limits
 	// Sections returns the sections that the agent adds to its own
 	// prompt, in order. A native agent calls it before each model call,
 	// and an agent CLI calls it before each run. A change of the
@@ -331,4 +334,27 @@ func CheckMode(m Mode, supported ...Mode) error {
 		return fmt.Errorf("agent: unknown mode %q", m)
 	}
 	return fmt.Errorf("agent: the mode %s: %w", m, errors.ErrUnsupported)
+}
+
+// Limits are hard limits on the paths of an agent. A limit holds in each
+// mode, also in [ModeBypass]. The roots are Dir and AddDirs of the
+// [Config]. Each driver maps a limit to its own control, and a driver
+// whose agent has no such control fails at the start.
+type Limits struct {
+	// BlockReadsOutside refuses a read of a file tool outside the roots.
+	// The harness denies the call, and a read-only bash command outside
+	// the roots asks. Claude Code gets the setting
+	// permissions.blockReadsOutsideWorkingDirectories. Codex has no such
+	// control, so its driver fails at the start.
+	BlockReadsOutside bool
+	// BlockWritesOutside refuses an edit of a file tool outside the
+	// roots. The harness denies the call. Claude Code gets the setting
+	// permissions.blockWritesOutsideWorkingDirectories. Codex in
+	// [ModeBypass] gets the workspace-write sandbox.
+	BlockWritesOutside bool
+	// Fence runs the commands of the agent in an OS sandbox. The harness
+	// uses the fence of its default sandbox, which runs only on macOS.
+	// Claude Code gets the setting sandbox.enabled. Codex in
+	// [ModeBypass] gets the workspace-write sandbox.
+	Fence bool
 }
