@@ -6,6 +6,7 @@ import (
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/fence"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -47,8 +48,10 @@ func Dir(path string) Option {
 	return func(h *Harness) { h.dir = path }
 }
 
-// AddDirs gives the default sandbox more folders that the agent can
-// read and write, as it does [Dir]. A sandbox of [Sandbox] ignores them.
+// AddDirs gives the agent more folders that it can read and write, as
+// it does [Dir]. The permission policy reads and edits in them without a
+// question, as in Dir. The fence of [Fence] writes in them. A sandbox of
+// [Sandbox] ignores them.
 func AddDirs(paths ...string) Option {
 	return func(h *Harness) { h.addDirs = append(h.addDirs, paths...) }
 }
@@ -133,12 +136,27 @@ func MCP(servers ...agent.MCPServer) Option {
 }
 
 // Sandbox sets the sandbox of the tools of [Sandboxed]. Without Sandbox,
-// each assembly makes a [sandbox.Local] in its [Dir] with the
-// [fence.Workspace] policy. The fence runs only on macOS, so on another
-// OS an assembly with a tool of Sandboxed fails until a caller gives a
-// sandbox.
+// each assembly makes a [sandbox.Local] in its [Dir]. That sandbox has
+// no fence unless the harness has [Fence].
 func Sandbox(box sandbox.Sandbox) Option {
 	return func(h *Harness) { h.box = box }
+}
+
+// Fence puts the default sandbox in the [fence.Workspace] policy: a
+// command writes only in [Dir], [AddDirs], and the temp folder, and it
+// cannot read the credential folders of the home folder. opts go after
+// the Workspace policy, so they can change it. Each Fence adds its opts.
+// Without Fence, the default sandbox has no fence, and the permission
+// policy is the only check.
+//
+// The fence runs only on macOS. On another OS, an assembly with a tool
+// of [Sandboxed] fails until a caller gives a sandbox with [Sandbox]. A
+// sandbox of Sandbox ignores Fence.
+func Fence(opts ...fence.Option) Option {
+	return func(h *Harness) {
+		h.fenced = true
+		h.fence = append(h.fence, opts...)
+	}
 }
 
 // System sets the base text of the system prompt. The harness sends it

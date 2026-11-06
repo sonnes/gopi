@@ -62,7 +62,7 @@ func AgentTool() Binder {
 
 // Sandboxed returns a Binder that calls build with the sandbox of each
 // assembly: the [Sandbox] of the harness, or a [sandbox.Local] in its
-// [Dir] with the [fence.Workspace] policy. Each tool of an assembly gets
+// [Dir], in the fence of [Fence] if the harness has it. Each tool of an assembly gets
 // the same sandbox. Sandboxed calls build once with a nil sandbox to
 // read the info of the tool, so build must not use the sandbox before a
 // call, as the tools of pkg/sandbox do not.
@@ -154,9 +154,14 @@ func (a *Assembly) sandbox() (sandbox.Sandbox, error) {
 		a.box = a.h.box
 		return a.box, nil
 	}
-	box, err := sandbox.Local(a.Dir, sandbox.Policy(fence.Workspace(a.Dir, a.h.addDirs...)...))
+	var opts []sandbox.Option
+	if a.h.fenced {
+		policy := append(fence.Workspace(a.Dir, a.h.addDirs...), a.h.fence...)
+		opts = append(opts, sandbox.Policy(policy...))
+	}
+	box, err := sandbox.Local(a.Dir, opts...)
 	if errors.Is(err, errors.ErrUnsupported) {
-		return nil, fmt.Errorf("%w: the fence of the default sandbox runs only on macOS. Give a sandbox with harness.Sandbox", err)
+		return nil, fmt.Errorf("%w: the fence of harness.Fence runs only on macOS. Give a sandbox with harness.Sandbox", err)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("the sandbox: %w", err)

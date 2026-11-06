@@ -34,7 +34,7 @@ flowchart TD
 - The agent calls the prompt builder before each model call, so a resumed session gets the definitions that the readers give now, as a section change after the history.
 - The harness sets the permission hook first and `agent.System` and `agent.Store` after the agent options of the caller. A hook of the caller then sees only the calls that the rules let run, and the prompt and the store of the harness win.
 - The harness adds no tool of its own. Each tool comes from `Toolset`, and a `Binder` binds to each assembly, so one harness serves sessions with different folders, skills, and subagents.
-- The default sandbox of a `Sandboxed` tool has the workspace fence. A coding agent then cannot write outside its folder by default. The fence runs only on macOS, so on another OS the assembly fails with a message that names `Sandbox`.
+- The default sandbox of a `Sandboxed` tool has no fence, so the harness runs on each OS. The [permission policy](permission.md) asks before a call outside `Dir` and `AddDirs`. `Fence` turns on the workspace fence, which runs only on macOS. On another OS, an assembly with `Fence` fails with a message that names `Sandbox`.
 
 ## Map
 

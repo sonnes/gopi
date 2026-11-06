@@ -99,7 +99,7 @@ If a server does not connect, `New` and `Durable` fail. `Close` on the agent clo
 
 A `Deny` rule wins over every mode. Then an `Ask` rule, then an `Allow` rule. The rules have the format of Claude Code settings. `Approve` asks a person. Without it, each call that needs an approval is denied.
 
-A tool of `Sandboxed` runs in a local sandbox with the workspace fence, so a command cannot write outside `Dir`. The fence runs only on macOS. On another OS, give a sandbox with `Sandbox`, or an assembly with a tool of `Sandboxed` fails.
+A tool of `Sandboxed` runs in a local sandbox in `Dir`, with no fence. To keep the writes of each command in `Dir` and `AddDirs`, give `Fence`. The fence runs only on macOS. On another OS, an assembly with `Fence` fails, so give a sandbox with `Sandbox`.
 
 ## Agent Options and the First Entries
 

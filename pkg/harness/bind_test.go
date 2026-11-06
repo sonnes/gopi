@@ -2,6 +2,8 @@ package harness_test
 
 import (
 	"context"
+	"errors"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/fence"
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -77,9 +80,6 @@ func TestUnboundToolsHaveTheirNames(t *testing.T) {
 }
 
 func TestSandboxedToolBindsToTheSandboxOfTheSession(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("the fence of the default sandbox runs only on macOS")
-	}
 	dir := t.TempDir()
 	var boxes []sandbox.Sandbox
 	build := func(box sandbox.Sandbox) tool.Tool {
@@ -104,28 +104,97 @@ func TestSandboxedToolBindsToTheSandboxOfTheSession(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestTheSandboxWritesInEachAddDir(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		t.Skip("the fence of the default sandbox runs only on macOS")
-	}
-	extra := t.TempDir()
+// boundSandbox returns the sandbox that the harness of opts binds to a
+// tool of [harness.Sandboxed].
+func boundSandbox(t *testing.T, opts []harness.Option) sandbox.Sandbox {
+	t.Helper()
 	var boxes []sandbox.Sandbox
 	build := func(box sandbox.Sandbox) tool.Tool {
 		boxes = append(boxes, box)
 		return read.New(box)
 	}
-	opts := with(bare(t),
-		harness.AddDirs(extra),
-		harness.Toolset(harness.Tools(harness.Sandboxed(build))),
-	)
-
-	assemblyOf(t, opts)
-
+	assemblyOf(t, with(opts, harness.Toolset(harness.Tools(harness.Sandboxed(build)))))
 	require.NotEmpty(t, boxes)
 	bound := boxes[len(boxes)-1]
-	err := bound.WriteFile(context.Background(), filepath.Join(extra, "a.txt"), []byte("x"))
+	require.NotNil(t, bound)
+	return bound
+}
+
+// needFence skips t on an OS with no fence.
+func needFence(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "darwin" {
+		t.Skip("the fence runs only on macOS")
+	}
+}
+
+// secretInHome makes a home folder with a key in ~/.ssh, and returns
+// the path of the key.
+func secretInHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	key := filepath.Join(home, ".ssh", "id_ed25519")
+	require.NoError(t, os.MkdirAll(filepath.Dir(key), 0o700))
+	require.NoError(t, os.WriteFile(key, []byte("s3cret"), 0o600))
+	return key
+}
+
+func TestTheDefaultSandboxHasNoFence(t *testing.T) {
+	key := secretInHome(t)
+	box := boundSandbox(t, bare(t))
+
+	got, err := box.ReadFile(context.Background(), key)
+
+	require.NoError(t, err)
+	assert.Equal(t, "s3cret", string(got))
+}
+
+func TestFenceHidesTheCredentials(t *testing.T) {
+	needFence(t)
+	key := secretInHome(t)
+	box := boundSandbox(t, with(bare(t), harness.Fence()))
+
+	_, err := box.ReadFile(context.Background(), key)
+
+	require.Error(t, err)
+}
+
+func TestFenceWritesInEachAddDir(t *testing.T) {
+	needFence(t)
+	extra := t.TempDir()
+	box := boundSandbox(t, with(bare(t), harness.AddDirs(extra), harness.Fence()))
+
+	err := box.WriteFile(context.Background(), filepath.Join(extra, "a.txt"), []byte("x"))
+
 	require.NoError(t, err)
 	assert.FileExists(t, filepath.Join(extra, "a.txt"))
+}
+
+func TestFenceAddsItsOptionsToTheWorkspacePolicy(t *testing.T) {
+	needFence(t)
+	hidden := filepath.Join(t.TempDir(), "notes.txt")
+	require.NoError(t, os.WriteFile(hidden, []byte("x"), 0o600))
+	box := boundSandbox(t, with(bare(t), harness.Fence(fence.Hide(hidden))))
+
+	_, err := box.ReadFile(context.Background(), hidden)
+
+	require.Error(t, err)
+}
+
+func TestFenceFailsOnAnOSWithNoFence(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("macOS has a fence")
+	}
+	opts := with(bare(t),
+		harness.Fence(),
+		harness.Toolset(harness.Tools(harness.Sandboxed(read.New))),
+	)
+
+	_, err := harness.New(opts...).New(context.Background())
+
+	require.ErrorIs(t, err, errors.ErrUnsupported)
+	assert.Contains(t, err.Error(), "harness.Sandbox")
 }
 
 func TestTheHarnessSkipsANamedTool(t *testing.T) {

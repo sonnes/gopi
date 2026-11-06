@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/mcp"
 	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/fence"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -42,8 +43,12 @@ type Harness struct {
 	tools        []ToolsReader
 	// only names the tools that the agent keeps. If it is nil, the
 	// agent keeps each tool.
-	only      []string
-	box       sandbox.Sandbox
+	only []string
+	box  sandbox.Sandbox
+	// fenced is true if the default sandbox runs in the fence of
+	// [Fence], and fence holds the options of Fence.
+	fenced    bool
+	fence     []fence.Option
 	system    string
 	preload   []string
 	prompt    PromptBuilder
@@ -81,6 +86,7 @@ func (h *Harness) with(opts []Option) *Harness {
 	c.seeds = slices.Clip(c.seeds)
 	c.agentOpts = slices.Clip(c.agentOpts)
 	c.mcp = slices.Clip(c.mcp)
+	c.fence = slices.Clip(c.fence)
 	c.policy.Allow = slices.Clip(c.policy.Allow)
 	c.policy.Ask = slices.Clip(c.policy.Ask)
 	c.policy.Deny = slices.Clip(c.policy.Deny)

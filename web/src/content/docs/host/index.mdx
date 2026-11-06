@@ -53,7 +53,7 @@ The config has no `ID`, so the host gives the session a UUIDv4. To name sessions
 
 The tool list of the host is the full set of tools of each session, and each driver gets it. `Open` fails without `host.Tools`, and each call of `host.Tools` adds to the list. `harness.Coding` gives the tools that read files, change files, and run commands. `claude.Tools` and `codex.Tools` give each tool of the CLI by name. Claude Code and Codex read only the names, and skip a well-known tool that the CLI does not have. `tool.Named` gives the name of one tool that only a CLI runs, such as `apply_patch` of Codex. A tool of your own runs only in the harness, and a CLI skips it.
 
-The harness that is the default driver takes no `Toolset`, because the host gives the tools. Give it `harness.Sandbox` on an OS other than macOS, because the default sandbox fence runs only on macOS.
+The harness that is the default driver takes no `Toolset`, because the host gives the tools.
 
 `Config.ToolNames` picks a subset of the list, as the `tools` key of an agent file does. `Create` fails on a name of no tool of the list, and the error names the agent file if the name came from it. A `Deny` rule with no content, such as `WebFetch`, removes the tool. `ToolNames`, `Allow`, `Ask`, and `Deny` take a gopi name, such as `bash`, or a Claude Code name, such as `Bash`. Each driver reads both, so a rule from a Claude Code settings file works as written.
 
