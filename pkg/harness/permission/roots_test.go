@@ -64,18 +64,6 @@ func TestTheModeChecksTheRoots(t *testing.T) {
 			},
 		},
 		{
-			mode: permission.Plan,
-			want: map[string]outcome{
-				"read in":        ran,
-				"read out":       asked,
-				"grep out":       asked,
-				"edit in":        denied,
-				"edit out":       denied,
-				"edit protected": denied,
-				"read protected": ran,
-			},
-		},
-		{
 			mode: permission.Bypass,
 			want: map[string]outcome{
 				"read in":        ran,

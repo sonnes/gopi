@@ -94,7 +94,6 @@ If a server does not connect, `New` and `Durable` fail. `Close` on the agent clo
 | ------------------- | ---------- | ---------- | -------------- | ---------- | ----------- |
 | `Default`           | run        | ask        | run            | ask        | ask         |
 | `AcceptEdits`       | run        | run        | run            | ask        | ask         |
-| `Plan`              | run        | deny       | run            | deny       | deny        |
 | `Bypass`            | run        | run        | run            | run        | run         |
 
 The table is for paths in the roots: `Dir` and each folder of `AddDirs`. A read outside the roots asks, and an edit outside the roots asks in `AcceptEdits`. An edit of a protected path, such as `.git/hooks` or `.bashrc`, asks. A read-only bash command is a command such as `ls`, `cat`, `grep`, or `git status`, with flags that only read.

@@ -116,13 +116,13 @@ func TestCheckMode(t *testing.T) {
 		},
 		{
 			name:      "a supported mode",
-			mode:      agent.ModePlan,
-			supported: []agent.Mode{agent.ModePlan, agent.ModeBypass},
+			mode:      agent.ModeDefault,
+			supported: []agent.Mode{agent.ModeDefault, agent.ModeBypass},
 		},
 		{
 			name:        "a mode that the driver cannot honor",
 			mode:        agent.ModeAcceptEdits,
-			supported:   []agent.Mode{agent.ModePlan},
+			supported:   []agent.Mode{agent.ModeDefault},
 			errText:     "agent: the mode acceptEdits: unsupported operation",
 			unsupported: true,
 		},

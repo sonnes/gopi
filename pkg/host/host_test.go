@@ -21,13 +21,13 @@ func TestCreate(t *testing.T) {
 	sess := f.create(t, host.Config{
 		ID:   "s1",
 		Dir:  "/tmp",
-		Mode: agent.ModePlan,
+		Mode: agent.ModeAcceptEdits,
 	})
 
 	assert.Equal(t, "s1", sess.ID)
 	assert.Equal(t, host.StatusIdle, sess.Status)
 	assert.Equal(t, "fake/m", sess.Model)
-	assert.Equal(t, agent.ModePlan, sess.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, sess.Mode)
 	assert.Empty(t, sess.StopReason, "a session with no run has no stop reason")
 	got := next(t, events, func(host.Event) bool { return true })
 	assert.Equal(t, sess, got.Session)
@@ -40,7 +40,7 @@ func TestCreate(t *testing.T) {
 	c := f.lastConfig(t)
 	assert.Equal(t, "s1", c.SessionID)
 	assert.Equal(t, "/tmp", c.Dir)
-	assert.Equal(t, agent.ModePlan, c.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
 	assert.NotNil(t, c.Approve, "the host answers each call that asks")
 }
 

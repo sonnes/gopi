@@ -285,10 +285,9 @@ func (h *hook) BeforeTool(
 	if h.blockReads && command == readsOutside {
 		return h.requestApproval(ctx, c, in)
 	}
-	// An Allow rule does not approve an edit of a protected path. Plan
-	// mode keeps its own rule for edits.
+	// An Allow rule does not approve an edit of a protected path.
 	editsProtected := kind == tool.KindEdit && protected(targets)
-	if editsProtected && h.mode != Bypass && h.mode != Plan {
+	if editsProtected && h.mode != Bypass {
 		return h.requestApproval(ctx, c, in)
 	}
 	if h.allowed(c.Name, in) {
@@ -307,12 +306,6 @@ func (h *hook) BeforeTool(
 		return c, nil
 	case command == readsOutside:
 		return h.requestApproval(ctx, c, in)
-	case h.mode == Plan:
-		reason := fmt.Sprintf(
-			"plan mode blocks the tool call %q, because the tool can change the workspace",
-			c.Name,
-		)
-		return c, agent.Deny(reason)
 	case h.mode == AcceptEdits && kind == tool.KindEdit && inRoots:
 		return c, nil
 	}

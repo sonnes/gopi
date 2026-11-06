@@ -70,7 +70,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | agent tool    | The tool of the harness that runs a subagent in a child session, and gives the parent the last text of the subagent | task tool, subagent tool |
 | session config | The config that a session started with, with the fields of its agent file, which the host keeps in a session value | saved agent, agent snapshot |
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
-| permission mode | What decides a tool call that no rule matches: default, acceptEdits, plan, or bypassPermissions | approval policy, level |
+| permission mode | What decides a tool call that no rule matches: default, acceptEdits, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
 | permission policy | The permission mode and the permission rules of a harness, as one value that becomes one BeforeTool hook | policy, approval config |
 | root          | A folder where the permission policy runs a read, and an edit in acceptEdits, with no question: Dir and each folder of AddDirs | working directory, workspace |

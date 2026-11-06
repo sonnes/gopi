@@ -111,7 +111,7 @@ The `Mode` of the config decides the calls that need a person. With `agent.ModeA
 ```go
 s, err := h.Update(ctx, s.ID, func(c *host.Config) {
 	c.Model = "claude-code/claude-sonnet-5-5"
-	c.Mode = agent.ModePlan
+	c.Mode = agent.ModeAcceptEdits
 })
 ```
 

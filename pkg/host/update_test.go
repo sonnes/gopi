@@ -31,13 +31,13 @@ func TestUpdateAnIdleSession(t *testing.T) {
 	got, err := f.h.Update(ctx, "s1", func(c *host.Config) {
 		c.Model = "fake2/n"
 		c.Effort = ai.ThinkingHigh
-		c.Mode = agent.ModePlan
+		c.Mode = agent.ModeAcceptEdits
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "fake2/n", got.Model)
 	assert.Equal(t, ai.ThinkingHigh, got.Effort)
-	assert.Equal(t, agent.ModePlan, got.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, got.Mode)
 	assert.Equal(t, host.StatusIdle, got.Status)
 	assert.Equal(t, got, next(t, events, func(host.Event) bool { return true }).Session)
 
@@ -47,7 +47,7 @@ func TestUpdateAnIdleSession(t *testing.T) {
 	assert.Equal(t, 2, f.driver.starts(), "the next run starts the agent again")
 	assert.Equal(t, "fake2/n", c.Spec)
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
-	assert.Equal(t, agent.ModePlan, c.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
 	assert.Equal(t, []string{"a", "b"}, f.model.texts(), "the agent resumes the log")
 }
 
@@ -82,7 +82,7 @@ func TestUpdateDuringARun(t *testing.T) {
 	f.send(t, "s1", "b")
 
 	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
-		c.Mode = agent.ModePlan
+		c.Mode = agent.ModeAcceptEdits
 	})
 
 	require.NoError(t, err)
@@ -91,7 +91,7 @@ func TestUpdateDuringARun(t *testing.T) {
 	runEnd(t, events)
 	runEnd(t, events)
 	assert.Equal(t, 2, f.driver.starts(), "the held message runs on a new agent")
-	assert.Equal(t, agent.ModePlan, f.lastConfig(t).Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, f.lastConfig(t).Mode)
 }
 
 func TestUpdateSurvivesARestart(t *testing.T) {
@@ -99,18 +99,18 @@ func TestUpdateSurvivesARestart(t *testing.T) {
 	ctx := context.Background()
 	f.create(t, host.Config{ID: "s1"})
 	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
-		c.Mode = agent.ModePlan
+		c.Mode = agent.ModeAcceptEdits
 	})
 	require.NoError(t, err)
 
 	f = f.restart(t)
 
 	got, _ := f.h.Get("s1")
-	assert.Equal(t, agent.ModePlan, got.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, got.Mode)
 	_, events := f.watch(t)
 	f.send(t, "s1", "a")
 	runEnd(t, events)
-	assert.Equal(t, agent.ModePlan, f.lastConfig(t).Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, f.lastConfig(t).Mode)
 }
 
 func TestUpdateRefusesAChange(t *testing.T) {

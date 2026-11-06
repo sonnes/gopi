@@ -185,7 +185,6 @@ func TestReadOnlyCommandsInEachMode(t *testing.T) {
 	}{
 		{mode: permission.Default, in: ran, out: asked, rm: asked},
 		{mode: permission.AcceptEdits, in: ran, out: asked, rm: asked},
-		{mode: permission.Plan, in: ran, out: asked, rm: denied},
 		{mode: permission.Bypass, in: ran, out: ran, rm: ran},
 	}
 	for _, tt := range tests {

@@ -90,13 +90,13 @@ func TestAFieldOfTheSpecWinsOverTheAgentFile(t *testing.T) {
 		ID:     "s1",
 		Dirs:   []string{dir},
 		Agent:  "reviewer",
-		Mode:   "plan",
+		Mode:   "acceptEdits",
 		Effort: ai.ThinkingLow,
 	})
 	require.NoError(t, err)
 
 	c := f.lastConfig(t)
-	assert.Equal(t, agent.Mode("plan"), c.Mode)
+	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
 	assert.Equal(t, ai.ThinkingLow, c.Effort)
 }
 
