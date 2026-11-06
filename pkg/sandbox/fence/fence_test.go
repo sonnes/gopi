@@ -49,14 +49,11 @@ func TestWorkspace(t *testing.T) {
 	assert.Contains(t, c.names[0].names, ".git/commondir")
 	assert.Contains(t, c.names[0].names, ".gitmodules")
 	assert.Contains(t, c.names[0].names, ".bashrc")
-	require.Len(t, c.hideExcept, 1)
-	assert.Equal(t, home, c.hideExcept[0].dir)
-	assert.Contains(t, c.hideExcept[0].keep, "/work/app")
-	assert.Contains(t, c.hideExcept[0].keep, filepath.Join(home, "go"))
+	assert.Empty(t, c.hideExcept, "the command reads the home directory")
 	assert.Contains(t, c.hide, filepath.Join(home, ".ssh"))
 	assert.Contains(t, c.hide, filepath.Join(home, ".aws"))
-	assert.False(t, c.network)
-	assert.Equal(t, []string{"PATH", "HOME", "USER", "LANG", "TERM", "SHELL", "TMPDIR"}, c.env)
+	assert.True(t, c.network)
+	assert.Empty(t, c.env, "the command gets the whole environment")
 	assert.Contains(t, c.setEnv, "XDG_CACHE_HOME="+cache)
 	assert.Contains(t, c.setEnv, "GOCACHE="+filepath.Join(cache, "go-build"))
 }
@@ -77,16 +74,14 @@ func TestWorkspaceWithMoreRoots(t *testing.T) {
 	require.Len(t, c.names, 2)
 	assert.Equal(t, "/lw/repos", c.names[1].root)
 	assert.Contains(t, c.names[1].names, ".git/hooks")
-	require.Len(t, c.hideExcept, 1)
-	assert.Contains(t, c.hideExcept[0].keep, "/lw/repos")
 }
 
 func TestWorkspaceThenAnOption(t *testing.T) {
-	opts := append(Workspace("/work/app"), Network(true))
+	opts := append(Workspace("/work/app"), Network(false))
 
 	c := newConfig(opts...)
 
-	assert.True(t, c.network)
+	assert.False(t, c.network)
 }
 
 func TestKeepEnv(t *testing.T) {

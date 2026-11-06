@@ -34,10 +34,10 @@ A fence runs a command inside an OS sandbox. The command and its children can wr
 - A program outside the fence that later runs a file from a write directory runs it without limits, so `Workspace` keeps each file that git, a shell, or an editor runs read-only, at the root and in each directory under it. The list comes from [sandbox-runtime](https://github.com/anthropics/sandbox-runtime/blob/22b545aa6661491bcb911e7239a8d29b17de0bae/src/sandbox/sandbox-utils.ts), with `.git/commondir` added. The cost: `git init` and `git remote add` fail inside the fence.
 - `Workspace` takes more roots after the first one. Each root gets the same rules for git, so an agent can add a worktree of a clone in another root and cannot change the hooks of that clone.
 - A read-only path also protects each parent that a command can rename, up to the outermost write directory. Otherwise, a rename of a root in the temp directory moves `.git/hooks` out of the rule.
-- A command can read every path outside the home directory, because compilers and interpreters read from all over the disk. `Workspace` hides the home directory except the root and the tool directories, because it holds the histories and the credentials of the user. The cost: a tool that reads another file there fails, and a `.env` file in the project stays readable.
+- `Workspace` limits the writes and leaves the reads open, because compilers, interpreters, and package managers read their toolchains from all over the disk, also from the home directory. It hides only the credential folders of the home directory, such as `~/.ssh` and `~/.aws`. The cost: a shell history and a `.env` file stay readable.
 - `Workspace` puts the build caches in the temp directory, because a program outside the fence reads the cache directory of the user.
 - With the network on, a command cannot connect to a unix socket, except the resolver of macOS. A socket reaches a process outside the fence, such as Docker.
-- With `Env`, the command gets only the named variables, and `Workspace` names a short list. A profile that the command loads can export a secret again.
+- `Workspace` turns the network on and keeps the whole environment, because builds and package managers need both. With `Env`, the command gets only the named variables. A profile that the command loads can export a secret again.
 
 ## Map
 

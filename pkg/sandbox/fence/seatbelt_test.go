@@ -502,22 +502,23 @@ func TestSeatbeltDeniesAUnixSocket(t *testing.T) {
 	require.Error(t, err, out)
 }
 
-func TestWorkspaceHidesTheHomeDirectory(t *testing.T) {
+func TestWorkspaceHidesOnlyTheCredentials(t *testing.T) {
 	needSeatbelt(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".zsh_history"), []byte("s3cret"), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[user]"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".zsh_history"), []byte("history"), 0o600))
+	require.NoError(t, os.Mkdir(filepath.Join(home, ".ssh"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".ssh", "id_ed25519"), []byte("s3cret"), 0o600))
 	ws := filepath.Join(home, "work", "app")
 	require.NoError(t, os.MkdirAll(ws, 0o755))
 	f, err := New(Workspace(ws)...)
 	require.NoError(t, err)
 
-	out, err := run(t, f, ws, "cat ~/.zsh_history")
+	out, err := run(t, f, ws, "cat ~/.ssh/id_ed25519")
 	require.Error(t, err, out)
 	assert.NotContains(t, out, "s3cret")
 
-	out, err = run(t, f, ws, "cat ~/.gitconfig && echo x > a.txt")
+	out, err = run(t, f, ws, "cat ~/.zsh_history")
 	require.NoError(t, err, out)
-	assert.FileExists(t, filepath.Join(ws, "a.txt"))
+	assert.Contains(t, out, "history")
 }

@@ -106,11 +106,6 @@ func HideExcept(dir string, keep ...string) Option {
 	}
 }
 
-// workspaceEnv are the environment variables of a [Workspace] command.
-// The API keys in the environment of the caller stay out of the
-// command. A key in a file that the command can read is not protected.
-var workspaceEnv = []string{"PATH", "HOME", "USER", "LANG", "TERM", "SHELL", "TMPDIR"}
-
 // workspaceHide are the directories and files under the home directory
 // that hold credentials.
 var workspaceHide = []string{
@@ -127,31 +122,6 @@ var workspaceHide = []string{
 	".pypirc",
 	".git-credentials",
 	"Library/Keychains",
-}
-
-// workspaceKeep are the paths under the home directory that a
-// [Workspace] command can read. Compilers and package managers read
-// their toolchains and modules from them. The rest of the home
-// directory is hidden.
-var workspaceKeep = []string{
-	".gitconfig",
-	".gitignore_global",
-	".gitignore",
-	".gitattributes",
-	".config/git",
-	"go",
-	".cargo",
-	".rustup",
-	".npm",
-	".nvm",
-	".pyenv",
-	".rbenv",
-	".local/bin",
-	".local/lib",
-	".bun",
-	".deno",
-	".volta",
-	".asdf",
 }
 
 // workspaceNames are the files and directories that a program outside
@@ -198,11 +168,12 @@ const workspaceCache = "gopi-cache"
 //     config of each submodule.
 //   - If root has no .git directory, it cannot create or change .git. A
 //     .git file points git to another directory, which can hold a hook.
-//   - It cannot read the home directory, except root and the tool
-//     directories in workspaceKeep. It never reads the credentials in
-//     workspaceHide.
-//   - It has no network.
-//   - It gets only a short list of environment variables.
+//   - It can read each path, except the credentials in workspaceHide.
+//   - It has the network and the whole environment of the caller.
+//
+// The policy follows the sandbox of Claude Code: it limits the writes
+// and leaves the reads open. A command reads its toolchain from the
+// home directory, so a hidden home directory breaks builds.
 //
 // Each directory in more is a root too: the command can write to it and
 // read it, with the same rules for git as root. For example, more can
@@ -211,24 +182,20 @@ const workspaceCache = "gopi-cache"
 //
 // To change the policy, add options after it:
 //
-//	fence.New(append(fence.Workspace(root), fence.Network(true))...)
+//	fence.New(append(fence.Workspace(root), fence.Network(false))...)
 func Workspace(root string, more ...string) []Option {
 	roots := append([]string{root}, more...)
 	write := append(slices.Clone(roots), os.TempDir())
 	cache := filepath.Join(os.TempDir(), workspaceCache)
 
 	var hide []string
-	var opts []Option
 	if home, err := os.UserHomeDir(); err == nil {
 		for _, p := range workspaceHide {
 			hide = append(hide, filepath.Join(home, p))
 		}
-		keep := slices.Clone(roots)
-		for _, p := range workspaceKeep {
-			keep = append(keep, filepath.Join(home, p))
-		}
-		opts = append(opts, HideExcept(home, keep...))
 	}
+
+	var opts []Option
 
 	var readOnly []string
 	for _, r := range roots {
@@ -244,8 +211,7 @@ func Workspace(root string, more ...string) []Option {
 		Write(write...),
 		ReadOnly(readOnly...),
 		Hide(hide...),
-		Network(false),
-		Env(workspaceEnv...),
+		Network(true),
 		SetEnv("XDG_CACHE_HOME", cache),
 		SetEnv("GOCACHE", filepath.Join(cache, "go-build")),
 		SetEnv("PIP_CACHE_DIR", filepath.Join(cache, "pip")),
