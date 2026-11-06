@@ -82,7 +82,7 @@ a := claude.New(
 A `Decision` with no `Allow` denies the call. Only Claude Code sends the `Message` to the model. With `Always`, the CLI also allows the calls that it matches to this call:
 
 - Codex keeps the rule until its process stops. Codex cannot change an action, so it declines a decision with an `Input`.
-- Claude Code keeps the rule for its session. `Always` allows only this call if the CLI offers no rule, if the `Input` is new, or if the request has `NoAlways`. The agent sets `NoAlways` when the rule of the CLI allows more than the call.
+- Claude Code keeps the rule for its session. `Always` allows only this call if the CLI offers no rule, if the `Input` is new, or if the rule of the CLI allows more than the call.
 
 `codex.New` uses `ApprovalNever`, so Codex acts with no request inside its `Sandbox` mode. The [Codex driver](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#Driver) uses `ApprovalUntrusted` when the config has an `Approve` function, and a mode of the config replaces both.
 

@@ -507,3 +507,23 @@ func TestHookOfInvalidPolicyDenies(t *testing.T) {
 	reason := denyReason(t, p, pathCall(t, "read_file", "a.txt"))
 	assert.Contains(t, reason, "bash(ls")
 }
+
+func TestProtectedEditAsksForASafetyCheck(t *testing.T) {
+	var got []agent.ApprovalRequest
+	p := permission.Policy{
+		Mode:  permission.AcceptEdits,
+		Dir:   t.TempDir(),
+		Allow: []string{"Edit"},
+		Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			got = append(got, req)
+			return allow, nil
+		},
+	}
+
+	assert.Equal(t, ran, runOn(t, p.Hook(), pathCall(t, "edit_file", ".git/hooks/pre-commit")))
+	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "make build")))
+
+	require.Len(t, got, 2)
+	assert.True(t, got[0].Safety, "an edit of a protected path asks for a safety check")
+	assert.False(t, got[1].Safety, "a command that the mode asks for is not a safety check")
+}

@@ -16,6 +16,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -32,6 +33,9 @@ type process struct {
 	nextID int
 	// approve answers the permission prompts, or is nil.
 	approve agent.ApproveFunc
+	// dir is the working directory of the CLI. A relative path of a
+	// permission prompt is in it.
+	dir string
 	// hooks answer the hook callbacks, and state gives them the state
 	// of the agent.
 	hooks []agent.Hook
@@ -47,6 +51,8 @@ type process struct {
 // launch starts cmd and its reader goroutine. approve answers the
 // permission prompts of the CLI. If it is nil, the agent denies them.
 // The CLI calls hooks at its hook events, and each hook gets state.
+// The working directory of cmd is the folder of a relative path of a
+// prompt.
 func launch(
 	cmd *exec.Cmd,
 	approve agent.ApproveFunc,
@@ -60,6 +66,7 @@ func launch(
 	pr := &process{
 		p:       cliproc.Open(pipes),
 		approve: approve,
+		dir:     cmd.Dir,
 		hooks:   hooks,
 		state:   state,
 	}
@@ -150,8 +157,8 @@ func (pr *process) answer(ctx context.Context, l *line) error {
 }
 
 // decide returns the answer to the permission prompt req.
-func (pr *process) decide(ctx context.Context, req *controlRequest) (permission, error) {
-	deny := permission{
+func (pr *process) decide(ctx context.Context, req *controlRequest) (promptAnswer, error) {
+	deny := promptAnswer{
 		Behavior:  "deny",
 		Message:   denyText,
 		ToolUseID: req.ToolUseID,
@@ -159,18 +166,22 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (permission,
 	if pr.approve == nil {
 		return deny, nil
 	}
+	call := ai.ToolCall{
+		ID:    req.ToolUseID,
+		Name:  tool.Canonical(req.ToolName),
+		Input: req.Input,
+	}
+	// The CLI sends the reason of a safety check as plain text, with no
+	// type. gopi finds the safety check with the list of protected
+	// paths, which comes from Claude Code.
 	ask := agent.ApprovalRequest{
-		Call: ai.ToolCall{
-			ID:    req.ToolUseID,
-			Name:  tool.Canonical(req.ToolName),
-			Input: req.Input,
-		},
-		Reason:   plainText(req.DecisionReason),
-		NoAlways: req.SuppressAlwaysAllowRule,
+		Call:   call,
+		Reason: plainText(req.DecisionReason),
+		Safety: permission.EditsProtected(call, pr.dir),
 	}
 	d, err := pr.approve(ctx, ask)
 	if err != nil {
-		return permission{}, err
+		return promptAnswer{}, err
 	}
 	if !d.Allow {
 		deny.Message = d.Message
@@ -186,7 +197,7 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (permission,
 	if newInput {
 		input = d.Input
 	}
-	allow := permission{
+	allow := promptAnswer{
 		Behavior:     "allow",
 		UpdatedInput: input,
 		ToolUseID:    req.ToolUseID,

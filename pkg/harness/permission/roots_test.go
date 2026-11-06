@@ -348,3 +348,48 @@ func TestAnAllowRuleDoesNotApproveAProtectedEdit(t *testing.T) {
 		})
 	}
 }
+
+func TestEditsProtected(t *testing.T) {
+	dir := t.TempDir()
+	tests := []struct {
+		name string
+		call ai.ToolCall
+		want bool
+	}{
+		{
+			name: "an edit of a git hook",
+			call: pathCall(t, "edit_file", ".git/hooks/pre-commit"),
+			want: true,
+		},
+		{
+			name: "a write of Claude Code to a shell file",
+			call: call(t, "write_file", map[string]any{"file_path": filepath.Join(dir, ".bashrc")}),
+			want: true,
+		},
+		{
+			name: "a patch with a protected path",
+			call: call(t, "apply_patch", map[string]any{"changes": []map[string]string{
+				{"path": filepath.Join(dir, "a.go")},
+				{"path": filepath.Join(dir, ".vscode", "tasks.json")},
+			}}),
+			want: true,
+		},
+		{
+			name: "an edit of a source file",
+			call: pathCall(t, "edit_file", "a.go"),
+		},
+		{
+			name: "a read of a git file",
+			call: pathCall(t, "read_file", ".git/config"),
+		},
+		{
+			name: "a command",
+			call: bashCall(t, "rm -rf .git"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, permission.EditsProtected(tt.call, dir))
+		})
+	}
+}

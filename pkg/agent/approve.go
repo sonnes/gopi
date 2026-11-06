@@ -64,10 +64,15 @@ type ApprovalRequest struct {
 	// that the call did not pass. It is empty if the agent gives no
 	// reason.
 	Reason string
-	// NoAlways reports that the agent does not keep an Always decision
-	// for this call. An approve function does not offer Always then.
-	// The Claude Code agent sets it when the CLI offers no "allow
-	// always" for the call, because the rule that "allow always" writes
-	// allows more than the call. The agent then allows only this call.
-	NoAlways bool
+	// Safety reports that the call asks for a safety check, such as an
+	// edit of a protected path like .git/hooks. A rule or a kept Always
+	// decision does not allow the call. Only a person can. Each agent
+	// sets it for an edit of a protected path.
+	Safety bool
+	// Rule is the exact rule that an Always decision keeps, such as
+	// "Bash(go test ./...)". An approve function offers Always only for
+	// a request with a Rule. The agent leaves it empty, and the host fills
+	// it. It stays empty for a Safety call, and for a call that no rule
+	// can match alone.
+	Rule string
 }

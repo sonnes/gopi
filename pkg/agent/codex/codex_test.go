@@ -1167,3 +1167,39 @@ func TestUserInputsMentionASkill(t *testing.T) {
 		})
 	}
 }
+
+func TestApproveSafetyCheck(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		want bool
+	}{
+		{
+			name: "a change of a git hook asks for a safety check",
+			file: "approval_file_protected.trace",
+			want: true,
+		},
+		{
+			name: "a change of another file does not",
+			file: "approval_file.trace",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			useTraces(t, []string{tt.file})
+			var got []agent.ApprovalRequest
+			a := newAgent(t,
+				Policy(ApprovalUntrusted),
+				Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+					got = append(got, req)
+					return agent.Decision{}, nil
+				}),
+			)
+
+			_, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			assert.Equal(t, tt.want, got[0].Safety)
+		})
+	}
+}

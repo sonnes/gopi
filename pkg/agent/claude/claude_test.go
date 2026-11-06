@@ -975,7 +975,22 @@ func TestApproveRequest(t *testing.T) {
 	_, _, err := run(context.Background(), a, "Delete a.txt")
 	require.NoError(t, err, "an Always decision on a prompt with no allow always sends no permission updates")
 	assert.Equal(t, "rm deletes files", got.Reason, "the request has the reason with no escapes")
-	assert.True(t, got.NoAlways)
+	assert.False(t, got.Safety)
+}
+
+func TestApproveSafetyCheck(t *testing.T) {
+	claude.Replay(t, nil, "testdata/can_use_tool_safety.trace")
+	var got agent.ApprovalRequest
+	a := claude.New(claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		got = req
+		return agent.Decision{Allow: true}, nil
+	}))
+	defer closeAgent(t, a)
+
+	_, _, err := run(context.Background(), a, "Edit the hook")
+	require.NoError(t, err)
+	assert.True(t, got.Safety, "an edit of a protected path asks for a safety check")
+	assert.Equal(t, "edit_file", got.Call.Name)
 }
 
 func TestRunNotLoggedIn(t *testing.T) {

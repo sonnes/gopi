@@ -13,6 +13,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 )
 
 // inboxSize is the number of messages that the reader holds for the
@@ -60,6 +61,9 @@ type conn struct {
 
 	// approve answers the approval requests, or is nil.
 	approve agent.ApproveFunc
+	// dir is the working directory of the thread. A relative path of an
+	// approval request is in it.
+	dir string
 	// ctx ends when the reader stops. The approve function gets it.
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -94,12 +98,14 @@ func (c *conn) hookErr() error {
 	return c.hooks.takeErr()
 }
 
-// dial starts the reader of p.
-func dial(p cliproc.Pipes, approve agent.ApproveFunc) *conn {
+// dial starts the reader of p. approve answers the approval requests,
+// and dir is the working directory of the thread.
+func dial(p cliproc.Pipes, approve agent.ApproveFunc, dir string) *conn {
 	ctx, cancel := context.WithCancel(context.Background())
 	c := &conn{
 		p:       cliproc.Open(p),
 		approve: approve,
+		dir:     dir,
 		ctx:     ctx,
 		cancel:  cancel,
 		inbox:   make(chan message, inboxSize),
@@ -236,9 +242,12 @@ func approvalReason(m message) string {
 // response to the request id, with reason in the request. If the
 // function fails, or the decision changes the input, the agent declines.
 func (c *conn) decide(id json.RawMessage, call ai.ToolCall, reason string) {
+	// Codex sends no type of check. gopi finds the safety check with
+	// its list of protected paths.
 	req := agent.ApprovalRequest{
 		Call:   call,
 		Reason: reason,
+		Safety: permission.EditsProtected(call, c.dir),
 	}
 	d, err := c.approve(c.ctx, req)
 	declined := err != nil || !d.Allow || d.Input != nil
