@@ -291,11 +291,56 @@ func TestDriverGivesTheAddDirsAsWritableRoots(t *testing.T) {
 		AddDirs: []string{"/lw/repos"},
 	})
 
+	args := a.command().Args
 	p := a.threadParams("", nil, "", nil)
 
-	assert.Equal(t, map[string]any{
-		"writable_roots": []string{"/lw/repos"},
-	}, p.Config["sandbox_workspace_write"])
+	assert.Contains(t, args, `sandbox_workspace_write.writable_roots=["/lw/repos"]`)
+	assert.NotContains(t, p.Config, "sandbox_workspace_write", "the config of the thread would replace the table of -c")
+}
+
+func TestAppServerPinsThePermissionKeys(t *testing.T) {
+	tests := []struct {
+		name string
+		opts []Option
+		want []string
+	}{
+		{
+			name: "no sandbox",
+			want: []string{
+				"/bin/codex", "app-server",
+				"-c", `approvals_reviewer="user"`,
+				"-c", `sandbox_workspace_write.writable_roots=[]`,
+				"-c", "sandbox_workspace_write.network_access=false",
+				"-c", "sandbox_workspace_write.exclude_tmpdir_env_var=false",
+				"-c", "sandbox_workspace_write.exclude_slash_tmp=false",
+			},
+		},
+		{
+			name: "a sandbox and a writable root",
+			opts: []Option{
+				Sandbox(SandboxWorkspaceWrite),
+				AddDirs("/lw/repos", `/lw/a "b"`),
+			},
+			want: []string{
+				"/bin/codex", "app-server",
+				"-c", `approvals_reviewer="user"`,
+				"-c", `sandbox_mode="workspace-write"`,
+				"-c", `sandbox_workspace_write.writable_roots=["/lw/repos","/lw/a \"b\""]`,
+				"-c", "sandbox_workspace_write.network_access=false",
+				"-c", "sandbox_workspace_write.exclude_tmpdir_env_var=false",
+				"-c", "sandbox_workspace_write.exclude_slash_tmp=false",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newConfig(append([]Option{Binary("/bin/codex")}, tt.opts...))
+
+			cmd := appServer(c)
+
+			assert.Equal(t, tt.want, cmd.Args)
+		})
+	}
 }
 
 func TestDriverGivesTheDirsToTheCLI(t *testing.T) {

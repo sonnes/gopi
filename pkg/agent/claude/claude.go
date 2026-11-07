@@ -236,8 +236,8 @@ func Approve(fn agent.ApproveFunc) Option {
 
 // MCP gives the CLI the MCP servers servers, with --mcp-config. The CLI
 // connects to them and names each tool "mcp__<server>__<tool>". The
-// servers of the settings of the CLI stay, so a server of servers
-// replaces a server of the settings with the same name.
+// servers of the project settings of the CLI stay, so a server of
+// servers replaces a server of the settings with the same name.
 func MCP(servers ...agent.MCPServer) Option {
 	return func(c *config) { c.mcp = append(c.mcp, servers...) }
 }
@@ -575,6 +575,16 @@ func cliCommand(c config, args []string) *exec.Cmd {
 	return cmd
 }
 
+// settingSources are the settings files that the CLI reads: the
+// project settings and the local settings of the working directory. The
+// CLI does not read the user settings in ~/.claude, so the permission
+// rules of the user do not decide a tool call of gopi. The caller
+// decides each call. The CLI also skips the other parts of the user
+// settings: the env, the hooks, the plugins, the MCP servers of the
+// user scope, the skills and the agents in ~/.claude, and
+// ~/.claude/CLAUDE.md. The CLI always reads the managed settings.
+const settingSources = "project,local"
+
 // cliArgs returns the arguments of the CLI of c, with system as the
 // appended system prompt, without a session to resume. The input never goes on
 // the command line. It goes to stdin.
@@ -587,6 +597,7 @@ func cliArgs(c config, system string) ([]string, error) {
 		"--include-partial-messages",
 		"--replay-user-messages",
 		"--permission-prompt-tool", "stdio",
+		"--setting-sources", settingSources,
 	}
 	if c.model != "" {
 		args = append(args, "--model", c.model)

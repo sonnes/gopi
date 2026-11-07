@@ -705,6 +705,7 @@ func TestOptions(t *testing.T) {
 		"--include-partial-messages",
 		"--replay-user-messages",
 		"--permission-prompt-tool", "stdio",
+		"--setting-sources", "project,local",
 		"--model", "haiku",
 		"--append-system-prompt", "Be brief.",
 		"--effort", "high",

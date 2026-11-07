@@ -20,6 +20,11 @@
 // [Approve] function answers it. To let the CLI act without a request,
 // set [Policy] to [ApprovalNever] and pick a [Sandbox] mode.
 //
+// The agent sets the permission keys of the CLI with -c flags, so the
+// config.toml of the user does not decide them. The exec policy rules
+// in ~/.codex/rules still apply, because Codex has no key that turns
+// them off. An allow rule there runs a command outside the sandbox.
+//
 // A subagent of the CLI, which a spawn_agent call starts, keeps its
 // messages in a child session. The stream of the run carries its
 // start, its events, and its end. A run waits for each subagent that
@@ -39,6 +44,7 @@ package codex
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -617,9 +623,11 @@ func (a *Agent) command() *exec.Cmd {
 	return appServer(a.cfg)
 }
 
-// appServer returns the command that starts the app server of c.
+// appServer returns the command that starts the app server of c, with
+// the permission keys of [permissionArgs].
 func appServer(c config) *exec.Cmd {
-	cmd := exec.Command(c.binary, "app-server")
+	args := append([]string{"app-server"}, permissionArgs(c)...)
+	cmd := exec.Command(c.binary, args...)
 	cmd.Dir = c.dir
 	if len(c.env) > 0 {
 		cmd.Env = append(os.Environ(), c.env...)
@@ -662,15 +670,50 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 		}
 		p.Config["agents"] = roles
 	}
-	if len(a.cfg.addDirs) > 0 {
-		if p.Config == nil {
-			p.Config = make(map[string]any)
-		}
-		p.Config["sandbox_workspace_write"] = map[string]any{
-			"writable_roots": a.cfg.addDirs,
-		}
-	}
 	return p
+}
+
+// permissionArgs returns the -c flags that set the permission keys of
+// the config of the CLI, so the config.toml of the user does not decide
+// them:
+//
+//   - approvals_reviewer is "user", so each approval request reaches
+//     the [Approve] function and no automatic reviewer.
+//   - sandbox_mode is the mode of [Sandbox], if c has one. The mode
+//     selects the sandbox model of the modes, so the CLI does not read a
+//     permission profile of default_permissions.
+//   - The sandbox_workspace_write table has the [AddDirs] as the
+//     writable_roots, no network, and the temp folders as writable.
+//
+// The flags do not set approval_policy. The approvalPolicy of
+// thread/start sets it, and the CLI fails to load a config with the
+// policy "untrusted". The config of thread/start has no
+// sandbox_workspace_write table, because a table there replaces the
+// table of the flags.
+func permissionArgs(c config) []string {
+	// The value of a -c flag is TOML. A JSON string and a JSON array of
+	// strings are also TOML.
+	dirs := c.addDirs
+	if dirs == nil {
+		dirs = []string{}
+	}
+	roots, _ := json.Marshal(dirs)
+	keys := []string{`approvals_reviewer="user"`}
+	if c.sandbox != "" {
+		mode, _ := json.Marshal(string(c.sandbox))
+		keys = append(keys, "sandbox_mode="+string(mode))
+	}
+	keys = append(keys,
+		"sandbox_workspace_write.writable_roots="+string(roots),
+		"sandbox_workspace_write.network_access=false",
+		"sandbox_workspace_write.exclude_tmpdir_env_var=false",
+		"sandbox_workspace_write.exclude_slash_tmp=false",
+	)
+	args := make([]string, 0, 2*len(keys))
+	for _, k := range keys {
+		args = append(args, "-c", k)
+	}
+	return args
 }
 
 // mcpServers returns servers as the mcp_servers table of the config of
