@@ -34,7 +34,7 @@ flowchart LR
 - A rule and a tools list also keep the literal name. So a caller tool named `Read` matches a `Read` rule, and needs no exception.
 - An entry holds each fact about a well-known tool that more than one package needs. The permission policy reads the kind and the rule content, and the Claude Code driver reads the Claude Code name. A new well-known tool then needs one entry.
 - A driver changes the name of a call, not its input. A `read_file` call from Claude Code keeps `file_path`, so a reader of a call accepts the input of each driver.
-- Each driver applies the rules in its own way. The harness runs the permission policy. The Claude Code driver gives the rules to the CLI with Claude Code names, and the CLI applies them. The Codex driver applies the Deny and Ask rules in its PreToolUse hook, and the Allow rules in its approvals.
+- A host checks the rules with the permission parser for each driver, so a rule reads the gopi name on each driver. A driver of a CLI gives its CLI only the Deny rules that name a whole tool, with the name of the CLI.
 - The event checks of the driver tests fail on a Claude Code name of a well-known tool. A recorded trace with a new name for such a tool then fails a test.
 
 ## Map
@@ -45,7 +45,7 @@ flowchart LR
 | Change how a rule reads its tool names        | `pkg/harness/permission/rule.go`       |
 | Change how a tools list filters the tools     | `pkg/tool/select.go`, `pkg/harness/agent_tool.go`, `pkg/agent/only.go` |
 | Change how the Claude Code driver writes names | `pkg/agent/claude/names.go`           |
-| Change how the Codex driver applies rules     | `pkg/agent/codex/driver.go`            |
+| Change how a host checks the rules            | `pkg/host/rules.go`                    |
 | Change the event checks of a driver test      | `pkg/agent/internal/emittest/check.go` |
 
 ## Related Concepts

@@ -27,6 +27,9 @@ flowchart LR
 - The agent answers every request of the CLI, and an unknown request gets an error. The CLI waits for an answer, so a request with no answer stops the turn.
 - Both agents take the approve function of the harness, `agent.ApproveFunc`, so one function answers the approvals of each agent. The function gets the tool call as the log has it, so a rule for the log matches the approval too. Without an `Approve` function, the agent declines each approval.
 - Codex cannot change the input of an action or send a reason to the model, so the Codex agent declines a changed input and drops the reason.
+- Neither agent keeps a rule for an `Always` decision, and neither CLI gets one. A CLI matches a rule in its own way, so the caller keeps the grant with the rules of gopi.
+- Neither CLI sends the type of a safety check. Each agent marks a safety check with the protected paths of gopi, so a rule or a grant cannot allow it.
+- A gopi hook that returns `agent.Ask` asks a person. The Claude Code agent answers the hook with "ask", so the CLI sends its permission prompt, which has no time limit. The Codex agent waits in its hook for the approve function.
 - The Codex approve function runs in its own goroutine, so the reader goes on while a caller decides.
 - Claude Code calls the gopi hooks over the control protocol. The agent registers one callback for each hook event in `initialize`, so the CLI runs no command and needs no trust for a hook.
 - Codex has no hook callback over its protocol, so the agent adds a command hook to the thread through the config of `thread/start`, with the hook trust bypassed.

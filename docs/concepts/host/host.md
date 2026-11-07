@@ -36,6 +36,12 @@ flowchart LR
 - `Release` stops the agent of an idle session, and `IdleTimeout` does it after an idle time. The agent of a CLI then frees its process, and the next message starts the agent again from the session config. An agent that ran to `Close` lost, because each idle session then kept a CLI process alive. A session that runs a child in the background keeps its agent.
 - A message to a running session steers it, if the agent is a steerer. Otherwise the host holds the message for the end of the run, so a message is never lost.
 - A call waits for its confirmation on a channel of its own, so calls wait at the same time and end in any order.
+- The host checks the [permission rules](../harness/permission.md) of a session for each driver: the rules of the config, the rules of `Rules`, and the grants. One rule then matches the same calls on each driver. The driver gets only the Deny rules, to remove a tool.
+- The host reads `Rules` at each checked call and keeps nothing, so an edit of a settings file reaches the next call. The cost: one read for each checked call. A read error blocks the call, so a broken settings file fails closed.
+- A Deny rule or an Ask rule needs a `BeforeTool` hook, because a CLI runs a call that its mode allows with no approval request. The host adds the hook only to a session that can have such a rule, so Codex needs no hook command without one.
+- The host keeps the exact rule of an `Always` decision as a grant in a session value, so the grant survives a restart and reaches each agent of the session. The agent gets the decision with no `Always`, so no CLI keeps a rule that the host cannot see.
+- A safety check and a call that an Ask rule matches have no exact rule, so a person decides each one.
+- The hook and the agent can ask about one call. The host remembers each call that a person allowed in the run, so the person answers once.
 - Each event of `Events` has the whole session, so a reader needs no history.
 - Each `Events` and `Stream` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. A stalled reader loses its stream, so it cannot hold the events in memory.
 - Two hosts on one store must not run the same session, because their entries interleave in one log.
@@ -50,6 +56,7 @@ flowchart LR
 | Change how the agent of a session starts or stops   | `pkg/host/session.go`   |
 | Change how a message steers, waits, or runs         | `pkg/host/run.go`       |
 | Change how a call waits for Confirm                 | `pkg/host/approval.go`  |
+| Change how the rules and the grants decide a call   | `pkg/host/rules.go`     |
 | Change how a reader gets the state and the events   | `pkg/host/hub.go`       |
 
 ## Related Concepts
@@ -58,3 +65,4 @@ flowchart LR
 - [Child Session](child-session.md)
 - [Section](../agent/section.md)
 - [Definition](../def/definition.md)
+- [Permission](../harness/permission.md)

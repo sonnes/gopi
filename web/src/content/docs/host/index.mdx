@@ -55,7 +55,7 @@ The tool list of the host is the full set of tools of each session, and each dri
 
 The harness that is the default driver takes no `Toolset`, because the host gives the tools.
 
-`Config.ToolNames` picks a subset of the list, as the `tools` key of an agent file does. `Create` fails on a name of no tool of the list, and the error names the agent file if the name came from it. A `Deny` rule with no content, such as `WebFetch`, removes the tool. `ToolNames`, `Allow`, `Ask`, and `Deny` take a gopi name, such as `bash`, or a Claude Code name, such as `Bash`. Each driver reads both, so a rule from a Claude Code settings file works as written.
+`Config.ToolNames` picks a subset of the list, as the `tools` key of an agent file does. `Create` fails on a name of no tool of the list, and the error names the agent file if the name came from it. A `Deny` rule with no content, such as `WebFetch`, removes the tool. `ToolNames`, `Allow`, `Ask`, and `Deny` take a gopi name, such as `bash`, or a Claude Code name, such as `Bash`. The host checks each rule for each driver, so a rule from a Claude Code settings file works as written.
 
 `anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Create`.
 
@@ -103,6 +103,12 @@ for _, req := range s.Waiting {
 A call waits until `Confirm` or the end of its run, and after the run `Confirm` returns `host.ErrNotFound`. A call has the gopi name of its tool, such as `bash`, on each driver.
 
 The `Mode` of the config decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. With `agent.ModeBypass`, no call asks. If no person answers, confirm from `Events`, or pick a mode that asks for no call.
+
+The host checks the rules before a call waits. A `Deny` rule blocks the call, and an `Ask` rule makes it wait in each mode. An `Allow` rule runs the call with no person, unless the call is a safety check, such as an edit of `.git/hooks`.
+
+A waiting call has `Rule`, the exact rule of the call, such as `Bash(go test ./...)`. If the person confirms with `Always: true`, the host keeps the rule as a grant of the session. The grant allows the same call with no person, also after a restart. A safety check and a call that an `Ask` rule matches have no `Rule`, so do not offer Always for them.
+
+To add rules from outside the config, such as the settings of a project, give the host a reader with `host.Rules`. The host reads it at each call, so an edit of the settings reaches the next call.
 
 ## Change a Session
 
