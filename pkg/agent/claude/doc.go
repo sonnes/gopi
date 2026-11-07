@@ -11,9 +11,8 @@
 // stdout, with the control channel for the initialize, interrupt, and
 // permission requests.
 //
-// The CLI reads only the project settings and the local settings, so
-// the permission rules of the user do not decide a tool call. The
-// caller decides each call that the CLI asks about.
+// The CLI reads each of its settings files, also the user settings in
+// ~/.claude. An Allow rule there runs a call before the caller sees it.
 //
 // A caller must obey these rules:
 //
