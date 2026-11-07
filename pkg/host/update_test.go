@@ -124,6 +124,7 @@ func TestUpdateRefusesAChange(t *testing.T) {
 		{name: "the agent file", change: func(c *host.Config) { c.Agent = "reviewer" }},
 		{name: "the kind of agent", change: func(c *host.Config) { c.Model = "other/x" }},
 		{name: "a bad effort", change: func(c *host.Config) { c.Effort = "huge" }},
+		{name: "an unknown mode", change: func(c *host.Config) { c.Mode = "plan" }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

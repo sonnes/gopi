@@ -34,8 +34,9 @@ type ApproveFunc func(ctx context.Context, req ApprovalRequest) (Decision, error
 type Decision struct {
 	// Allow lets the call run.
 	Allow bool `json:"allow,omitempty"`
-	// Always also allows the later calls that match this call, for the
-	// life of the agent. The agent decides what matches.
+	// Always asks the host to keep the Rule of the request as a grant
+	// of the session. The later calls that the rule matches then run
+	// with no question. An agent does not read it.
 	Always bool `json:"always,omitempty"`
 	// Input replaces the input of an allowed call. Nil keeps the input.
 	Input json.RawMessage `json:"input,omitempty"`

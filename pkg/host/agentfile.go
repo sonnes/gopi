@@ -28,6 +28,12 @@ func checkEffort(config Config) error {
 	return err
 }
 
+// checkMode returns an error if the mode of config is not a mode of
+// gopi. Without it, an unknown mode fails only the next start.
+func checkMode(config Config) error {
+	return agent.CheckMode(config.Mode, agent.AllModes...)
+}
+
 // AgentSection is the name of the section with the prompt of the agent
 // file of a session.
 const AgentSection = "agent"
