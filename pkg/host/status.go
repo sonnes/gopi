@@ -78,6 +78,10 @@ type Session struct {
 	Effort ai.ThinkingLevel `json:"effort,omitempty"`
 	// Mode is the permission mode of the config, or empty.
 	Mode agent.Mode `json:"mode,omitempty"`
+	// Dir is the working directory of the config, or empty. It does not
+	// change after [Host.Create], so a caller that shows the files of the
+	// agent reads them here.
+	Dir string `json:"dir,omitempty"`
 	// CreatedAt is the time of [Host.Create]. The record of the session
 	// in the store has the same time.
 	CreatedAt time.Time `json:"created_at"`
@@ -145,6 +149,7 @@ func (h *Host) recover(ctx context.Context, snap session.Snapshot) (Session, err
 		sess.Model = config.Model
 		sess.Mode = config.Mode
 		sess.Effort = config.Effort
+		sess.Dir = config.Dir
 	}
 	stopped := !ok || sess.Status == StatusIdle
 	sess.Status = StatusIdle

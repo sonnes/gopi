@@ -154,3 +154,19 @@ func TestInterruptRightAfterSend(t *testing.T) {
 
 	assert.Equal(t, host.StopInterrupted, runEnd(t, events).StopReason, "a run is active as soon as Send returns")
 }
+
+func TestTheSessionGivesItsDir(t *testing.T) {
+	f := newFixture(t)
+	dir := t.TempDir()
+
+	created := f.create(t, host.Config{
+		ID:  "s1",
+		Dir: dir,
+	})
+	assert.Equal(t, dir, created.Dir)
+
+	f = f.restart(t)
+	got, ok := f.h.Get("s1")
+	require.True(t, ok)
+	assert.Equal(t, dir, got.Dir, "a recovered session gives the Dir of its config")
+}

@@ -348,6 +348,7 @@ func (h *Host) add(ctx context.Context, config Config) (*hosted, error) {
 		Model:     config.Model,
 		Mode:      config.Mode,
 		Effort:    config.Effort,
+		Dir:       config.Dir,
 		CreatedAt: created,
 		UpdatedAt: created,
 	}
