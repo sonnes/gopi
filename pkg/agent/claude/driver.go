@@ -45,7 +45,7 @@ import (
 // start, as in the harness. A skill name with a slash also fails the
 // start, because the name is a folder name. The driver does not
 // read the AGENTS.md of Dirs. The CLI also keeps the skills and the
-// agents of the project folder, and skips the ones in ~/.claude. A subagent gets the model ID of its spec
+// agents of its own folders. A subagent gets the model ID of its spec
 // only if the spec has the account of Spec. Any other model of a file
 // gives the subagent the model of the parent. It runs the
 // hooks at the points of [Hooks]. Start rejects a hook at a model call,
