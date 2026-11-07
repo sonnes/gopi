@@ -11,6 +11,10 @@
 // stdout, with the control channel for the initialize, interrupt, and
 // permission requests.
 //
+// The CLI reads only the project settings and the local settings, so
+// the permission rules of the user do not decide a tool call. The
+// caller decides each call that the CLI asks about.
+//
 // A caller must obey these rules:
 //
 //   - The CLI must be installed and logged in. [Binary] sets its path.
