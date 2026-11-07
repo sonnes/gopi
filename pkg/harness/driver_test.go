@@ -150,6 +150,13 @@ func TestStartTakesAToolWithAnyName(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// askingHook asks a person about each tool call.
+type askingHook struct{ agent.BaseHook }
+
+func (askingHook) BeforeTool(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+	return c, agent.Ask("the hook asks")
+}
+
 // TestStartAddsTheRules checks that each rule of the config changes
 // what a call of echo does. Without the rule, the mode of the harness
 // gives the other outcome.
@@ -162,15 +169,9 @@ func TestStartAddsTheRules(t *testing.T) {
 		wantRan   bool
 	}{
 		{
-			name:    "Allow runs a call that the mode asks for",
-			mode:    permission.Default,
-			config:  agent.Config{Allow: []string{"echo"}},
-			wantRan: true,
-		},
-		{
-			name:      "Ask asks for a call that the mode runs",
+			name:      "a hook of the config that asks asks the approve function",
 			mode:      permission.Bypass,
-			config:    agent.Config{Ask: []string{"echo"}},
+			config:    agent.Config{Hooks: []agent.Hook{askingHook{}}},
 			wantAsked: true,
 			wantRan:   true,
 		},

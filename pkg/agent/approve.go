@@ -7,6 +7,12 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
+// Approve sets the function that answers a BeforeTool hook that
+// returns an [AskError]. Without Approve, such a call is blocked.
+func Approve(fn ApproveFunc) Option {
+	return func(a *Agent) { a.cfg.approve = fn }
+}
+
 // ApproveFunc decides a tool call that needs a person. Each agent of
 // gopi takes one through its Approve option: the harness, the Claude
 // Code agent, and the Codex agent. One function then answers the

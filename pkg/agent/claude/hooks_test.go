@@ -143,6 +143,37 @@ func TestHookBeforeTool(t *testing.T) {
 	}
 }
 
+func TestHookBeforeToolAsks(t *testing.T) {
+	claude.Replay(t, nil, "testdata/hook_pre_tool_ask.trace")
+	var (
+		seen []ai.ToolCall
+		asks []agent.ApprovalRequest
+	)
+	guard := toolGuard{
+		seen: &seen,
+		fn: func(c ai.ToolCall) (ai.ToolCall, error) {
+			return c, agent.Ask("the rule asks")
+		},
+	}
+	a := claude.New(
+		claude.Hooks(guard),
+		claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			asks = append(asks, req)
+			return agent.Decision{Allow: true}, nil
+		}),
+	)
+	defer closeAgent(t, a)
+
+	_, msgs, err := run(context.Background(), a, "Delete a.txt")
+	require.NoError(t, err, "the hook answers ask, and the prompt of the CLI reaches the approve function")
+
+	require.Len(t, seen, 1)
+	require.Len(t, asks, 1)
+	assert.Equal(t, "the rule asks", asks[0].Reason)
+	require.Len(t, msgs, 3)
+	assert.False(t, msgs[1].IsError)
+}
+
 func TestHookAfterToolAndAfterTurn(t *testing.T) {
 	tests := []struct {
 		name string

@@ -16,9 +16,13 @@ import (
 // the config come after them.
 //
 // The driver maps Model to the ID of the model, Dir, System, Effort to
-// [Thinking], Mode to [PermissionMode], Allow to [AllowedTools], Ask to
-// [AskTools], Limits to [Limits], Deny to [DisallowedTools], MCP to [MCP], Idle to
-// [Idle], Wake to [Wake], and Approve.
+// [Thinking], Mode to [PermissionMode], Limits to [Limits], MCP to
+// [MCP], Idle to [Idle], Wake to [Wake], and Approve.
+//
+// The driver gives the CLI each Deny rule with no content, such as
+// "web_fetch", with [DisallowedTools]. It gives the CLI no rule with
+// content. The CLI reads such a rule in its own way, so the hooks of
+// the caller check it, as the host does.
 //
 // The driver maps the names of the Tools that ToolNames keeps to
 // [OnlyTools], with ToolSearch, because the CLI loads the deferred MCP
@@ -119,17 +123,11 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		// The modes of a config have the names of the modes of the CLI.
 		opts = append(opts, PermissionMode(Permission(c.Mode)))
 	}
-	if len(c.Allow) > 0 {
-		opts = append(opts, AllowedTools(c.Allow...))
-	}
-	if len(c.Ask) > 0 {
-		opts = append(opts, AskTools(c.Ask...))
-	}
 	if c.Limits != (agent.Limits{}) {
 		opts = append(opts, Limits(c.Limits))
 	}
-	if len(c.Deny) > 0 {
-		opts = append(opts, DisallowedTools(c.Deny...))
+	if removed := wholeTools(c.Deny); len(removed) > 0 {
+		opts = append(opts, DisallowedTools(removed...))
 	}
 	// An OnlyTools option of the driver limits the list of the config.
 	opts = append(opts, OnlyTools(limitTools(tools, own.only)...))
@@ -149,4 +147,17 @@ func (d driver) Start(ctx context.Context, c agent.Config) (agent.Runner, error)
 		opts = append(opts, Hooks(configHooks...))
 	}
 	return Durable(ctx, c.SessionID, opts...)
+}
+
+// wholeTools returns the rules of rules with no content. Each one
+// names a whole tool, such as "web_fetch".
+func wholeTools(rules []string) []string {
+	var out []string
+	for _, r := range rules {
+		_, content := tool.SplitRule(r)
+		if content == "" {
+			out = append(out, r)
+		}
+	}
+	return out
 }

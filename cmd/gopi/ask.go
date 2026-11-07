@@ -90,25 +90,31 @@ func pick(q askquestion.Question, line string) string {
 }
 
 // Approve asks on the terminal if a tool call can run. "y" allows the
-// call. "a" allows it and each later call that the same rule matches.
-// Any other line denies it.
+// call. If the request has a rule, "a" allows the call always, and the
+// prompt shows the rule. Any other line denies the call.
 func (r terminal) Approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 	call := req.Call
 	if err := r.shown.wait(ctx, call.ID); err != nil {
 		return agent.Decision{}, err
 	}
 
+	choices := "[y]es, [n]o"
+	if req.Rule != "" {
+		choices = "[y]es, [a]lways " + req.Rule + ", [n]o"
+	}
 	shown := time.Now()
-	fmt.Fprintf(r.w, "? allow %s %s? [y]es, [a]lways, [n]o: ", call.Name, compact(call.Input))
+	fmt.Fprintf(r.w, "? allow %s %s? %s: ", call.Name, compact(call.Input), choices)
 	line, err := r.in.after(ctx, shown)
 	if err != nil {
 		return agent.Decision{}, err
 	}
 
-	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "y", "yes":
+	answer := strings.ToLower(strings.TrimSpace(line))
+	always := answer == "a" || answer == "always"
+	switch {
+	case answer == "y" || answer == "yes":
 		return agent.Decision{Allow: true}, nil
-	case "a", "always":
+	case always && req.Rule != "":
 		return agent.Decision{Allow: true, Always: true}, nil
 	default:
 		return agent.Decision{}, nil

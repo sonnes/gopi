@@ -58,8 +58,8 @@ msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 | `HookCommand(path)`                | codex   | The `gopi` binary that relays a hook          | `gopi` on `PATH` |
 | `Sandbox(mode)`                    | codex   | What a command can touch                      | The CLI decides |
 | `Policy(policy)`                   | codex   | When the CLI asks                             | `ApprovalNever` |
-| `PermissionMode(mode)`, `AllowedTools(names...)` | claude | What the CLI runs without a prompt | The CLI decides |
-| `DisallowedTools(names...)`, `AskTools(names...)` | claude | The tools that the CLI cannot use, or always asks for | None |
+| `PermissionMode(mode)`             | claude  | What the CLI runs without a prompt            | The CLI decides |
+| `DisallowedTools(names...)`        | claude  | The tools that the CLI cannot use             | None |
 
 ## Tools and Approvals
 
@@ -69,7 +69,7 @@ The log keeps each call of a CLI tool as a tool call and a tool result. Claude C
 
 ```go
 a := claude.New(
-	claude.AllowedTools("read_file", "grep"),
+	claude.PermissionMode(claude.PermissionAcceptEdits),
 	claude.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		if req.Call.Name == "bash" && !confirm(req.Call.Input) {
 			return agent.Decision{Message: "The user refused the command."}, nil
@@ -79,10 +79,9 @@ a := claude.New(
 )
 ```
 
-A `Decision` with no `Allow` denies the call. Only Claude Code sends the `Message` to the model. With `Always`, the CLI also allows the calls that it matches to this call:
+A `Decision` with no `Allow` denies the call. Only Claude Code sends the `Message` to the model. Codex cannot change an action, so it declines a decision with an `Input`.
 
-- Codex keeps the rule until its process stops. Codex cannot change an action, so it declines a decision with an `Input`.
-- Claude Code keeps the rule for its session. `Always` allows only this call if the CLI offers no rule, if the `Input` is new, or if the rule of the CLI allows more than the call.
+Neither CLI keeps a rule for `Always`, so the decision allows only this call. The [host](../host/index.mdx) keeps the rule of `Always` for the session, and checks it before it asks a person.
 
 `codex.New` uses `ApprovalNever`, so Codex acts with no request inside its `Sandbox` mode. The [Codex driver](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#Driver) uses `ApprovalUntrusted` when the config has an `Approve` function, and a mode of the config replaces both.
 

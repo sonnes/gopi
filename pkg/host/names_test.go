@@ -20,13 +20,11 @@ func TestCreateKeepsTheNamesOfTheConfig(t *testing.T) {
 		ID:        "s1",
 		Model:     "fake/m",
 		ToolNames: []string{"Glob", "lookup_order"},
-		Allow:     []string{"Read(src/**)", "mcp__lw__*"},
 		Deny:      []string{"bash(git push *)"},
 	})
 
 	require.NoError(t, err)
 	c := f.lastConfig(t)
 	assert.Equal(t, []string{"Glob", "lookup_order"}, c.ToolNames)
-	assert.Equal(t, []string{"Read(src/**)", "mcp__lw__*"}, c.Allow)
 	assert.Equal(t, []string{"bash(git push *)"}, c.Deny)
 }

@@ -107,9 +107,7 @@ type config struct {
 	autoCompact int
 	env         []string
 	permission  Permission
-	allowed     []string
 	disallowed  []string
-	ask         []string
 	limits      agent.Limits
 	only        []string
 	approve     agent.ApproveFunc
@@ -198,25 +196,11 @@ func Env(kv ...string) Option {
 	return func(c *config) { c.env = append(c.env, kv...) }
 }
 
-// AllowedTools lets the CLI run the named tools without a prompt. A
-// name is a gopi name or a Claude Code name, and it can hold a rule,
-// such as "bash(git:*)". The agent gives the CLI the Claude Code names. Without it, the
-// settings of the CLI decide.
-func AllowedTools(names ...string) Option {
-	return func(c *config) { c.allowed = append(c.allowed, names...) }
-}
-
-// DisallowedTools removes the named tools from the CLI. A name is as
-// in [AllowedTools].
+// DisallowedTools removes the named tools from the CLI. A name is a
+// gopi name or a Claude Code name, and it can hold a rule, such as
+// "bash(rm:*)". The agent gives the CLI the Claude Code names.
 func DisallowedTools(names ...string) Option {
 	return func(c *config) { c.disallowed = append(c.disallowed, names...) }
-}
-
-// AskTools makes the CLI ask before it runs the named tools, also when
-// [AllowedTools] allows them. A name is as in AllowedTools. The agent gives the rules to the CLI as settings, and
-// the CLI adds them to the ask rules of its own settings.
-func AskTools(names ...string) Option {
-	return func(c *config) { c.ask = append(c.ask, names...) }
 }
 
 // Limits gives the CLI the hard limits l in the settings of --settings:
@@ -240,21 +224,12 @@ func OnlyTools(names ...string) Option {
 // Approve sets the function that answers each permission prompt of the
 // CLI. The call of the request has the tool_use_id, the tool name, and
 // the input of the prompt. The request has the reason of the CLI. It
-// has Safety for an edit of a protected path. Without Approve, the agent denies every prompt. If fn
-// returns an error, the agent sends the error to the CLI, which denies
-// the call.
+// has Safety for an edit of a protected path. Without Approve, the
+// agent denies every prompt. If fn returns an error, the agent sends the
+// error to the CLI, which denies the call.
 //
-// An Always decision sends the permission suggestions of the CLI back,
-// so that the CLI does not ask again for the calls that match them. The
-// CLI decides what matches. The agent sets the destination of each
-// suggestion to the session, so the CLI writes no rule to a settings
-// file. A suggestion can change the mode of the CLI for the session,
-// such as to acceptEdits after an edit. If the CLI offers no
-// suggestions, or if its rule for "allow always" allows more than the
-// call, Always does nothing. The
-// suggestions describe the original input, so an Always decision with
-// a new Input allows only this call. An Input that holds the same JSON
-// value as the input of the prompt is not a new Input.
+// The agent keeps no rule for an Always decision, and the CLI keeps
+// none. The caller keeps the rule of Always, as the host does.
 func Approve(fn agent.ApproveFunc) Option {
 	return func(c *config) { c.approve = fn }
 }
@@ -464,9 +439,8 @@ func (a *Agent) drop(proc *process) {
 // --settings.
 type cliSettings struct {
 	Permissions struct {
-		Ask                []string `json:"ask,omitempty"`
-		BlockReadsOutside  bool     `json:"blockReadsOutsideWorkingDirectories,omitempty"`
-		BlockWritesOutside bool     `json:"blockWritesOutsideWorkingDirectories,omitempty"`
+		BlockReadsOutside  bool `json:"blockReadsOutsideWorkingDirectories,omitempty"`
+		BlockWritesOutside bool `json:"blockWritesOutsideWorkingDirectories,omitempty"`
 	} `json:"permissions"`
 	Sandbox *sandboxSettings `json:"sandbox,omitempty"`
 }
@@ -476,14 +450,13 @@ type sandboxSettings struct {
 	Enabled bool `json:"enabled"`
 }
 
-// settings returns the settings of the CLI, as JSON, that hold the ask
-// rules and the limits. ok is false if there is nothing to give.
-func settings(rules []string, l agent.Limits) (string, bool, error) {
-	if len(rules) == 0 && l == (agent.Limits{}) {
+// settings returns the settings of the CLI, as JSON, that hold the
+// limits. ok is false if there is nothing to give.
+func settings(l agent.Limits) (string, bool, error) {
+	if l == (agent.Limits{}) {
 		return "", false, nil
 	}
 	var s cliSettings
-	s.Permissions.Ask = rules
 	s.Permissions.BlockReadsOutside = l.BlockReadsOutside
 	s.Permissions.BlockWritesOutside = l.BlockWritesOutside
 	if l.Fence {
@@ -634,19 +607,11 @@ func cliArgs(c config, system string) ([]string, error) {
 	if c.permission != "" {
 		args = append(args, "--permission-mode", string(c.permission))
 	}
-	if len(c.allowed) > 0 {
-		rules := claudeRules(c.allowed)
-		args = append(args, "--allowedTools", strings.Join(rules, ","))
-	}
 	if len(c.disallowed) > 0 {
 		rules := claudeRules(c.disallowed)
 		args = append(args, "--disallowedTools", strings.Join(rules, ","))
 	}
-	var ask []string
-	if len(c.ask) > 0 {
-		ask = claudeRules(c.ask)
-	}
-	s, ok, err := settings(ask, c.limits)
+	s, ok, err := settings(c.limits)
 	if err != nil {
 		return nil, err
 	}

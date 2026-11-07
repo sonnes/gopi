@@ -961,8 +961,8 @@ func TestApprove(t *testing.T) {
 			want:     command,
 		},
 		{
-			name: "allow a command for the session",
-			file: "approval_always.trace",
+			name: "an Always decision accepts only this call",
+			file: "approval_accept.trace",
 			decision: agent.Decision{
 				Allow:  true,
 				Always: true,

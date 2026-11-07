@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/sonnes/gopi/pkg/agent"
@@ -32,6 +33,11 @@ var hookPoints = []agent.Point{
 	agent.PointBeforeStop,
 }
 
+// permissionAsk is the PreToolUse decision that sends the call to the
+// permission prompt of the CLI. It skips the permission mode and the
+// rules of the CLI.
+const permissionAsk = "ask"
+
 // renameText is the reason of a deny when a hook renames a tool call.
 const renameText = "claude: a hook cannot rename a tool call of Claude Code"
 
@@ -39,8 +45,9 @@ const renameText = "claude: a hook cannot rename a tool call of Claude Code"
 // control protocol:
 //
 //   - BeforeTool at PreToolUse. An error denies the call with its text.
-//     A new input replaces the input. The CLI cannot rename a call, so
-//     a new name denies it.
+//     An [agent.AskError] sends the call to the permission prompt of
+//     the CLI, and [Approve] answers the prompt. A new input replaces
+//     the input. The CLI cannot rename a call, so a new name denies it.
 //   - AfterTool at PostToolUse. The result has the text of the
 //     tool_response. A built-in tool such as Bash gives a JSON object,
 //     so its result is the JSON of that object. A new text replaces the
@@ -168,13 +175,22 @@ func (pr *process) beforeTool(ctx context.Context, in hookInput) hookOutput {
 		Input: in.ToolInput,
 	}
 	call := orig
+	// ask is the reason of the first hook that asks. The other hooks
+	// still run, so a deny or a new input of a later hook counts.
+	var ask *agent.AskError
 	for _, h := range pr.hooks {
 		bt, ok := h.(agent.BeforeToolHook)
 		if !ok {
 			continue
 		}
 		next, err := bt.BeforeTool(ctx, pr.state(), call)
-		if err != nil {
+		var asks *agent.AskError
+		switch {
+		case errors.As(err, &asks):
+			if ask == nil {
+				ask = asks
+			}
+		case err != nil:
 			return denyTool(err.Error())
 		}
 		call = next
@@ -182,13 +198,21 @@ func (pr *process) beforeTool(ctx context.Context, in hookInput) hookOutput {
 	if call.Name != orig.Name {
 		return denyTool(renameText)
 	}
-	if bytes.Equal(call.Input, orig.Input) {
+	out := &hookSpecific{HookEventName: eventPreToolUse}
+	if !bytes.Equal(call.Input, orig.Input) {
+		out.UpdatedInput = call.Input
+	}
+	// An ask goes to the permission prompt of the CLI, which has no
+	// time limit. A hook that waits for a person can time out, and the
+	// CLI then runs the call.
+	if ask != nil {
+		out.PermissionDecision = permissionAsk
+		out.PermissionDecisionReason = ask.Error()
+	}
+	if out.UpdatedInput == nil && ask == nil {
 		return hookOutput{}
 	}
-	return hookOutput{HookSpecificOutput: &hookSpecific{
-		HookEventName: eventPreToolUse,
-		UpdatedInput:  call.Input,
-	}}
+	return hookOutput{HookSpecificOutput: out}
 }
 
 func denyTool(reason string) hookOutput {

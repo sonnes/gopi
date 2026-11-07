@@ -168,15 +168,9 @@ type controlRequest struct {
 	Input json.RawMessage `json:"input"`
 	// CallbackID names the callback of a hook_callback request.
 	CallbackID string `json:"callback_id"`
-	// PermissionSuggestions are the permission updates that the CLI
-	// offers for "allow always".
-	PermissionSuggestions json.RawMessage `json:"permission_suggestions"`
 	// DecisionReason tells a person why the call asks. It can hold the
 	// ANSI escapes of the terminal of the CLI.
 	DecisionReason string `json:"decision_reason"`
-	// SuppressAlwaysAllowRule reports that the rule for "allow always"
-	// allows more than the call, such as each call of the tool.
-	SuppressAlwaysAllowRule bool `json:"suppress_always_allow_rule"`
 }
 
 // controlResponse is the response of a control_response line.
@@ -225,9 +219,6 @@ type promptAnswer struct {
 	Message      string          `json:"message,omitempty"`
 	UpdatedInput json.RawMessage `json:"updatedInput,omitempty"`
 	ToolUseID    string          `json:"toolUseID,omitempty"`
-	// UpdatedPermissions are the permission updates that the CLI keeps
-	// for the session, so that it does not ask again.
-	UpdatedPermissions json.RawMessage `json:"updatedPermissions,omitempty"`
 }
 
 // outUser is a user line that the agent sends.

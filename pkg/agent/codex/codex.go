@@ -258,10 +258,11 @@ func MCP(servers ...agent.MCPServer) Option {
 // So if it comes before its item, the agent declines it and does not
 // call fn.
 //
-// An Always decision accepts the action, and the actions that the CLI
-// matches to it, until the process stops. Codex cannot change the input
-// of an action, so a decision with an Input declines it. Codex has no
-// field for the Message of a decision, so the model does not read it.
+// An Always decision accepts only this action. The agent and the CLI
+// keep no rule for it. The caller keeps the rule of Always, as the host
+// does. Codex cannot change the input of an action, so a decision with
+// an Input declines it. Codex has no field for the Message of a
+// decision, so the model does not read it.
 func Approve(fn agent.ApproveFunc) Option {
 	return func(c *config) { c.approve = fn }
 }
@@ -495,7 +496,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		hooks, err = startHookServer(a.cfg.hooks, a.State)
+		hooks, err = startHookServer(a.cfg.hooks, a.State, a.cfg.approve)
 		if err != nil {
 			return nil, "", err
 		}

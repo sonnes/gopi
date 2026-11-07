@@ -156,15 +156,3 @@ func TestApplyPatchAllowNeedsEachPath(t *testing.T) {
 	assert.Equal(t, ran, decide(t, p, one))
 	assert.Equal(t, asked, decide(t, p, two))
 }
-
-func TestAllows(t *testing.T) {
-	p := permission.Policy{
-		Dir:   testDir,
-		Allow: []string{"bash(git status)", "mcp__lw__*"},
-	}
-
-	assert.True(t, p.Allows(bashCall(t, "git status")))
-	assert.True(t, p.Allows(call(t, "mcp__lw__threads_get", nil)))
-	assert.False(t, p.Allows(bashCall(t, "git push")))
-	assert.False(t, permission.Policy{Allow: []string{"bash(ls"}}.Allows(bashCall(t, "ls")), "a policy that is not valid allows nothing")
-}

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -24,8 +23,13 @@ import (
 // the format and the order of the checks.
 //
 // A Policy is a value with no state, so a caller can copy it, for
-// example to give a child agent a stricter Mode. The rules of the
-// Always decisions are in the hook that [Policy.Hook] returns.
+// example to give a child agent a stricter Mode.
+//
+// A host gives the harness only its Deny rules. Its own hook checks
+// the Allow rules and the Ask rules of the session, after the hook of
+// the Policy. The Policy still asks for the calls that its Mode asks
+// for, and the host answers them with its rules first. If both hooks
+// ask about one call, the host asks the person once.
 type Policy struct {
 	// Mode decides the calls that no rule matches. The default is
 	// [Default].
@@ -40,15 +44,12 @@ type Policy struct {
 	// each call that needs approval is blocked, with a reason that says
 	// that the policy has no approver.
 	//
-	// If the decision allows the call with Always, the hook keeps an
-	// Allow rule. For the bash tool, the rule is for the exact command.
-	// For another tool, the rule is for the tool name. The hook keeps
-	// the rule in memory for its life. An Ask rule and a Deny rule
-	// still apply to the later calls. An Input replaces the input of the
-	// call. The Deny rules check the new input, and a match denies the
-	// call. An Always rule is for the new input. A Message is the reason
-	// of a deny. If Approve returns an error, the call does not run, and
-	// the text of the error is the error result.
+	// An Input of the decision replaces the input of the call. The Deny
+	// rules check the new input, and a match denies the call. A Message
+	// is the reason of a deny. The hook keeps no rule for Always. A
+	// caller that keeps a rule, such as a host, answers the later calls
+	// in Approve. If Approve returns an error, the call does not run,
+	// and the text of the error is the error result.
 	Approve agent.ApproveFunc
 	// Kinds gives the kind of a tool, for a custom tool or to change the
 	// kind of a built-in tool. A tool that is not in Kinds gets its kind
@@ -70,19 +71,6 @@ type Policy struct {
 	// BlockWritesOutside denies an edit of a file tool outside Roots, in
 	// each mode, also in [Bypass].
 	BlockWritesOutside bool
-}
-
-// Allows reports if an Allow rule of p matches c, as the hook of
-// [Policy.Hook] checks it. It ignores the mode, the Ask rules, and the
-// Deny rules. A driver whose agent asks on its own uses it to answer
-// the requests that an Allow rule covers. A policy that is not valid
-// allows no call.
-func (p Policy) Allows(c ai.ToolCall) bool {
-	h, ok := p.Hook().(*hook)
-	if !ok || h.err != nil {
-		return false
-	}
-	return h.allowed(c.Name, decodeInput(c.Input))
 }
 
 // Validate returns an error for an unknown mode and for each rule that
@@ -133,8 +121,7 @@ func (p Policy) compile() (compiled, error) {
 // policy in its BeforeTool method. The hook resolves the symlinks of the
 // roots once, in this call, and the symlinks of each path on each call.
 // The hook reads the fields of the policy once, in this call. A later
-// change to a field does not change the hook. Each hook starts with no
-// rules of the Always decisions, and keeps them for its life.
+// change to a field does not change the hook.
 //
 // If the policy is not valid, or Dir is empty and the working
 // directory is unknown, the hook blocks each call with the error.
@@ -193,10 +180,6 @@ type hook struct {
 	// blockReads and blockWrites are the hard limits of the policy.
 	blockReads  bool
 	blockWrites bool
-
-	mu sync.Mutex
-	// kept are the Allow rules of the Always decisions.
-	kept []rule
 }
 
 // toolInput holds the inputs that the rules read. A file tool of
@@ -442,8 +425,8 @@ func protected(targets [][]string) bool {
 
 // requestApproval gets a decision on c from the approver. safety
 // marks the request as a safety check. If the decision edits the input,
-// the Deny rules check the edited input, and an Always decision keeps a
-// rule for the edited input. The edited input is the input that runs.
+// the Deny rules check the edited input. The edited input is the input
+// that runs.
 func (h *hook) requestApproval(
 	ctx context.Context,
 	c ai.ToolCall,
@@ -481,36 +464,7 @@ func (h *hook) requestApproval(
 			return c, agent.Deny(reason)
 		}
 	}
-	if d.Always {
-		h.keep(c.Name, in)
-	}
 	return c, nil
-}
-
-// keep adds the Allow rule of an Always decision to the hook. For a bash
-// call with an input that does not decode, it keeps no rule, because a
-// rule for the tool name would allow each command.
-func (h *hook) keep(name string, in toolInput) {
-	r := rule{
-		text:  name,
-		names: []string{name},
-	}
-	if name == bash.Name {
-		if !in.ok {
-			return
-		}
-		command := strings.TrimSpace(in.Command)
-		r.text = fmt.Sprintf("%s(%s)", name, command)
-		r.hasContent = true
-		r.command = shellRule{
-			kind: shellExact,
-			text: command,
-		}
-	}
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.kept = append(h.kept, r)
 }
 
 // firstMatch returns the first Deny rule or Ask rule in rules that
@@ -590,18 +544,13 @@ func (h *hook) eachPathMatches(r *rule, name string, in toolInput) bool {
 	return true
 }
 
-// allowed reports if the Allow rules or the kept rules match the call.
-// For the bash tool, the Allow rules together must match each part of
-// the command. If the input does not decode, only a rule without
-// content matches.
+// allowed reports if the Allow rules match the call. For the bash
+// tool, the Allow rules together must match each part of the command.
+// If the input does not decode, only a rule without content matches.
 func (h *hook) allowed(name string, in toolInput) bool {
-	h.mu.Lock()
-	rules := append(h.allow[:len(h.allow):len(h.allow)], h.kept...)
-	h.mu.Unlock()
-
 	var commands []shellRule
-	for i := range rules {
-		r := &rules[i]
+	for i := range h.allow {
+		r := &h.allow[i]
 		if !r.matchesName(name) {
 			continue
 		}

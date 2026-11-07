@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 )
 
 // call is a tool call that waits for [Host.Confirm].
@@ -16,16 +17,73 @@ type call struct {
 }
 
 // approve is the approve function that the host gives each agent. It
-// adds req to the waiting calls of the session, and waits for
-// [Host.Confirm], for the end of ctx, or for the end of the run. Each
-// call has its own channel, so two or more calls can wait at the same
-// time, and a Confirm answers one of them.
+// checks the rules of the call first, as [Rules] gives them:
 //
-// If no run is active, approve returns [ErrNoRun]. If the session
+//   - A Deny rule denies the call.
+//   - An Allow rule or a grant allows the call with no person, unless an
+//     Ask rule matches or the request has Safety.
+//   - Each other call waits for a person, with the exact rule of the
+//     call in req.Rule. A Safety call and an Ask call have no Rule.
+//
+// If the person allows the call with Always, approve adds req.Rule to
+// the grants of the session before it returns. A decision with a new
+// Input keeps no grant, because the rule is for the old input. The
+// agent gets the decision with no Always, so it keeps no rule of its
+// own. If the rules hook and the agent ask about one call, the second
+// question gets the answer of the first.
+func (s *hosted) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	if s.personAllowed(req.Call) {
+		return agent.Decision{Allow: true}, nil
+	}
+	rules, dir, err := s.ruleSet(ctx)
+	if err != nil {
+		return agent.Decision{}, err
+	}
+	match, rule, err := rules.Check(req.Call, dir)
+	if err != nil {
+		return agent.Decision{}, fmt.Errorf("host: session %s: %w", s.id, err)
+	}
+	switch {
+	case match == permission.DenyMatch:
+		return agent.Decision{Message: denyText(rule, req.Call.Name)}, nil
+	case match == permission.AllowMatch && !req.Safety:
+		return agent.Decision{Allow: true}, nil
+	}
+
+	req.Rule = ""
+	canKeep := match != permission.AskMatch && !req.Safety
+	if canKeep {
+		req.Rule, _ = permission.Exact(req.Call, dir)
+	}
+	d, err := s.waitForPerson(ctx, req)
+	if err != nil || !d.Allow {
+		return d, err
+	}
+	input := req.Call.Input
+	if d.Input != nil {
+		input = d.Input
+	}
+	s.allowCall(req.Call.ID, input)
+	keep := d.Always && req.Rule != "" && d.Input == nil
+	if keep {
+		if err := s.addGrant(ctx, req.Rule); err != nil {
+			return agent.Decision{}, err
+		}
+	}
+	d.Always = false
+	return d, nil
+}
+
+// waitForPerson adds req to the waiting calls of the session, and waits
+// for [Host.Confirm], for the end of ctx, or for the end of the run.
+// Each call has its own channel, so two or more calls can wait at the
+// same time, and a Confirm answers one of them.
+//
+// If no run is active, waitForPerson returns [ErrNoRun]. If the session
 // stops, it returns [ErrClosed]. The wait also ends when the active run
 // ends. The Codex agent calls approve with the context of its
 // connection, and an interrupt does not end that context.
-func (s *hosted) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+func (s *hosted) waitForPerson(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 	s.mu.Lock()
 	run := s.run
 	if s.closing {

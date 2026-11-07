@@ -50,9 +50,7 @@ func TestDriverStart(t *testing.T) {
 		Dir:       "/work",
 		Sections:  agent.SystemText("Be brief."),
 		Mode:      agent.ModeAcceptEdits,
-		Allow:     []string{"read_file"},
-		Ask:       []string{"bash(gh pr comment:*)"},
-		Deny:      []string{"web_fetch"},
+		Deny:      []string{"web_fetch", "bash(rm:*)"},
 		Effort:    ai.ThinkingHigh,
 		MCP:       []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
@@ -73,9 +71,7 @@ func TestDriverStart(t *testing.T) {
 	for _, want := range []string{
 		"--model haiku",
 		"--append-system-prompt Be brief.",
-		"--allowedTools Read",
-		"--disallowedTools WebFetch",
-		`--settings {"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
+		"--disallowedTools WebFetch --",
 		"--permission-mode acceptEdits",
 		"--effort high",
 		`--mcp-config {"mcpServers":{"local":{"command":"lw-mcp"}}}`,
@@ -83,6 +79,8 @@ func TestDriverStart(t *testing.T) {
 		assert.Contains(t, args, want)
 	}
 	assert.NotContains(t, args, "bypassPermissions", "the mode of the config replaces the mode of the driver")
+	assert.NotContains(t, args, "Bash(rm:*)", "the CLI gets no rule with content")
+	assert.NotContains(t, args, "--settings", "the CLI gets no permission rules in its settings")
 	assert.NotContains(t, args, "--agents", "a config with no dirs gives no agents")
 }
 
@@ -325,12 +323,11 @@ func TestDriverGivesTheLimitsToTheCLI(t *testing.T) {
 			want: `{"permissions":{"blockReadsOutsideWorkingDirectories":true,"blockWritesOutsideWorkingDirectories":true},"sandbox":{"enabled":true}}`,
 		},
 		{
-			name: "a limit and an ask rule",
+			name: "one limit",
 			config: agent.Config{
-				Ask:    []string{"bash(git push *)"},
 				Limits: agent.Limits{BlockWritesOutside: true},
 			},
-			want: `{"permissions":{"ask":["Bash(git push *)"],"blockWritesOutsideWorkingDirectories":true}}`,
+			want: `{"permissions":{"blockWritesOutsideWorkingDirectories":true}}`,
 		},
 	}
 	for _, tt := range tests {

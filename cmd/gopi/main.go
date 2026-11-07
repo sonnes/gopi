@@ -297,6 +297,10 @@ func run(ctx context.Context, o options, args []string) error {
 		in:    in,
 		shown: shown,
 	}
+	approver := &grants{
+		dir: o.root,
+		ask: answers.Approve,
+	}
 	tools, err := newTools(o.root, o.tools, o.fence, answers)
 	if err != nil {
 		return fenceError(err)
@@ -325,7 +329,7 @@ func run(ctx context.Context, o options, args []string) error {
 		harness.Mode(mode),
 		harness.Allow(o.allow...),
 		harness.Deny(o.deny...),
-		harness.Approve(answers.Approve),
+		harness.Approve(approver.Approve),
 		harness.Defs(defReaders(o)...),
 	}
 	if o.system != "" {

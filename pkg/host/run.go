@@ -215,6 +215,7 @@ func (s *hosted) finish(ctx context.Context, end agent.EventAgentEnd, err error)
 	s.cancelRun(nil)
 	s.run = nil
 	s.cancelRun = nil
+	s.allowed = nil
 	// A call that waits ends with its run. Its approve function sees the
 	// end of the run in its context.
 	s.calls = nil

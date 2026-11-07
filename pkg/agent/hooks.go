@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
@@ -178,7 +180,8 @@ func (h beforeTool) BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.
 //
 // If a hook returns an error, the call does not run, the hooks after
 // it do not run, and the text of the error is the error result. [Deny]
-// gives a reason to the block. If ctx is done, the run fails, and no
+// gives a reason to the block. [Ask] asks the function of [Approve]
+// instead. If the person allows the call, the hooks after it run. If ctx is done, the run fails, and no
 // hook runs for the calls after it.
 func BeforeTool(fn BeforeToolFunc) Option {
 	return Hooks(beforeTool{fn: fn})
@@ -294,4 +297,67 @@ func (e *DenyError) Error() string {
 //	return c, agent.Deny("write outside the workspace")
 func Deny(reason string) error {
 	return &DenyError{Reason: reason}
+}
+
+// AskError asks a person about a tool call before it runs. A
+// [BeforeToolFunc] returns one through [Ask]. The driver of the agent
+// gives the call to its approve function, as [AnswerAsk] does. The
+// Claude Code agent gives the call to the permission prompt of the
+// CLI instead, and the prompt reaches the approve function. A hook does
+// not wait for a person, because the CLI can stop a hook that runs
+// long, and then run the call.
+type AskError struct {
+	// Reason tells the person why the call asks. If it is empty, the
+	// text is "the tool call needs a person".
+	Reason string
+}
+
+func (e *AskError) Error() string {
+	if e.Reason == "" {
+		return "the tool call needs a person"
+	}
+	return e.Reason
+}
+
+// Ask returns an error that asks a person about a tool call:
+//
+//	return c, agent.Ask("the rule Bash(git push *) asks")
+func Ask(reason string) error {
+	return &AskError{Reason: reason}
+}
+
+// AnswerAsk answers the error err of a BeforeTool hook on the call c.
+// If err is an [AskError], AnswerAsk asks approve and returns the call
+// that runs: c, or c with the input of the decision. A denied call gives
+// a [DenyError] with the message of the decision. A nil approve, or an
+// error of approve, also blocks the call. Each other err comes back as
+// it is.
+func AnswerAsk(ctx context.Context, approve ApproveFunc, c ai.ToolCall, err error) (ai.ToolCall, error) {
+	var ask *AskError
+	if !errors.As(err, &ask) {
+		return c, err
+	}
+	if approve == nil {
+		reason := fmt.Sprintf("the tool call %q needs a person, and the agent has no approve function", c.Name)
+		return c, Deny(reason)
+	}
+	req := ApprovalRequest{
+		Call:   c,
+		Reason: ask.Reason,
+	}
+	d, err := approve(ctx, req)
+	if err != nil {
+		return c, fmt.Errorf("agent: approve the tool call %q: %w", c.Name, err)
+	}
+	if !d.Allow {
+		reason := d.Message
+		if reason == "" {
+			reason = fmt.Sprintf("the person denied the tool call %q", c.Name)
+		}
+		return c, Deny(reason)
+	}
+	if d.Input != nil {
+		c.Input = d.Input
+	}
+	return c, nil
 }

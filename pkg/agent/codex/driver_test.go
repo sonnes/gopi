@@ -187,23 +187,6 @@ func TestDriverLimits(t *testing.T) {
 	}
 }
 
-func TestDriverAllowAnswersAnApproval(t *testing.T) {
-	useTraces(t, []string{"approval_accept.trace"})
-	var asked []string
-	a := startAgent(t, Driver(), agent.Config{
-		Dir:   workDir,
-		Allow: []string{"bash(rm *)"},
-		Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-			asked = append(asked, req.Call.Name)
-			return agent.Decision{}, nil
-		},
-	})
-
-	_, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
-	require.NoError(t, err, "the agent accepts the request that the Allow rule covers")
-	assert.Empty(t, asked, "the approve function does not get the request")
-}
-
 // defsDir writes a folder with the skill deploy and the agent reviewer.
 func defsDir(t *testing.T) string {
 	t.Helper()

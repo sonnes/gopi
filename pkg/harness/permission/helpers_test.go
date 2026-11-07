@@ -22,11 +22,8 @@ const (
 	denied outcome = "deny"
 )
 
-// The decisions that the tests use most.
-var (
-	allow       = agent.Decision{Allow: true}
-	allowAlways = agent.Decision{Allow: true, Always: true}
-)
+// allow is the decision that the tests use most.
+var allow = agent.Decision{Allow: true}
 
 // approver records the calls that it gets, and returns one decision.
 type approver struct {
