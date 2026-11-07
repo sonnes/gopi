@@ -251,12 +251,11 @@ func (c *conn) decide(id json.RawMessage, call ai.ToolCall, reason string) {
 	}
 	d, err := c.approve(c.ctx, req)
 	declined := err != nil || !d.Allow || d.Input != nil
+	// An Always decision accepts only this call. The caller keeps the
+	// rule of Always, as the host does.
 	decision := decisionAccept
-	switch {
-	case declined:
+	if declined {
 		decision = decisionDecline
-	case d.Always:
-		decision = decisionAcceptForSession
 	}
 	_ = c.write(response{
 		ID:     id,
@@ -266,9 +265,8 @@ func (c *conn) decide(id json.RawMessage, call ai.ToolCall, reason string) {
 
 // The decisions of an approval response.
 const (
-	decisionDecline          = "decline"
-	decisionAccept           = "accept"
-	decisionAcceptForSession = "acceptForSession"
+	decisionDecline = "decline"
+	decisionAccept  = "accept"
 )
 
 // decisionResult returns the result of an approval response.

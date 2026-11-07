@@ -116,6 +116,8 @@ type fakeDriver struct {
 	// reason goes with each call to the approve function, as an agent
 	// says why a call asks.
 	reason string
+	// safety marks each call to the approve function as a safety check.
+	safety bool
 	// wakes gives each runner Continue, and the Wake function of its
 	// config, as the Claude Code agent has. The runner of the last start is in wake.
 	wakes bool
@@ -146,6 +148,9 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 	if c.Sections != nil {
 		opts = append(opts, agent.System(c.Sections))
 	}
+	if c.Approve != nil {
+		opts = append(opts, agent.Approve(c.Approve))
+	}
 	if d.ask {
 		approve := c.Approve
 		if d.detached {
@@ -156,7 +161,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		if d.abandon {
 			approve = abandoned(approve)
 		}
-		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason)))
+		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason, d.safety)))
 	}
 	r, err := agent.Durable(ctx, d.lm, c.SessionID, opts...)
 	if err != nil {
@@ -250,12 +255,13 @@ func abandoned(approve agent.ApproveFunc) agent.ApproveFunc {
 }
 
 // askFirst returns a hook that asks approve before each tool call, with
-// reason.
-func askFirst(approve agent.ApproveFunc, reason string) agent.BeforeToolFunc {
+// reason. safety marks each request as a safety check.
+func askFirst(approve agent.ApproveFunc, reason string, safety bool) agent.BeforeToolFunc {
 	return func(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 		req := agent.ApprovalRequest{
 			Call:   c,
 			Reason: reason,
+			Safety: safety,
 		}
 		d, err := approve(ctx, req)
 		if err != nil {

@@ -38,21 +38,14 @@ func TestHookToolNames(t *testing.T) {
 }
 
 func TestRuleHooks(t *testing.T) {
-	var asked []string
-	approve := func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-		asked = append(asked, req.Call.Name)
-		return agent.Decision{}, nil
-	}
 	hooks, err := ruleHooks(agent.Config{
 		Dir:       workDir,
 		Tools:     allTools,
-		Deny:      []string{"bash(git push *)", "apply_patch(secrets/**)"},
-		Ask:       []string{"mcp__docs__write"},
-		ToolNames: []string{"bash", "apply_patch", "mcp__docs__write"},
-		Approve:   approve,
+		Deny:      []string{"mcp__docs__drop", "bash(git push *)"},
+		ToolNames: []string{"bash", "apply_patch", "mcp__docs__write", "mcp__docs__drop"},
 	})
 	require.NoError(t, err)
-	srv, err := startHookServer(hooks, noState)
+	srv, err := startHookServer(hooks, noState, nil)
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -65,24 +58,14 @@ func TestRuleHooks(t *testing.T) {
 		want  string
 	}{
 		{
-			name:  "a deny rule blocks a command",
+			name:  "a deny rule with no content blocks the tool",
+			input: `{"hook_event_name":"PreToolUse","tool_name":"mcp__docs__drop","tool_input":{}}`,
+			want:  deny(`"the rule \"mcp__docs__drop\" denies the tool call \"mcp__docs__drop\""`),
+		},
+		{
+			name:  "the driver does not check a deny rule with content",
 			input: `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin main"}}`,
-			want:  deny(`"the rule \"bash(git push *)\" denies the tool call \"bash\""`),
-		},
-		{
-			name:  "a deny rule blocks a patch of a path",
-			input: `{"hook_event_name":"PreToolUse","tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: secrets/a.txt\n*** End Patch\n"}}`,
-			want:  deny(`"the rule \"apply_patch(secrets/**)\" denies the tool call \"apply_patch\""`),
-		},
-		{
-			name:  "another command runs",
-			input: `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status"}}`,
 			want:  `{}`,
-		},
-		{
-			name:  "an ask rule asks the approve function",
-			input: `{"hook_event_name":"PreToolUse","tool_name":"mcp__docs__write","tool_input":{}}`,
-			want:  deny(`"the approver denied the tool call \"mcp__docs__write\""`),
 		},
 		{
 			name:  "a tool that ToolNames does not name is blocked",
@@ -98,12 +81,11 @@ func TestRuleHooks(t *testing.T) {
 			assert.JSONEq(t, tt.want, out.String())
 		})
 	}
-	assert.Equal(t, []string{"mcp__docs__write"}, asked)
 }
 
 func TestRuleHooksWithNoRules(t *testing.T) {
-	hooks, err := ruleHooks(agent.Config{Tools: allTools, Allow: []string{"bash"}})
+	hooks, err := ruleHooks(agent.Config{Tools: allTools, Deny: []string{"bash(rm *)"}})
 
 	require.NoError(t, err)
-	assert.Empty(t, hooks, "an Allow rule needs no hook, so the CLI needs no hook command")
+	assert.Empty(t, hooks, "a rule with content needs no hook in the driver, so the CLI needs no hook command")
 }

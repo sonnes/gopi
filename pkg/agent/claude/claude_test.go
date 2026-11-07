@@ -678,9 +678,7 @@ func TestOptions(t *testing.T) {
 		claude.System("Be brief."),
 		claude.Thinking(ai.ThinkingHigh),
 		claude.PermissionMode(claude.PermissionAcceptEdits),
-		claude.AllowedTools("read_file", "bash(git:*)", "mcp__lw__threads_get"),
 		claude.DisallowedTools("web_fetch"),
-		claude.AskTools("bash(gh pr comment:*)"),
 		claude.OnlyTools("read_file", "find", "ExitPlanMode", "mcp__lw__threads_get"),
 		claude.MCP(agent.MCPServer{
 			Name:    "lw",
@@ -711,9 +709,7 @@ func TestOptions(t *testing.T) {
 		"--append-system-prompt", "Be brief.",
 		"--effort", "high",
 		"--permission-mode", "acceptEdits",
-		"--allowedTools", "Read,Bash(git:*),mcp__lw__threads_get",
 		"--disallowedTools", "WebFetch",
-		"--settings", `{"permissions":{"ask":["Bash(gh pr comment:*)"]}}`,
 		"--tools", "Read,Glob,ExitPlanMode",
 		"--mcp-config", `{"mcpServers":{"lw":{"type":"http","url":"http://127.0.0.1:1/mcp","headers":{"Authorization":"Bearer t"}}}}`,
 	}, cmd.Args)
@@ -917,51 +913,8 @@ func TestRunFileOnly(t *testing.T) {
 	require.NoError(t, err, "a file without text is input")
 }
 
-func TestApproveAlways(t *testing.T) {
-	tests := []struct {
-		name  string
-		file  string
-		input json.RawMessage
-	}{
-		{
-			name: "the suggestions of the CLI go back for the session",
-			file: "testdata/can_use_tool_always.trace",
-		},
-		{
-			name: "no suggestions send no permission updates",
-			file: "testdata/can_use_tool_always_none.trace",
-		},
-		{
-			name:  "the same input in another form keeps the suggestions",
-			file:  "testdata/can_use_tool_always.trace",
-			input: json.RawMessage(`{ "command": "rm a.txt" }`),
-		},
-		{
-			name:  "a new input sends no permission updates",
-			file:  "testdata/can_use_tool_always_input.trace",
-			input: json.RawMessage(`{"command":"rm -i a.txt"}`),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			claude.Replay(t, nil, tt.file)
-			a := claude.New(claude.Approve(func(ctx context.Context, _ agent.ApprovalRequest) (agent.Decision, error) {
-				return agent.Decision{
-					Allow:  true,
-					Always: true,
-					Input:  tt.input,
-				}, nil
-			}))
-			defer closeAgent(t, a)
-
-			_, _, err := run(context.Background(), a, "Delete a.txt")
-			require.NoError(t, err, "the trace matches the answer to the prompt")
-		})
-	}
-}
-
 func TestApproveRequest(t *testing.T) {
-	claude.Replay(t, nil, "testdata/can_use_tool_no_always.trace")
+	claude.Replay(t, nil, "testdata/can_use_tool_reason.trace")
 	var got agent.ApprovalRequest
 	a := claude.New(claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		got = req
@@ -973,7 +926,7 @@ func TestApproveRequest(t *testing.T) {
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Delete a.txt")
-	require.NoError(t, err, "an Always decision on a prompt with no allow always sends no permission updates")
+	require.NoError(t, err, "an Always decision sends no permission updates")
 	assert.Equal(t, "rm deletes files", got.Reason, "the request has the reason with no escapes")
 	assert.False(t, got.Safety)
 }

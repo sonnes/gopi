@@ -145,6 +145,9 @@ func (a *Agent) prepare(ctx context.Context, declared []ai.ToolInfo, tc ai.ToolC
 		}
 		next, err := bt.BeforeTool(ctx, a.State(), call)
 		if err != nil {
+			next, err = AnswerAsk(ctx, a.cfg.approve, call, err)
+		}
+		if err != nil {
 			result, err := failure(ctx, err)
 			return pending{call: call, result: result, err: err}
 		}

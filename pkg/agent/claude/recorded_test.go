@@ -256,8 +256,7 @@ func TestRecordedToolEdits(t *testing.T) {
 	a := claude.New(
 		claude.Dir(dir),
 		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionDontAsk),
-		claude.AllowedTools("bash"),
+		claude.PermissionMode(claude.PermissionBypass),
 		claude.Hooks(guard, outputEditor{results: &results}),
 	)
 	defer closeAgent(t, a)

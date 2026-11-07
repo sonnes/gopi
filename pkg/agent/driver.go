@@ -81,14 +81,16 @@ type Config struct {
 	// is nil, the agent keeps each tool of Tools. A name of no tool of
 	// Tools fails the start with [tool.ErrUnknownTool].
 	ToolNames []string
-	// Allow, Ask, and Deny are the permission rules of the agent, in
-	// the format "Tool" or "Tool(content)". A rule can use a gopi name
-	// or a Claude Code name. [tool.RuleNames] gives the tools of a
-	// rule, so a rule on "Read" also covers grep and find.
-	Allow []string
-	Ask   []string
-	Deny  []string
-	// Approve decides each tool call that needs a person.
+	// Deny are the Deny rules of the agent, in the format "Tool" or
+	// "Tool(content)". A rule can use a gopi name or a Claude Code name.
+	// Each driver removes each tool that a rule with no content names,
+	// so the model does not see the tool. The harness also blocks each
+	// call that a rule matches. A driver of a CLI does not check a rule
+	// with content. A host checks each rule of a session for each driver,
+	// so the Config has no Allow rules and no Ask rules.
+	Deny []string
+	// Approve decides each tool call that needs a person. It also
+	// answers a BeforeTool hook that returns an [AskError].
 	Approve ApproveFunc
 	// Hooks change the loop of the agent.
 	Hooks []Hook

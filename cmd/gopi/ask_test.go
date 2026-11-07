@@ -210,32 +210,70 @@ func TestTerminal_Ask_OnATerminal(t *testing.T) {
 }
 
 func TestTerminal_Approve(t *testing.T) {
+	call := ai.ToolCall{ID: "call_1", Name: "bash", Input: json.RawMessage(`{"command":"rm -rf .bin"}`)}
 	tests := []struct {
-		line string
-		want agent.Decision
+		line       string
+		rule       string
+		want       agent.Decision
+		wantPrompt string
 	}{
-		{"y", agent.Decision{Allow: true}},
-		{" YES ", agent.Decision{Allow: true}},
-		{"a", agent.Decision{Allow: true, Always: true}},
-		{"always", agent.Decision{Allow: true, Always: true}},
-		{"n", agent.Decision{}},
-		{"", agent.Decision{}},
-		{"maybe", agent.Decision{}},
+		{
+			line:       "y",
+			rule:       "Bash(rm -rf .bin)",
+			want:       agent.Decision{Allow: true},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [a]lways Bash(rm -rf .bin), [n]o: `,
+		},
+		{
+			line:       " YES ",
+			want:       agent.Decision{Allow: true},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [n]o: `,
+		},
+		{
+			line:       "a",
+			rule:       "Bash(rm -rf .bin)",
+			want:       agent.Decision{Allow: true, Always: true},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [a]lways Bash(rm -rf .bin), [n]o: `,
+		},
+		{
+			line:       "always",
+			rule:       "Bash(rm -rf .bin)",
+			want:       agent.Decision{Allow: true, Always: true},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [a]lways Bash(rm -rf .bin), [n]o: `,
+		},
+		{
+			line:       "a",
+			want:       agent.Decision{},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [n]o: `,
+		},
+		{
+			line:       "n",
+			want:       agent.Decision{},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [n]o: `,
+		},
+		{
+			line:       "",
+			want:       agent.Decision{},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [n]o: `,
+		},
+		{
+			line:       "maybe",
+			want:       agent.Decision{},
+			wantPrompt: `? allow bash {"command":"rm -rf .bin"}? [y]es, [n]o: `,
+		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.line, func(t *testing.T) {
+		t.Run(tt.line+tt.rule, func(t *testing.T) {
 			var out strings.Builder
 			r := terminal{
 				w:  &out,
 				in: readInput(strings.NewReader(tt.line+"\n"), false),
 			}
-			call := ai.ToolCall{ID: "call_1", Name: "bash", Input: json.RawMessage(`{"command":"rm -rf .bin"}`)}
 
-			got, err := r.Approve(t.Context(), agent.ApprovalRequest{Call: call})
+			got, err := r.Approve(t.Context(), agent.ApprovalRequest{Call: call, Rule: tt.rule})
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
-			assert.Equal(t, `? allow bash {"command":"rm -rf .bin"}? [y]es, [a]lways, [n]o: `, out.String())
+			assert.Equal(t, tt.wantPrompt, out.String())
 		})
 	}
 }

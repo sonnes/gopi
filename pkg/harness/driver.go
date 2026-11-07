@@ -24,8 +24,9 @@ const autoCompactFraction = 0.8
 // The harness honors each field of c, each mode, and each point of a
 // hook. It reads the Skillset of c, then each folder of the Dirs of c, after the readers of h. The Mode of c replaces the [Mode] of h. The System of c goes
 // after the [System] of h, as a CLI agent adds it to its own prompt.
-// The Skills of c are preloaded, as with [Preload]. The rules of c go
-// after the rules of h. The MCP servers of c go after those of [MCP].
+// The Skills of c are preloaded, as with [Preload]. The Deny rules of c
+// go after the Deny rules of h. The Approve function of c also answers
+// a hook of c that returns an [agent.AskError]. The MCP servers of c go after those of [MCP].
 // The Limits of c apply as [Limits] does.
 func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, error) {
 	if err := agent.CheckHooks(c.Hooks, agent.AllPoints...); err != nil {
@@ -37,8 +38,6 @@ func (h *Harness) Start(ctx context.Context, c agent.Config) (agent.Runner, erro
 
 	opts := []Option{
 		Preload(c.Skills...),
-		Allow(c.Allow...),
-		Ask(c.Ask...),
 		Deny(c.Deny...),
 	}
 	if c.Store != nil {

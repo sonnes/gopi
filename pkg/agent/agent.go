@@ -51,6 +51,8 @@ type config struct {
 	// log as they are.
 	system SystemFunc
 	hooks  []Hook
+	// approve answers an [AskError] of a hook, or is nil.
+	approve ApproveFunc
 	// compactor is the strategy of [Compaction], or nil.
 	compactor Compactor
 	// closers run once, at the first [Agent.Close].

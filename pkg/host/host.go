@@ -61,6 +61,8 @@ type Host struct {
 	skillset []def.SkillsReader
 	// sections returns the sections of a session, by ID.
 	sections SectionsFunc
+	// rules reads the rules of [Rules], or is nil.
+	rules RulesReader
 	// toolList reports a call of [Tools], also with no tools.
 	toolList bool
 	// newID makes the ID of a session that the caller gives no ID.
@@ -247,9 +249,10 @@ type Config struct {
 	// Allow, Ask, and Deny are the permission rules of the agent, in
 	// the format "Tool" or "Tool(content)". A rule can use a gopi name
 	// or a Claude Code name, and a rule on "Read" also covers grep and
-	// find. The host keeps the names as the caller wrote them, and the
-	// driver reads them. A call that the mode and the rules do not
-	// allow waits for [Host.Confirm].
+	// find. The host checks each rule at each tool call, with the rules
+	// of [Rules] and the grants, and a Deny rule wins, then an Ask rule.
+	// The driver gets only the Deny rules, to remove a tool. A call that
+	// the mode and the rules do not allow waits for [Host.Confirm].
 	Allow []string `json:"allow,omitempty"`
 	Ask   []string `json:"ask,omitempty"`
 	Deny  []string `json:"deny,omitempty"`

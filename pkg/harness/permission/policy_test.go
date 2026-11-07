@@ -289,26 +289,6 @@ func TestToolNames(t *testing.T) {
 	}
 }
 
-func TestAlways(t *testing.T) {
-	a := &approver{decision: allowAlways}
-	p := permission.Policy{Approve: a.approve}
-	h := p.Hook()
-
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "make test")))
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "make test")))
-	assert.Len(t, a.calls, 1, "the second call uses the kept rule")
-
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "make build")))
-	assert.Len(t, a.calls, 2, "the kept rule is the exact command")
-
-	assert.Equal(t, ran, runOn(t, h, call(t, "deploy", map[string]any{"env": "a"})))
-	assert.Equal(t, ran, runOn(t, h, call(t, "deploy", map[string]any{"env": "b"})))
-	assert.Len(t, a.calls, 3, "the kept rule is the tool name")
-
-	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "make test")))
-	assert.Len(t, a.calls, 4, "a new hook starts with no kept rules")
-}
-
 func TestPolicyIsAValue(t *testing.T) {
 	p := permission.Policy{Mode: permission.Bypass}
 	child := p
@@ -317,17 +297,6 @@ func TestPolicyIsAValue(t *testing.T) {
 	assert.NoError(t, child.Validate())
 	assert.Equal(t, ran, runOn(t, p.Hook(), bashCall(t, "make build")))
 	assert.Equal(t, denied, runOn(t, child.Hook(), bashCall(t, "make build")))
-}
-
-func TestAlwaysDoesNotBeatDeny(t *testing.T) {
-	a := &approver{decision: allowAlways}
-	p := permission.Policy{
-		Approve: a.approve,
-		Deny:    []string{"bash(rm:*)"},
-	}
-	h := p.Hook()
-	assert.Equal(t, ran, runOn(t, h, call(t, "deploy", map[string]any{})))
-	assert.Equal(t, denied, runOn(t, h, bashCall(t, "rm -rf /")))
 }
 
 func TestAllow(t *testing.T) {
@@ -383,45 +352,18 @@ func TestApproveChangesInput(t *testing.T) {
 	assert.JSONEq(t, `{"command":"make test -v"}`, string(got.Input))
 }
 
-func TestAlwaysKeepsTheEditedInput(t *testing.T) {
-	a := &approver{decision: agent.Decision{
-		Allow:  true,
-		Always: true,
-		Input:  json.RawMessage(`{"command":"rm -rf build/tmp"}`),
-	}}
-	p := permission.Policy{Approve: a.approve}
-	h := p.Hook()
-
-	got, out := runEdited(t, h, bashCall(t, "rm -rf build"))
-	assert.Equal(t, ran, out)
-	assert.JSONEq(t, `{"command":"rm -rf build/tmp"}`, string(got.Input))
-
-	a.decision = allow
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "rm -rf build/tmp")))
-	assert.Len(t, a.calls, 1, "the kept rule is the edited command")
-
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "rm -rf build")))
-	assert.Len(t, a.calls, 2, "the command before the edit asks again")
-}
-
 func TestDenyChecksTheEditedInput(t *testing.T) {
 	a := &approver{decision: agent.Decision{
-		Allow:  true,
-		Always: true,
-		Input:  json.RawMessage(`{"command":"rm -rf /"}`),
+		Allow: true,
+		Input: json.RawMessage(`{"command":"rm -rf /"}`),
 	}}
 	p := permission.Policy{
 		Approve: a.approve,
 		Deny:    []string{"bash(rm:*)"},
 	}
-	h := p.Hook()
 
-	_, out := runEdited(t, h, bashCall(t, "make build"))
+	_, out := runEdited(t, p.Hook(), bashCall(t, "make build"))
 	assert.Equal(t, denied, out)
-
-	a.decision = allow
-	assert.Equal(t, ran, runOn(t, h, bashCall(t, "make build")))
-	assert.Len(t, a.calls, 2, "a denied edit keeps no rule")
 }
 
 func TestApproveError(t *testing.T) {

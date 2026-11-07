@@ -328,6 +328,7 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 	policy.Roots = append([]string{a.Dir}, a.h.addDirs...)
 	opts := []agent.Option{
 		agent.Hooks(policy.Hook()),
+		agent.Approve(policy.Approve),
 		// The first option, so [AgentDefaults] can replace it.
 		agent.Compaction(compact.Summarize()),
 	}

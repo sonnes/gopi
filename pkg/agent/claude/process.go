@@ -13,7 +13,6 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
-	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness/permission"
@@ -190,24 +189,14 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (promptAnswe
 		}
 		return deny, nil
 	}
-	// An input that holds the same JSON value as the request is not a
-	// new input.
-	newInput := d.Input != nil && !jsonx.Same(d.Input, req.Input)
 	input := req.Input
-	if newInput {
+	if d.Input != nil {
 		input = d.Input
 	}
 	allow := promptAnswer{
 		Behavior:     "allow",
 		UpdatedInput: input,
 		ToolUseID:    req.ToolUseID,
-	}
-	// The suggestions describe the original input. With a new input,
-	// they would allow calls that the caller did not approve. A prompt
-	// with a rule that allows more than the call keeps no rule.
-	keep := d.Always && !newInput && !req.SuppressAlwaysAllowRule
-	if keep {
-		allow.UpdatedPermissions = forSession(req.PermissionSuggestions)
 	}
 	return allow, nil
 }
@@ -218,35 +207,6 @@ var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]
 // plainText returns s with no ANSI escapes and no space at the ends.
 func plainText(s string) string {
 	return strings.TrimSpace(ansiEscape.ReplaceAllString(s, ""))
-}
-
-// sessionDestination is the destination of a permission update that
-// lasts for the session of the CLI. Other destinations, such as
-// localSettings, write the rule to a settings file.
-const sessionDestination = `"session"`
-
-// forSession returns the permission suggestions of the CLI with the
-// destination of each one set to the session. It returns nil if there
-// are no suggestions, or if they are not a list of objects.
-func forSession(suggestions json.RawMessage) json.RawMessage {
-	var list []map[string]json.RawMessage
-	if err := json.Unmarshal(suggestions, &list); err != nil {
-		return nil
-	}
-	if len(list) == 0 {
-		return nil
-	}
-	for _, s := range list {
-		if s == nil {
-			return nil
-		}
-		s["destination"] = json.RawMessage(sessionDestination)
-	}
-	data, err := json.Marshal(list)
-	if err != nil {
-		return nil
-	}
-	return data
 }
 
 // denyText is the reason that the agent gives the model when it denies

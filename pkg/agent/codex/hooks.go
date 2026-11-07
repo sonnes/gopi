@@ -176,6 +176,8 @@ type hookServer struct {
 	socket string
 	hooks  []agent.Hook
 	state  func() agent.State
+	// approve answers a hook that returns an [agent.AskError].
+	approve agent.ApproveFunc
 	// ctx ends when the server closes. A hook between runs gets it. A
 	// hook in a run gets a context that ends with the run or with ctx.
 	ctx    context.Context
@@ -224,8 +226,8 @@ func hookDir() (string, error) {
 }
 
 // startHookServer listens on a socket in a new folder, and serves the
-// hooks.
-func startHookServer(hooks []agent.Hook, state func() agent.State) (*hookServer, error) {
+// hooks. approve answers a hook that asks a person.
+func startHookServer(hooks []agent.Hook, state func() agent.State, approve agent.ApproveFunc) (*hookServer, error) {
 	dir, err := hookDir()
 	if err != nil {
 		return nil, fmt.Errorf("codex: make the folder of the hook socket: %w", err)
@@ -238,13 +240,14 @@ func startHookServer(hooks []agent.Hook, state func() agent.State) (*hookServer,
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &hookServer{
-		ln:     ln,
-		dir:    dir,
-		socket: socket,
-		hooks:  hooks,
-		state:  state,
-		ctx:    ctx,
-		cancel: cancel,
+		ln:      ln,
+		dir:     dir,
+		socket:  socket,
+		hooks:   hooks,
+		state:   state,
+		approve: approve,
+		ctx:     ctx,
+		cancel:  cancel,
 	}
 	s.wg.Add(1)
 	go s.serve()
@@ -403,6 +406,11 @@ func (s *hookServer) beforeTool(ctx context.Context, orig ai.ToolCall) hookOutpu
 			continue
 		}
 		next, err := bt.BeforeTool(ctx, s.state(), call)
+		if err != nil {
+			// Codex has no prompt that a hook can send a call to, so the
+			// hook waits for the answer of a person.
+			next, err = agent.AnswerAsk(ctx, s.approve, call, err)
+		}
 		if err != nil {
 			return denyTool(err.Error())
 		}

@@ -93,7 +93,7 @@ func noState() agent.State { return agent.State{} }
 func TestHookShim(t *testing.T) {
 	var names []string
 	stops := 0
-	srv, err := startHookServer([]agent.Hook{policyHook{names: &names, stops: &stops}}, noState)
+	srv, err := startHookServer([]agent.Hook{policyHook{names: &names, stops: &stops}}, noState, nil)
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -221,7 +221,7 @@ func TestHookShimWithoutHost(t *testing.T) {
 }
 
 func TestHookErrorStopsTheTurn(t *testing.T) {
-	srv, err := startHookServer([]agent.Hook{failingStop{}}, noState)
+	srv, err := startHookServer([]agent.Hook{failingStop{}}, noState, nil)
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -402,7 +402,7 @@ func TestHookServerFailure(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv, err := startHookServer([]agent.Hook{badInput{}}, noState)
+			srv, err := startHookServer([]agent.Hook{badInput{}}, noState, nil)
 			require.NoError(t, err)
 			defer srv.close()
 
@@ -568,7 +568,7 @@ func TestHookNewInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv, err := startHookServer([]agent.Hook{inputHook{input: tt.hook}}, noState)
+			srv, err := startHookServer([]agent.Hook{inputHook{input: tt.hook}}, noState, nil)
 			require.NoError(t, err)
 			defer srv.close()
 
@@ -589,7 +589,7 @@ func TestHookServerEndsAStuckConnection(t *testing.T) {
 	saved := hookReadTimeout
 	hookReadTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { hookReadTimeout = saved })
-	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState)
+	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil)
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -610,7 +610,7 @@ func TestHookServerWithALongTempDir(t *testing.T) {
 	require.NoError(t, os.MkdirAll(long, 0o700))
 	t.Setenv("TMPDIR", long)
 
-	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState)
+	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil)
 	require.NoError(t, err, "a socket path over the limit of the OS fails to listen")
 	defer srv.close()
 
@@ -618,4 +618,51 @@ func TestHookServerWithALongTempDir(t *testing.T) {
 	input := `{"hook_event_name":"SessionStart"}`
 	require.NoError(t, HookShim(context.Background(), srv.socket, strings.NewReader(input), &out))
 	assert.JSONEq(t, `{}`, out.String())
+}
+
+func TestHookServerAsks(t *testing.T) {
+	tests := []struct {
+		name     string
+		decision agent.Decision
+		want     string
+	}{
+		{
+			name:     "an allow runs the call",
+			decision: agent.Decision{Allow: true},
+			want:     `{}`,
+		},
+		{
+			name:     "a deny blocks the call",
+			decision: agent.Decision{Message: "not now"},
+			want:     `{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"not now"}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var seen []agent.ApprovalRequest
+			approve := func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+				seen = append(seen, req)
+				return tt.decision, nil
+			}
+			srv, err := startHookServer([]agent.Hook{askHook{}}, noState, approve)
+			require.NoError(t, err)
+			defer srv.close()
+
+			var out bytes.Buffer
+			input := `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_use_id":"c1","tool_input":{"command":"rm a.txt"}}`
+			require.NoError(t, HookShim(context.Background(), srv.socket, strings.NewReader(input), &out))
+
+			assert.JSONEq(t, tt.want, out.String())
+			require.Len(t, seen, 1, "the hook asks the approve function")
+			assert.Equal(t, "the rule asks", seen[0].Reason)
+			assert.Equal(t, "c1", seen[0].Call.ID)
+		})
+	}
+}
+
+// askHook asks a person about each tool call.
+type askHook struct{ agent.BaseHook }
+
+func (askHook) BeforeTool(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+	return c, agent.Ask("the rule asks")
 }

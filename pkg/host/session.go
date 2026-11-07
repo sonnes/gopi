@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -40,6 +41,10 @@ type hosted struct {
 	// message.
 	closing bool
 
+	// grantMu holds a read and a write of the grants, so two Always
+	// decisions keep both rules.
+	grantMu sync.Mutex
+
 	mu   sync.Mutex
 	sess Session
 	// writeErr is the first error of a write of the status. Close
@@ -54,6 +59,13 @@ type hosted struct {
 	// calls has the tool calls that wait for [Host.Confirm], the oldest
 	// first.
 	calls []*call
+	// rules are the rules of the config of the agent, and dir is its
+	// working directory. The start of the agent sets them.
+	rules permission.Rules
+	dir   string
+	// allowed has the input of each call that a person allowed in the
+	// active run, by call ID.
+	allowed map[string]json.RawMessage
 	// childRuns is true while the run of the parent of a child runs the
 	// child. inBackground is true while the child runs after the run of
 	// its parent.
@@ -211,8 +223,22 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		return nil, agent.State{}, fmt.Errorf("host: session %s: %w", s.id, err)
 	}
 
+	s.mu.Lock()
+	s.rules = permission.Rules{
+		Allow: config.Allow,
+		Ask:   config.Ask,
+		Deny:  config.Deny,
+	}
+	s.dir = config.Dir
+	s.mu.Unlock()
+	hooks := h.hooks
+	if h.needsRulesHook(config) {
+		hooks = append([]agent.Hook{rulesHook{s: s}}, h.hooks...)
+	}
+
 	// The driver gets the snapshot, so it does not read the log a second
-	// time.
+	// time. The host checks the Allow rules and the Ask rules, so the
+	// driver gets only the Deny rules, to remove a tool.
 	runner, err := d.Start(ctx, agent.Config{
 		SessionID: s.id,
 		Store:     session.Preloaded(h.store, s.id, snap),
@@ -227,14 +253,12 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Dirs:      config.Dirs,
 		Effort:    config.Effort,
 		ToolNames: config.ToolNames,
-		Allow:     config.Allow,
-		Ask:       config.Ask,
 		Deny:      config.Deny,
 		MCP:       config.MCP,
 		Approve:   s.approve,
 		Idle:      s.idle,
 		Wake:      s.woke,
-		Hooks:     h.hooks,
+		Hooks:     hooks,
 		Tools:     h.tools,
 
 		Compaction:  h.compaction,
