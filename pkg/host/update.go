@@ -97,6 +97,9 @@ func (h *Host) checkChange(old, config Config) error {
 	if err := checkEffort(config); err != nil {
 		return fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
+	if err := checkMode(config); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalid, err)
+	}
 	if err := h.checkTools(config, false); err != nil {
 		return err
 	}

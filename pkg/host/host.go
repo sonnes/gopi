@@ -283,6 +283,9 @@ func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
 		err = checkEffort(config)
 	}
 	if err == nil {
+		err = checkMode(config)
+	}
+	if err == nil {
 		err = h.checkTools(config, fromFile)
 	}
 	if err == nil {
