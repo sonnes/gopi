@@ -49,7 +49,7 @@ ImageModel{Model, Provider}  -> ImageProvider
 | Bind a model to a provider             | `pkg/ai/text.go`                        |
 | Add an option                          | `pkg/ai/options.go`                     |
 | Add an optional capability             | `pkg/ai/object.go`, `pkg/ai/tokens.go`  |
-| List the models                        | `pkg/ai/lister.go`                      |
+| List the models or check a key         | `pkg/ai/lister.go`                      |
 | Mark what a Claude model accepts       | `pkg/ai/anthropic/compat.go`            |
 | Match a model ID to its family         | `internal/family/family.go`             |
 | Change the retry loop                  | `internal/retry/retry.go`               |

@@ -109,3 +109,13 @@ func (m listedModel) model() ai.Model {
 		Input:         input,
 	}
 }
+
+// CheckKey asks for the first page of the models of the account, so a
+// refused key fails and no model runs. Fireworks says nothing more
+// about the key, so the info is zero.
+func (p *Provider) CheckKey(ctx context.Context) (ai.KeyInfo, error) {
+	if _, err := p.listPage(ctx, ""); err != nil {
+		return ai.KeyInfo{}, fmt.Errorf("fireworks: check key: %w", err)
+	}
+	return ai.KeyInfo{}, nil
+}
