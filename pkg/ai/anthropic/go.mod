@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/anthropics/anthropic-sdk-go v1.75.0
 	github.com/google/jsonschema-go v0.4.3
-	github.com/sonnes/gopi v0.0.2
+	github.com/sonnes/gopi v0.0.3
 	github.com/stretchr/testify v1.11.1
 )
 
