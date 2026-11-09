@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,17 +15,16 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
+	"github.com/sonnes/gopi/pkg/agent/internal/drivertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// The agent is a runner that a host stops with Close.
-var (
-	_ agent.Runner = (*Agent)(nil)
-	_ io.Closer    = (*Agent)(nil)
-)
+var _ agent.Runner = (*Agent)(nil)
 
 // stopHook is a hook at BeforeStop.
 type stopHook struct{ agent.BaseHook }
@@ -62,18 +60,20 @@ func startAgent(t *testing.T, d agent.Driver, c agent.Config) *Agent {
 
 func TestDriverStart(t *testing.T) {
 	useTraces(t, []string{"text.trace"})
-	d := Driver(Sandbox(SandboxReadOnly))
+	d := Driver(Binary("/opt/codex"))
 	a := startAgent(t, d, agent.Config{
 		Store:    session.NewMemoryStore(),
 		Spec:     "codex/gpt-5-codex",
 		Model:    ai.Model{ID: "gpt-5-codex"},
 		Dir:      workDir,
 		Sections: agent.SystemText("Be brief."),
+		Mode:     permission.Default,
 		Effort:   ai.ThinkingHigh,
 	})
 
 	_, msgs, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
-	require.NoError(t, err, "the thread has the model, the dir, the system, the sandbox, and the effort")
+	require.NoError(t, err, "the thread has the model, the dir, the system, the mode, and the effort")
+	assert.Equal(t, "/opt/codex", a.command().Path, "the driver gives its options")
 	require.Len(t, msgs, 1)
 	assert.Equal(t, "Hello", msgs[0].Text())
 }
@@ -100,38 +100,36 @@ func TestDriverMode(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		mode        agent.Mode
-		wantPolicy  ApprovalPolicy
-		wantSandbox SandboxMode
+		mode        permission.Mode
+		wantPolicy  approvalPolicy
+		wantSandbox sandboxMode
 	}{
 		{
-			name:        "no mode keeps the untrusted policy of an approve function",
-			wantPolicy:  ApprovalUntrusted,
-			wantSandbox: SandboxWorkspaceWrite,
+			name:       "no mode keeps the sandbox of the CLI, and asks with an approve function",
+			wantPolicy: approvalUntrusted,
 		},
 		{
 			name:        "the default mode reads, and asks before a write or an unsafe command",
-			mode:        agent.ModeDefault,
-			wantPolicy:  ApprovalUntrusted,
-			wantSandbox: SandboxReadOnly,
+			mode:        permission.Default,
+			wantPolicy:  approvalUntrusted,
+			wantSandbox: sandboxReadOnly,
 		},
 		{
 			name:        "the accept edits mode writes in the workspace, and asks for more",
-			mode:        agent.ModeAcceptEdits,
-			wantPolicy:  ApprovalOnRequest,
-			wantSandbox: SandboxWorkspaceWrite,
+			mode:        permission.AcceptEdits,
+			wantPolicy:  approvalOnRequest,
+			wantSandbox: sandboxWorkspaceWrite,
 		},
 		{
 			name:        "the bypass mode turns the sandbox off and never asks",
-			mode:        agent.ModeBypass,
-			wantPolicy:  ApprovalNever,
-			wantSandbox: SandboxDangerFullAccess,
+			mode:        permission.Bypass,
+			wantPolicy:  approvalNever,
+			wantSandbox: sandboxDangerFullAccess,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := Driver(Sandbox(SandboxWorkspaceWrite))
-			a := startAgent(t, d, agent.Config{
+			a := startAgent(t, Driver(), agent.Config{
 				Mode:    tt.mode,
 				Approve: approve,
 			})
@@ -146,32 +144,45 @@ func TestDriverMode(t *testing.T) {
 func TestDriverLimits(t *testing.T) {
 	tests := []struct {
 		name        string
-		mode        agent.Mode
-		limits      agent.Limits
-		wantSandbox SandboxMode
+		mode        permission.Mode
+		limits      permission.Limits
+		wantSandbox sandboxMode
 	}{
 		{
 			name:        "the bypass mode with no limit turns the sandbox off",
-			mode:        agent.ModeBypass,
-			wantSandbox: SandboxDangerFullAccess,
+			mode:        permission.Bypass,
+			wantSandbox: sandboxDangerFullAccess,
 		},
 		{
 			name:        "the bypass mode with a block on writes writes in the workspace",
-			mode:        agent.ModeBypass,
-			limits:      agent.Limits{BlockWritesOutside: true},
-			wantSandbox: SandboxWorkspaceWrite,
+			mode:        permission.Bypass,
+			limits:      permission.Limits{BlockWritesOutside: true},
+			wantSandbox: sandboxWorkspaceWrite,
 		},
 		{
 			name:        "the bypass mode with the fence writes in the workspace",
-			mode:        agent.ModeBypass,
-			limits:      agent.Limits{Fence: true},
-			wantSandbox: SandboxWorkspaceWrite,
+			mode:        permission.Bypass,
+			limits:      permission.Limits{Fence: true},
+			wantSandbox: sandboxWorkspaceWrite,
+		},
+		{
+			name: "no mode with no limit keeps the sandbox of the CLI",
+		},
+		{
+			name:        "no mode with a block on writes writes in the workspace",
+			limits:      permission.Limits{BlockWritesOutside: true},
+			wantSandbox: sandboxWorkspaceWrite,
+		},
+		{
+			name:        "no mode with the fence writes in the workspace",
+			limits:      permission.Limits{Fence: true},
+			wantSandbox: sandboxWorkspaceWrite,
 		},
 		{
 			name:        "the default mode keeps its sandbox",
-			mode:        agent.ModeDefault,
-			limits:      agent.Limits{BlockWritesOutside: true, Fence: true},
-			wantSandbox: SandboxReadOnly,
+			mode:        permission.Default,
+			limits:      permission.Limits{BlockWritesOutside: true, Fence: true},
+			wantSandbox: sandboxReadOnly,
 		},
 	}
 	for _, tt := range tests {
@@ -221,7 +232,7 @@ func TestDriverWritesOnlyTheSkillKeysOfCodex(t *testing.T) {
 		AllowedTools: []string{"bash"},
 	}
 	a := startAgent(t, Driver(), agent.Config{
-		Skillset: []def.SkillsReader{skill},
+		Defs: def.Set{Skills: []def.Skill{skill}},
 	})
 
 	_, skillRoot, _, err := a.writeDefs(context.Background())
@@ -251,13 +262,13 @@ func TestDriverStartErrorOfTheSkillRoots(t *testing.T) {
 			name:        "Codex 0.163 has no method",
 			body:        reply(errInvalidRequest, "Invalid request: "+unknown),
 			unsupported: true,
-			text:        "the config fields Skillset and Dirs",
+			text:        "the config field Defs",
 		},
 		{
 			name:        "the method-not-found code",
 			body:        reply(errMethodNotFound, "no method"),
 			unsupported: true,
-			text:        "the config fields Skillset and Dirs",
+			text:        "the config field Defs",
 		},
 		{
 			name: "an invalid request for another reason",
@@ -274,7 +285,7 @@ func TestDriverStartErrorOfTheSkillRoots(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			defsRoot(t)
 			a := startAgent(t, Driver(Binary(fakeCLI(t, tt.body))), agent.Config{
-				Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+				Defs: def.Set{Skills: []def.Skill{{Name: "deploy", Description: "D.", Body: "Do it."}}},
 			})
 
 			_, _, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
@@ -300,9 +311,9 @@ func TestDriverGivesTheAddDirsAsWritableRoots(t *testing.T) {
 
 func TestAppServerPinsThePermissionKeys(t *testing.T) {
 	tests := []struct {
-		name string
-		opts []Option
-		want []string
+		name   string
+		config agent.Config
+		want   []string
 	}{
 		{
 			name: "no sandbox",
@@ -317,9 +328,9 @@ func TestAppServerPinsThePermissionKeys(t *testing.T) {
 		},
 		{
 			name: "a sandbox and a writable root",
-			opts: []Option{
-				Sandbox(SandboxWorkspaceWrite),
-				AddDirs("/lw/repos", `/lw/a "b"`),
+			config: agent.Config{
+				Mode:    permission.AcceptEdits,
+				AddDirs: []string{"/lw/repos", `/lw/a "b"`},
 			},
 			want: []string{
 				"/bin/codex", "app-server",
@@ -334,7 +345,8 @@ func TestAppServerPinsThePermissionKeys(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := newConfig(append([]Option{Binary("/bin/codex")}, tt.opts...))
+			c, err := newConfig(tt.config, []Option{Binary("/bin/codex")})
+			require.NoError(t, err)
 
 			cmd := appServer(c)
 
@@ -343,23 +355,33 @@ func TestAppServerPinsThePermissionKeys(t *testing.T) {
 	}
 }
 
-func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
+func TestDriverConformance(t *testing.T) {
+	drivertest.Run(t, drivertest.Suite{
+		Driver:          Driver(),
+		Tools:           allTools,
+		UnsupportedHook: turnHook{},
+		SkillDir:        skillsDir,
+		WriteDefs: func(t *testing.T, r agent.Runner) {
+			a, ok := r.(*Agent)
+			require.True(t, ok, "the driver starts a *codex.Agent")
+			_, _, _, err := a.writeDefs(context.Background())
+			require.NoError(t, err)
+		},
+	})
+}
+
+func TestDriverGivesTheRolesToTheCLI(t *testing.T) {
 	root := defsRoot(t)
 	a := startAgent(t, Driver(), agent.Config{
-		Spec:   "codex/gpt-5",
-		Dirs:   []string{defsDir(t)},
-		Skills: []string{"deploy"},
+		Spec: "codex/gpt-5",
+		Defs: storefs.Dir(defsDir(t)),
 	})
-	folder := filepath.Join(root, "s1")
 
-	_, skillRoot, roles, err := a.writeDefs(context.Background())
+	_, _, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 	p := a.threadParams("", nil, "", roles)
 
-	assert.Equal(t, filepath.Join(folder, "skills"), skillRoot)
-	assert.FileExists(t, filepath.Join(folder, "skills", "deploy", "SKILL.md"))
-
-	roleFile := filepath.Join(folder, "codex", "agents", "reviewer.toml")
+	roleFile := filepath.Join(root, "s1", "codex", "agents", "reviewer.toml")
 	assert.Equal(t, map[string]any{
 		"reviewer": map[string]any{
 			"description": `Review "it".`,
@@ -372,35 +394,29 @@ func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 description = "Review \"it\"."
 developer_instructions = "Review\nit."
 model = "gpt-6"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "max"
 `
 	assert.Equal(t, want, string(data), "a role has no limits: Codex has no key for them")
-
-	require.NoError(t, a.Close())
-	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
 }
 
-func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
-	root := defsRoot(t)
+func TestDriverFailsOnARoleNameThatLeavesTheFolder(t *testing.T) {
+	defsRoot(t)
 	a := startAgent(t, Driver(), agent.Config{
-		Skillset: []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+		Defs: def.Set{Agents: []def.Agent{{Name: "../evil", Description: "E."}}},
 	})
 
-	_, skillRoot, _, err := a.writeDefs(context.Background())
-	require.NoError(t, err)
+	_, _, _, err := a.writeDefs(context.Background())
 
-	assert.Equal(t, filepath.Join(root, "s1", "skills"), skillRoot)
-	assert.FileExists(t, filepath.Join(skillRoot, "deploy", "SKILL.md"))
+	assert.ErrorContains(t, err, "../evil")
 }
 
-func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
+func TestDriverWithNoDefsGivesNoRoles(t *testing.T) {
 	a := startAgent(t, Driver(), agent.Config{})
 
-	_, skillRoot, roles, err := a.writeDefs(context.Background())
+	_, _, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
 	p := a.threadParams("", nil, "", roles)
 
-	assert.Empty(t, skillRoot)
 	assert.NotContains(t, p.Config, "agents")
 }
 
@@ -412,47 +428,13 @@ func TestDriverRejects(t *testing.T) {
 		errText     string
 	}{
 		{
-			name:    "a skill that no dir has",
-			config:  agent.Config{Skills: []string{"deploy"}},
-			errText: `codex: clidefs: the skill "deploy": no skill has this name`,
-		},
-		{
-			name: "a tool of the caller that ToolNames names",
-			config: agent.Config{
-				Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Func("echo", nil)},
-				ToolNames: []string{"bash", "echo"},
-			},
-			errText: `codex: tool: unknown tool: "echo" is not a tool of codex`,
-		},
-		{
-			name:    "a name outside the tools",
-			config:  agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash)}, ToolNames: []string{"apply_patch"}},
-			errText: `codex: tool: unknown tool: "apply_patch" is not in the tool list`,
-		},
-		{
 			name:    "a rule that does not parse",
 			config:  agent.Config{Deny: []string{"bash(rm *"}},
 			errText: `codex: permission: rule "bash(rm *": the content has no closing parenthesis`,
 		},
 		{
-			name:        "a hook after a turn",
-			config:      agent.Config{Hooks: []agent.Hook{stopHook{}, turnHook{}}},
-			unsupported: true,
-			errText:     "codex: agent: hook 2 (codex.turnHook) uses AfterTurn: unsupported operation",
-		},
-		{
-			name:    "a hook with no point",
-			config:  agent.Config{Hooks: []agent.Hook{agent.BaseHook{}}},
-			errText: "codex: agent: hook 1 (agent.BaseHook) implements no point",
-		},
-		{
-			name:    "an unknown mode",
-			config:  agent.Config{Mode: "auto"},
-			errText: `codex: agent: unknown mode "auto"`,
-		},
-		{
 			name:        "a block on reads outside the roots",
-			config:      agent.Config{Limits: agent.Limits{BlockReadsOutside: true}},
+			config:      agent.Config{Limits: permission.Limits{BlockReadsOutside: true}},
 			unsupported: true,
 			errText:     "codex: the limit BlockReadsOutside: Codex has no control for reads outside the roots: unsupported operation",
 		},
@@ -516,17 +498,6 @@ func TestLeftOutTools(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
-}
-
-func TestDriverRejectsAnOptionHook(t *testing.T) {
-	d := Driver(Hooks(turnHook{}))
-
-	_, err := d.Start(context.Background(), agent.Config{
-		SessionID: "s1",
-		Hooks:     []agent.Hook{stopHook{}},
-	})
-	require.ErrorIs(t, err, errors.ErrUnsupported, "Start checks the hooks of the options")
-	assert.EqualError(t, err, "codex: agent: hook 1 (codex.turnHook) uses AfterTurn: unsupported operation")
 }
 
 func TestDriver_ListModels(t *testing.T) {
@@ -681,20 +652,13 @@ func TestDriverMCP(t *testing.T) {
 	})
 
 	t.Run("the servers go next to the hooks", func(t *testing.T) {
-		a := startAgent(t, Driver(Hooks(stopHook{})), agent.Config{MCP: servers})
+		a := startAgent(t, Driver(), agent.Config{
+			MCP:   servers,
+			Hooks: []agent.Hook{stopHook{}},
+		})
 
 		p := a.threadParams("", &hookServer{socket: "/tmp/hooks.sock"}, "gopi-hook", nil)
 		assert.Equal(t, wantServers, p.Config["mcp_servers"])
 		assert.Contains(t, p.Config, "hooks")
 	})
-}
-
-func TestToolsIsEachToolOfCodex(t *testing.T) {
-	var names []string
-	for _, tl := range Tools() {
-		assert.True(t, tool.IsNamed(tl))
-		names = append(names, tl.Info().Name)
-	}
-
-	assert.Equal(t, []string{tool.Bash, tool.ApplyPatch, tool.WebSearch, tool.Agent}, names)
 }

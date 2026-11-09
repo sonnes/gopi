@@ -37,6 +37,12 @@ func TestText(t *testing.T) {
 			want: "2026 ERROR failed",
 		},
 		{
+			name: "strips links and cursor codes",
+			in:   "\x1b]8;;https://x.dev\x07docs\x1b]8;;\x07 \x1b[?25lread",
+			max:  64,
+			want: "docs read",
+		},
+		{
 			name: "empty",
 			in:   "",
 			max:  64,

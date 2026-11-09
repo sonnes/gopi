@@ -321,6 +321,7 @@ func TestBuildParams_OrphanToolCalls(t *testing.T) {
 
 func TestFeaturesOf(t *testing.T) {
 	assert.Equal(t, gpt, featuresOf("gpt-6-luna"))
+	assert.Equal(t, gpt, featuresOf("gpt-6.1-sol"))
 	assert.Equal(t, gpt, featuresOf("openai/gpt-6-luna"))
 	assert.Equal(t, features{}, featuresOf("gpt-4o"))
 }
@@ -546,4 +547,32 @@ func TestBuildCountTokensParams(t *testing.T) {
 	assert.Equal(t, "gpt-6-luna", body["model"])
 	assert.Len(t, body["input"], 2)
 	assert.Equal(t, map[string]any{"effort": "high", "summary": "auto"}, body["reasoning"])
+}
+
+func TestBuildParams_BadToolSchema(t *testing.T) {
+	bad := ai.ToolInfo{
+		Name:        "bad",
+		InputSchema: &jsonschema.Schema{Type: "object", Types: []string{"object"}},
+	}
+	tests := []struct {
+		name     string
+		messages []ai.Message
+		opts     ai.Options
+	}{
+		{name: "a first tool", opts: ai.Tools([]ai.ToolInfo{bad})},
+		{
+			name: "an added tool",
+			messages: []ai.Message{
+				ai.UserMessage("Hi"),
+				ai.SystemMessage(ai.ToolAdded{Tool: bad}),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := buildParams(testModel, tt.messages, tt.opts)
+			require.ErrorContains(t, err, `tool "bad"`)
+		})
+	}
 }

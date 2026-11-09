@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.10.2 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect

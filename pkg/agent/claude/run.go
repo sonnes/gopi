@@ -11,17 +11,12 @@ import (
 	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
-
-// interruptTimeout is how long a cancelled run waits for the result of
-// the CLI after the interrupt request. Then the agent kills the CLI,
-// and the next run starts a new one.
-const interruptTimeout = 5 * time.Second
 
 // emptyInput is the input of a tool call whose input the CLI did not
 // stream.
@@ -33,7 +28,7 @@ const emptyInput = "{}"
 type runner struct {
 	a    *Agent
 	proc *process
-	em   *emit.Emitter
+	em   *cliagent.Emitter
 	// reminder is the change of the sections, as a text block before
 	// the input. The log keeps the change as a system message, and the
 	// input without the reminder.
@@ -166,23 +161,17 @@ func (r *runner) run(
 		}
 	}
 
-	var (
-		done     = ctx.Done()
-		deadline <-chan time.Time
-	)
+	stop := cliagent.Watch(ctx)
 	for {
 		select {
-		case <-done:
-			done = nil
+		case <-stop.Done:
+			stop.Fire()
 			r.interrupted = true
 			if _, err := r.proc.request(outRequestBody{Subtype: "interrupt"}); err != nil {
 				return r.fail(ctx, ctx.Err())
 			}
-			timer := time.NewTimer(interruptTimeout)
-			defer timer.Stop()
-			deadline = timer.C
 
-		case <-deadline:
+		case <-stop.Deadline:
 			return r.fail(ctx, ctx.Err())
 
 		case <-r.moveDeadline:
@@ -225,7 +214,7 @@ func (r *runner) sendInput(ctx context.Context, entries []session.Entry) error {
 			return err
 		}
 	}
-	input := emit.Input(entries)
+	input := cliagent.Input(entries)
 	if !r.command {
 		input = skillLast(input, r.proc.skills)
 	}
@@ -304,7 +293,7 @@ func fileBlock(f ai.File) outBlock {
 	case f.MediaType == pdfType:
 		kind = "document"
 	default:
-		return textBlock(emit.Unread(f))
+		return textBlock(cliagent.Unread(f))
 	}
 	return outBlock{
 		Type: kind,
@@ -790,7 +779,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	}
 	if l.ModelUsage != nil {
 		r.byModel = r.proc.runUsage(l.ModelUsage)
-		if err := saveBase(ctx, r.a.log, l.SessionID, l.ModelUsage); err != nil {
+		if err := saveBase(ctx, r.a.core.Log(), l.SessionID, l.ModelUsage); err != nil {
 			return r.abort(ctx, u, err)
 		}
 	}
@@ -803,7 +792,7 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 	if r.interrupted {
 		return r.abort(ctx, u, ctx.Err())
 	}
-	if err := r.proc.takeHookErr(); err != nil {
+	if err := r.a.core.Stops().Take(); err != nil {
 		return r.abort(ctx, u, err)
 	}
 
@@ -818,14 +807,14 @@ func (r *runner) result(ctx context.Context, l *line) ([]ai.Message, error) {
 const loginText = "Please run /login"
 
 // resultError returns the error of a result line that reports a
-// failure. A result that asks for a login is [ErrAuth].
+// failure. A result that asks for a login is [agent.ErrNotLoggedIn].
 func resultError(l *line) error {
 	text := strings.Join(l.Errors, "; ")
 	if l.Subtype == "success" {
 		text = l.Result
 	}
 	if strings.Contains(text, loginText) {
-		return fmt.Errorf("%w: %s", ErrAuth, text)
+		return fmt.Errorf("claude: %w: %s", agent.ErrNotLoggedIn, text)
 	}
 	if text == "" {
 		return fmt.Errorf("claude: %s", l.Subtype)
@@ -836,7 +825,7 @@ func resultError(l *line) error {
 // saveSession stores the session ID of the CLI, so that a later CLI
 // resumes it.
 func (r *runner) saveSession(ctx context.Context, id string) error {
-	return conversation.Save(ctx, r.a.log, id)
+	return conversation.Save(ctx, r.a.core.Log(), id)
 }
 
 // usage converts the usage of the CLI. A nil usage is zero.

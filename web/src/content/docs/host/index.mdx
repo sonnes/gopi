@@ -57,21 +57,23 @@ The harness that is the default driver takes no `Toolset`, because the host give
 
 `Config.ToolNames` picks a subset of the list, as the `tools` key of an agent file does. `Create` fails on a name of no tool of the list, and the error names the agent file if the name came from it. A `Deny` rule with no content, such as `WebFetch`, removes the tool. `ToolNames`, `Allow`, `Ask`, and `Deny` take a gopi name, such as `bash`, or a Claude Code name, such as `Bash`. The host checks each rule for each driver, so a rule from a Claude Code settings file works as written.
 
+For a bad config, `Create` returns an error that wraps `host.ErrInvalid`, and makes no session. A bad config has a name of no tool of the list, an effort that is not a thinking level, an unknown mode, or a rule that does not parse.
+
 `anthropic/claude-opus-5-5` runs the same model in the harness. If the file does not have the model of a spec, call `cat.FetchDriverModels(ctx)` before `Create`.
 
 ## Create an Agent From a Folder
 
-`Agent` names an agent file in the `agents/` folder of `Dirs`:
+`Agent` names an agent file in the `agents/` folder of `DefDirs`:
 
 ```go
 s, err := h.Create(ctx, host.Config{
-	Dirs:  []string{teamDir, repoDir},
-	Agent: "reviewer",
-	Dir:   repoDir,
+	DefDirs: []string{teamDir, repoDir},
+	Agent:   "reviewer",
+	Dir:     repoDir,
 })
 ```
 
-The model, the mode, and the effort of the file fill the empty fields of the config, and an edit of them changes only a new session. If two dirs have the agent, the later dir wins. The host reads the prompt of the file before each run. Each driver gets the skills of `Skillset`, then the skills and the subagents of `Dirs`. Claude Code and Codex read them from a written folder, and they also keep their own skills and subagents. `Skills` lists the skills of a session for a menu. A message that starts with `/` and the name of a skill, such as `/deploy now`, loads that skill in each driver.
+The model, the mode, and the effort of the file fill the empty fields of the config, and an edit of them changes only a new session. If two folders have the agent, the later folder wins. The host reads the prompt of the file before each run. Each driver gets the definitions of `host.Defs`, then the skills and the subagents of `DefDirs`. `Agent` can also name an agent of `host.Defs`. Claude Code and Codex read them from a written folder, and they also keep their own skills and subagents. `Skills` lists the skills of a session for a menu. A message that starts with `/` and the name of a skill, such as `/deploy now`, loads that skill in each driver.
 
 ## Send a Message
 
@@ -102,7 +104,7 @@ for _, req := range s.Waiting {
 
 A call waits until `Confirm` or the end of its run, and after the run `Confirm` returns `host.ErrNotFound`. A call has the gopi name of its tool, such as `bash`, on each driver.
 
-The `Mode` of the config decides the calls that need a person. With `agent.ModeAcceptEdits`, an edit runs and a command asks. With `agent.ModeBypass`, no call asks. If no person answers, confirm from `Events`, or pick a mode that asks for no call.
+The `Mode` of the config decides the calls that need a person. With `permission.AcceptEdits`, an edit runs and a command asks. With `permission.Bypass`, no call asks. If no person answers, confirm from `Events`, or pick a mode that asks for no call.
 
 The host checks the rules before a call waits. A `Deny` rule blocks the call, and an `Ask` rule makes it wait in each mode. An `Allow` rule runs the call with no person, unless the call is a safety check, such as an edit of `.git/hooks`.
 
@@ -117,11 +119,11 @@ To add rules from outside the config, such as the settings of a project, give th
 ```go
 s, err := h.Update(ctx, s.ID, func(c *host.Config) {
 	c.Model = "claude-code/claude-sonnet-5-5"
-	c.Mode = agent.ModeAcceptEdits
+	c.Mode = permission.AcceptEdits
 })
 ```
 
-An active run ends with its old config. `Update` returns `host.ErrInvalid` for a model of another kind of agent, and for a change of the folders or the agent file.
+An active run ends with its old config. `Update` returns `host.ErrInvalid` for a config that `Create` refuses, for a model of another kind of agent, and for a change of the folders or the agent file.
 
 ## Follow the Host
 

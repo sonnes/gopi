@@ -11,6 +11,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -21,13 +22,13 @@ func TestCreate(t *testing.T) {
 	sess := f.create(t, host.Config{
 		ID:   "s1",
 		Dir:  "/tmp",
-		Mode: agent.ModeAcceptEdits,
+		Mode: permission.AcceptEdits,
 	})
 
 	assert.Equal(t, "s1", sess.ID)
 	assert.Equal(t, host.StatusIdle, sess.Status)
 	assert.Equal(t, "fake/m", sess.Model)
-	assert.Equal(t, agent.ModeAcceptEdits, sess.Mode)
+	assert.Equal(t, permission.AcceptEdits, sess.Mode)
 	assert.Empty(t, sess.StopReason, "a session with no run has no stop reason")
 	got := next(t, events, func(host.Event) bool { return true })
 	assert.Equal(t, sess, got.Session)
@@ -40,7 +41,7 @@ func TestCreate(t *testing.T) {
 	c := f.lastConfig(t)
 	assert.Equal(t, "s1", c.SessionID)
 	assert.Equal(t, "/tmp", c.Dir)
-	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
+	assert.Equal(t, permission.AcceptEdits, c.Mode)
 	assert.NotNil(t, c.Approve, "the host answers each call that asks")
 }
 
@@ -103,6 +104,33 @@ func TestCreateAnUnknownModel(t *testing.T) {
 	require.Error(t, err)
 	_, ok := f.h.Get("s1")
 	assert.False(t, ok, "a config that no driver takes makes no session")
+}
+
+func TestCreateRefusesABadConfig(t *testing.T) {
+	tests := []struct {
+		name   string
+		config host.Config
+		want   string
+	}{
+		{name: "an unknown mode", config: host.Config{Mode: "plan"}, want: `"plan"`},
+		{name: "a bad Allow rule", config: host.Config{Allow: []string{"Bash(ls"}}, want: `"Bash(ls"`},
+		{name: "a bad Ask rule", config: host.Config{Ask: []string{"Bash(ls"}}, want: `"Bash(ls"`},
+		{name: "a bad Deny rule", config: host.Config{Deny: []string{"Bash(ls"}}, want: `"Bash(ls"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			tt.config.ID = "s1"
+			tt.config.Model = "fake/m"
+
+			_, err := f.h.Create(context.Background(), tt.config)
+
+			assert.ErrorIs(t, err, host.ErrInvalid)
+			assert.ErrorContains(t, err, tt.want)
+			_, ok := f.h.Get("s1")
+			assert.False(t, ok, "a bad config makes no session")
+		})
+	}
 }
 
 func TestCreateWhenTheDriverFails(t *testing.T) {

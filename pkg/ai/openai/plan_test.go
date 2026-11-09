@@ -163,16 +163,3 @@ func TestChatGPTPlan_GenerateObject(t *testing.T) {
 	require.Len(t, *bodies, 1)
 	assert.Equal(t, true, (*bodies)[0]["stream"])
 }
-
-func TestChatGPTPlan_CountTokens(t *testing.T) {
-	p, _ := planServer(t, nil)
-
-	_, err := p.CountTokens(
-		t.Context(),
-		luna,
-		[]ai.Message{ai.UserMessage("Hi")},
-		nil,
-	)
-
-	require.ErrorIs(t, err, openai.ErrNotOnPlan)
-}

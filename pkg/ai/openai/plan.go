@@ -1,8 +1,6 @@
 package openai
 
 import (
-	"errors"
-
 	"github.com/openai/openai-go/v3/packages/param"
 	"github.com/openai/openai-go/v3/responses"
 )
@@ -16,10 +14,6 @@ const planNamespace = "gopi"
 // API requires one.
 const planNamespaceDescription = "The tools of the agent."
 
-// ErrNotOnPlan is the error of a call that the route of the ChatGPT plan
-// does not serve, such as [Provider.CountTokens].
-var ErrNotOnPlan = errors.New("openai: the ChatGPT plan route does not serve this call")
-
 // ChatGPTPlan shapes each request for the Responses route of a ChatGPT
 // plan, as Sign in with ChatGPT gives it. The caller also sets an
 // [HTTPClient] that sends the OAuth token of the plan. With this option:
@@ -30,7 +24,6 @@ var ErrNotOnPlan = errors.New("openai: the ChatGPT plan route does not serve thi
 //     function call of the history carries that namespace.
 //   - [Provider.GenerateObject] reads its response from a stream,
 //     because the route serves only a stream.
-//   - [Provider.CountTokens] returns [ErrNotOnPlan].
 func ChatGPTPlan() Option {
 	return func(c *config) { c.plan = true }
 }

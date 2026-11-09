@@ -2,6 +2,7 @@ package fs_test
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,6 +28,12 @@ func agentNames(agents []def.Agent) []string {
 	return out
 }
 
+// agentsOf returns the agents that [storefs.FS] reads from fsys.
+func agentsOf(ctx context.Context, fsys fs.FS) ([]def.Agent, error) {
+	set, err := storefs.FS(fsys).Load(ctx)
+	return set.Agents, err
+}
+
 // readAgent reads the one agent of text as agents/a.md.
 func readAgent(t *testing.T, text string) def.Agent {
 	t.Helper()
@@ -34,7 +41,7 @@ func readAgent(t *testing.T, text string) def.Agent {
 		"agents/a.md": file(text),
 	}
 
-	got, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
+	got, err := agentsOf(context.Background(), fsys)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	return got[0]
@@ -42,19 +49,19 @@ func readAgent(t *testing.T, text string) def.Agent {
 
 func TestAgentsReadEveryFileInPathOrder(t *testing.T) {
 	fsys := fstest.MapFS{
-		".claude/agents/review.md":        agentFile("reviewer", "Review a diff.", "Read the diff.\n"),
-		".claude/agents/team/deploy.md":   agentFile("deployer", "Deploy.", "Ship it.\n"),
-		".claude/agents/team/a/b/deep.md": agentFile("deep", "Deep.", "body"),
-		".claude/agents/team.md":          agentFile("team", "Team.", "body"),
-		".claude/agents/README.md":        file("# Agents\n\nThe agents of the team.\n"),
-		".claude/agents/notes.txt":        agentFile("notes", "Not markdown.", "body"),
+		"agents/review.md":        agentFile("reviewer", "Review a diff.", "Read the diff.\n"),
+		"agents/team/deploy.md":   agentFile("deployer", "Deploy.", "Ship it.\n"),
+		"agents/team/a/b/deep.md": agentFile("deep", "Deep.", "body"),
+		"agents/team.md":          agentFile("team", "Team.", "body"),
+		"agents/README.md":        file("# Agents\n\nThe agents of the team.\n"),
+		"agents/notes.txt":        agentFile("notes", "Not markdown.", "body"),
 	}
 
-	got, err := storefs.Agents(fsys, ".claude/agents").ReadAgents(context.Background())
+	got, err := agentsOf(context.Background(), fsys)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"reviewer", "team", "deep", "deployer"}, agentNames(got))
-	assert.Equal(t, ".claude/agents/review.md", got[0].Path)
+	assert.Equal(t, "agents/review.md", got[0].Path)
 	assert.Equal(t, "Read the diff.", got[0].Prompt)
 }
 
@@ -180,7 +187,7 @@ func TestAgentsSkipBadFiles(t *testing.T) {
 				"agents/good.md": agentFile("good", "Works.", "body"),
 			}
 
-			got, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
+			got, err := agentsOf(context.Background(), fsys)
 			require.NoError(t, err)
 
 			assert.Equal(t, []string{"good"}, agentNames(got))
@@ -192,11 +199,11 @@ func TestAgentsThatFindNothingGiveNothing(t *testing.T) {
 	ctx := context.Background()
 	missing := os.DirFS(filepath.Join(t.TempDir(), "missing"))
 
-	got, err := storefs.Agents(missing, ".claude/agents").ReadAgents(ctx)
+	got, err := agentsOf(ctx, missing)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
-	got, err = storefs.Agents(fstest.MapFS{}, ".claude/agents").ReadAgents(ctx)
+	got, err = agentsOf(ctx, fstest.MapFS{})
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -209,6 +216,6 @@ func TestAgentsFailOnAFileThatCannotBeRead(t *testing.T) {
 		broken: "agents/a.md",
 	}
 
-	_, err := storefs.Agents(fsys, "agents").ReadAgents(context.Background())
+	_, err := agentsOf(context.Background(), fsys)
 	assert.Error(t, err)
 }

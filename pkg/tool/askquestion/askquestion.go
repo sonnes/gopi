@@ -90,13 +90,17 @@ type Output struct {
 const shapeExample = `Expected shape: {"questions":[{"header":"Short","question":"Full question?","options":[{"label":"Option A","description":"..."},{"label":"Option B","description":"..."}],"multi_select":false}]}. Each option must be an object. Use one to four questions and two to four options per question.`
 
 // New returns the ask_user_question tool. The tool asks responder for the
-// answers. If responder is nil, each call returns an error result.
+// answers. If responder is nil, New panics, because that is a bug in the
+// caller.
 //
 // The run function needs the ID of the tool call, so New builds the tool
 // with [tool.Func] and not with [tool.New]. The tool is sequential: the
 // other calls of its message wait for the answers, and a user sees one
 // question batch at a time.
 func New(responder Responder) tool.Tool {
+	if responder == nil {
+		panic("askquestion: New: no responder")
+	}
 	schema, err := jsonschema.For[Input](nil)
 	if err != nil {
 		panic(fmt.Sprintf("askquestion: input schema: %v", err))
@@ -127,10 +131,6 @@ func ask(ctx context.Context, responder Responder, call ai.ToolCall) (ai.ToolRes
 
 	if err := validate(in); err != nil {
 		return errorResult(err.Error() + ". " + shapeExample), nil
-	}
-
-	if responder == nil {
-		return errorResult("askquestion: no responder configured"), nil
 	}
 
 	answers, err := responder.Ask(ctx, call.ID, in.Questions)

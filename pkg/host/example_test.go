@@ -10,6 +10,7 @@ import (
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/harness"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -66,7 +67,7 @@ func ExampleHost_Update() {
 
 	s, err := h.Update(ctx, s.ID, func(c *host.Config) {
 		c.Model = "claude-code/claude-sonnet-5-5"
-		c.Mode = agent.ModeAcceptEdits
+		c.Mode = permission.AcceptEdits
 	})
 	if err != nil {
 		return

@@ -30,92 +30,46 @@ type convertConfig struct {
 // tool results.
 const attachedText = "Attached image(s) from tool result:"
 
-// convertMessages maps the messages to the API. Each tool result is its
-// own message. The tool message takes only text, so the files of the
-// results of one turn follow in one user message.
-//
-// A system message waits until the next assistant message, or the end,
-// so it never comes between a tool call and its result. A
-// system-reminder goes at the start of the next user message, or at the
-// end of the last one.
+// convertMessages maps the messages to the API, in the order of
+// [transcript.Order]. Each tool result is its own message. The tool
+// message takes only text, so the files of the results of one turn
+// follow in one user message, before the next message of another role.
 func convertMessages(messages []ai.Message, cfg convertConfig) []sdk.ChatCompletionMessageParamUnion {
-	messages = transcript.CloseToolCalls(messages)
-
 	var out []sdk.ChatCompletionMessageParamUnion
-	var pending []sdk.ChatCompletionMessageParamUnion
-	var reminders []sdk.ChatCompletionContentPartUnionParam
 	var files []sdk.ChatCompletionContentPartUnionParam
 
-	// lastUser holds the parts of the last message if it is a user
-	// message, so a reminder can join it.
-	var lastUser []sdk.ChatCompletionContentPartUnionParam
-	pushUser := func(parts []sdk.ChatCompletionContentPartUnionParam) {
-		out = append(out, userMessage(parts))
-		lastUser = parts
-	}
-	push := func(msgs ...sdk.ChatCompletionMessageParamUnion) {
-		out = append(out, msgs...)
-		lastUser = nil
-	}
 	flushFiles := func() {
 		if len(files) > 0 {
-			pushUser(append([]sdk.ChatCompletionContentPartUnionParam{sdk.TextContentPart(attachedText)}, files...))
+			parts := append([]sdk.ChatCompletionContentPartUnionParam{sdk.TextContentPart(attachedText)}, files...)
+			out = append(out, userMessage(parts))
 		}
 		files = nil
 	}
-	flushPending := func() {
-		if len(pending) > 0 {
-			push(pending...)
-		}
-		pending = nil
-	}
-	flushReminders := func() {
-		if len(reminders) == 0 {
-			return
-		}
-		if lastUser != nil {
-			out = out[:len(out)-1]
-			pushUser(append(lastUser, reminders...))
-		} else {
-			pushUser(reminders)
-		}
-		reminders = nil
-	}
 
-	for _, msg := range messages {
+	for _, msg := range transcript.Order(messages, cfg.systemMessages) {
 		switch msg.Role {
 		case ai.RoleSystem:
-			text := transcript.SystemText(msg.Content)
-			switch {
-			case text == "":
-			case cfg.systemMessages:
-				pending = append(pending, sdk.SystemMessage(text))
-			default:
-				reminders = append(reminders, sdk.TextContentPart(transcript.Reminder(text)))
+			flushFiles()
+			if text := transcript.SystemText(msg.Content); text != "" {
+				out = append(out, sdk.SystemMessage(text))
 			}
 		case ai.RoleUser:
 			flushFiles()
-			parts := append(reminders, userParts(msg.Content)...)
-			reminders = nil
-			if len(parts) > 0 {
-				pushUser(parts)
+			if parts := userParts(msg.Content); len(parts) > 0 {
+				out = append(out, userMessage(parts))
 			}
 		case ai.RoleAssistant:
 			flushFiles()
-			flushPending()
-			flushReminders()
 			if m, ok := assistantMessage(msg.Content); ok {
-				push(m)
+				out = append(out, m)
 			}
 		case ai.RoleToolResult:
-			push(sdk.ToolMessage(toolText(msg.Content), msg.ToolCallID))
+			out = append(out, sdk.ToolMessage(toolText(msg.Content), msg.ToolCallID))
 			files = append(files, fileParts(msg.Content)...)
 		}
 	}
 
 	flushFiles()
-	flushPending()
-	flushReminders()
 	return out
 }
 

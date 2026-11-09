@@ -1,6 +1,10 @@
 package openai
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/sonnes/gopi/internal/family"
+)
 
 // features holds what a model accepts beyond the base Responses API.
 // The zero value is the base API, so a model that this package does not
@@ -26,22 +30,17 @@ var gpt = features{
 	cacheBreakpoint: true,
 }
 
-// modelFeatures maps a model ID of the OpenAI API to its features. The
-// list comes from the OpenAI docs.
-var modelFeatures = map[string]features{
-	"gpt-6-sol":   gpt,
-	"gpt-6-luna":  gpt,
-	"gpt-6-astra": gpt,
-	"gpt-5.6":     gpt,
-}
-
 // openRouterPrefix starts the ID of an OpenAI model on OpenRouter, such
 // as "openai/gpt-6-luna".
 const openRouterPrefix = "openai/"
 
-// featuresOf returns the features of a model ID. An OpenRouter ID gets
-// the features of the same OpenAI model. OpenRouter accepts a developer
-// message in the conversation and an additional_tools item.
+// featuresOf returns the features of a model ID. A model of a GPT family
+// of [family.GPT] gets [gpt]. An OpenRouter ID gets the features of the
+// same OpenAI model. OpenRouter accepts a developer message in the
+// conversation and an additional_tools item.
 func featuresOf(id string) features {
-	return modelFeatures[strings.TrimPrefix(id, openRouterPrefix)]
+	if family.GPT(strings.TrimPrefix(id, openRouterPrefix)) {
+		return gpt
+	}
+	return features{}
 }

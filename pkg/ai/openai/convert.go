@@ -49,89 +49,43 @@ type convertConfig struct {
 	addTools bool
 }
 
-// convertMessages maps the messages to input items. Each block of an
-// assistant message becomes one item, in order, because a reasoning
-// item must come before the output that it produced.
-//
-// A system message waits until the next assistant message, or the end,
-// so it never comes between a function call and its output. A
-// system-reminder goes at the start of the next user message, or at the
-// end of the last one.
-func convertMessages(messages []ai.Message, cfg convertConfig) responses.ResponseInputParam {
-	messages = transcript.CloseToolCalls(messages)
-
+// convertMessages maps the messages to input items, in the order of
+// [transcript.Order]. Each block of an assistant message becomes one
+// item, in order, because a reasoning item must come before the output
+// that it produced.
+func convertMessages(messages []ai.Message, cfg convertConfig) (responses.ResponseInputParam, error) {
 	var out responses.ResponseInputParam
-	var pending responses.ResponseInputParam
-	var reminders responses.ResponseInputMessageContentListParam
-
-	// lastUser holds the parts of the last item if it is a user
-	// message, so a reminder can join it.
-	var lastUser responses.ResponseInputMessageContentListParam
-	pushUser := func(parts responses.ResponseInputMessageContentListParam) {
-		out = append(out, responses.ResponseInputItemParamOfMessage(parts, responses.EasyInputMessageRoleUser))
-		lastUser = parts
-	}
-	push := func(items ...responses.ResponseInputItemUnionParam) {
-		out = append(out, items...)
-		lastUser = nil
-	}
-	flushPending := func() {
-		if len(pending) > 0 {
-			push(pending...)
-		}
-		pending = nil
-	}
-	flushReminders := func() {
-		if len(reminders) == 0 {
-			return
-		}
-		if lastUser != nil {
-			out = out[:len(out)-1]
-			pushUser(append(lastUser, reminders...))
-		} else {
-			pushUser(reminders)
-		}
-		reminders = nil
-	}
-
-	for _, msg := range messages {
+	for _, msg := range transcript.Order(messages, cfg.systemMessages) {
 		switch msg.Role {
 		case ai.RoleSystem:
-			text := transcript.SystemText(msg.Content)
-			if !cfg.systemMessages {
-				if text != "" {
-					reminders = append(reminders, inputText(transcript.Reminder(text)))
-				}
-				continue
-			}
-			if text != "" {
+			if text := transcript.SystemText(msg.Content); text != "" {
 				parts := responses.ResponseInputMessageContentListParam{inputText(text)}
-				pending = append(pending, responses.ResponseInputItemParamOfMessage(
+				out = append(out, responses.ResponseInputItemParamOfMessage(
 					parts,
 					responses.EasyInputMessageRoleDeveloper,
 				))
 			}
-			if item, ok := additionalTools(msg.Content); ok && cfg.addTools {
-				pending = append(pending, item)
+			if !cfg.addTools {
+				continue
+			}
+			item, ok, err := additionalTools(msg.Content)
+			if err != nil {
+				return nil, err
+			}
+			if ok {
+				out = append(out, item)
 			}
 		case ai.RoleUser:
-			parts := append(reminders, userParts(msg.Content)...)
-			reminders = nil
-			if len(parts) > 0 {
-				pushUser(parts)
+			if parts := userParts(msg.Content); len(parts) > 0 {
+				out = append(out, responses.ResponseInputItemParamOfMessage(parts, responses.EasyInputMessageRoleUser))
 			}
 		case ai.RoleAssistant:
-			flushPending()
-			flushReminders()
-			push(assistantItems(msg.Content)...)
+			out = append(out, assistantItems(msg.Content)...)
 		case ai.RoleToolResult:
-			push(toolResultItem(msg))
+			out = append(out, toolResultItem(msg))
 		}
 	}
-
-	flushPending()
-	flushReminders()
-	return out
+	return out, nil
 }
 
 // inputText is one text part of an input message.
@@ -143,7 +97,7 @@ func inputText(text string) responses.ResponseInputContentUnionParam {
 
 // additionalTools maps the [ai.ToolAdded] blocks to one
 // additional_tools item. The bool is false if there are none.
-func additionalTools(content []ai.Content) (responses.ResponseInputItemUnionParam, bool) {
+func additionalTools(content []ai.Content) (responses.ResponseInputItemUnionParam, bool, error) {
 	var tools []ai.ToolInfo
 	for _, c := range content {
 		if v, ok := c.(ai.ToolAdded); ok {
@@ -151,9 +105,13 @@ func additionalTools(content []ai.Content) (responses.ResponseInputItemUnionPara
 		}
 	}
 	if len(tools) == 0 {
-		return responses.ResponseInputItemUnionParam{}, false
+		return responses.ResponseInputItemUnionParam{}, false, nil
 	}
-	return responses.ResponseInputItemParamOfAdditionalTools(convertTools(tools)), true
+	converted, err := convertTools(tools)
+	if err != nil {
+		return responses.ResponseInputItemUnionParam{}, false, err
+	}
+	return responses.ResponseInputItemParamOfAdditionalTools(converted), true, nil
 }
 
 // userParts maps the blocks of a user message to the parts of an input

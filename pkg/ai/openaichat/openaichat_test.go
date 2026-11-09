@@ -3,17 +3,15 @@ package openaichat_test
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httprr"
 	"github.com/sonnes/gopi/internal/modelstest"
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
@@ -48,108 +46,44 @@ var fireworksModel = ai.Model{
 	MaxTokens: 8192,
 }
 
-// fireworksBaseURL is the base URL of the Chat Completions API of
-// Fireworks.
-const fireworksBaseURL = "https://api.fireworks.ai/inference/v1"
-
-// canonicalHost is the host in every fixture. The scrubber replaces the
-// host and the path prefix of a recording, so a replay does not depend
-// on the base URL that the recording used.
+// canonicalHost is the host in every fixture.
 const canonicalHost = "api.openai.com"
 
 type weatherInput struct {
 	City string `json:"city" jsonschema:"The city name"`
 }
 
-type person struct {
-	Name string `json:"name" jsonschema:"The name of the person"`
-	Age  int    `json:"age" jsonschema:"The age of the person"`
-	City string `json:"city" jsonschema:"The city where the person lives"`
-}
-
 var weatherTool = tool.New("get_weather", func(_ context.Context, in weatherInput) (string, error) {
 	return "Sunny, 22C in " + in.City, nil
 }, tool.Description("Get the current weather in a city"))
 
-// scrubRequest removes the secrets and the headers that change between
-// runs, so a replay matches a recording.
-func scrubRequest(req *http.Request) error {
-	req.URL.Host = canonicalHost
-	req.Host = canonicalHost
-	if i := strings.Index(req.URL.Path, "/v1/"); i > 0 {
-		req.URL.Path = req.URL.Path[i:]
-	}
-	req.Header.Del("Authorization")
-	req.Header.Del("Accept")
-	req.Header.Del("OpenAI-Organization")
-	req.Header.Del("OpenAI-Project")
-	for key := range req.Header {
-		if strings.HasPrefix(key, "X-Stainless-") {
-			req.Header.Del(key)
-		}
-	}
-	req.Header.Set("User-Agent", "Go-http-client/1.1")
-	return nil
-}
-
-// server names the API that a test records from. If the key of the
-// server is unset, the test records from the fallback.
-type server struct {
-	keyEnv  string
-	baseURL string
-	// fallback is the server to record from without keyEnv, or nil.
-	fallback *server
-}
-
-// openRouter is the Chat Completions API of OpenRouter.
-var openRouter = server{keyEnv: "OPENROUTER_API_KEY", baseURL: "https://openrouter.ai/api/v1"}
-
 // compatible is the API of OPENAI_BASE_URL, OpenAI by default. Without
-// OPENAI_API_KEY, the test records from OpenRouter.
-var compatible = server{
-	keyEnv:   "OPENAI_API_KEY",
-	baseURL:  os.Getenv("OPENAI_BASE_URL"),
-	fallback: &openRouter,
+// OPENAI_API_KEY, the test records from the Chat Completions API of
+// OpenRouter.
+var compatible = providertest.Server{
+	KeyEnv:  "OPENAI_API_KEY",
+	BaseURL: os.Getenv("OPENAI_BASE_URL"),
+	Fallback: &providertest.Server{
+		KeyEnv:  "OPENROUTER_API_KEY",
+		BaseURL: "https://openrouter.ai/api/v1",
+	},
 }
 
-// fireworks is the API of Fireworks.
-var fireworks = server{keyEnv: "FIREWORKS_API_KEY", baseURL: fireworksBaseURL}
+// fireworks is the Chat Completions API of Fireworks.
+var fireworks = providertest.Server{
+	KeyEnv:  "FIREWORKS_API_KEY",
+	BaseURL: "https://api.fireworks.ai/inference/v1",
+}
 
-// newTestProvider returns a provider that replays the fixture of the
-// test. If -httprecord matches, it records against srv and needs the key
-// of srv. A test with no fixture is skipped.
-func newTestProvider(t *testing.T, srv server, opts ...openaichat.Option) *openaichat.Provider {
+// newTestProvider returns a provider with opts that replays the fixture
+// of the test. A recording goes to srv.
+func newTestProvider(t *testing.T, srv providertest.Server, opts ...openaichat.Option) *openaichat.Provider {
 	t.Helper()
-
-	trace := filepath.Join("testdata", strings.ReplaceAll(t.Name(), "/", "_")+".httprr")
-
-	recording, err := httprr.Recording(trace)
-	require.NoError(t, err)
-
-	apiKey := "fake-api-key"
-	var baseURL string
-	if recording {
-		if os.Getenv(srv.keyEnv) == "" && srv.fallback != nil {
-			srv = *srv.fallback
-		}
-		apiKey = os.Getenv(srv.keyEnv)
-		if apiKey == "" {
-			t.Skipf("%s is not set", srv.keyEnv)
-		}
-		baseURL = srv.baseURL
-	} else if _, err := os.Stat(trace); os.IsNotExist(err) {
-		t.Skipf("fixture %s not found; run make record PKG=openaichat", trace)
-	}
-
-	rr, err := httprr.Open(trace, http.DefaultTransport)
-	require.NoError(t, err)
-	rr.ScrubReq(scrubRequest)
-	t.Cleanup(func() { _ = rr.Close() })
-
+	r := providertest.Open(t, srv, canonicalHost)
 	opts = append(opts,
-		openaichat.APIKey(apiKey),
-		openaichat.BaseURL(baseURL),
-		openaichat.HTTPClient(rr.Client()),
+		openaichat.APIKey(r.APIKey),
+		openaichat.BaseURL(r.BaseURL),
+		openaichat.HTTPClient(r.Client),
 	)
 	return openaichat.New(opts...)
 }
@@ -287,22 +221,4 @@ func TestCacheBreakpoints(t *testing.T) {
 
 	cached := first.Usage.CacheRead + first.Usage.CacheWrite + second.Usage.CacheRead
 	assert.NotZero(t, cached)
-}
-
-func TestGenerateObject(t *testing.T) {
-	p := newTestProvider(t, compatible)
-	lm := ai.LanguageModel{Model: testModel, Provider: p}
-
-	res, err := ai.GenerateObject[person](
-		t.Context(),
-		lm,
-		[]ai.Message{ai.UserMessage("Describe Alice, who is 30 and lives in Lisbon.")},
-		ai.Thinking(ai.ThinkingOff),
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Alice", res.Object.Name)
-	assert.Equal(t, 30, res.Object.Age)
-	assert.Equal(t, "Lisbon", res.Object.City)
-	assert.NotZero(t, res.Usage.Output)
 }

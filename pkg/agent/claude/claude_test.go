@@ -17,7 +17,9 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // run runs a with input and returns the events, the result, and the
@@ -40,8 +42,8 @@ func run(ctx context.Context, a *claude.Agent, input ...string) ([]agent.Event, 
 }
 
 // checkLog fails t if a tool call in the log of a has no result, or if
-// the state of a does not hold the messages of the log. A custom entry
-// holds no message.
+// the state of a does not hold the messages and the entry IDs of the
+// log. A custom entry holds no message.
 func checkLog(t *testing.T, a *claude.Agent) {
 	t.Helper()
 	log := a.Log()
@@ -53,7 +55,7 @@ func checkLog(t *testing.T, a *claude.Agent) {
 		entries = append(entries, e.Message)
 	}
 	assert.Equal(t, entries, log.Messages(), "every tool call in the log has a result")
-	assert.Equal(t, log.Messages(), a.State().Messages(), "the state has the messages of the log")
+	emittest.CheckState(t, log, a.State())
 	assert.False(t, a.State().Running())
 }
 
@@ -73,7 +75,7 @@ func closeAgent(t *testing.T, a *claude.Agent) {
 
 func TestRunText(t *testing.T) {
 	claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New(claude.Name("claude"))
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Say hello")
@@ -107,7 +109,6 @@ func TestRunText(t *testing.T) {
 	entries := a.Log().Entries()
 	require.Len(t, entries, 2)
 	assert.Equal(t, "Say hello", entries[0].Message.Text())
-	assert.Equal(t, "claude", entries[1].Author)
 	checkLog(t, a)
 
 	id, err := claude.SessionID(a)
@@ -117,7 +118,7 @@ func TestRunText(t *testing.T) {
 
 func TestRunDropsOtherUserText(t *testing.T) {
 	claude.Replay(t, nil, "testdata/user_text.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, _, err := run(context.Background(), a, "Say hello")
@@ -141,7 +142,7 @@ func TestRunDropsOtherUserText(t *testing.T) {
 
 func TestRunThinking(t *testing.T) {
 	claude.Replay(t, nil, "testdata/thinking.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Think, then say hi")
@@ -190,7 +191,7 @@ func TestRunToolCall(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
-			a := claude.New()
+			a := claude.New(agent.Config{})
 			defer closeAgent(t, a)
 
 			events, msgs, err := run(context.Background(), a, "Run echo hi")
@@ -239,7 +240,7 @@ func TestRunToolCall(t *testing.T) {
 
 func TestRunTwiceOnOneProcess(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/two_runs.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	for _, in := range []string{"Say hello", "Again"} {
@@ -260,14 +261,14 @@ func TestDurableResumes(t *testing.T) {
 	store := session.NewMemoryStore()
 	starts := claude.Replay(t, nil, "testdata/text.trace", "testdata/resume.trace")
 
-	first, err := claude.Durable(ctx, "s1", claude.Store(store))
+	first, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	events, _, err := run(ctx, first, "Say hello")
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	require.NoError(t, first.Close())
 
-	second, err := claude.Durable(ctx, "s1", claude.Store(store))
+	second, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	defer closeAgent(t, second)
 	assert.Len(t, second.State().Messages(), 2, "the state starts with the stored messages")
@@ -297,7 +298,7 @@ const cliSessionS1 = "b169ccbc-740a-5437-ae7b-ac2973e42de2"
 
 func TestNewGivesNoSessionID(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 	_, _, err := run(context.Background(), a, "Say hello")
 	require.NoError(t, err)
@@ -317,7 +318,7 @@ func TestRunTakenSession(t *testing.T) {
 		"testdata/taken_session.trace",
 		"testdata/text.trace",
 	)
-	a, err := claude.Durable(ctx, "s1", claude.Store(store))
+	a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 	events, _, err := run(ctx, a, "Say hello")
@@ -352,7 +353,7 @@ func TestRunOtherInUseErrorFailsTheStart(t *testing.T) {
 				[]string{tt.stderr},
 				"testdata/taken_session.trace",
 			)
-			a, err := claude.Durable(ctx, "s1", claude.Store(session.NewMemoryStore()))
+			a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: session.NewMemoryStore()})
 			require.NoError(t, err)
 			defer closeAgent(t, a)
 
@@ -366,7 +367,7 @@ func TestRunOtherInUseErrorFailsTheStart(t *testing.T) {
 
 func TestRunCancel(t *testing.T) {
 	claude.Replay(t, nil, "testdata/cancel.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -400,7 +401,7 @@ func TestRunCancel(t *testing.T) {
 
 func TestRunCancelWhileToolRuns(t *testing.T) {
 	claude.Replay(t, nil, "testdata/cancel_tool.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -430,7 +431,7 @@ func TestRunCancelWhileToolRuns(t *testing.T) {
 
 func TestRunErrorResult(t *testing.T) {
 	claude.Replay(t, nil, "testdata/error.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, _, err := run(context.Background(), a, "Say hello")
@@ -461,7 +462,7 @@ func TestRunFailureKeepsProduced(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
-			a := claude.New()
+			a := claude.New(agent.Config{})
 			defer closeAgent(t, a)
 
 			events, msgs, err := run(context.Background(), a, "Run echo hi")
@@ -493,7 +494,7 @@ func updates(events []agent.Event) []ai.Message {
 
 func TestRunSkippedBlock(t *testing.T) {
 	claude.Replay(t, nil, "testdata/skipped_block.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Say hi")
@@ -514,7 +515,7 @@ func TestRunSkippedBlock(t *testing.T) {
 
 func TestRunEmptyMessage(t *testing.T) {
 	claude.Replay(t, nil, "testdata/empty_message.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Say hi")
@@ -566,7 +567,7 @@ func TestControlRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
-			a := claude.New()
+			a := claude.New(agent.Config{})
 			defer closeAgent(t, a)
 
 			events, msgs, err := run(context.Background(), a, tt.input)
@@ -596,7 +597,7 @@ func TestRunWithoutText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			starts := claude.Replay(t, nil)
-			a := claude.New()
+			a := claude.New(agent.Config{})
 			defer closeAgent(t, a)
 
 			_, err := a.Run(context.Background(), tt.entries...).Wait()
@@ -615,17 +616,17 @@ func TestRunLostSession(t *testing.T) {
 		"testdata/lost_session.trace",
 		"testdata/text.trace",
 	)
-	first, err := claude.Durable(ctx, "s1", claude.Store(store))
+	first, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	_, _, err = run(ctx, first, "Say hello")
 	require.NoError(t, err)
 	require.NoError(t, first.Close())
 
-	second, err := claude.Durable(ctx, "s1", claude.Store(store))
+	second, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	defer closeAgent(t, second)
 	events, _, err := run(ctx, second, "Say hello")
-	require.ErrorIs(t, err, claude.ErrNoConversation)
+	require.ErrorIs(t, err, agent.ErrNoConversation)
 	emittest.CheckEvents(t, events)
 	id, err := claude.SessionID(second)
 	require.NoError(t, err)
@@ -644,7 +645,7 @@ func TestRunLostSession(t *testing.T) {
 
 func TestRunWhileRunning(t *testing.T) {
 	claude.Replay(t, nil, "testdata/cancel.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -666,26 +667,32 @@ func TestRunWhileRunning(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
-func TestOptions(t *testing.T) {
+func TestConfig(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
 	t.Setenv("NODE_OPTIONS", "--inspect")
 	t.Setenv("DEBUG", "1")
 	starts := claude.Replay(t, nil, "testdata/text.trace")
 	a := claude.New(
+		agent.Config{
+			Dir:      "/work",
+			Model:    ai.Model{ID: "haiku"},
+			Sections: agent.SystemText("Be brief."),
+			Effort:   ai.ThinkingHigh,
+			Mode:     permission.AcceptEdits,
+			Deny:     []string{"web_fetch", "bash(rm:*)"},
+			Tools: []tool.Tool{
+				tool.Named(tool.ReadFile),
+				tool.Named(tool.Find),
+				tool.Named(tool.ExitPlanMode),
+			},
+			MCP: []agent.MCPServer{{
+				Name:    "lw",
+				Type:    agent.MCPHTTP,
+				URL:     "http://127.0.0.1:1/mcp",
+				Headers: map[string]string{"Authorization": "Bearer t"},
+			}},
+		},
 		claude.Binary("/opt/claude"),
-		claude.Dir("/work"),
-		claude.Model("haiku"),
-		claude.System("Be brief."),
-		claude.Thinking(ai.ThinkingHigh),
-		claude.PermissionMode(claude.PermissionAcceptEdits),
-		claude.DisallowedTools("web_fetch"),
-		claude.OnlyTools("read_file", "find", "ExitPlanMode", "mcp__lw__threads_get"),
-		claude.MCP(agent.MCPServer{
-			Name:    "lw",
-			Type:    agent.MCPHTTP,
-			URL:     "http://127.0.0.1:1/mcp",
-			Headers: map[string]string{"Authorization": "Bearer t"},
-		}),
 		claude.Env("FOO=bar"),
 	)
 	defer closeAgent(t, a)
@@ -710,7 +717,7 @@ func TestOptions(t *testing.T) {
 		"--effort", "high",
 		"--permission-mode", "acceptEdits",
 		"--disallowedTools", "WebFetch",
-		"--tools", "Read,Glob,ExitPlanMode",
+		"--tools", "Read,Glob,ExitPlanMode,ToolSearch",
 		"--mcp-config", `{"mcpServers":{"lw":{"type":"http","url":"http://127.0.0.1:1/mcp","headers":{"Authorization":"Bearer t"}}}}`,
 	}, cmd.Args)
 	assert.Equal(t, "/work", cmd.Dir)
@@ -723,7 +730,7 @@ func TestOptions(t *testing.T) {
 
 func TestThinkingOffDisablesThinking(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New(claude.Thinking(ai.ThinkingOff))
+	a := claude.New(agent.Config{Effort: ai.ThinkingOff})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Say hello")
@@ -777,10 +784,10 @@ func TestApprove(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
 			var got []ai.ToolCall
-			a := claude.New(claude.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			a := claude.New(agent.Config{Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 				got = append(got, req.Call)
 				return tt.decision, tt.err
-			}))
+			}})
 			defer closeAgent(t, a)
 
 			events, msgs, err := run(context.Background(), a, "Delete a.txt")
@@ -802,7 +809,7 @@ func TestApprove(t *testing.T) {
 
 func TestRunEphemeralInput(t *testing.T) {
 	claude.Replay(t, nil, "testdata/ephemeral.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	s := a.Run(context.Background(),
@@ -834,7 +841,7 @@ func TestCloseSendsSIGTERM(t *testing.T) {
 read line
 echo '{"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}'
 while :; do sleep 0.1; done`
-	a := claude.New(claude.Binary(fakeCLI(t, body)))
+	a := claude.New(agent.Config{}, claude.Binary(fakeCLI(t, body)))
 	require.NoError(t, claude.Start(context.Background(), a))
 
 	require.NoError(t, a.Close(), "the CLI exits on SIGTERM before the kill")
@@ -868,7 +875,7 @@ func TestRunStderrOnExit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := claude.New(claude.Binary(fakeCLI(t, tt.body)))
+			a := claude.New(agent.Config{}, claude.Binary(fakeCLI(t, tt.body)))
 			defer a.Close()
 
 			_, _, err := run(context.Background(), a, "Hi")
@@ -881,7 +888,7 @@ func TestRunStderrOnExit(t *testing.T) {
 
 func TestRunSendsFiles(t *testing.T) {
 	claude.Replay(t, nil, "testdata/files.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	input := session.NewEntry(ai.Message{
@@ -902,7 +909,7 @@ func TestRunSendsFiles(t *testing.T) {
 
 func TestRunFileOnly(t *testing.T) {
 	claude.Replay(t, nil, "testdata/file_only.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	input := session.NewEntry(ai.Message{
@@ -916,13 +923,13 @@ func TestRunFileOnly(t *testing.T) {
 func TestApproveRequest(t *testing.T) {
 	claude.Replay(t, nil, "testdata/can_use_tool_reason.trace")
 	var got agent.ApprovalRequest
-	a := claude.New(claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a := claude.New(agent.Config{Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		got = req
 		return agent.Decision{
 			Allow:  true,
 			Always: true,
 		}, nil
-	}))
+	}})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Delete a.txt")
@@ -934,10 +941,10 @@ func TestApproveRequest(t *testing.T) {
 func TestApproveSafetyCheck(t *testing.T) {
 	claude.Replay(t, nil, "testdata/can_use_tool_safety.trace")
 	var got agent.ApprovalRequest
-	a := claude.New(claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a := claude.New(agent.Config{Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 		got = req
 		return agent.Decision{Allow: true}, nil
-	}))
+	}})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Edit the hook")
@@ -948,11 +955,11 @@ func TestApproveSafetyCheck(t *testing.T) {
 
 func TestRunNotLoggedIn(t *testing.T) {
 	claude.Replay(t, nil, "testdata/auth.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, _, err := run(context.Background(), a, "Hi")
-	require.ErrorIs(t, err, claude.ErrAuth)
+	require.ErrorIs(t, err, agent.ErrNotLoggedIn)
 	assert.ErrorContains(t, err, "Please run /login")
 	emittest.CheckEvents(t, events)
 }
@@ -974,7 +981,7 @@ func TestSubagentOpenAtTheResultEndsInterrupted(t *testing.T) {
 	ctx := context.Background()
 	claude.Replay(t, nil, "testdata/subagent_open_at_result.trace")
 	store := session.NewMemoryStore()
-	a, err := claude.Durable(ctx, "s1", claude.Store(store))
+	a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -1002,7 +1009,7 @@ func TestSubagentOpenAtTheResultEndsInterrupted(t *testing.T) {
 func TestSubagentWhoseResultComesFirstEndsWithItsText(t *testing.T) {
 	ctx := context.Background()
 	claude.Replay(t, nil, "testdata/subagent_result_first.trace")
-	a, err := claude.Durable(ctx, "s1", claude.Store(session.NewMemoryStore()))
+	a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: session.NewMemoryStore()})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -1036,7 +1043,7 @@ func (s childFailStore) Append(ctx context.Context, id string, entries ...sessio
 func TestSubagentWithAFailedLogStillEnds(t *testing.T) {
 	ctx := context.Background()
 	claude.Replay(t, nil, "testdata/subagent_open_at_result.trace")
-	a, err := claude.Durable(ctx, "s1", claude.Store(childFailStore{session.NewMemoryStore()}))
+	a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: childFailStore{session.NewMemoryStore()}})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -1053,6 +1060,32 @@ func TestSubagentWithAFailedLogStillEnds(t *testing.T) {
 	assert.Equal(t, 1, ends, "the child that started also ends")
 }
 
+// interruptFailStore is a store whose appends of an interrupted tool
+// result to a child session fail.
+type interruptFailStore struct {
+	*session.MemoryStore
+}
+
+func (s interruptFailStore) Append(ctx context.Context, id string, entries ...session.Entry) error {
+	for _, e := range entries {
+		if id != "s1" && e.Message.Role == ai.RoleToolResult {
+			return errors.New("disk full")
+		}
+	}
+	return s.MemoryStore.Append(ctx, id, entries...)
+}
+
+func TestAnInterruptedSubagentReportsAFailedWriteOfItsEnd(t *testing.T) {
+	ctx := context.Background()
+	claude.Replay(t, nil, "testdata/subagent_open_tool_at_result.trace")
+	a, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: interruptFailStore{session.NewMemoryStore()}})
+	require.NoError(t, err)
+	defer closeAgent(t, a)
+
+	_, _, err = run(ctx, a, "Use the Agent tool once.")
+	require.ErrorContains(t, err, "disk full", "the end of the child stores the result of its open tool call")
+}
+
 func TestInputWaitsForTheTurnThatTheCLIStarted(t *testing.T) {
 	ctx := context.Background()
 	claude.Replay(t, nil, "testdata/background_wake_input.trace")
@@ -1060,10 +1093,10 @@ func TestInputWaitsForTheTurnThatTheCLIStarted(t *testing.T) {
 		return agent.Decision{Allow: true}, nil
 	}
 	woke := newWakeSink()
-	a := claude.New(
-		claude.Approve(allow),
-		claude.Wake(woke.signal),
-	)
+	a := claude.New(agent.Config{
+		Approve: allow,
+		Wake:    woke.signal,
+	})
 	defer closeAgent(t, a)
 
 	_, _, err := run(ctx, a, "Start a helper in the background.")
@@ -1088,7 +1121,7 @@ func TestInputWaitsForTheTurnThatTheCLIStarted(t *testing.T) {
 
 func TestContinueWithNoTurnEndsAtOnce(t *testing.T) {
 	claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 	_, _, err := run(context.Background(), a, "Say hello")
 	require.NoError(t, err)
@@ -1111,18 +1144,4 @@ func (w wakeSink) signal() {
 	case w <- struct{}{}:
 	default:
 	}
-}
-
-func TestOnlyToolsWithNoNameDisablesEachTool(t *testing.T) {
-	starts := claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New(claude.OnlyTools())
-	defer closeAgent(t, a)
-
-	_, _, err := run(context.Background(), a, "Say hello")
-	require.NoError(t, err)
-
-	args := starts.Cmds()[0].Args
-	i := slices.Index(args, "--tools")
-	require.GreaterOrEqual(t, i, 0)
-	assert.Equal(t, "", args[i+1])
 }

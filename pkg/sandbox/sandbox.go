@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -36,6 +37,24 @@ type Sandbox interface {
 	// Dir is the absolute working directory of the sandbox.
 	Dir() string
 }
+
+// The errors of a sandbox with a [Policy]. Each wraps
+// [io/fs.ErrPermission].
+var (
+	// ErrHidden is the error for a path that the policy hides.
+	ErrHidden error = permissionError("path is hidden by the sandbox policy")
+	// ErrNotWritable is the error for a path that the policy does not
+	// let the tools write.
+	ErrNotWritable error = permissionError("path is not writable under the sandbox policy")
+)
+
+// permissionError is an error that wraps [io/fs.ErrPermission] and does
+// not add its text.
+type permissionError string
+
+func (e permissionError) Error() string { return string(e) }
+
+func (permissionError) Unwrap() error { return fs.ErrPermission }
 
 // Command is one shell command for [Sandbox.Exec].
 type Command struct {

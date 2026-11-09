@@ -35,9 +35,9 @@ type Binder interface {
 // model can call.
 func SkillTool() Binder {
 	return unbound{
-		name: skillToolName,
+		name: tool.Skill,
 		bind: func(a *Assembly) (tool.Tool, error) {
-			if t := newSkillTool(a.Skills, a.names); t != nil {
+			if t := newSkillTool(a.defs, a.names); t != nil {
 				return t, nil
 			}
 			return nil, nil
@@ -50,7 +50,7 @@ func SkillTool() Binder {
 // assembly of a subagent.
 func AgentTool() Binder {
 	return unbound{
-		name: agentToolName,
+		name: tool.Agent,
 		bind: func(a *Assembly) (tool.Tool, error) {
 			if !a.agentTool() {
 				return nil, nil
@@ -61,9 +61,9 @@ func AgentTool() Binder {
 }
 
 // Sandboxed returns a Binder that calls build with the sandbox of each
-// assembly: the [Sandbox] of the harness, or a [sandbox.Local] in its
-// [Dir], in the fence of [Fence] if the harness has it. Each tool of an assembly gets
-// the same sandbox. Sandboxed calls build once with a nil sandbox to
+// assembly: the [Sandbox] of the harness, or a [sandbox.Local] in the
+// Dir of the config, in the fence of [Fence] if the harness has it.
+// Each tool of an assembly gets the same sandbox. Sandboxed calls build once with a nil sandbox to
 // read the info of the tool, so build must not use the sandbox before a
 // call, as the tools of pkg/sandbox do not.
 func Sandboxed(build func(sandbox.Sandbox) tool.Tool) Binder {
@@ -155,8 +155,9 @@ func (a *Assembly) sandbox() (sandbox.Sandbox, error) {
 		return a.box, nil
 	}
 	var opts []sandbox.Option
-	if a.h.fenced {
-		policy := append(fence.Workspace(a.Dir, a.h.addDirs...), a.h.fence...)
+	if a.h.inFence() {
+		roots := a.h.roots(a.Dir)
+		policy := append(fence.Workspace(roots[0], roots[1:]...), a.h.fence...)
 		opts = append(opts, sandbox.Policy(policy...))
 	}
 	box, err := sandbox.Local(a.Dir, opts...)

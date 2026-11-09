@@ -1,11 +1,13 @@
 // Package fence runs a command inside an OS sandbox. A [Fence] limits
-// the files that the command can write, the files that it can read, its
-// network, and its environment. The child processes of the command stay
-// inside the fence.
+// the files that the command can write, the files that it can read, and
+// its network. The child processes of the command stay inside the
+// fence.
 //
-// [New] picks the backend of this OS. [Seatbelt] is the macOS backend.
-// [Workspace] is the policy for an agent that works in one project
-// directory.
+// [New] picks the backend of this OS. The backend of macOS is
+// Seatbelt. [Workspace] is the policy for an agent that works in one
+// project directory. [ProtectedNames] are the files that it keeps
+// read-only, and [RealPath] and [Within] are the path rules of the
+// fence, for a caller that checks a path as the fence does.
 //
 // A caller must obey these rules:
 //
@@ -14,8 +16,8 @@
 //   - The fence matches real paths. It resolves the symlinks in each
 //     path when it is built, so a path that becomes a symlink later is
 //     not in the policy.
-//   - A constructor returns an error if the backend cannot run. A fence
-//     never runs a command outside the sandbox.
+//   - [New] returns an error if the backend cannot run. A fence never
+//     runs a command outside the sandbox.
 //
 // The package imports only the standard library, so a program without
 // gopi can use it.
@@ -27,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,6 +37,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -71,15 +75,8 @@ func Network(on bool) Option {
 	return func(c *config) { c.network = on }
 }
 
-// Env gives the command only the environment variables with these
-// names. Each Env adds names. Without Env, the command gets the whole
-// environment of the caller.
-func Env(names ...string) Option {
-	return func(c *config) { c.env = append(c.env, names...) }
-}
-
-// SetEnv gives the command the variable name with value. It replaces a
-// variable with the same name that Env keeps.
+// SetEnv gives the command the variable name with value. It replaces
+// the variable with the same name in the environment of the caller.
 func SetEnv(name, value string) Option {
 	return func(c *config) { c.setEnv = append(c.setEnv, name+"="+value) }
 }
@@ -96,23 +93,32 @@ func ReadOnlyNames(root string, names ...string) Option {
 	}
 }
 
-// HideExcept makes dir and its subtree unreadable and unwritable, except
-// each path in keep and its subtree. A command can still read the
-// metadata of a path in dir, such as its size, because a tool that
-// resolves a kept path reads the metadata of each parent.
-func HideExcept(dir string, keep ...string) Option {
-	return func(c *config) {
-		c.hideExcept = append(c.hideExcept, hideExceptRule{dir: dir, keep: keep})
-	}
-}
-
-// workspaceNames are the files and directories that a program outside
-// the fence loads and runs, at the root of a [Workspace] and in each
-// directory under it. The list comes from sandbox-runtime
-// (https://github.com/anthropics/sandbox-runtime/blob/22b545aa6661491bcb911e7239a8d29b17de0bae/src/sandbox/sandbox-utils.ts),
-// with .git/commondir added: git reads hooks and config from the
-// directory that commondir names.
-var workspaceNames = []string{
+// protectedNames are the files and directories that a program outside
+// the fence loads and runs. The list joins the list of sandbox-runtime
+// (https://github.com/anthropics/sandbox-runtime/blob/22b545aa6661491bcb911e7239a8d29b17de0bae/src/sandbox/sandbox-utils.ts)
+// and the list of Claude Code 2.1.316, with .git/commondir added: git
+// reads hooks and config from the directory that commondir names.
+//
+// The list names the parts of .git and .claude that run code, and not
+// the whole folder, because a command writes the rest of them: git
+// writes its objects in .git, and Claude Code keeps its worktrees in
+// .claude/worktrees.
+var protectedNames = []string{
+	// The folders that git, editors, and package managers run files of.
+	".git/hooks",
+	".git/config",
+	".git/commondir",
+	".claude/commands",
+	".claude/agents",
+	".config/git",
+	".vscode",
+	".idea",
+	".husky",
+	".cargo",
+	".devcontainer",
+	".yarn",
+	".mvn",
+	// The files that a shell, git, or a package manager reads and runs.
 	".gitconfig",
 	".gitmodules",
 	".bashrc",
@@ -120,15 +126,45 @@ var workspaceNames = []string{
 	".zshrc",
 	".zprofile",
 	".profile",
+	".zshenv",
+	".zlogin",
+	".zlogout",
+	".bash_login",
+	".bash_aliases",
+	".bash_logout",
+	".envrc",
 	".ripgreprc",
 	".mcp.json",
-	".vscode",
-	".idea",
-	".claude/commands",
-	".claude/agents",
-	".git/hooks",
-	".git/config",
-	".git/commondir",
+	".claude.json",
+	".npmrc",
+	".yarnrc",
+	".yarnrc.yml",
+	".pnp.cjs",
+	".pnp.loader.mjs",
+	".pnpmfile.cjs",
+	"bunfig.toml",
+	".bunfig.toml",
+	".bazelrc",
+	".bazelversion",
+	".bazeliskrc",
+	".pre-commit-config.yaml",
+	"lefthook.yml",
+	".lefthook.yml",
+	"lefthook.yaml",
+	".lefthook.yaml",
+	"gradle-wrapper.properties",
+	"maven-wrapper.properties",
+	".devcontainer.json",
+	"pyrightconfig.json",
+}
+
+// ProtectedNames returns the files and directories that a program
+// outside the fence loads and runs, such as .bashrc, .envrc, and
+// .git/hooks. A name is a relative path in lower case. It matches at
+// each depth and in any letter case, and it covers its subtree.
+// [Workspace] keeps each of them read-only.
+func ProtectedNames() []string {
+	return slices.Clone(protectedNames)
 }
 
 // workspaceCache is the directory under the temp directory where the
@@ -142,7 +178,7 @@ const workspaceCache = "gopi-cache"
 //   - It can write to root and to the temp directory. Its build tools
 //     keep their caches in the temp directory, because a program outside
 //     the fence reads the cache directory of the user.
-//   - It cannot change the files in workspaceNames, at root and under
+//   - It cannot change the files of [ProtectedNames], at root and under
 //     it, such as .git/hooks, .git/config, .gitmodules, and .bashrc.
 //     Git or a shell runs them outside the fence the next time the user
 //     runs it. So git init fails in the fence: it creates .git/hooks.
@@ -179,7 +215,7 @@ func Workspace(root string, more ...string) []Option {
 		if info, err := os.Stat(git); err != nil || !info.IsDir() {
 			readOnly = append(readOnly, git)
 		}
-		opts = append(opts, ReadOnlyNames(r, workspaceNames...))
+		opts = append(opts, ReadOnlyNames(r, protectedNames...))
 	}
 
 	return append(opts,
@@ -192,13 +228,15 @@ func Workspace(root string, more ...string) []Option {
 	)
 }
 
-// New returns the fence of the backend for this OS: [Seatbelt] on
-// macOS. On another OS, New returns an error that wraps
-// [errors.ErrUnsupported].
+// New returns the fence of the backend for this OS. On macOS, the fence
+// runs each command with sandbox-exec, and New runs a test command in
+// the fence first. A command in it can use only a short list of system
+// services, and a setuid program, such as ps, does not run. On another
+// OS, New returns an error that wraps [errors.ErrUnsupported].
 func New(opts ...Option) (Fence, error) {
 	switch runtime.GOOS {
 	case "darwin":
-		return Seatbelt(opts...)
+		return newSeatbelt(opts...)
 	default:
 		return nil, fmt.Errorf("fence: no backend for %s: %w", runtime.GOOS, errors.ErrUnsupported)
 	}
@@ -243,18 +281,9 @@ func (r Rules) CanWrite(p string) bool {
 	return writable && !denied
 }
 
-// hidden reports whether real is under a path of [Hide], or under the
-// directory of a [HideExcept] and not under a path that it keeps.
+// hidden reports whether real is under a path of [Hide].
 func (r Rules) hidden(real string) bool {
-	if underAny(r.c.hide, real, foldCase) {
-		return true
-	}
-	for _, h := range r.c.hideExcept {
-		if underAny([]string{h.dir}, real, foldCase) && !underAny(h.keep, real, false) {
-			return true
-		}
-	}
-	return false
+	return underAny(r.c.hide, real, foldCase)
 }
 
 // readOnlyName reports whether real matches a rule of [ReadOnlyNames].
@@ -269,17 +298,21 @@ func (r Rules) readOnlyName(real string) bool {
 	return false
 }
 
-// rulePath returns the real path of p for a check of [Rules]. macOS has
-// aliases that EvalSymlinks does not resolve, but Seatbelt matches the
-// path behind them. A path under /System/Volumes/Data is the same path
-// without the prefix. A path under /.vol names a file by its inode, so
-// rulePath refuses it.
+// rulePath returns the real path of p for a check of [Rules]. It
+// refuses a path that does not resolve. macOS has aliases that
+// EvalSymlinks does not resolve, but Seatbelt matches the path behind
+// them. A path under /System/Volumes/Data is the same path without the
+// prefix. A path under /.vol names a file by its inode, so rulePath
+// refuses it.
 func rulePath(p string) (string, bool) {
-	real := realPath(p)
+	real, err := RealPath(p)
+	if err != nil {
+		return "", false
+	}
 	if runtime.GOOS != "darwin" {
 		return real, true
 	}
-	if within(volPrefix, real) {
+	if Within(volPrefix, real) {
 		return "", false
 	}
 	if rest, ok := strings.CutPrefix(real, dataVolumePrefix); ok {
@@ -333,7 +366,7 @@ func underAny(dirs []string, p string, fold bool) bool {
 		if fold {
 			d = strings.ToLower(d)
 		}
-		if within(d, p) {
+		if Within(d, p) {
 			return true
 		}
 	}
@@ -341,26 +374,18 @@ func underAny(dirs []string, p string, fold bool) bool {
 }
 
 type config struct {
-	write      []string
-	readOnly   []string
-	names      []nameRule
-	hide       []string
-	hideExcept []hideExceptRule
-	network    bool
-	env        []string
-	setEnv     []string
+	write    []string
+	readOnly []string
+	names    []nameRule
+	hide     []string
+	network  bool
+	setEnv   []string
 }
 
 // nameRule is one [ReadOnlyNames] option.
 type nameRule struct {
 	root  string
 	names []string
-}
-
-// hideExceptRule is one [HideExcept] option.
-type hideExceptRule struct {
-	dir  string
-	keep []string
 }
 
 func newConfig(opts ...Option) config {
@@ -383,75 +408,83 @@ func (c config) resolved() config {
 		names = append(names, nameRule{root: realPaths([]string{n.root})[0], names: n.names})
 	}
 	c.names = names
-
-	hideExcept := make([]hideExceptRule, 0, len(c.hideExcept))
-	for _, h := range c.hideExcept {
-		hideExcept = append(hideExcept, hideExceptRule{
-			dir:  realPaths([]string{h.dir})[0],
-			keep: realPaths(h.keep),
-		})
-	}
-	c.hideExcept = hideExcept
 	return c
 }
 
+// realPaths returns each path of paths absolute and without symlinks.
+// A path that does not resolve stays as it is.
 func realPaths(paths []string) []string {
 	out := make([]string, 0, len(paths))
 	for _, p := range paths {
 		if abs, err := filepath.Abs(p); err == nil {
 			p = abs
 		}
-		out = append(out, realPath(p))
+		if real, err := RealPath(p); err == nil {
+			p = real
+		}
+		out = append(out, p)
 	}
 	return out
 }
 
-// maxSymlinks is how many symlinks realPath follows before it stops, so
-// that a symlink loop ends.
+// maxSymlinks is how many symlinks a path can go through. A path with
+// more, or a symlink loop, does not resolve. The number comes from the
+// limit of the Linux kernel.
 const maxSymlinks = 40
 
-// realPath resolves the symlinks on the longest part of p that exists.
-// It adds the parts that do not exist without change. A symlink to a
-// path that does not exist resolves to that path, because a write
-// through the symlink creates it.
-func realPath(p string) string {
-	return realPathN(p, maxSymlinks)
+// RealPath returns the absolute path p without symlinks. If a part of p
+// does not exist, RealPath resolves the parent folder and adds the rest
+// of p. A symlink to a path that does not exist resolves to that path,
+// because a write through the symlink creates it. RealPath returns an
+// error if a symlink loops, goes through more than 40 symlinks, or
+// cannot be read.
+func RealPath(p string) (string, error) {
+	hops := 0
+	return realPath(p, &hops)
 }
 
-func realPathN(p string, hops int) string {
-	if resolved, err := filepath.EvalSymlinks(p); err == nil {
-		return resolved
+// realPath is [RealPath]. hops counts the symlinks that it follows by
+// hand.
+func realPath(p string, hops *int) (string, error) {
+	real, err := filepath.EvalSymlinks(p)
+	if err == nil {
+		return real, nil
 	}
-	if target, err := os.Readlink(p); err == nil && hops > 0 {
-		if !filepath.IsAbs(target) {
-			target = filepath.Join(filepath.Dir(p), target)
-		}
-		return realPathN(target, hops-1)
+	missing := errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR)
+	if !missing {
+		return "", err
 	}
 	parent := filepath.Dir(p)
 	if parent == p {
-		return p
+		return p, nil
 	}
-	return filepath.Join(realPathN(parent, hops), filepath.Base(p))
+	realParent, err := realPath(parent, hops)
+	if err != nil {
+		return "", err
+	}
+	joined := filepath.Join(realParent, filepath.Base(p))
+	target, err := os.Readlink(joined)
+	if err != nil {
+		return joined, nil
+	}
+	*hops++
+	if *hops > maxSymlinks {
+		return "", fmt.Errorf("fence: the path %q has too many symlinks", p)
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(realParent, target)
+	}
+	return realPath(target, hops)
 }
 
-// keepEnv returns the entries of env with a name in names. If names is
-// empty, it returns env.
-func keepEnv(env, names []string) []string {
-	if len(names) == 0 {
-		return env
+// Within reports whether p is base or is in the subtree of base. It
+// compares the paths as text, so the caller resolves their symlinks
+// first, for example with [RealPath].
+func Within(base, p string) bool {
+	rel, err := filepath.Rel(base, p)
+	if err != nil {
+		return false
 	}
-	keep := make(map[string]bool, len(names))
-	for _, n := range names {
-		keep[n] = true
-	}
-
-	var out []string
-	for _, kv := range env {
-		name, _, _ := strings.Cut(kv, "=")
-		if keep[name] {
-			out = append(out, kv)
-		}
-	}
-	return out
+	parent := ".." + string(filepath.Separator)
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, parent) && !filepath.IsAbs(rel))
 }

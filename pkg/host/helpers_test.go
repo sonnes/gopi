@@ -161,7 +161,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 		if d.abandon {
 			approve = abandoned(approve)
 		}
-		opts = append(opts, agent.BeforeTool(askFirst(approve, d.reason, d.safety)))
+		opts = append(opts, agent.Hooks(agent.BeforeTool(askFirst(approve, d.reason, d.safety))))
 	}
 	r, err := agent.Durable(ctx, d.lm, c.SessionID, opts...)
 	if err != nil {
@@ -445,11 +445,11 @@ func (f fixture) follow(t *testing.T, id string) (agent.State, <-chan agent.Even
 	return state, ch
 }
 
-// gated returns a fixture whose model waits on a gate. close(gate) lets
-// each call go on.
-func gated(t *testing.T) (fixture, chan struct{}) {
+// gated returns a fixture with opts whose model waits on a gate.
+// close(gate) lets each call go on.
+func gated(t *testing.T, opts ...host.Option) (fixture, chan struct{}) {
 	t.Helper()
-	f := newFixture(t)
+	f := newFixture(t, opts...)
 	gate := make(chan struct{})
 	f.model.gate = gate
 	return f, gate

@@ -2,7 +2,6 @@ package anthropic
 
 import (
 	"encoding/base64"
-	"slices"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
@@ -28,102 +27,58 @@ type convertConfig struct {
 	cache *sdk.CacheControlEphemeralParam
 }
 
-// convertMessages maps the messages to the API.
+// convertMessages maps the messages to the API, in the order of
+// [transcript.Order].
 //
 // It groups consecutive tool results into one user message, because the
-// API wants every result of a turn in one message. A system message
-// waits until the next assistant message, or the end. A tool_result
-// must come directly after its tool_use, and a system message must come
-// last or before an assistant message. The last block of the last user
-// or system message carries the cache marker.
-func convertMessages(messages []ai.Message, cfg convertConfig) []sdk.MessageParam {
-	messages = transcript.CloseToolCalls(messages)
+// API wants every result of a turn in one message. The last block of
+// the last user or system message carries the cache marker.
+func convertMessages(messages []ai.Message, cfg convertConfig) ([]sdk.MessageParam, error) {
+	messages = transcript.Order(messages, cfg.systemMessages)
 
 	var out []sdk.MessageParam
-	var pending []sdk.MessageParam
-	var reminders []sdk.ContentBlockParamUnion
-
-	flushPending := func() {
-		out = append(out, pending...)
-		pending = nil
-	}
-	flushReminders := func() {
-		if len(reminders) == 0 {
-			return
-		}
-		if n := len(out); n > 0 && isUserMessage(out[n-1]) {
-			out[n-1].Content = append(out[n-1].Content, reminders...)
-		} else {
-			out = append(out, sdk.NewUserMessage(reminders...))
-		}
-		reminders = nil
-	}
-
-	i := 0
-	for i < len(messages) {
+	for i := 0; i < len(messages); i++ {
 		msg := messages[i]
 
 		switch msg.Role {
 		case ai.RoleSystem:
-			text := transcript.SystemText(msg.Content)
-			if !cfg.systemMessages {
-				if text != "" {
-					reminders = append(reminders, sdk.NewTextBlock(transcript.Reminder(text)))
-				}
-			} else if blocks := systemBlocks(msg, text, cfg.toolChanges); len(blocks) > 0 {
-				pending = append(pending, rawMessage("system", blocks))
+			blocks, err := systemBlocks(msg, cfg.toolChanges)
+			if err != nil {
+				return nil, err
 			}
-			i++
+			if len(blocks) > 0 {
+				out = append(out, rawMessage("system", blocks))
+			}
 
 		case ai.RoleUser:
-			blocks := append(reminders, convertUserContent(msg.Content)...)
-			reminders = nil
-			if len(blocks) > 0 {
+			if blocks := convertUserContent(msg.Content); len(blocks) > 0 {
 				out = append(out, sdk.NewUserMessage(blocks...))
 			}
-			i++
 
 		case ai.RoleAssistant:
-			flushPending()
-			flushReminders()
 			blocks := convertAssistantContent(msg.Content)
-			if len(blocks) > 0 {
-				if cfg.effort && isEffort(msg.Effort) {
-					out = append(out, effortMessage(msg.Effort))
-				}
-				out = append(out, sdk.NewAssistantMessage(blocks...))
+			if len(blocks) == 0 {
+				continue
 			}
-			i++
+			if cfg.effort && isEffort(msg.Effort) {
+				out = append(out, effortMessage(msg.Effort))
+			}
+			out = append(out, sdk.NewAssistantMessage(blocks...))
 
 		case ai.RoleToolResult:
 			var blocks []sdk.ContentBlockParamUnion
-			for i < len(messages) && messages[i].Role == ai.RoleToolResult {
+			for ; i < len(messages) && messages[i].Role == ai.RoleToolResult; i++ {
 				blocks = append(blocks, convertToolResult(messages[i]))
-				i++
 			}
-			blocks = append(blocks, reminders...)
-			reminders = nil
+			i--
 			out = append(out, sdk.NewUserMessage(blocks...))
-
-		default:
-			i++
 		}
 	}
-
-	flushPending()
-	flushReminders()
 
 	if cfg.cache != nil {
 		markLast(out, *cfg.cache)
 	}
-	return out
-}
-
-// isUserMessage reports if m is a user message that the SDK built. A
-// raw message is a system message.
-func isUserMessage(m sdk.MessageParam) bool {
-	_, raw := m.Overrides()
-	return !raw && m.Role == sdk.MessageParamRoleUser
+	return out, nil
 }
 
 // markLast puts the cache marker on the last block of the last message,
@@ -170,13 +125,13 @@ const inlineToolsBeta = "inline-tools-2026-09-15"
 // systemBlocks returns the blocks of a system message: text first, then
 // the tool changes if toolChanges is true. A tool_addition replaces a
 // tool with the same name, so a removal of that name is left out.
-func systemBlocks(msg ai.Message, text string, toolChanges bool) []any {
+func systemBlocks(msg ai.Message, toolChanges bool) ([]any, error) {
 	var blocks []any
-	if text != "" {
+	if text := transcript.SystemText(msg.Content); text != "" {
 		blocks = append(blocks, map[string]any{"type": "text", "text": text})
 	}
 	if !toolChanges {
-		return blocks
+		return blocks, nil
 	}
 
 	added := make(map[string]bool)
@@ -197,23 +152,25 @@ func systemBlocks(msg ai.Message, text string, toolChanges bool) []any {
 				"tool": map[string]any{"type": "tool_reference", "name": v.Name},
 			})
 		case ai.ToolAdded:
-			definition := convertTools([]ai.ToolInfo{v.Tool})[0]
+			definition, err := convertTools([]ai.ToolInfo{v.Tool})
+			if err != nil {
+				return nil, err
+			}
 			blocks = append(blocks, map[string]any{
 				"type": "tool_addition",
-				"tool": map[string]any{"type": "tool_definition", "definition": definition},
+				"tool": map[string]any{"type": "tool_definition", "definition": definition[0]},
 			})
 		}
 	}
-	return blocks
+	return blocks, nil
 }
 
-// efforts is the set of efforts that the API takes.
-var validEfforts = []string{"low", "medium", "high", "xhigh", "max"}
-
-// isEffort reports if effort is an effort of this API. A message from
-// another provider can hold an effort that this API does not take.
+// isEffort reports if effort is an effort of this API: a thinking level
+// other than off. A message from another provider can hold an effort
+// that this API does not take.
 func isEffort(effort string) bool {
-	return slices.Contains(validEfforts, effort)
+	level, err := ai.ParseThinking(effort)
+	return err == nil && level != ai.ThinkingOff
 }
 
 // effortMessage is a system message with no content that sets the

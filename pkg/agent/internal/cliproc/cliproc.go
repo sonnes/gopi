@@ -9,8 +9,13 @@ package cliproc
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -152,10 +157,49 @@ func (pr *Proc) Stderr() string {
 	return pr.pipes.Stderr()
 }
 
-// Write writes data to stdin.
+// ErrExited is the error of a CLI that exited while the agent read or
+// wrote it.
+var ErrExited = errors.New("the CLI exited")
+
+// Exited returns the error of a CLI whose stdout ended: [ErrExited] with
+// the error of the read, or with the end of stderr.
+func (pr *Proc) Exited() error {
+	if err := pr.ReadErr(); err != nil {
+		return fmt.Errorf("%w: read the output: %w", ErrExited, err)
+	}
+	if text := pr.Stderr(); text != "" {
+		return fmt.Errorf("%w: %s", ErrExited, text)
+	}
+	return ErrExited
+}
+
+// Write writes data to stdin. A CLI that rejects its flags exits at
+// once, so the first write can fail before stdout ends. If stderr has
+// text, the error is [ErrExited] with that text, because stderr says
+// why.
 func (pr *Proc) Write(data []byte) error {
 	_, err := pr.pipes.Stdin.Write(data)
-	return err
+	if err == nil {
+		return nil
+	}
+	if text := pr.Stderr(); text != "" {
+		return fmt.Errorf("%w: %s", ErrExited, text)
+	}
+	return fmt.Errorf("write to the CLI: %w", err)
+}
+
+// Environ returns the environment of a CLI: the environment of this
+// process without the variables named in drop, then extra.
+func Environ(drop, extra []string) []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if slices.Contains(drop, name) {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env, extra...)
 }
 
 // Stop ends the input of the CLI and waits for it to exit. Stop reads

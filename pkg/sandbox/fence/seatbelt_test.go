@@ -50,7 +50,7 @@ func TestSeatbeltArgsNetwork(t *testing.T) {
 }
 
 func TestSeatbeltRefusesAQuoteInARoot(t *testing.T) {
-	_, err := Seatbelt(ReadOnlyNames(`/w/a"b`, ".bashrc"))
+	_, err := newSeatbelt(ReadOnlyNames(`/w/a"b`, ".bashrc"))
 
 	require.Error(t, err)
 }
@@ -99,7 +99,7 @@ func TestSeatbeltReportsAMissingBinary(t *testing.T) {
 	seatbeltPath = "/nonexistent/sandbox-exec"
 	t.Cleanup(func() { seatbeltPath = old })
 
-	_, err := Seatbelt(Write(t.TempDir()))
+	_, err := newSeatbelt(Write(t.TempDir()))
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "sandbox-exec")
@@ -129,7 +129,7 @@ func TestSeatbeltWritesOnlyToWriteDirs(t *testing.T) {
 	needSeatbelt(t)
 	ws := t.TempDir()
 	outside := t.TempDir()
-	f, err := Seatbelt(Write(ws))
+	f, err := newSeatbelt(Write(ws))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, "echo in > in.txt")
@@ -144,7 +144,7 @@ func TestSeatbeltWritesOnlyToWriteDirs(t *testing.T) {
 func TestSeatbeltWritesToStdio(t *testing.T) {
 	needSeatbelt(t)
 	ws := t.TempDir()
-	f, err := Seatbelt(Write(ws))
+	f, err := newSeatbelt(Write(ws))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, "echo out > /dev/stdout; echo err > /dev/stderr; echo fd > /dev/fd/1")
@@ -158,7 +158,7 @@ func TestSeatbeltDoesNotWriteThroughASymlink(t *testing.T) {
 	ws := t.TempDir()
 	outside := t.TempDir()
 	require.NoError(t, os.Symlink(outside, filepath.Join(ws, "link")))
-	f, err := Seatbelt(Write(ws))
+	f, err := newSeatbelt(Write(ws))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, "echo out > link/out.txt")
@@ -172,7 +172,7 @@ func TestSeatbeltReadOnlyInsideAWriteDir(t *testing.T) {
 	ws := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(ws, ".git"), 0o755))
 	hooks := filepath.Join(ws, ".git", "hooks")
-	f, err := Seatbelt(Write(ws), ReadOnly(hooks))
+	f, err := newSeatbelt(Write(ws), ReadOnly(hooks))
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -203,7 +203,7 @@ func TestSeatbeltHidesPaths(t *testing.T) {
 	ws := t.TempDir()
 	secret := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(secret, "key"), []byte("s3cret"), 0o600))
-	f, err := Seatbelt(Write(ws), Hide(secret))
+	f, err := newSeatbelt(Write(ws), Hide(secret))
 	require.NoError(t, err)
 
 	for _, script := range []string{
@@ -245,7 +245,7 @@ func TestSeatbeltNetwork(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f, err := Seatbelt(append([]Option{Write(ws)}, tt.opts...)...)
+			f, err := newSeatbelt(append([]Option{Write(ws)}, tt.opts...)...)
 			require.NoError(t, err)
 
 			out, err := run(t, f, ws, script)
@@ -259,27 +259,13 @@ func TestSeatbeltNetwork(t *testing.T) {
 	}
 }
 
-func TestSeatbeltEnv(t *testing.T) {
-	needSeatbelt(t)
-	t.Setenv("FENCE_TEST_KEEP", "kept")
-	t.Setenv("FENCE_TEST_DROP", "dropped")
-	ws := t.TempDir()
-	f, err := Seatbelt(Write(ws), Env("FENCE_TEST_KEEP"))
-	require.NoError(t, err)
-
-	out, err := run(t, f, ws, "env | grep '^FENCE_TEST_' | sort")
-
-	require.NoError(t, err, out)
-	assert.Equal(t, "FENCE_TEST_KEEP=kept\n", out)
-}
-
 func TestSeatbeltStopsALaunchdJob(t *testing.T) {
 	needSeatbelt(t)
 	ws := t.TempDir()
 	marker := filepath.Join(t.TempDir(), "escaped")
 	label := fmt.Sprintf("dev.gopi.fence-test.%d", os.Getpid())
 	t.Cleanup(func() { _ = exec.Command("launchctl", "remove", label).Run() })
-	f, err := Seatbelt(Write(ws))
+	f, err := newSeatbelt(Write(ws))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, fmt.Sprintf("launchctl submit -l %s -- /usr/bin/touch %q", label, marker))
@@ -411,7 +397,7 @@ func TestSeatbeltReadOnlyNames(t *testing.T) {
 	needSeatbelt(t)
 	ws := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(ws, "sub", ".git", "hooks"), 0o755))
-	f, err := Seatbelt(Write(ws), ReadOnlyNames(ws, ".bashrc", ".gitmodules", ".git/hooks"))
+	f, err := newSeatbelt(Write(ws), ReadOnlyNames(ws, ".bashrc", ".gitmodules", ".git/hooks"))
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -440,36 +426,11 @@ func TestSeatbeltReadOnlyNames(t *testing.T) {
 	assert.NoFileExists(t, filepath.Join(ws, "sub", ".git", "hooks", "pre-commit"))
 }
 
-func TestSeatbeltHideExcept(t *testing.T) {
-	needSeatbelt(t)
-	ws := t.TempDir()
-	home := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(home, "go"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(home, "go", "mod.txt"), []byte("module"), 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".zsh_history"), []byte("s3cret"), 0o600))
-	f, err := Seatbelt(Write(ws), HideExcept(home, filepath.Join(home, "go")))
-	require.NoError(t, err)
-
-	out, err := run(t, f, ws, fmt.Sprintf("cat %q", filepath.Join(home, "go", "mod.txt")))
-	require.NoError(t, err, out)
-	assert.Equal(t, "module", out)
-
-	for _, script := range []string{
-		fmt.Sprintf("cat %q", filepath.Join(home, ".zsh_history")),
-		fmt.Sprintf("ls %q", home),
-	} {
-		out, err := run(t, f, ws, script)
-
-		require.Error(t, err, out)
-		assert.NotContains(t, out, "s3cret")
-	}
-}
-
 func TestSeatbeltSetEnv(t *testing.T) {
 	needSeatbelt(t)
 	t.Setenv("FENCE_TEST_SET", "outside")
 	ws := t.TempDir()
-	f, err := Seatbelt(Write(ws), Env("PATH"), SetEnv("FENCE_TEST_SET", "inside"))
+	f, err := newSeatbelt(Write(ws), SetEnv("FENCE_TEST_SET", "inside"))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, "env | grep '^FENCE_TEST_'")
@@ -494,7 +455,7 @@ func TestSeatbeltDeniesAUnixSocket(t *testing.T) {
 		}
 	}()
 	ws := t.TempDir()
-	f, err := Seatbelt(Write(ws), Network(true))
+	f, err := newSeatbelt(Write(ws), Network(true))
 	require.NoError(t, err)
 
 	out, err := run(t, f, ws, fmt.Sprintf("/usr/bin/nc -U %q < /dev/null", sock))

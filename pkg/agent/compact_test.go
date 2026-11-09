@@ -224,10 +224,10 @@ func TestCompactionKeepsSystemChangesInTheView(t *testing.T) {
 		agent.System(func(context.Context) ([]ai.Section, error) {
 			return []ai.Section{{Name: "s", Text: sections}}, nil
 		}),
-		agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+		agent.Hooks(agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 			sections = "two"
 			return nil, nil
-		}),
+		})),
 	)
 
 	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))

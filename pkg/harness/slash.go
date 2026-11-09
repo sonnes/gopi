@@ -18,11 +18,8 @@ import (
 // body at each model call. The body of each call is the same, so the
 // start of the request stays cached. An edit of the skill reaches the
 // next assembly.
-func (a *Assembly) slashSkills() agent.Option {
-	set := def.Set{
-		Skills: a.Skills,
-		Names:  a.names,
-	}
+func (a *Assembly) slashSkills() agent.Hook {
+	set := a.defs
 	return agent.BeforeCall(func(_ context.Context, _ agent.State, r agent.Request) (agent.Request, error) {
 		var msgs []ai.Message
 		for i, m := range r.Messages {
@@ -60,7 +57,7 @@ func withSkillBody(m ai.Message, set def.Set) (ai.Message, bool) {
 	if !ok {
 		return m, false
 	}
-	s, _ := set.Find(name)
+	s, _ := set.Skill(name)
 	body := ai.Text{Text: skillHeading(name) + skillBody(s)}
 	m.Content = slices.Insert(slices.Clone(m.Content), at, ai.Content(body))
 	return m, true

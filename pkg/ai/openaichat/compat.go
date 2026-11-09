@@ -2,6 +2,8 @@ package openaichat
 
 import (
 	"strings"
+
+	"github.com/sonnes/gopi/internal/family"
 )
 
 // features holds what a model accepts beyond the base Chat Completions
@@ -25,21 +27,16 @@ var openAIModel = features{
 	allowedTools:   true,
 }
 
-// modelFeatures maps a model ID of the OpenAI API to its features. The
-// list comes from the OpenAI docs.
-var modelFeatures = map[string]features{
-	"gpt-6-sol":   openAIModel,
-	"gpt-6-luna":  openAIModel,
-	"gpt-6-astra": openAIModel,
-	"gpt-5.6":     openAIModel,
-}
-
 // openRouterPrefix starts the ID of an OpenAI model on OpenRouter, such
 // as "openai/gpt-6-luna".
 const openRouterPrefix = "openai/"
 
-// featuresOf returns the features of a model ID. An OpenRouter ID gets
-// the features of the same OpenAI model.
+// featuresOf returns the features of a model ID. A model of a GPT family
+// of [family.GPT] gets [openAIModel]. An OpenRouter ID gets the features
+// of the same OpenAI model.
 func featuresOf(id string) features {
-	return modelFeatures[strings.TrimPrefix(id, openRouterPrefix)]
+	if family.GPT(strings.TrimPrefix(id, openRouterPrefix)) {
+		return openAIModel
+	}
+	return features{}
 }

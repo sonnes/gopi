@@ -3,19 +3,18 @@ package claude
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"os/exec"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/clihook"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
+	"github.com/sonnes/gopi/pkg/agent/internal/tail"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -39,8 +38,8 @@ type process struct {
 	// of the agent.
 	hooks []agent.Hook
 	state func() agent.State
-	// hookErr is the error of a hook that stopped the CLI in this run.
-	hookErr error
+	// stops keeps the error of a hook that stopped the CLI in this run.
+	stops *clihook.StopErr
 	// skills are the skills that the CLI of the process got.
 	skills def.Set
 	// models is the modelUsage of the last result line of the run before.
@@ -49,14 +48,15 @@ type process struct {
 
 // launch starts cmd and its reader goroutine. approve answers the
 // permission prompts of the CLI. If it is nil, the agent denies them.
-// The CLI calls hooks at its hook events, and each hook gets state.
-// The working directory of cmd is the folder of a relative path of a
-// prompt.
+// The CLI calls hooks at its hook events, and each hook gets state. A
+// hook that stops the CLI keeps its error in stops. The working
+// directory of cmd is the folder of a relative path of a prompt.
 func launch(
 	cmd *exec.Cmd,
 	approve agent.ApproveFunc,
 	hooks []agent.Hook,
 	state func() agent.State,
+	stops *clihook.StopErr,
 ) (*process, error) {
 	pipes, err := start(cmd)
 	if err != nil {
@@ -68,6 +68,7 @@ func launch(
 		dir:     cmd.Dir,
 		hooks:   hooks,
 		state:   state,
+		stops:   stops,
 	}
 	return pr, nil
 }
@@ -78,13 +79,7 @@ func (pr *process) lines() <-chan []byte { return pr.p.Lines() }
 
 // exited returns the error for a CLI whose stdout ended.
 func (pr *process) exited() error {
-	if err := pr.p.ReadErr(); err != nil {
-		return fmt.Errorf("claude: read the CLI output: %w", err)
-	}
-	if text := pr.p.Stderr(); text != "" {
-		return fmt.Errorf("claude: the CLI exited: %s", text)
-	}
-	return errors.New("claude: the CLI exited")
+	return fmt.Errorf("claude: %w", pr.p.Exited())
 }
 
 // send writes v to stdin as one JSON line.
@@ -95,12 +90,7 @@ func (pr *process) send(v any) error {
 	}
 	data = append(data, '\n')
 	if err := pr.p.Write(data); err != nil {
-		// A CLI that rejects its flags exits at once, so the first write
-		// can fail before stdout ends. Stderr says why.
-		if text := pr.p.Stderr(); text != "" {
-			return fmt.Errorf("claude: the CLI exited: %s", text)
-		}
-		return fmt.Errorf("claude: write to the CLI: %w", err)
+		return fmt.Errorf("claude: %w", err)
 	}
 	return nil
 }
@@ -175,7 +165,7 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (promptAnswe
 	// paths, which comes from Claude Code.
 	ask := agent.ApprovalRequest{
 		Call:   call,
-		Reason: plainText(req.DecisionReason),
+		Reason: tail.Plain(req.DecisionReason),
 		Safety: permission.EditsProtected(call, pr.dir),
 	}
 	d, err := pr.approve(ctx, ask)
@@ -201,20 +191,12 @@ func (pr *process) decide(ctx context.Context, req *controlRequest) (promptAnswe
 	return allow, nil
 }
 
-// ansiEscape matches an ANSI escape sequence of a terminal.
-var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[@-_]`)
-
-// plainText returns s with no ANSI escapes and no space at the ends.
-func plainText(s string) string {
-	return strings.TrimSpace(ansiEscape.ReplaceAllString(s, ""))
-}
-
 // denyText is the reason that the agent gives the model when it denies
-// a permission prompt with no [Approve] function.
+// a permission prompt with no Approve function.
 const denyText = "gopi does not answer permission prompts. Set a permission mode that allows the tool."
 
 // deniedText is the reason that the agent gives the model when a
-// [Approve] function denies a call with no message.
+// Approve function denies a call with no message.
 const deniedText = "The caller denied the tool call."
 
 // initialize sends the initialize request and waits for its response.
@@ -253,7 +235,7 @@ func (pr *process) initialize(ctx context.Context) (json.RawMessage, error) {
 			// A CLI that cannot start the session reports a result
 			// before the response, then exits.
 			if lostSession(&l) {
-				return nil, ErrNoConversation
+				return nil, fmt.Errorf("claude: %w", agent.ErrNoConversation)
 			}
 			return nil, resultError(&l)
 		case l.Type == "control_request":
@@ -298,17 +280,3 @@ func (pr *process) terminate() { pr.p.Kill() }
 //   - DEBUG turns on the debug output of the CLI. The official SDK
 //     drops it too.
 var dropped = []string{"CLAUDECODE", "NODE_OPTIONS", "DEBUG"}
-
-// environ returns the environment of the CLI: the environment of this
-// process without the [dropped] variables, then extra.
-func environ(extra []string) []string {
-	var env []string
-	for _, kv := range os.Environ() {
-		name, _, _ := strings.Cut(kv, "=")
-		if slices.Contains(dropped, name) {
-			continue
-		}
-		env = append(env, kv)
-	}
-	return append(env, extra...)
-}

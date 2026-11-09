@@ -1,26 +1,12 @@
 package def_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/def"
 )
-
-func TestASkillIsAReader(t *testing.T) {
-	s := def.Skill{
-		Name:        "deploy",
-		Description: "Deploy.",
-		Body:        "Run it.",
-	}
-
-	got, err := s.ReadSkills(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, []def.Skill{s}, got)
-}
 
 func TestQualifiedName(t *testing.T) {
 	tests := []struct {

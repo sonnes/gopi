@@ -6,28 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// interruptTimeout is how long a cancelled run waits for the turn to
-// stop after turn/interrupt. Then the agent kills the process, and the
-// next Run starts a new one.
-const interruptTimeout = 5 * time.Second
-
-// The gopi names of the tools that stand for the tool items of the CLI.
-const (
-	toolBash       = tool.Bash
-	toolApplyPatch = tool.ApplyPatch
-	toolWebSearch  = tool.WebSearch
-	// toolSpawnAgent is the call that starts a subagent. The CLI
-	// reports it as a subAgentActivity item.
-	toolSpawnAgent = "spawn_agent"
-)
+// toolSpawnAgent is the call that starts a subagent. The CLI reports it
+// as a subAgentActivity item.
+const toolSpawnAgent = "spawn_agent"
 
 // reasoningSeparator joins the parts of a reasoning item.
 const reasoningSeparator = "\n\n"
@@ -78,7 +67,7 @@ var usedMethods = map[string]bool{
 // the tool while it runs, and a cancel keeps the text and the call.
 type turn struct {
 	conn     *conn
-	emitter  *emit.Emitter
+	emitter  *cliagent.Emitter
 	threadID string
 	model    string
 	effort   string
@@ -188,8 +177,7 @@ func (t *turn) read(ctx context.Context, method string, request any) (ai.Usage, 
 
 	var (
 		cancelled bool
-		cancel    = ctx.Done()
-		deadline  <-chan time.Time
+		stop      = cliagent.Watch(ctx)
 	)
 	// finish returns the result of a run that ends.
 	finish := func(err error) (ai.Usage, error) {
@@ -215,17 +203,16 @@ func (t *turn) read(ctx context.Context, method string, request any) (ai.Usage, 
 				return t.usage, t.conn.exitErr()
 			}
 			m = msg
-		case <-cancel:
+		case <-stop.Done:
+			stop.Fire()
 			cancelled = true
-			cancel = nil
 			store = context.WithoutCancel(ctx)
-			deadline = time.After(interruptTimeout)
 			if err := t.interrupt(); err != nil {
 				t.dead = true
 				return t.usage, ctx.Err()
 			}
 			continue
-		case <-deadline:
+		case <-stop.Deadline:
 			t.dead = true
 			return t.usage, ctx.Err()
 		}
@@ -447,7 +434,7 @@ func (t *turn) complete(ctx context.Context, p params, cancelled bool) error {
 		}
 		unauthorized := info.Error != nil && string(info.Error.Info) == errorUnauthorized
 		if unauthorized {
-			return fmt.Errorf("%w: %s", ErrAuth, msg)
+			return fmt.Errorf("codex: %w: %s", agent.ErrNotLoggedIn, msg)
 		}
 		return errors.New("codex: " + msg)
 	case turnInterrupted:
@@ -801,16 +788,16 @@ func toolCall(it item) (ai.ToolCall, bool) {
 	)
 	switch it.Type {
 	case itemCommandExecution:
-		name = toolBash
+		name = tool.Bash
 		input = map[string]string{"command": it.Command}
 	case itemFileChange:
-		name = toolApplyPatch
+		name = tool.ApplyPatch
 		input = map[string]json.RawMessage{"changes": orNull(it.Changes)}
 	case itemMcpToolCall:
 		name = tool.MCPName(it.Server, it.Tool)
 		input = orEmptyObject(it.Arguments)
 	case itemWebSearch:
-		name = toolWebSearch
+		name = tool.WebSearch
 		input = map[string]string{"query": it.Query}
 	case itemCollabAgentToolCall:
 		name = collabToolName(it.Tool)

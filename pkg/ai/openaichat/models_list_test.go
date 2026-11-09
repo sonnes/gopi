@@ -2,8 +2,10 @@ package openaichat_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,6 +29,24 @@ func TestListModels(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []ai.Model{{ID: "accounts/fireworks/models/kimi-k2"}}, got)
+}
+
+func TestListModelsError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":{"message":"bad key"}}`))
+	}))
+	t.Cleanup(server.Close)
+	p := openaichat.New(openaichat.APIKey("test-key"), openaichat.BaseURL(server.URL))
+
+	_, err := p.ListModels(context.Background())
+
+	require.Error(t, err)
+	assert.True(t, strings.HasPrefix(err.Error(), "openaichat: list models: "), err.Error())
+	var apiErr *openaichat.Error
+	require.True(t, errors.As(err, &apiErr), "the error wraps the API error")
+	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
 }
 
 func TestAPIKey(t *testing.T) {

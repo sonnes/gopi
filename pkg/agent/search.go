@@ -15,9 +15,6 @@ import (
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// searchToolName is the name of the search tool.
-const searchToolName = tool.ToolSearch
-
 // defaultMaxResults is the number of tools that a keyword query loads
 // when the call gives no max_results.
 const defaultMaxResults = 5
@@ -89,7 +86,7 @@ func newSearchTool(a *Agent, tools []tool.Tool) *searchTool {
 // Info returns the info of the search tool.
 func (t *searchTool) Info() ai.ToolInfo {
 	return ai.ToolInfo{
-		Name:        searchToolName,
+		Name:        tool.ToolSearch,
 		Description: t.description,
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
@@ -140,7 +137,7 @@ func parseQuery(s string) query {
 		return q
 	}
 	var q query
-	for _, field := range strings.Fields(s) {
+	for field := range strings.FieldsSeq(s) {
 		if w, ok := strings.CutPrefix(field, "+"); ok {
 			q.required = append(q.required, words(w)...)
 		} else {

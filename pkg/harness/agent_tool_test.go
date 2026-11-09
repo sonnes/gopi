@@ -33,23 +33,27 @@ func childID(t *testing.T, m ai.Message) string {
 	return match[1]
 }
 
-// taskHarness returns a durable harness over store, with the subagents
-// agents, and the model script p.
-func taskHarness(t *testing.T, p *script, store session.Storer, agents ...def.Agent) *harness.Harness {
-	return harness.New(taskOptions(t, p, store, agents...)...)
+// childConfig returns c for the child session that the tool result m
+// names. It has no Spec, so the child keeps its model.
+func childConfig(t *testing.T, c agent.Config, m ai.Message) agent.Config {
+	t.Helper()
+	c.SessionID = childID(t, m)
+	c.Spec = ""
+	return c
 }
 
-// taskOptions returns the options of a harness with p, store, and the
-// subagents agents.
-func taskOptions(t *testing.T, p *script, store session.Storer, agents ...def.Agent) []harness.Option {
-	readers := make([]def.AgentsReader, len(agents))
-	for i, a := range agents {
-		readers[i] = a
-	}
-	return with(base(t, p),
-		harness.Store(store),
-		harness.Agents(readers...),
-	)
+// taskHarness returns a harness with the subagents agents and the model
+// script p.
+func taskHarness(p *script, agents ...def.Agent) *harness.Harness {
+	return harness.New(with(base(p), agentTool, harness.Defs(def.Set{Agents: agents}))...)
+}
+
+// taskConfig returns the config of the session s1 of a test over store.
+func taskConfig(t *testing.T, store session.Storer) agent.Config {
+	t.Helper()
+	c := config(t)
+	c.Store = store
+	return c
 }
 
 func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
@@ -60,10 +64,10 @@ func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
 		reply("2 problems"),
 		reply("done"),
 	}}
-	h := taskHarness(t, p, store, reviewer)
+	h := taskHarness(p, reviewer)
+	c := taskConfig(t, store)
 
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "fix it")
 
 	result := toolResult(t, a)
@@ -80,15 +84,16 @@ func TestTaskRunsTheSubagentInAChildSession(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, agent.ParentRef{SessionID: "s1", ToolCallID: "c1"}, parent)
 
-	child, err := h.Durable(ctx, id)
-	require.NoError(t, err)
+	c.SessionID = id
+	c.Spec = ""
+	child := start(t, h, c)
 	assert.Equal(t, "You review code.", section(child, harness.SystemSection))
 	assert.NotContains(t, toolNames(child), "agent", "a child cannot start a subagent")
 }
 
 func TestTaskListsTheSubagents(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("hi")}}
-	a, err := taskHarness(t, p, session.NewMemoryStore(), reviewer).New(context.Background())
+	a, err := taskHarness(p, reviewer).New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "hello")
 
@@ -97,16 +102,15 @@ func TestTaskListsTheSubagents(t *testing.T) {
 }
 
 func TestTaskResumesAChild(t *testing.T) {
-	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
 		callTool("c1", "agent", `{"agent":"reviewer","prompt":"first"}`),
 		reply("one"),
 		reply("ok"),
 	}}
-	h := taskHarness(t, p, store, reviewer)
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	h := taskHarness(p, reviewer)
+	c := taskConfig(t, store)
+	a := start(t, h, c)
 	run(t, a, "go")
 	id := childID(t, toolResult(t, a))
 
@@ -117,8 +121,9 @@ func TestTaskResumesAChild(t *testing.T) {
 	}
 	run(t, a, "again")
 
-	child, err := h.Durable(ctx, id)
-	require.NoError(t, err)
+	c.SessionID = id
+	c.Spec = ""
+	child := start(t, h, c)
 	var inputs []string
 	for _, m := range child.Log().Messages() {
 		if m.Role == ai.RoleUser {
@@ -129,16 +134,17 @@ func TestTaskResumesAChild(t *testing.T) {
 }
 
 func TestTaskResumesOnlyItsOwnChild(t *testing.T) {
-	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
 		callTool("c1", "agent", `{"agent":"reviewer","prompt":"first"}`),
 		reply("one"),
 		reply("ok"),
 	}}
-	h := taskHarness(t, p, store, reviewer)
-	other, err := h.Durable(ctx, "s2")
-	require.NoError(t, err)
+	h := taskHarness(p, reviewer)
+	c := taskConfig(t, store)
+	otherConfig := c
+	otherConfig.SessionID = "s2"
+	other := start(t, h, otherConfig)
 	run(t, other, "go")
 	id := childID(t, toolResult(t, other))
 
@@ -146,8 +152,7 @@ func TestTaskResumesOnlyItsOwnChild(t *testing.T) {
 		callTool("c2", "agent", `{"agent":"reviewer","prompt":"second","resume":"`+id+`"}`),
 		reply("ok"),
 	}
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "go")
 
 	result := toolResult(t, a)
@@ -172,8 +177,7 @@ func TestTaskErrors(t *testing.T) {
 				callTool("c1", "agent", tt.input),
 				reply("done"),
 			}}
-			a, err := taskHarness(t, p, session.NewMemoryStore(), reviewer).Durable(context.Background(), "s1")
-			require.NoError(t, err)
+			a := start(t, taskHarness(p, reviewer), taskConfig(t, session.NewMemoryStore()))
 			run(t, a, "go")
 
 			result := toolResult(t, a)
@@ -195,18 +199,16 @@ func TestTaskGivesTheChildOnlyItsTools(t *testing.T) {
 		reply("ok"),
 	}}
 	store := session.NewMemoryStore()
-	h := harness.New(with(base(t, p),
-		harness.Store(store),
-		harness.Agents(limited),
+	h := harness.New(with(base(p), agentTool,
+		harness.Defs(def.Set{Agents: []def.Agent{limited}}),
 		harness.Toolset(harness.Tools(echo, other)),
 	)...)
+	c := taskConfig(t, store)
 
-	a, err := h.Durable(context.Background(), "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "go")
 
-	child, err := h.Durable(context.Background(), childID(t, toolResult(t, a)))
-	require.NoError(t, err)
+	child := start(t, h, childConfig(t, c, toolResult(t, a)))
 	assert.Equal(t, []string{"echo"}, toolNames(child))
 }
 
@@ -223,18 +225,16 @@ func TestTaskKeepsAToolWithContent(t *testing.T) {
 		reply("ok"),
 	}}
 	store := session.NewMemoryStore()
-	h := harness.New(with(base(t, p),
-		harness.Store(store),
-		harness.Agents(limited),
+	h := harness.New(with(base(p), agentTool,
+		harness.Defs(def.Set{Agents: []def.Agent{limited}}),
 		harness.Toolset(harness.Tools(echo, other)),
 	)...)
+	c := taskConfig(t, store)
 
-	a, err := h.Durable(context.Background(), "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "go")
 
-	child, err := h.Durable(context.Background(), childID(t, toolResult(t, a)))
-	require.NoError(t, err)
+	child := start(t, h, childConfig(t, c, toolResult(t, a)))
 	assert.Equal(t, []string{"echo"}, toolNames(child))
 }
 
@@ -259,8 +259,7 @@ func TestTaskRunsTheChildOnItsModel(t *testing.T) {
 				reply("done"),
 				reply("ok"),
 			}}
-			a, err := taskHarness(t, p, session.NewMemoryStore(), sub).Durable(context.Background(), "s1")
-			require.NoError(t, err)
+			a := start(t, taskHarness(p, sub), taskConfig(t, session.NewMemoryStore()))
 			run(t, a, "go")
 
 			assert.Equal(t, []string{"one", tt.want, "one"}, p.called())
@@ -280,12 +279,12 @@ func TestTaskChildModelWithADriver(t *testing.T) {
 	}}
 	cat := newCatalog(p)
 	cat.RegisterDriver("cli", harness.New(), ai.Model{ID: "two"})
-	h := harness.New(with(base(t, p),
+	h := harness.New(with(base(p), agentTool,
 		harness.Catalog(cat),
-		harness.Agents(sub),
+		harness.Defs(def.Set{Agents: []def.Agent{sub}}),
 	)...)
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "go")
 
@@ -303,12 +302,12 @@ func TestTaskFailsOnAnAmbiguousModel(t *testing.T) {
 	}}
 	cat := newCatalog(p)
 	cat.RegisterTextProvider("other", p, ai.Model{ID: "two"})
-	h := harness.New(with(base(t, p),
+	h := harness.New(with(base(p), agentTool,
 		harness.Catalog(cat),
-		harness.Agents(sub),
+		harness.Defs(def.Set{Agents: []def.Agent{sub}}),
 	)...)
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "go")
 
@@ -325,8 +324,7 @@ func TestTaskSendsTheChildOnTheParentStream(t *testing.T) {
 		reply("done"),
 		reply("ok"),
 	}}
-	a, err := taskHarness(t, p, session.NewMemoryStore(), reviewer).Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, taskHarness(p, reviewer), taskConfig(t, session.NewMemoryStore()))
 
 	var (
 		start  agent.EventSubagentStart
@@ -345,7 +343,7 @@ func TestTaskSendsTheChildOnTheParentStream(t *testing.T) {
 			end = e
 		}
 	}
-	_, err = s.Wait()
+	_, err := s.Wait()
 	require.NoError(t, err)
 
 	id := childID(t, toolResult(t, a))
@@ -376,7 +374,7 @@ func TestTaskOfAnUnsavedAgentCannotResume(t *testing.T) {
 		callTool("c2", "agent", `{"agent":"reviewer","prompt":"go","resume":"x"}`),
 		reply("ok"),
 	}}
-	a, err := harness.New(with(base(t, p), harness.Agents(reviewer))...).New(context.Background())
+	a, err := harness.New(with(base(p), agentTool, harness.Defs(def.Set{Agents: []def.Agent{reviewer}}))...).New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "go")
 
@@ -393,7 +391,6 @@ func TestTaskOfAnUnsavedAgentCannotResume(t *testing.T) {
 }
 
 func TestASubagentStartsUnderOnly(t *testing.T) {
-	ctx := context.Background()
 	store := session.NewMemoryStore()
 	p := &script{responses: []ai.Message{
 		callTool("c1", "agent", `{"agent":"echoer","prompt":"go"}`),
@@ -405,15 +402,14 @@ func TestASubagentStartsUnderOnly(t *testing.T) {
 		Description: "Echo.",
 		Tools:       []string{"echo"},
 	}
-	h := harness.New(with(base(t, p),
-		harness.Store(store),
-		harness.Agents(echoer),
+	h := harness.New(with(base(p), agentTool,
+		harness.Defs(def.Set{Agents: []def.Agent{echoer}}),
 		harness.Toolset(harness.Tools(echo, otherTool)),
-		harness.Only("echo", "other", "agent"),
 	)...)
+	c := taskConfig(t, store)
+	c.ToolNames = []string{"echo", "other", "agent"}
 
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "go")
 
 	result := toolResult(t, a)
@@ -435,14 +431,12 @@ func TestASubagentFileWithAnUnknownToolFails(t *testing.T) {
 		Description: "Echo.",
 		Tools:       []string{"echo", "ech0"},
 	}
-	h := harness.New(with(base(t, p),
-		harness.Store(session.NewMemoryStore()),
-		harness.Agents(echoer),
+	h := harness.New(with(base(p), agentTool,
+		harness.Defs(def.Set{Agents: []def.Agent{echoer}}),
 		harness.Toolset(harness.Tools(echo)),
 	)...)
 
-	a, err := h.Durable(context.Background(), "s1")
-	require.NoError(t, err)
+	a := start(t, h, taskConfig(t, session.NewMemoryStore()))
 	run(t, a, "go")
 
 	result := toolResult(t, a)

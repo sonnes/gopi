@@ -114,39 +114,3 @@ func TestListModels_Error(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
 }
-
-func TestCheckKey(t *testing.T) {
-	var key, limit string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key = r.Header.Get("X-Api-Key")
-		limit = r.URL.Query().Get("limit")
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(modelsPage1))
-	}))
-	t.Cleanup(server.Close)
-	p := anthropic.New(anthropic.APIKey("test-key"), anthropic.BaseURL(server.URL))
-
-	got, err := p.CheckKey(context.Background())
-
-	require.NoError(t, err)
-	assert.Equal(t, ai.KeyInfo{}, got)
-	assert.Equal(t, "test-key", key)
-	assert.Equal(t, "1", limit, "the check asks for one model, and reads no second page")
-}
-
-func TestCheckKey_Error(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`))
-	}))
-	t.Cleanup(server.Close)
-	p := anthropic.New(anthropic.APIKey("bad"), anthropic.BaseURL(server.URL))
-
-	_, err := p.CheckKey(context.Background())
-
-	var apiErr *anthropic.Error
-	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
-	assert.ErrorContains(t, err, "anthropic: check key: ")
-}

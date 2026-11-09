@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -51,64 +52,74 @@ func TestDo(t *testing.T) {
 	short := header("retry-after-ms", "1")
 	tests := []struct {
 		name      string
-		policy    Policy
+		policy    retryPolicy
 		errs      []error
 		wantCalls int
 		wantErr   bool
+		// wantWait is the range of the time that the retries wait.
+		wantWait [2]time.Duration
 	}{
 		{
 			name:      "retries a rate limit and an overload",
-			policy:    Policy{MaxRetries: 2, MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxRetries: 2, MaxDelay: time.Minute},
 			errs:      []error{&apiError{429, short}, &apiError{503, short}},
 			wantCalls: 3,
+			wantWait:  [2]time.Duration{2 * time.Millisecond, 2 * time.Millisecond},
 		},
 		{
 			name:      "no retry by default",
-			policy:    Policy{MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxDelay: time.Minute},
 			errs:      []error{&apiError{429, short}},
 			wantCalls: 1,
 			wantErr:   true,
 		},
 		{
 			name:      "no retry of a client error",
-			policy:    Policy{MaxRetries: 3, MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxRetries: 3, MaxDelay: time.Minute},
 			errs:      []error{&apiError{400, nil}},
 			wantCalls: 1,
 			wantErr:   true,
 		},
 		{
 			name:      "the server says no",
-			policy:    Policy{MaxRetries: 3, MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxRetries: 3, MaxDelay: time.Minute},
 			errs:      []error{&apiError{503, header("x-should-retry", "false")}},
 			wantCalls: 1,
 			wantErr:   true,
 		},
 		{
 			name:      "a wait over the cap fails at once",
-			policy:    Policy{MaxRetries: 3, MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxRetries: 3, MaxDelay: time.Minute},
 			errs:      []error{&apiError{429, header("retry-after", "120")}},
 			wantCalls: 1,
 			wantErr:   true,
 		},
 		{
 			name:      "an error with no status can pass",
-			policy:    Policy{MaxRetries: 1, MaxDelay: time.Minute},
+			policy:    retryPolicy{MaxRetries: 1, MaxDelay: time.Minute},
 			errs:      []error{errors.New("connection reset")},
 			wantCalls: 2,
+			wantWait:  [2]time.Duration{firstBackoff * 3 / 4, firstBackoff},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var calls int
-			got, err := Do(t.Context(), tt.policy, fakeSend(&calls, tt.errs...), status)
-			assert.Equal(t, tt.wantCalls, calls)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, "ok", got)
+			synctest.Test(t, func(t *testing.T) {
+				var calls int
+				start := time.Now()
+				got, err := do(t.Context(), tt.policy, fakeSend(&calls, tt.errs...), status)
+				waited := time.Since(start)
+				assert.Equal(t, tt.wantCalls, calls)
+				assert.GreaterOrEqual(t, waited, tt.wantWait[0])
+				assert.LessOrEqual(t, waited, tt.wantWait[1])
+				if tt.wantErr {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, "ok", got)
+			})
 		})
 	}
 }
@@ -118,17 +129,17 @@ func TestDo_ContextCanceled(t *testing.T) {
 	cancel()
 
 	var calls int
-	_, err := Do(ctx, Policy{MaxRetries: 3}, fakeSend(&calls, &apiError{503, nil}), status)
+	_, err := do(ctx, retryPolicy{MaxRetries: 3}, fakeSend(&calls, &apiError{503, nil}), status)
 	require.Error(t, err)
 	assert.Equal(t, 1, calls, "a canceled call does not retry")
 }
 
 func TestPolicyOf(t *testing.T) {
-	assert.Equal(t, Policy{MaxDelay: DefaultMaxDelay}, PolicyOf(nil))
+	assert.Equal(t, retryPolicy{MaxDelay: defaultMaxDelay}, policyOf(nil))
 	assert.Equal(
 		t,
-		Policy{MaxRetries: 2, MaxDelay: 0},
-		PolicyOf(ai.JoinOptions(ai.MaxRetries(2), ai.MaxRetryDelay(0))),
+		retryPolicy{MaxRetries: 2, MaxDelay: 0},
+		policyOf(ai.JoinOptions(ai.MaxRetries(2), ai.MaxRetryDelay(0))),
 	)
 }
 
@@ -168,9 +179,58 @@ func TestMarkContextExceeded(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := MarkContextExceeded(errors.New(tt.err), tt.status)
+			got := markContextExceeded(errors.New(tt.err), tt.status)
 			assert.Equal(t, tt.want, errors.Is(got, ai.ErrContextExceeded))
 			assert.ErrorContains(t, got, tt.err)
+		})
+	}
+}
+
+func TestCall(t *testing.T) {
+	short := header("retry-after-ms", "1")
+	tests := []struct {
+		name        string
+		opts        ai.Options
+		errs        []error
+		wantCalls   int
+		wantErr     string
+		wantTooLong bool
+	}{
+		{
+			name:      "retries with the policy of the options",
+			opts:      ai.MaxRetries(1),
+			errs:      []error{&apiError{503, short}},
+			wantCalls: 2,
+		},
+		{
+			name:      "adds the name of the provider",
+			errs:      []error{&apiError{503, nil}},
+			wantCalls: 1,
+			wantErr:   "fake: Service Unavailable",
+		},
+		{
+			name:        "marks a request that is too large",
+			errs:        []error{&apiError{413, nil}},
+			wantCalls:   1,
+			wantErr:     "fake: ",
+			wantTooLong: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var calls int
+				got, err := Call(t.Context(), tt.opts, "fake", status, fakeSend(&calls, tt.errs...))
+				assert.Equal(t, tt.wantCalls, calls)
+				if tt.wantErr == "" {
+					require.NoError(t, err)
+					assert.Equal(t, "ok", got)
+					return
+				}
+				require.ErrorContains(t, err, tt.wantErr)
+				assert.Equal(t, tt.wantTooLong, errors.Is(err, ai.ErrContextExceeded))
+			})
 		})
 	}
 }

@@ -3,9 +3,7 @@ package anthropic_test
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httprr"
 	"github.com/sonnes/gopi/internal/modelstest"
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -23,87 +21,38 @@ import (
 // testModel is the model of the recorded tests.
 var testModel = modelstest.Model("anthropic", "claude-sonnet-5")
 
-// canonicalHost is the host in every fixture. The scrubber replaces the
-// host and the path prefix of a recording, so a replay does not depend
-// on the base URL that the recording used.
+// canonicalHost is the host in every fixture.
 const canonicalHost = "api.anthropic.com"
 
 type weatherInput struct {
 	City string `json:"city" jsonschema:"The city name"`
 }
 
-type person struct {
-	Name string `json:"name" jsonschema:"The name of the person"`
-	Age  int    `json:"age" jsonschema:"The age of the person"`
-	City string `json:"city" jsonschema:"The city where the person lives"`
-}
-
 var weatherTool = tool.New("get_weather", func(_ context.Context, in weatherInput) (string, error) {
 	return "Sunny, 22C in " + in.City, nil
 }, tool.Description("Get the current weather in a city"))
 
-// scrubRequest removes the secrets and the headers that change between
-// runs, so a replay matches a recording.
-func scrubRequest(req *http.Request) error {
-	req.URL.Host = canonicalHost
-	req.Host = canonicalHost
-	if i := strings.Index(req.URL.Path, "/v1/"); i > 0 {
-		req.URL.Path = req.URL.Path[i:]
-	}
-	req.Header.Del("x-api-key")
-	req.Header.Del("Authorization")
-	req.Header.Del("Accept")
-	req.Header.Del("Anthropic-Version")
-	for key := range req.Header {
-		if strings.HasPrefix(key, "X-Stainless-") {
-			req.Header.Del(key)
-		}
-	}
-	req.Header.Set("User-Agent", "Go-http-client/1.1")
-	return nil
+// recordFrom is the API that a test records from: the API of
+// ANTHROPIC_BASE_URL, Anthropic by default. Without ANTHROPIC_API_KEY,
+// the test records from the Messages API of OpenRouter.
+var recordFrom = providertest.Server{
+	KeyEnv:  "ANTHROPIC_API_KEY",
+	BaseURL: os.Getenv("ANTHROPIC_BASE_URL"),
+	Fallback: &providertest.Server{
+		KeyEnv:  "OPENROUTER_API_KEY",
+		BaseURL: "https://openrouter.ai/api",
+	},
 }
 
-// openRouterURL is the base URL of the Messages API of OpenRouter.
-const openRouterURL = "https://openrouter.ai/api"
-
 // newTestProvider returns a provider that replays the fixture of the
-// test. If -httprecord matches, it records against a real API. It uses
-// ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL if they are set. Else it uses
-// OPENROUTER_API_KEY and the API of OpenRouter. A test with no fixture
-// is skipped.
+// test.
 func newTestProvider(t *testing.T) *anthropic.Provider {
 	t.Helper()
-
-	trace := filepath.Join("testdata", strings.ReplaceAll(t.Name(), "/", "_")+".httprr")
-
-	recording, err := httprr.Recording(trace)
-	require.NoError(t, err)
-
-	apiKey := "fake-api-key"
-	var baseURL string
-	if recording {
-		apiKey = os.Getenv("ANTHROPIC_API_KEY")
-		baseURL = os.Getenv("ANTHROPIC_BASE_URL")
-		if apiKey == "" {
-			apiKey = os.Getenv("OPENROUTER_API_KEY")
-			baseURL = openRouterURL
-		}
-		if apiKey == "" {
-			t.Skip("neither ANTHROPIC_API_KEY nor OPENROUTER_API_KEY is set")
-		}
-	} else if _, err := os.Stat(trace); os.IsNotExist(err) {
-		t.Skipf("fixture %s not found; run make record", trace)
-	}
-
-	rr, err := httprr.Open(trace, http.DefaultTransport)
-	require.NoError(t, err)
-	rr.ScrubReq(scrubRequest)
-	t.Cleanup(func() { _ = rr.Close() })
-
+	r := providertest.Open(t, recordFrom, canonicalHost)
 	return anthropic.New(
-		anthropic.APIKey(apiKey),
-		anthropic.BaseURL(baseURL),
-		anthropic.HTTPClient(rr.Client()),
+		anthropic.APIKey(r.APIKey),
+		anthropic.BaseURL(r.BaseURL),
+		anthropic.HTTPClient(r.Client),
 	)
 }
 
@@ -274,23 +223,6 @@ func TestCacheReadUsage(t *testing.T) {
 	).Wait()
 	require.NoError(t, err)
 	assert.NotZero(t, second.Usage.CacheRead)
-}
-
-func TestGenerateObject(t *testing.T) {
-	p := newTestProvider(t)
-	lm := ai.LanguageModel{Model: testModel, Provider: p}
-
-	res, err := ai.GenerateObject[person](
-		t.Context(),
-		lm,
-		[]ai.Message{ai.UserMessage("Describe Alice, who is 30 and lives in Lisbon.")},
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Alice", res.Object.Name)
-	assert.Equal(t, 30, res.Object.Age)
-	assert.Equal(t, "Lisbon", res.Object.City)
-	assert.NotZero(t, res.Usage.Output)
 }
 
 func TestCountTokens(t *testing.T) {

@@ -21,33 +21,17 @@ var (
 	errNoAgentDetail = errors.New("the agent has no description")
 )
 
-// AgentDir reads subagents from the Markdown files under one directory
-// of an fs.FS. [Agents] returns one.
-type AgentDir struct {
-	fsys fs.FS
-	dir  string
-}
-
-// Agents returns a reader that reads one subagent from each *.md file
-// under dir, at any depth, as Claude Code does:
+// readAgents reads one agent from each *.md file under dir, at any
+// depth, in path order, as Claude Code does:
 //
 //	dir/<file>.md         one agent
 //	dir/<team>/<file>.md  one agent
 //
 // A file needs a name and a description in its frontmatter. A file
-// without them is not an agent, such as a README.
-func Agents(fsys fs.FS, dir string) AgentDir {
-	return AgentDir{
-		fsys: fsys,
-		dir:  dir,
-	}
-}
-
-// ReadAgents reads each agent file in path order. It skips a malformed
-// file. It keeps each agent, also when two files give the same name.
-// The caller picks the agent that wins.
-func (d AgentDir) ReadAgents(ctx context.Context) ([]def.Agent, error) {
-	names, err := d.agentFiles()
+// without them is not an agent, such as a README, and readAgents skips
+// it. It keeps each agent, also when two files give the same name.
+func readAgents(ctx context.Context, fsys fs.FS, dir string) ([]def.Agent, error) {
+	names, err := agentFiles(fsys, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +42,7 @@ func (d AgentDir) ReadAgents(ctx context.Context) ([]def.Agent, error) {
 			return nil, err
 		}
 
-		data, err := fs.ReadFile(d.fsys, name)
+		data, err := fs.ReadFile(fsys, name)
 		if err != nil {
 			return nil, fmt.Errorf("fs: read %s: %w", name, err)
 		}
@@ -74,10 +58,10 @@ func (d AgentDir) ReadAgents(ctx context.Context) ([]def.Agent, error) {
 
 // agentFiles returns the path of each *.md file under dir, sorted. A
 // dir that does not exist has no files.
-func (d AgentDir) agentFiles() ([]string, error) {
+func agentFiles(fsys fs.FS, dir string) ([]string, error) {
 	var names []string
 	walk := func(name string, e fs.DirEntry, err error) error {
-		isMissingRoot := name == d.dir && errors.Is(err, fs.ErrNotExist)
+		isMissingRoot := name == dir && errors.Is(err, fs.ErrNotExist)
 		if isMissingRoot {
 			return fs.SkipAll
 		}
@@ -89,7 +73,7 @@ func (d AgentDir) agentFiles() ([]string, error) {
 		}
 		return nil
 	}
-	if err := fs.WalkDir(d.fsys, d.dir, walk); err != nil {
+	if err := fs.WalkDir(fsys, dir, walk); err != nil {
 		return nil, err
 	}
 

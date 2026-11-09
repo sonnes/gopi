@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 )
 
 // otherDriver is a driver of another kind of agent, such as Codex next
@@ -31,13 +32,13 @@ func TestUpdateAnIdleSession(t *testing.T) {
 	got, err := f.h.Update(ctx, "s1", func(c *host.Config) {
 		c.Model = "fake2/n"
 		c.Effort = ai.ThinkingHigh
-		c.Mode = agent.ModeAcceptEdits
+		c.Mode = permission.AcceptEdits
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "fake2/n", got.Model)
 	assert.Equal(t, ai.ThinkingHigh, got.Effort)
-	assert.Equal(t, agent.ModeAcceptEdits, got.Mode)
+	assert.Equal(t, permission.AcceptEdits, got.Mode)
 	assert.Equal(t, host.StatusIdle, got.Status)
 	assert.Equal(t, got, next(t, events, func(host.Event) bool { return true }).Session)
 
@@ -47,7 +48,7 @@ func TestUpdateAnIdleSession(t *testing.T) {
 	assert.Equal(t, 2, f.driver.starts(), "the next run starts the agent again")
 	assert.Equal(t, "fake2/n", c.Spec)
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
-	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
+	assert.Equal(t, permission.AcceptEdits, c.Mode)
 	assert.Equal(t, []string{"a", "b"}, f.model.texts(), "the agent resumes the log")
 }
 
@@ -82,7 +83,7 @@ func TestUpdateDuringARun(t *testing.T) {
 	f.send(t, "s1", "b")
 
 	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
-		c.Mode = agent.ModeAcceptEdits
+		c.Mode = permission.AcceptEdits
 	})
 
 	require.NoError(t, err)
@@ -91,7 +92,7 @@ func TestUpdateDuringARun(t *testing.T) {
 	runEnd(t, events)
 	runEnd(t, events)
 	assert.Equal(t, 2, f.driver.starts(), "the held message runs on a new agent")
-	assert.Equal(t, agent.ModeAcceptEdits, f.lastConfig(t).Mode)
+	assert.Equal(t, permission.AcceptEdits, f.lastConfig(t).Mode)
 }
 
 func TestUpdateSurvivesARestart(t *testing.T) {
@@ -99,18 +100,18 @@ func TestUpdateSurvivesARestart(t *testing.T) {
 	ctx := context.Background()
 	f.create(t, host.Config{ID: "s1"})
 	_, err := f.h.Update(ctx, "s1", func(c *host.Config) {
-		c.Mode = agent.ModeAcceptEdits
+		c.Mode = permission.AcceptEdits
 	})
 	require.NoError(t, err)
 
 	f = f.restart(t)
 
 	got, _ := f.h.Get("s1")
-	assert.Equal(t, agent.ModeAcceptEdits, got.Mode)
+	assert.Equal(t, permission.AcceptEdits, got.Mode)
 	_, events := f.watch(t)
 	f.send(t, "s1", "a")
 	runEnd(t, events)
-	assert.Equal(t, agent.ModeAcceptEdits, f.lastConfig(t).Mode)
+	assert.Equal(t, permission.AcceptEdits, f.lastConfig(t).Mode)
 }
 
 func TestUpdateRefusesAChange(t *testing.T) {
@@ -120,11 +121,12 @@ func TestUpdateRefusesAChange(t *testing.T) {
 	}{
 		{name: "the ID", change: func(c *host.Config) { c.ID = "s2" }},
 		{name: "the folder", change: func(c *host.Config) { c.Dir = "/other" }},
-		{name: "the dirs", change: func(c *host.Config) { c.Dirs = []string{"/other"} }},
+		{name: "the dirs", change: func(c *host.Config) { c.DefDirs = []string{"/other"} }},
 		{name: "the agent file", change: func(c *host.Config) { c.Agent = "reviewer" }},
 		{name: "the kind of agent", change: func(c *host.Config) { c.Model = "other/x" }},
 		{name: "a bad effort", change: func(c *host.Config) { c.Effort = "huge" }},
 		{name: "an unknown mode", change: func(c *host.Config) { c.Mode = "plan" }},
+		{name: "a bad rule", change: func(c *host.Config) { c.Ask = []string{"Bash(ls"} }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

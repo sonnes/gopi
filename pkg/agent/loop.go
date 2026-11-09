@@ -123,26 +123,7 @@ func (a *Agent) next(ctx context.Context, calledTools bool) ([]session.Entry, er
 	if followUp := a.queues.drain(&a.queues.followUp); len(followUp) > 0 {
 		return followUp, nil
 	}
-	return a.beforeStop(ctx)
-}
-
-// beforeStop runs the BeforeStop hooks until one continues the run. It
-// returns the entries of that hook, or nil if the run stops.
-func (a *Agent) beforeStop(ctx context.Context) ([]session.Entry, error) {
-	for _, h := range a.cfg.hooks {
-		bs, ok := h.(BeforeStopHook)
-		if !ok {
-			continue
-		}
-		entries, err := bs.BeforeStop(ctx, a.State())
-		if err != nil {
-			return nil, err
-		}
-		if len(entries) > 0 {
-			return entries, nil
-		}
-	}
-	return nil, nil
+	return RunBeforeStop(ctx, a.cfg.hooks, a.State)
 }
 
 // add stores entries in the log, one at a time, and returns their
@@ -154,7 +135,7 @@ func (a *Agent) add(ctx context.Context, em *emitter, entries ...session.Entry) 
 	var msgs []ai.Message
 	for _, e := range entries {
 		if e.Kind != "" {
-			if err := em.commit(ctx, []session.Entry{e}); err != nil {
+			if err := em.commit(ctx, e); err != nil {
 				return msgs, err
 			}
 			continue
@@ -164,7 +145,7 @@ func (a *Agent) add(ctx context.Context, em *emitter, entries ...session.Entry) 
 			Ephemeral: e.Ephemeral,
 		}
 		err := em.commit(ctx,
-			[]session.Entry{e},
+			e,
 			EventMessageStart{Message: e.Message},
 			end,
 		)

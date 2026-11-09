@@ -76,7 +76,7 @@ A removal reads `Removed system prompt section "todos".` A model that takes no s
 
 ## Claude Code and Codex
 
-`claude.Sections` and `codex.Sections` take the same function. The agent calls it before each run. The first sections go in the prompt of the CLI. Claude Code gets each later change as a `<system-reminder>` before the input of the run. Codex gets it as a developer message before the turn. `claude.System` and `codex.System` give one fixed section.
+A CLI agent takes the same function in the `Sections` field of its config. The agent calls it before each run. The first sections go in the prompt of the CLI. Claude Code gets each later change as a `<system-reminder>` before the input of the run. Codex gets it as a developer message before the turn. `agent.SystemText` gives one fixed section.
 
 ## Resume a Session
 

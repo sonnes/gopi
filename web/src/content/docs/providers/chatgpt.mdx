@@ -67,9 +67,9 @@ The provider sends each call through the [OpenAI](openai.mdx) provider with `ope
 - A request has no output cap, no temperature, and no cache retention. `ai.MaxTokens`, `ai.Temperature`, and `ai.CacheLong` have no effect.
 - The function tools go into one namespace, `gopi`.
 - An object call reads its response from a stream.
-- The route has no token count. `ai.CountTokens` returns an error.
+- The route has no token count. `ai.CountTokens` returns an error that wraps `errors.ErrUnsupported`.
 
-The OpenAI provider does not know the features of `gpt-6.1-sol`. So that model gets each system message as a `<system-reminder>` in a user message, and its request has no cache mark.
+`gpt-6.1-sol` is a GPT-6 model, so it gets the system messages in place, the tool changes in place, and the cache mark. The [OpenAI](openai.mdx#system-messages) page says how they work.
 
 ## Errors
 

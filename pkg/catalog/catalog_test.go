@@ -3,6 +3,7 @@ package catalog_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,20 +42,6 @@ func (imageProvider) GenerateImage(
 	return &ai.ImageResponse{}, nil
 }
 
-// speechProvider implements [ai.TextProvider] and [ai.SpeechProvider].
-type speechProvider struct {
-	textProvider
-}
-
-func (speechProvider) GenerateSpeech(
-	_ context.Context,
-	_ ai.Model,
-	_ string,
-	_ ai.Options,
-) (*ai.SpeechResponse, error) {
-	return &ai.SpeechResponse{}, nil
-}
-
 var (
 	alpha  = ai.Model{ID: "alpha", Name: "Alpha", MaxTokens: 100}
 	beta   = ai.Model{ID: "beta", Name: "Beta", MaxTokens: 200}
@@ -77,7 +64,7 @@ func TestCatalog_Model(t *testing.T) {
 		name    string
 		spec    string
 		want    ai.Model
-		wantErr string
+		wantErr error
 	}{
 		{
 			name: "full spec",
@@ -92,22 +79,22 @@ func TestCatalog_Model(t *testing.T) {
 		{
 			name:    "unregistered ID on a known provider",
 			spec:    "one/next",
-			wantErr: `catalog: unknown model "one/next": provider "one" has no model "next"`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 		{
 			name:    "bare ID with two providers",
 			spec:    "shared",
-			wantErr: `catalog: ambiguous model "shared": use one of one/shared, two/shared`,
+			wantErr: catalog.ErrAmbiguousModel,
 		},
 		{
 			name:    "unknown bare ID",
 			spec:    "nope",
-			wantErr: `catalog: unknown model "nope"`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 		{
 			name:    "unknown provider",
 			spec:    "nope/alpha",
-			wantErr: `catalog: unknown model "nope/alpha": no provider "nope": use one of one, paint, two`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 	}
 	for _, tt := range tests {
@@ -116,22 +103,13 @@ func TestCatalog_Model(t *testing.T) {
 
 			got, err := c.Model(tt.spec)
 
-			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
-	}
-}
-
-func TestCatalog_UnknownModelIs(t *testing.T) {
-	c := newCatalog()
-
-	for _, spec := range []string{"one/next", "next", "nope/alpha"} {
-		_, err := c.Model(spec)
-		require.ErrorIs(t, err, catalog.ErrUnknownModel, spec)
 	}
 }
 
@@ -167,26 +145,14 @@ func TestCatalog_ImageModel(t *testing.T) {
 	assert.Equal(t, imageProvider{}, im.Provider)
 }
 
-func TestCatalog_SpeechModel(t *testing.T) {
-	c := catalog.New()
-	c.RegisterSpeechProvider("voice", speechProvider{}, alpha)
-
-	sm, err := c.SpeechModel("voice/alpha")
-
-	require.NoError(t, err)
-	assert.Equal(t, alpha, sm.Model)
-}
-
 func TestCatalog_MissingCapability(t *testing.T) {
 	c := newCatalog()
 
 	_, textErr := c.LanguageModel("paint/pixel")
 	_, imageErr := c.ImageModel("one/alpha")
-	_, speechErr := c.SpeechModel("one/alpha")
 
-	assert.EqualError(t, textErr, `catalog: provider "paint" does not support text generation`)
-	assert.EqualError(t, imageErr, `catalog: provider "one" does not support image generation`)
-	assert.EqualError(t, speechErr, `catalog: provider "one" does not support speech generation`)
+	assert.ErrorIs(t, textErr, errors.ErrUnsupported)
+	assert.ErrorIs(t, imageErr, errors.ErrUnsupported)
 }
 
 func TestCatalog_RegisterModel(t *testing.T) {
@@ -435,4 +401,54 @@ func TestMergeModel(t *testing.T) {
 		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingOff},
 		Pricing:        ai.Pricing{Input: 5},
 	}, got)
+}
+
+// fullModel returns a model with each field set.
+func fullModel() ai.Model {
+	return ai.Model{
+		ID:             "m",
+		Name:           "M",
+		MaxTokens:      100,
+		ContextWindow:  1000,
+		Input:          []ai.Modality{ai.ModalityText},
+		Reasoning:      true,
+		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingHigh},
+		Pricing: ai.Pricing{
+			Input: 1,
+			Tiers: []ai.PriceTier{{InputAbove: 10, Input: 2}},
+		},
+	}
+}
+
+// TestFillModel_EachField checks that FillModel fills each field of
+// [ai.Model]. A new field fails the test until fullModel sets it.
+func TestFillModel_EachField(t *testing.T) {
+	full := fullModel()
+	v := reflect.ValueOf(full)
+	for i := range v.NumField() {
+		require.False(t, v.Field(i).IsZero(), "fullModel must set %s", v.Type().Field(i).Name)
+	}
+
+	assert.Equal(t, full, catalog.FillModel(ai.Model{}, full), "each zero field takes the value of d")
+	assert.Equal(t, full, catalog.FillModel(full, ai.Model{ID: "d", Name: "D", MaxTokens: 5}), "each set field stays")
+}
+
+func TestFillModel_Copies(t *testing.T) {
+	full := fullModel()
+
+	got := catalog.FillModel(full, ai.Model{})
+	got.Input[0] = ai.ModalityPDF
+	got.ThinkingLevels[0] = ai.ThinkingLow
+	got.Pricing.Tiers[0].Input = 9
+
+	assert.Equal(t, fullModel(), full, "the result has its own copy of each slice")
+}
+
+func TestFillModel_Prices(t *testing.T) {
+	m := ai.Model{ID: "m", Pricing: ai.Pricing{Output: 2}}
+	d := ai.Model{Pricing: ai.Pricing{Input: 1, Output: 5, CacheRead: 0.1}}
+
+	got := catalog.FillModel(m, d)
+
+	assert.Equal(t, ai.Pricing{Output: 2}, got.Pricing, "a model with a price keeps all of its prices")
 }

@@ -19,8 +19,8 @@
 //     [Host.Events], or picks a mode that asks for no call.
 //   - Call Close on the host when it is done. Close stops the process of
 //     each CLI agent.
-//   - Do not call Close from a hook. Close waits for the run, and the run
-//     waits for its hooks.
+//   - Do not call Close from a tool or from a [RulesReader]. Close waits
+//     for the run, and the run waits for them.
 //
 // The reasons are in docs/concepts/host/host.md.
 package host

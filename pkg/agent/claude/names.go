@@ -61,12 +61,12 @@ func builtinTools(names []string) []string {
 }
 
 // cliTools returns the gopi name of each tool of all that names keeps
-// and that Claude Code has, then tool_search, for [OnlyTools]. The CLI
+// and that Claude Code has, then tool_search, for --tools. The CLI
 // loads the deferred MCP tools with ToolSearch, so it is always on. A
 // well-known tool that Claude Code does not have, such as apply_patch,
 // is skipped, and so is a tool of the caller, because the CLI cannot
-// run its code. One list then serves each driver. A tool of the caller
-// that names keeps fails with [tool.ErrUnknownTool]. A [tool.Named]
+// run its code. A tool of the caller that names keeps fails with
+// [tool.ErrUnknownTool]. A [tool.Named]
 // tool that the registry does not hold, such as DesignSync, keeps its
 // name, because it names a tool of the CLI.
 func cliTools(all []tool.Tool, names []string) ([]string, error) {
@@ -98,23 +98,6 @@ func cliTools(all []tool.Tool, names []string) ([]string, error) {
 	}
 	add(tool.ToolSearch)
 	return out, nil
-}
-
-// limitTools returns the names of names that the names of limit keep,
-// and tool_search, because the CLI loads the deferred MCP tools with
-// it. A nil limit keeps each name.
-func limitTools(names, limit []string) []string {
-	if limit == nil {
-		return names
-	}
-	keep := tool.ListNames(limit)
-	var out []string
-	for _, n := range names {
-		if n == tool.ToolSearch || slices.Contains(keep, n) {
-			out = append(out, n)
-		}
-	}
-	return out
 }
 
 // Tools returns a [tool.Named] tool for each well-known tool that Claude

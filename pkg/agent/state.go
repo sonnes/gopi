@@ -74,6 +74,28 @@ type State struct {
 	loaded []string
 }
 
+// NewState returns the state of an agent over l with no run: the
+// messages of l with the ID of each entry, the edits of each
+// compaction, and l as [State.Log]. It has no queues, so [State.Steer]
+// does nothing. [New], [Durable], and each CLI agent build their state
+// with it, so a state that a run changes keeps the IDs that an edit
+// names.
+func NewState(l *session.Log) State {
+	h := l.History()
+	s := State{
+		messages:    make([]ai.Message, 0, len(h.Entries)),
+		ids:         make([]string, 0, len(h.Entries)),
+		edits:       h.Edits,
+		compactedAt: h.CompactedAt,
+		log:         l.Writer(),
+	}
+	for _, e := range h.Entries {
+		s.messages = append(s.messages, e.Message)
+		s.ids = append(s.ids, e.ID)
+	}
+	return s
+}
+
 // Apply changes the state by one event. Each event type makes one
 // change:
 //
@@ -265,14 +287,6 @@ func (s State) FollowUp(entries ...session.Entry) {
 // also if the run fails after it. The log is not part of the JSON, so
 // a state that a viewer decoded returns nil.
 func (s State) Log() session.Writer { return s.log }
-
-// WithLog returns a copy of s with w as its log. A CLI agent keeps its
-// state outside the loop of [Agent], so it gives its log to each copy
-// with WithLog. Then a hook reads the session as it does on [Agent].
-func (s State) WithLog(w session.Writer) State {
-	s.log = w
-	return s
-}
 
 // Tools returns the tools that the model can call after
 // [State.Messages]: the tools of the base, then the changes of the

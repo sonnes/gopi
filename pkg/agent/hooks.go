@@ -12,13 +12,16 @@ import (
 // Hook changes the loop at the points that it implements. Each point
 // is its own interface: [BeforeCallHook], [AfterCallHook],
 // [BeforeToolHook], [AfterToolHook], [AfterTurnHook], and
-// [BeforeStopHook]. A hook embeds [BaseHook] and implements the points
-// that it needs. Each point gets a copy of the [State] and returns the
-// value that the loop uses.
+// [BeforeStopHook]. [BeforeTool] and the other constructors of one
+// point return a hook from a function. A hook at more than one point
+// embeds [BaseHook] and implements the points that it needs. Each point
+// gets a copy of the [State] and returns the value that the loop uses.
 //
 // A point is an interface, so the code that runs a hook can see the
 // points that the hook uses. A driver of an agent that cannot call a
-// point rejects a hook that implements it.
+// point rejects a hook that implements it. [New], [Durable], and each
+// driver reject a hook that implements no point, because such a hook
+// has a misspelled method.
 //
 // The loop calls each point of each hook, in the order of
 // registration. A point gets the value that the hook before it
@@ -104,13 +107,13 @@ func (h beforeCall) BeforeCall(ctx context.Context, s State, r Request) (Request
 	return h.fn(ctx, s, r)
 }
 
-// BeforeCall adds a hook that runs before each model call. The state is
+// BeforeCall returns a hook that runs before each model call. The state is
 // the state before the call, and its turn is the turn of the call. The
 // agent sends the request that the last hook returns. The state and
 // the log do not change, and no event is sent. If a hook returns an
 // error, the run fails before the model call.
-func BeforeCall(fn BeforeCallFunc) Option {
-	return Hooks(beforeCall{fn: fn})
+func BeforeCall(fn BeforeCallFunc) Hook {
+	return beforeCall{fn: fn}
 }
 
 // AfterCallFunc changes the message of one model call. See [AfterCall].
@@ -135,7 +138,7 @@ func (h afterCall) AfterCall(
 	return h.fn(ctx, s, r, m)
 }
 
-// AfterCall adds a hook that runs after each model call that ends
+// AfterCall returns a hook that runs after each model call that ends
 // without an error. The request is the request that the model read.
 // The message is the final message of the model. The hook runs before
 // message_end, so message_end and the log have the message that the
@@ -147,8 +150,8 @@ func (h afterCall) AfterCall(
 //
 // If a hook returns an error, the run fails, the hooks after it do not
 // run, and the log does not keep the message.
-func AfterCall(fn AfterCallFunc) Option {
-	return Hooks(afterCall{fn: fn})
+func AfterCall(fn AfterCallFunc) Hook {
+	return afterCall{fn: fn}
 }
 
 // BeforeToolFunc changes or blocks one tool call. See [BeforeTool].
@@ -163,12 +166,12 @@ func (h beforeTool) BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.
 	return h.fn(ctx, s, c)
 }
 
-// BeforeTool adds a hook that runs before each tool call. The state
+// BeforeTool returns a hook that runs before each tool call. The state
 // holds the assistant message of the call, and the results of the calls
 // before it if the calls run in order. The agent runs the call that the
 // last hook returns. If a hook changes the name, the agent finds the
-// tool again. The ID of the call stays, so the
-// result answers the call of the model.
+// tool again. The ID of the call stays, so the result answers the call
+// of the model.
 //
 // The hooks run after the agent finds the tool. A call to an unknown
 // tool gets its error result, and no hook runs.
@@ -181,10 +184,10 @@ func (h beforeTool) BeforeTool(ctx context.Context, s State, c ai.ToolCall) (ai.
 // If a hook returns an error, the call does not run, the hooks after
 // it do not run, and the text of the error is the error result. [Deny]
 // gives a reason to the block. [Ask] asks the function of [Approve]
-// instead. If the person allows the call, the hooks after it run. If ctx is done, the run fails, and no
-// hook runs for the calls after it.
-func BeforeTool(fn BeforeToolFunc) Option {
-	return Hooks(beforeTool{fn: fn})
+// instead, as [RunBeforeTool] says. If ctx is done, the run fails, and
+// no hook runs for the calls after it.
+func BeforeTool(fn BeforeToolFunc) Hook {
+	return beforeTool{fn: fn}
 }
 
 // AfterToolFunc changes the result of one tool call. See [AfterTool].
@@ -209,7 +212,7 @@ func (h afterTool) AfterTool(
 	return h.fn(ctx, s, c, r)
 }
 
-// AfterTool adds a hook that runs after each tool call, before
+// AfterTool returns a hook that runs after each tool call, before
 // tool_execution_end, so the event has the final result. The call is
 // the call that ran, with the changes of the BeforeTool hooks.
 // [State.Pending] still holds the call as the model sent it. The agent
@@ -222,8 +225,8 @@ func (h afterTool) AfterTool(
 // If a hook returns an error, the result is an error result with the
 // text of the error, and the hooks after it do not run. If ctx is done,
 // the run fails.
-func AfterTool(fn AfterToolFunc) Option {
-	return Hooks(afterTool{fn: fn})
+func AfterTool(fn AfterToolFunc) Hook {
+	return afterTool{fn: fn}
 }
 
 // AfterTurnFunc reads a finished turn and returns entries to add.
@@ -239,7 +242,7 @@ func (h afterTurn) AfterTurn(ctx context.Context, s State) ([]session.Entry, err
 	return h.fn(ctx, s)
 }
 
-// AfterTurn adds a hook that runs after each turn, after turn_end.
+// AfterTurn returns a hook that runs after each turn, after turn_end.
 //
 // After each hook, the agent stores the entries of the hook in the
 // log. Each message entry gets message_start and message_end, and the
@@ -250,8 +253,8 @@ func (h afterTurn) AfterTurn(ctx context.Context, s State) ([]session.Entry, err
 // reads them. If not, the next run reads them, except an ephemeral
 // entry. If a hook returns an
 // error, the run fails.
-func AfterTurn(fn AfterTurnFunc) Option {
-	return Hooks(afterTurn{fn: fn})
+func AfterTurn(fn AfterTurnFunc) Hook {
+	return afterTurn{fn: fn}
 }
 
 // BeforeStopFunc continues a run that would stop. See [BeforeStop].
@@ -266,15 +269,15 @@ func (h beforeStop) BeforeStop(ctx context.Context, s State) ([]session.Entry, e
 	return h.fn(ctx, s)
 }
 
-// BeforeStop adds a hook that runs when the run would stop: the turn
+// BeforeStop returns a hook that runs when the run would stop: the turn
 // made no tool calls, and the queues are empty. The first hook that
 // returns entries wins, and the hooks after it do not run.
 //
 // The agent starts the next turn, and stores the entries after its
 // turn_start, as AfterTurn does. If no hook returns entries, the run
 // stops. If a hook returns an error, the run fails.
-func BeforeStop(fn BeforeStopFunc) Option {
-	return Hooks(beforeStop{fn: fn})
+func BeforeStop(fn BeforeStopFunc) Hook {
+	return beforeStop{fn: fn}
 }
 
 // DenyError blocks a tool call. A [BeforeToolFunc] returns one through
@@ -300,12 +303,9 @@ func Deny(reason string) error {
 }
 
 // AskError asks a person about a tool call before it runs. A
-// [BeforeToolFunc] returns one through [Ask]. The driver of the agent
-// gives the call to its approve function, as [AnswerAsk] does. The
-// Claude Code agent gives the call to the permission prompt of the
-// CLI instead, and the prompt reaches the approve function. A hook does
-// not wait for a person, because the CLI can stop a hook that runs
-// long, and then run the call.
+// [BeforeToolFunc] returns one through [Ask]. Each agent gives the
+// call to its approve function before the call runs, as
+// [RunBeforeTool] does.
 type AskError struct {
 	// Reason tells the person why the call asks. If it is empty, the
 	// text is "the tool call needs a person".
@@ -326,17 +326,46 @@ func Ask(reason string) error {
 	return &AskError{Reason: reason}
 }
 
-// AnswerAsk answers the error err of a BeforeTool hook on the call c.
-// If err is an [AskError], AnswerAsk asks approve and returns the call
-// that runs: c, or c with the input of the decision. A denied call gives
-// a [DenyError] with the message of the decision. A nil approve, or an
-// error of approve, also blocks the call. Each other err comes back as
-// it is.
-func AnswerAsk(ctx context.Context, approve ApproveFunc, c ai.ToolCall, err error) (ai.ToolCall, error) {
-	var ask *AskError
-	if !errors.As(err, &ask) {
-		return c, err
+// RunBeforeTool runs the BeforeTool point of each hook on c, in order.
+// Each hook gets a new state from state, and the call that the hook
+// before it returned. RunBeforeTool returns the call that runs. The
+// loop and each agent CLI run the BeforeTool hooks with it.
+//
+// If a hook returns an [AskError], RunBeforeTool asks approve with the
+// call and the reason of the error. If the person allows the call, the
+// call takes the input of the decision, and the next hook runs. A
+// denied call gives a [DenyError] with the message of the decision. A
+// nil approve also denies the call.
+//
+// On an error, the hooks after it do not run. RunBeforeTool then
+// returns the call that the failed hook got, and the error.
+func RunBeforeTool(
+	ctx context.Context,
+	hooks []Hook,
+	state func() State,
+	approve ApproveFunc,
+	c ai.ToolCall,
+) (ai.ToolCall, error) {
+	for _, h := range hooks {
+		bt, ok := h.(BeforeToolHook)
+		if !ok {
+			continue
+		}
+		next, err := bt.BeforeTool(ctx, state(), c)
+		if ask, ok := errors.AsType[*AskError](err); ok {
+			next, err = answerAsk(ctx, approve, c, ask)
+		}
+		if err != nil {
+			return c, err
+		}
+		c = next
 	}
+	return c, nil
+}
+
+// answerAsk asks approve about the call c, which ask asks about. It
+// returns c with the input of the decision, or the error that blocks c.
+func answerAsk(ctx context.Context, approve ApproveFunc, c ai.ToolCall, ask *AskError) (ai.ToolCall, error) {
 	if approve == nil {
 		reason := fmt.Sprintf("the tool call %q needs a person, and the agent has no approve function", c.Name)
 		return c, Deny(reason)
@@ -360,4 +389,51 @@ func AnswerAsk(ctx context.Context, approve ApproveFunc, c ai.ToolCall, err erro
 		c.Input = d.Input
 	}
 	return c, nil
+}
+
+// RunAfterTool runs the AfterTool point of each hook on the result r of
+// the call c, in order. Each hook gets a new state from state, and the
+// result that the hook before it returned. RunAfterTool returns the last
+// result. If a hook returns an error, the hooks after it do not run,
+// and RunAfterTool returns the error.
+func RunAfterTool(
+	ctx context.Context,
+	hooks []Hook,
+	state func() State,
+	c ai.ToolCall,
+	r ai.ToolResult,
+) (ai.ToolResult, error) {
+	for _, h := range hooks {
+		at, ok := h.(AfterToolHook)
+		if !ok {
+			continue
+		}
+		next, err := at.AfterTool(ctx, state(), c, r)
+		if err != nil {
+			return r, err
+		}
+		r = next
+	}
+	return r, nil
+}
+
+// RunBeforeStop runs the BeforeStop point of each hook, in order, until
+// a hook returns entries. It returns the entries of that hook, or nil if
+// the run stops. Each hook gets a new state from state. If a hook
+// returns an error, the hooks after it do not run.
+func RunBeforeStop(ctx context.Context, hooks []Hook, state func() State) ([]session.Entry, error) {
+	for _, h := range hooks {
+		bs, ok := h.(BeforeStopHook)
+		if !ok {
+			continue
+		}
+		entries, err := bs.BeforeStop(ctx, state())
+		if err != nil {
+			return nil, err
+		}
+		if len(entries) > 0 {
+			return entries, nil
+		}
+	}
+	return nil, nil
 }

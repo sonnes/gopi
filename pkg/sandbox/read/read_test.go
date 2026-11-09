@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/tooltest"
 )
 
@@ -31,9 +32,9 @@ func TestReadText(t *testing.T) {
 	tooltest.WriteFiles(t, dir, map[string]string{
 		"three.txt": "one\ntwo\nthree\n",
 		"empty.txt": "",
-		"long.txt":  numbered(1, maxLines+10) + "\n",
+		"long.txt":  numbered(1, output.MaxLines+10) + "\n",
 		"wide.txt":  wide,
-		"huge.txt":  strings.Repeat("x", maxBytes+1) + "\nshort\n",
+		"huge.txt":  strings.Repeat("x", output.MaxBytes+1) + "\nshort\n",
 		"program":   "\x7fELF\x00\x01",
 		"sub/f.txt": "nested",
 	})
@@ -83,7 +84,7 @@ func TestReadText(t *testing.T) {
 		{
 			name:  "line limit",
 			input: map[string]any{"path": "long.txt"},
-			want:  numbered(1, maxLines) + "\n\n[Showing lines 1-2000 of 2010. Use offset=2001 to continue.]",
+			want:  numbered(1, output.MaxLines) + "\n\n[Showing lines 1-2000 of 2010. Use offset=2001 to continue.]",
 		},
 		{
 			name:  "line limit from an offset",

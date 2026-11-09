@@ -328,7 +328,7 @@ func TestBuildParams_SystemReminders(t *testing.T) {
 			},
 		},
 		{
-			name: "after the tool results",
+			name: "in a user message after the tool results",
 			messages: []ai.Message{
 				ai.UserMessage("Hi"),
 				ai.AssistantMessage(call),
@@ -349,8 +349,8 @@ func TestBuildParams_SystemReminders(t *testing.T) {
 						"tool_use_id": "c1",
 						"content":     []any{text("sunny")},
 					},
-					reminder,
 				}},
+				map[string]any{"role": "user", "content": []any{reminder}},
 			},
 		},
 		{
@@ -927,6 +927,8 @@ func TestFeaturesOf(t *testing.T) {
 		want features
 	}{
 		{id: "claude-opus-5-5", want: claude5},
+		{id: "claude-opus-5-6", want: claude5},
+		{id: "claude-sonnet-5-5-20261101", want: claude5},
 		{id: "claude-sonnet-5", want: features{noTemperature: true}},
 		{id: "anthropic/claude-opus-5.5", want: features{systemMessages: true, effort: true, noTemperature: true}},
 		{id: "anthropic/claude-sonnet-5", want: features{noTemperature: true}},
@@ -1009,6 +1011,35 @@ func TestBuildParams_OrphanToolCalls(t *testing.T) {
 				got = append(got, results)
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestBuildParams_BadToolSchema(t *testing.T) {
+	bad := ai.ToolInfo{
+		Name:        "bad",
+		InputSchema: &jsonschema.Schema{Type: "object", Types: []string{"object"}},
+	}
+	tests := []struct {
+		name     string
+		messages []ai.Message
+		opts     ai.Options
+	}{
+		{name: "a first tool", opts: ai.Tools([]ai.ToolInfo{bad})},
+		{
+			name: "an added tool",
+			messages: []ai.Message{
+				ai.UserMessage("Hi"),
+				ai.SystemMessage(ai.ToolAdded{Tool: bad}),
+			},
+			opts: ai.Tools([]ai.ToolInfo{{Name: "first"}}),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := buildRequest(testModel, tt.messages, tt.opts)
+			require.ErrorContains(t, err, `tool "bad"`)
 		})
 	}
 }

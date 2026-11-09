@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -211,12 +210,9 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 	if err != nil {
 		return nil, agent.State{}, fmt.Errorf("host: session %s: %w", s.id, err)
 	}
-	config, ok, err := configValue.Read(snap)
-	if err == nil && !ok {
-		err = fmt.Errorf("no config: %w", ErrInvalid)
-	}
+	config, err := s.storedConfig(configValue.Read(snap))
 	if err != nil {
-		return nil, agent.State{}, fmt.Errorf("host: session %s: %w", s.id, err)
+		return nil, agent.State{}, err
 	}
 	d, model, err := h.cat.Driver(config.Model)
 	if err != nil {
@@ -224,16 +220,12 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 	}
 
 	s.mu.Lock()
-	s.rules = permission.Rules{
-		Allow: config.Allow,
-		Ask:   config.Ask,
-		Deny:  config.Deny,
-	}
+	s.rules = config.rules()
 	s.dir = config.Dir
 	s.mu.Unlock()
-	hooks := h.hooks
+	var hooks []agent.Hook
 	if h.needsRulesHook(config) {
-		hooks = append([]agent.Hook{rulesHook{s: s}}, h.hooks...)
+		hooks = []agent.Hook{rulesHook(s)}
 	}
 
 	// The driver gets the snapshot, so it does not read the log a second
@@ -247,10 +239,9 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Mode:      config.Mode,
 		Dir:       config.Dir,
 		AddDirs:   config.AddDirs,
-		Sections:  sectionsOf(config, s.id, h.sections),
-		Skillset:  h.skillset,
+		Sections:  h.sectionsOf(config, s.id),
+		Defs:      h.configDefs(config),
 		Skills:    config.Skills,
-		Dirs:      config.Dirs,
 		Effort:    config.Effort,
 		ToolNames: config.ToolNames,
 		Deny:      config.Deny,
@@ -270,7 +261,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 	state, err := viewerState(runner.State())
 	if err != nil {
 		err = fmt.Errorf("host: session %s: copy the state of the agent: %w", s.id, err)
-		return nil, agent.State{}, errors.Join(err, closeRunner(runner))
+		return nil, agent.State{}, errors.Join(err, runner.Close())
 	}
 	return runner, state, nil
 }
@@ -311,7 +302,7 @@ func (s *hosted) stop() error {
 	s.mu.Unlock()
 	var err error
 	if runner != nil {
-		err = closeRunner(runner)
+		err = runner.Close()
 	}
 	// No child outlives the agent that runs it.
 	s.host.endChildren(s.id, StopRestarted, true)
@@ -370,7 +361,7 @@ func (s *hosted) release() error {
 	s.stopIdleLocked()
 	s.mu.Unlock()
 
-	if err := closeRunner(runner); err != nil {
+	if err := runner.Close(); err != nil {
 		return fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
 	}
 	return nil
@@ -436,7 +427,7 @@ func (s *hosted) freshRunner(ctx context.Context) (agent.Runner, error) {
 	// A session with no agent, such as one that a release stopped,
 	// starts it here.
 	if old != nil {
-		if err := closeRunner(old); err != nil {
+		if err := old.Close(); err != nil {
 			return nil, fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
 		}
 	}
@@ -466,13 +457,4 @@ func (s *hosted) woke() {
 		return
 	}
 	s.startRunLocked(nil)
-}
-
-// closeRunner stops the process of an agent that has one.
-func closeRunner(r agent.Runner) error {
-	c, ok := r.(io.Closer)
-	if !ok {
-		return nil
-	}
-	return c.Close()
 }

@@ -19,28 +19,33 @@ const (
 	agentsDir   = "agents"
 )
 
-// writeDefs writes the skills and the agents of d for the CLI, and
-// returns the merged set and the folder for --add-dir. It writes a copy
-// of each agent file, because the CLI does not load an agent file that
-// is a symbolic link. The tool names of a file become Claude Code
+// writeDefs loads src and writes its skills and agents in folder f for
+// the CLI. It returns the set and the folder for --add-dir. It writes a
+// copy of each agent file, because the CLI does not load an agent file
+// that is a symbolic link. The tool names of a file become Claude Code
 // names. The folder is "" if there is nothing to write.
-func writeDefs(ctx context.Context, d *clidefs.Defs) (def.Set, string, error) {
-	if d == nil {
+func writeDefs(ctx context.Context, src def.Source, f *clidefs.Folder) (def.Set, string, error) {
+	if f == nil {
 		return def.Set{}, "", nil
 	}
-	set, folder, err := d.Prepare(ctx)
+	set, err := clidefs.Load(ctx, src)
+	if err != nil {
+		return def.Set{}, "", err
+	}
+	folder, err := f.Prepare(set)
 	if err != nil || folder == "" {
 		return set, "", err
 	}
+	names := set.SkillNames()
 
 	for i := range set.Skills {
 		s := &set.Skills[i]
-		s.Model = d.Model(s.Model)
+		s.Model = f.Model(s.Model)
 		s.AllowedTools = claudeRules(s.AllowedTools)
 	}
 	for i := range set.Agents {
 		a := &set.Agents[i]
-		a.Model = d.Model(a.Model)
+		a.Model = f.Model(a.Model)
 		if a.Tools != nil {
 			a.Tools = claudeRules(a.Tools)
 		}
@@ -53,7 +58,7 @@ func writeDefs(ctx context.Context, d *clidefs.Defs) (def.Set, string, error) {
 
 	settings := filepath.Join(folder, settingsDir)
 	skills := filepath.Join(settings, skillsDir)
-	if err := storefs.WriteSkills(skills, set.Skills, set.Names); err != nil {
+	if err := storefs.WriteSkills(skills, set.Skills, names); err != nil {
 		return def.Set{}, "", err
 	}
 	agents := filepath.Join(settings, agentsDir)

@@ -77,8 +77,7 @@ a, err := agent.Durable(ctx, lm, "user-42", agent.Store(store), agent.Toolset(we
 | `System(fn)`        | The [sections](sections.mdx) of the prompt, built before each model call | The sections of the log |
 | `MaxTokens(n)`      | The maximum output tokens of every model call                   | The model decides |
 | `Thinking(level)`   | The thinking level of every model call                          | The model decides |
-| `Hooks(hs...)`      | [Hooks](hooks.mdx) that change the loop                         | None |
-| `BeforeCall(fn)` and the other points | One hook at one point of the loop             | None |
+| `Hooks(hs...)`      | [Hooks](hooks.mdx) that change the loop, such as `BeforeTool(fn)` | None |
 | `OnClose(fn)`       | A function that `Close` runs once, to release what the tools hold | None |
 
 ## Run

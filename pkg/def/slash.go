@@ -34,12 +34,11 @@ func (s Set) Slash(text string) (name, rest string, ok bool) {
 	if next, _ := utf8.DecodeRuneInString(rest); rest != "" && !unicode.IsSpace(next) {
 		return "", "", false
 	}
-	for i, skill := range s.Skills {
-		if typed == s.Names[i] || typed == skill.QualifiedName() {
-			return s.Names[i], rest, true
-		}
+	i := s.skillIndex(typed)
+	if i < 0 {
+		return "", "", false
 	}
-	return "", "", false
+	return s.SkillNames()[i], rest, true
 }
 
 // slashNameRune reports whether r can be in the name of a call of a

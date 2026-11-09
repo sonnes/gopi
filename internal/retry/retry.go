@@ -1,6 +1,8 @@
-// Package retry sends a provider request again after an error that can
-// pass, such as a rate limit or an overload. Every provider uses it, so
-// they share one policy.
+// Package retry is the one path of each request of a provider. [Call]
+// sends the request again after an error that can pass, such as a rate
+// limit or an overload. It marks a refused size with
+// [ai.ErrContextExceeded], and it starts the error with the name of the
+// provider. Every provider uses it, so they share one policy.
 //
 // A caller must obey these rules:
 //
@@ -25,9 +27,9 @@ import (
 )
 
 const (
-	// DefaultMaxDelay is the longest wait that a server can ask for
+	// defaultMaxDelay is the longest wait that a server can ask for
 	// when [ai.MaxRetryDelay] is unset.
-	DefaultMaxDelay = 60 * time.Second
+	defaultMaxDelay = 60 * time.Second
 	// firstBackoff is the wait before the first retry when the server
 	// asks for no wait. Each retry doubles it.
 	firstBackoff = 500 * time.Millisecond
@@ -38,22 +40,22 @@ const (
 	backoffJitter = 0.25
 )
 
-// Policy is how a call retries a request that fails.
-type Policy struct {
-	// MaxRetries is how many times [Do] sends the request again. If
-	// [ai.MaxRetries] is unset, [PolicyOf] sets it to zero, so the call
+// retryPolicy is how a call retries a request that fails.
+type retryPolicy struct {
+	// MaxRetries is how many times [do] sends the request again. If
+	// [ai.MaxRetries] is unset, [policyOf] sets it to zero, so the call
 	// does not retry.
 	MaxRetries int
 	// MaxDelay caps the wait that a server can ask for. Zero removes
-	// the cap. If [ai.MaxRetryDelay] is unset, [PolicyOf] sets it to
-	// [DefaultMaxDelay].
+	// the cap. If [ai.MaxRetryDelay] is unset, [policyOf] sets it to
+	// [defaultMaxDelay].
 	MaxDelay time.Duration
 }
 
-// PolicyOf reads [ai.MaxRetries] and [ai.MaxRetryDelay]. With no
+// policyOf reads [ai.MaxRetries] and [ai.MaxRetryDelay]. With no
 // options, a call does not retry.
-func PolicyOf(opts ai.Options) Policy {
-	policy := Policy{MaxDelay: DefaultMaxDelay}
+func policyOf(opts ai.Options) retryPolicy {
+	policy := retryPolicy{MaxDelay: defaultMaxDelay}
 	if n, ok := ai.GetOption(opts, ai.MaxRetries); ok {
 		policy.MaxRetries = n
 	}
@@ -69,16 +71,35 @@ type Status struct {
 	Header http.Header
 }
 
-// Do calls send until it returns no error, an error that cannot pass,
-// or the policy has no retries left. status reads the [Status] from an
-// error of the SDK. It returns false for an error with no response,
-// such as a dropped connection, which can pass.
+// Call sends a request of the provider name with the retry policy of
+// opts. status reads the [Status] from an error of the SDK. It returns
+// false for an error with no response, such as a dropped connection,
+// which can pass.
 //
-// Do returns the last error of send as it is. If the server asks for a
-// wait over the cap, Do returns an error that wraps it.
-func Do[T any](
+// The error starts with name. If the API refused the size of the
+// request, the error wraps [ai.ErrContextExceeded].
+func Call[T any](
 	ctx context.Context,
-	policy Policy,
+	opts ai.Options,
+	name string,
+	status func(error) (Status, bool),
+	send func() (T, error),
+) (T, error) {
+	out, err := do(ctx, policyOf(opts), send, status)
+	if err != nil {
+		err = markContextExceeded(err, status)
+		return out, fmt.Errorf("%s: %w", name, err)
+	}
+	return out, nil
+}
+
+// do calls send until it returns no error, an error that cannot pass,
+// or the policy has no retries left. It returns the last error of send
+// as it is. If the server asks for a wait over the cap, the error wraps
+// the last error.
+func do[T any](
+	ctx context.Context,
+	policy retryPolicy,
 	send func() (T, error),
 	status func(error) (Status, bool),
 ) (T, error) {
@@ -110,7 +131,7 @@ func Do[T any](
 // wait returns the time to wait before the retry after err. The server
 // can ask for a wait. If it asks for more than the cap, wait returns an
 // error, because a long wait looks like a hung call.
-func (policy Policy) wait(st Status, attempt int, err error) (time.Duration, error) {
+func (policy retryPolicy) wait(st Status, attempt int, err error) (time.Duration, error) {
 	asked := serverDelay(st.Header)
 	overCap := policy.MaxDelay > 0 && asked > policy.MaxDelay
 	if overCap {
@@ -195,10 +216,10 @@ var contextExceededTexts = []string{
 	"prompt is too long",
 }
 
-// MarkContextExceeded wraps err with [ai.ErrContextExceeded] if the API
+// markContextExceeded wraps err with [ai.ErrContextExceeded] if the API
 // refused the size of the request: status 413, or status 400 with the
 // words of a refused size. Another error stays as it is.
-func MarkContextExceeded(err error, status func(error) (Status, bool)) error {
+func markContextExceeded(err error, status func(error) (Status, bool)) error {
 	if err == nil {
 		return nil
 	}

@@ -42,7 +42,7 @@ Use it for a product that runs many sessions, a page where a person approves too
 
 ## Harness
 
-`pkg/harness` turns a repository into an agent. Each part of the agent is an option: the model, the instruction files, skills, subagents, MCP servers, tools, and the permission rules.
+`pkg/harness` turns a repository into an agent. The options of a harness hold the parts that each session shares: the catalog, the instruction files, the skills, the subagents, the tools, and the Allow rules. The config of a session holds its own parts, such as the model, the MCP servers, and the permission mode.
 
 Use it for a coding agent, or for an agent that a team changes through files. Skip it when the code gives the tools and the prompt and reads no files, and use `agent.New`.
 
@@ -68,7 +68,7 @@ Use it for a record of the work that outlives the process, and for app state nex
 
 `pkg/tool` turns a Go function into a tool with a typed input. A middleware wraps each call, and a deferred tool loads only when the model searches for it.
 
-Use it for each function that the model can call. For the tools of an MCP server, give the server to `harness.MCP`.
+Use it for each function that the model can call. For the tools of an MCP server, give the server in the `MCP` field of `agent.Config`.
 
 [Read about tools](tool/index.mdx)
 

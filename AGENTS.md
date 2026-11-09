@@ -24,6 +24,7 @@ If a target that you need does not exist, add it to the `Makefile` first. Then r
 | `make check` | Run `make tidy`, then the linter                                |
 | `make build` | Build the binaries to `.bin/`                                   |
 | `make tidy`  | Run `go mod tidy`                                               |
+| `make modernize` | Apply the fixes of `go fix`. To print them only, set `ARGS=-diff`. |
 | `make fmt`   | Run `gofmt -w` on every Go file                                 |
 | `make record` | Re-record the fixtures of one provider. Set `PKG` and `RUN`. |
 | `make record-cli` | Re-record the trace of one CLI agent. Set `AGENT`. |

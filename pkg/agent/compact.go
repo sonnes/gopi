@@ -228,7 +228,7 @@ func (a *Agent) compact(
 	if err != nil {
 		return compactOutcome{}, err
 	}
-	err = em.commit(ctx, []session.Entry{entry}, EventCompaction{Compaction: data})
+	err = em.commit(ctx, entry, EventCompaction{Compaction: data})
 	if err != nil {
 		return compactOutcome{}, err
 	}

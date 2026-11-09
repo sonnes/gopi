@@ -1,9 +1,6 @@
 package def
 
-import (
-	"context"
-	"io/fs"
-)
+import "io/fs"
 
 // qualifierSep divides the qualifier from the name in
 // [Skill.QualifiedName].
@@ -62,12 +59,6 @@ type Skill struct {
 	// also holds "name" if the frontmatter name is not the folder name.
 	// It is nil if there are no other keys.
 	Extra Extra
-}
-
-// ReadSkills returns s as the one skill of a reader. A Skill is then a
-// skills reader, and a skill in code goes in the list of readers.
-func (s Skill) ReadSkills(context.Context) ([]Skill, error) {
-	return []Skill{s}, nil
 }
 
 // QualifiedName returns the qualifier, a colon, and the name, such as

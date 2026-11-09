@@ -27,6 +27,7 @@ flowchart LR
 
 - The list is the only source of tools. The harness adds no tool of its own, and `host.Open` fails without `host.Tools`, so a host never has no tool by mistake.
 - A subset names tools of the list, and `tool.Select` fails on a name of no tool, because a typo must not remove a tool silently. The host checks the names at `Create` and `Update`, so a bad name makes no session. An MCP name passes, because the MCP servers of a config give their tools outside the list.
+- Each driver keeps `tool_search` with a subset, and a subset does not name it, because the search loads the deferred tools that the subset keeps. The loop adds the search after the pick, and `agent.OnlyTools` lets it run in the hook of a CLI.
 - A Deny rule with no content removes the tool, as in Claude Code. A rule with content keeps the tool and denies the calls that it matches. Codex cannot hide a tool, so its hook denies each call.
 - A driver of a CLI reads only the names. It skips a well-known tool that its CLI does not have, and a tool of the caller, so one list serves each driver. A tool of the caller that the subset names fails, because the CLI cannot run its code.
 - A tool that needs the session is a `harness.Binder`: the skill tool, the agent tool, and each tool of `Sandboxed`. One list then serves sessions with different folders, skills, and subagents.

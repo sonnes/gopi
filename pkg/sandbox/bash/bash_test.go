@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/tooltest"
 )
 
@@ -110,7 +111,7 @@ func TestBashKeepsTheTailOfALongOutput(t *testing.T) {
 			name:     "one long line",
 			command:  "head -c 60000 /dev/zero | tr '\\0' x",
 			full:     strings.Repeat("x", 60000),
-			wantHead: strings.Repeat("x", maxBytes) + "\n\n[Showing the last 50KB of line 1 (the line is 60000 bytes). Full output: ",
+			wantHead: strings.Repeat("x", output.MaxBytes) + "\n\n[Showing the last 50KB of line 1 (the line is 60000 bytes). Full output: ",
 		},
 	}
 	for _, tt := range tests {

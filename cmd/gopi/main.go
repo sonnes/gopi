@@ -8,7 +8,7 @@
 // gopi reads stdin line by line. Each line is one run of the same
 // conversation. gopi prints each run as a tree of its turns, its text,
 // and its tool calls. With --json, gopi prints each event as one line
-// of JSON instead. During a run, an interrupt cancels the run.
+// of JSON instead. During a run, an interrupt stops the run.
 //
 // The agent has the tools of gopi on a local sandbox in the root
 // folder. By default, the sandbox has the fence.Workspace policy: a
@@ -16,12 +16,16 @@
 // folder, and it has no network. The file tools obey the same rules.
 // ask_user_question asks on the terminal.
 //
-// gopi builds the agent with package harness. It reads the CLAUDE.md
-// and AGENTS.md files, the skills, and the subagents of each --dir
-// folder, lowest first. Without --dir, it reads ~/.claude,
-// <root>/.claude, and <root>. --agent names an agent file of those
-// folders, which fills the unset flags. Each tool call obeys --permission-mode and the --allow and
-// --deny rules. A call that needs an approval asks on the terminal.
+// gopi runs the agent in a session of package host, and package harness
+// is the driver. The agent gets the CLAUDE.md and AGENTS.md files, the
+// skills, and the subagents of each --dir folder, lowest first. Without
+// --dir, it gets those of ~/.claude, <root>/.claude, and <root>. --agent
+// names an agent file of those folders. The file fills the flags that
+// are unset, and its prompt goes in the system prompt.
+//
+// Each tool call obeys --permission-mode and the --allow and --deny
+// rules. A call that needs an approval asks on the terminal. The answer
+// "always" keeps the rule of the call as a grant of the session.
 //
 // gopi finds the providers from ANTHROPIC_API_KEY, OPENAI_API_KEY,
 // OPENROUTER_API_KEY, and FIREWORKS_API_KEY, with the detectors of
@@ -33,21 +37,26 @@
 // the ChatGPT plan of the account, with no API key. "gopi logout
 // chatgpt" revokes the token and removes it from the file.
 // --model names the model by its spec, such as
-// anthropic/claude-opus-5-5. If --model is unset, gopi uses the first
-// model of the first provider that it finds. If no provider registered
-// the model, gopi asks the provider of the spec for its models once. A
-// bare model ID asks every provider, so two providers can list the ID,
-// and gopi then asks for the full spec.
+// anthropic/claude-opus-5-5. If --model is unset, gopi uses the model
+// of the resumed session, then the model of the agent file, then the
+// first model of the first provider that it finds. If no provider
+// registered the model, gopi asks the provider of the spec for its
+// models once. A bare model ID asks every provider, so two providers
+// can list the ID, and gopi then asks for the full spec.
 //
 // gopi reads the models of each provider from models.json: the path or
 // the URL in $GOPI_MODELS, or $GOPI_HOME/models.json, or
 // ~/.gopi/models.json. Without the file, a spec resolves after gopi asks
 // the provider for its models.
 //
-// With --session-id, gopi keeps the conversation in a JSONL file of
-// that name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The first run
-// creates the session, and each later run with the same ID resumes it.
-// A resumed session keeps its model. --model changes it.
+// With --session-id, gopi keeps the session in a JSONL file of that
+// name in $GOPI_HOME/sessions, or ~/.gopi/sessions. The session keeps
+// the conversation, the config, and the grants. The first run creates
+// the session, and each later run with the same ID resumes it. A
+// resumed session keeps its config. A flag of a later run changes the
+// config, and the rules of --allow and --deny add to the rules of the
+// session. A later run in another root, or with another agent file,
+// fails.
 //
 // "gopi models [provider...]" lists the spec of each model that
 // --model takes, with the models that each provider lists from its API.
@@ -59,14 +68,12 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -74,24 +81,14 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/permission"
-	"github.com/sonnes/gopi/pkg/sandbox"
-	"github.com/sonnes/gopi/pkg/sandbox/bash"
-	"github.com/sonnes/gopi/pkg/sandbox/edit"
-	"github.com/sonnes/gopi/pkg/sandbox/fence"
-	"github.com/sonnes/gopi/pkg/sandbox/find"
-	"github.com/sonnes/gopi/pkg/sandbox/grep"
-	"github.com/sonnes/gopi/pkg/sandbox/read"
-	"github.com/sonnes/gopi/pkg/sandbox/write"
-	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 	"github.com/sonnes/gopi/pkg/tool/askquestion"
-	"github.com/sonnes/gopi/pkg/tool/todowrite"
 )
 
 // prompt asks for the next line on stderr, so that stdout holds only
@@ -102,10 +99,6 @@ const prompt = "> "
 // always sends agent_end with its error, so main exits with no message.
 var errShown = errors.New("the run failed")
 
-// inheritModel is the model of an agent file that keeps the model of
-// the flags.
-const inheritModel = "inherit"
-
 // instructionFiles are the instruction files that gopi reads in each
 // folder, in order: the file of Claude Code, then the file of the other
 // agents.
@@ -115,10 +108,6 @@ var instructionFiles = []string{"CLAUDE.md", "AGENTS.md"}
 // that gopi reads without --dir.
 const claudeDir = ".claude"
 
-// defaultTools names every tool of gopi, in the order that the model
-// gets them.
-const defaultTools = "read_file,write_file,edit_file,bash,grep,find,todo_write,ask_user_question"
-
 // options holds the flags of gopi.
 type options struct {
 	// model is the model spec. Empty means the first model of the
@@ -127,7 +116,9 @@ type options struct {
 	turns int
 	root  string
 	fence bool
-	tools string
+	// tools names the tools of gopi that the agent gets. Nil means each
+	// tool.
+	tools []string
 	// thinking is the thinking level of each model call. Empty means
 	// the default of the model.
 	thinking string
@@ -148,15 +139,6 @@ type options struct {
 	dirs []string
 	// agent names an agent file in the dirs. Empty means no agent file.
 	agent string
-	// system is the base text of the system prompt: the prompt of the
-	// agent file. Empty means no base text.
-	system string
-	// agentModel is the model of the agent file. --model and the model
-	// of a resumed session win over it.
-	agentModel string
-	// skills names the skills that the agent loads at the start: the
-	// skills of the agent file.
-	skills []string
 }
 
 func main() {
@@ -168,7 +150,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "model",
 				Aliases: []string{"m"},
-				Usage:   "the model spec, such as anthropic/claude-opus-5-5 or openrouter/qwen/qwen3-coder, or a model ID that one provider serves. If unset, gopi uses the model of the resumed session, or the first model of the first provider that it finds",
+				Usage:   "the model spec, such as anthropic/claude-opus-5-5 or openrouter/qwen/qwen3-coder, or a model ID that one provider serves. If unset, gopi uses the model of the resumed session, then the model of the agent file, then the first model of the first provider that it finds",
 			},
 			&cli.IntFlag{
 				Name:  "turns",
@@ -186,8 +168,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:  "tools",
-				Value: defaultTools,
-				Usage: "the tools of the agent, with commas. An empty value gives no tool",
+				Usage: "the tools of gopi that the agent gets, with commas, such as read_file,grep. If unset, the agent gets each tool: read_file, write_file, edit_file, bash, grep, find, todo_write, and ask_user_question. An empty value gives none of them. The skill tool, the agent tool, and the MCP tools stay",
 			},
 			&cli.StringFlag{
 				Name:  "thinking",
@@ -200,7 +181,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "session-id",
 				Aliases: []string{"s"},
-				Usage:   "keep the conversation in the session with this ID. The first run creates it, and a later run resumes it",
+				Usage:   "keep the conversation, the config, and the grants in the session with this ID. The first run creates it, and a later run resumes it",
 			},
 			&cli.StringFlag{
 				Name:  "permission-mode",
@@ -221,7 +202,7 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:  "agent",
-				Usage: "the name of an agent file in agents/ of the --dir folders. Its model, thinking level, permission mode, prompt, and disallowed tools fill the flags that are unset. gopi reads the file at each start",
+				Usage: "the name of an agent file in agents/ of the --dir folders. Its model, thinking level, permission mode, tools, and disallowed tools fill the flags that are unset when gopi creates the session. gopi reads its prompt before each run",
 			},
 			&cli.StringFlag{
 				Name:  "mcp",
@@ -240,7 +221,6 @@ func main() {
 				turns:     c.Int("turns"),
 				root:      c.String("root"),
 				fence:     c.Bool("fence"),
-				tools:     c.String("tools"),
 				thinking:  c.String("thinking"),
 				json:      c.Bool("json"),
 				mcp:       c.String("mcp"),
@@ -250,6 +230,9 @@ func main() {
 				deny:      c.StringSlice("deny"),
 				dirs:      c.StringSlice("dir"),
 				agent:     c.String("agent"),
+			}
+			if c.IsSet("tools") {
+				opts.tools = toolNames(c.String("tools"))
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
@@ -266,47 +249,27 @@ func main() {
 }
 
 func run(ctx context.Context, o options, args []string) error {
-	dir, err := sessionsDir(os.Getenv)
-	if err != nil {
-		return err
-	}
-	if o.agent != "" {
-		a, err := findAgent(ctx, o)
-		if err != nil {
-			return err
-		}
-		o = withAgent(o, a)
-	}
-	// A resumed session keeps its model unless --model changes it, so
-	// gopi resolves the model that the harness uses.
-	stored, err := storedSpec(ctx, dir, o.sessionID)
-	if err != nil {
-		return err
-	}
-	set := loadModels(ctx, os.Stderr, os.Getenv)
-	cat, spec, err := newCatalog(ctx, modelSpec(o, stored), homeDetectors(set))
+	m, err := newModels(homeDetectors(loadModels(ctx, os.Stderr, os.Getenv)))
 	if err != nil {
 		return err
 	}
 
-	// The prompt loop and ask_user_question read the same input.
+	// The prompt loop, ask_user_question, and the approvals read the
+	// same input. Only the tree marks the calls that it shows.
 	in := readInput(os.Stdin, isTerminal(os.Stdin))
-	shown := &shownCalls{}
+	var shown *shownCalls
+	if !o.json {
+		shown = &shownCalls{}
+	}
 	answers := terminal{
 		w:     os.Stderr,
 		in:    in,
 		shown: shown,
 	}
-	approver := &grants{
-		dir: o.root,
-		ask: answers.Approve,
-	}
-	tools, err := newTools(o.root, o.tools, o.fence, answers)
+	tools, err := newTools(o.tools, answers)
 	if err != nil {
-		return fenceError(err)
+		return err
 	}
-	// The skill tool and the agent tool bind to the skills and the
-	// subagents of the session, so each run gets them.
 	tools = append(tools, harness.SkillTool(), harness.AgentTool())
 	if o.mcp != "" {
 		mcpTools, closeMCP, err := loadMCP(ctx, o.mcp, os.Environ(), os.Stderr)
@@ -317,53 +280,29 @@ func run(ctx context.Context, o options, args []string) error {
 		tools = append(tools, mcpTools...)
 	}
 
-	mode, err := permission.ParseMode(o.mode)
+	h, err := openHost(ctx, o, m, tools)
 	if err != nil {
 		return err
 	}
-	opts := []harness.Option{
-		harness.Catalog(cat),
-		harness.Model(spec),
-		harness.Dir(o.root),
-		harness.Toolset(harness.Tools(tools...)),
-		harness.Mode(mode),
-		harness.Allow(o.allow...),
-		harness.Deny(o.deny...),
-		harness.Approve(approver.Approve),
-		harness.Defs(defReaders(o)...),
-	}
-	if o.system != "" {
-		opts = append(opts, harness.System(o.system))
-	}
-	if len(o.skills) > 0 {
-		opts = append(opts, harness.Preload(o.skills...))
-	}
-	if o.turns > 0 {
-		opts = append(opts, harness.AgentDefaults(maxTurns(o.turns)))
-	}
-	if o.thinking != "" {
-		level, err := ai.ParseThinking(o.thinking)
-		if err != nil {
-			return err
-		}
-		opts = append(opts, harness.AgentDefaults(agent.Thinking(level)))
-	}
-	a, err := newAgent(ctx, opts, spec, o.sessionID, dir)
+	defer h.Close()
+	sess, err := openSession(ctx, h, o, m)
 	if err != nil {
-		return err
+		return fenceError(err)
 	}
+
 	var t printer = jsonLines{w: os.Stdout}
 	if !o.json {
-		tr := newTree(os.Stdout, spec, isTerminal(os.Stdout))
+		tr := newTree(os.Stdout, sess.Model, isTerminal(os.Stdout))
 		tr.shown = shown
 		t = tr
 	}
+	send := func(text string) error {
+		err := runPrompt(ctx, h, sess.ID, t, answers.Approve, m, text)
+		return fenceError(err)
+	}
 
 	if len(args) > 0 {
-		if err := runPrompt(ctx, a, t, strings.Join(args, " ")); err != nil {
-			return errShown
-		}
-		return nil
+		return send(strings.Join(args, " "))
 	}
 
 	fmt.Fprint(os.Stderr, prompt)
@@ -376,107 +315,47 @@ func run(ctx context.Context, o options, args []string) error {
 		if line != "" {
 			// The tree shows the error of a failed run, and the
 			// conversation continues.
-			_ = runPrompt(ctx, a, t, line)
+			err := send(line)
+			if err != nil && !errors.Is(err, errShown) {
+				fmt.Fprintln(os.Stderr, "gopi:", err)
+			}
 		}
 		fmt.Fprint(os.Stderr, prompt)
 	}
 	return nil
 }
 
-// newAgent assembles the agent of gopi with the harness, on the model
-// spec. With a session ID, the agent keeps the conversation in a JSONL
-// file in dir, and a later run with the same ID resumes it. The spec
-// becomes the model of a resumed session. Without a session ID, the
-// conversation ends with gopi.
-func newAgent(
-	ctx context.Context,
-	opts []harness.Option,
-	spec string,
-	sessionID string,
-	dir string,
-) (*agent.Agent, error) {
-	if sessionID == "" {
-		return harness.New(opts...).New(ctx, harness.Model(spec))
+// openHost returns the host of gopi on the catalog of m, with tools and
+// the definitions of [defs]. The harness is the default driver of the
+// catalog. With --session-id, the host keeps the sessions in the
+// sessions folder of the gopi home. Without it, the sessions end with
+// gopi.
+func openHost(ctx context.Context, o options, m models, tools []tool.Tool) (*host.Host, error) {
+	hopts := []harness.Option{harness.Catalog(m.cat)}
+	if o.fence {
+		hopts = append(hopts, harness.Fence())
 	}
-	store, err := storefs.Sessions(dir)
-	if err != nil {
-		return nil, err
+	if o.turns > 0 {
+		hopts = append(hopts, harness.AgentDefaults(agent.Hooks(agent.MaxTurns(o.turns))))
 	}
-	opts = append(slices.Clip(opts), harness.Store(store))
-	// A Model on the call, and not in the options of New, changes the
-	// model of a resumed session.
-	return harness.New(opts...).Durable(ctx, sessionID, harness.Model(spec))
-}
+	m.cat.DefaultDriver(harness.New(hopts...))
 
-// storedSpec returns the model spec that the session id in dir keeps,
-// or an empty string if id is empty or the session does not exist.
-func storedSpec(ctx context.Context, dir, id string) (string, error) {
-	if id == "" {
-		return "", nil
+	opts := []host.Option{
+		host.Tools(tools...),
+		host.Defs(defs(o)),
 	}
-	store, err := storefs.Sessions(dir)
-	if err != nil {
-		return "", err
-	}
-	snap, err := store.Load(ctx, id)
-	if errors.Is(err, session.ErrNotFound) {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	spec, _, err := harness.SessionModel.Read(snap)
-	if err != nil {
-		return "", fmt.Errorf("session %s: %w", id, err)
-	}
-	return spec, nil
-}
-
-// newCatalog returns a catalog of the providers that ds find, and the
-// spec of the model of gopi. If spec is empty, newCatalog uses the first
-// model of the first provider that ds find with models, because the
-// first model of a detector is the default of its provider.
-//
-// If no provider registered the model of spec, newCatalog asks the
-// provider of spec for its models, because a provider such as
-// openrouter registers none. A bare model ID asks every provider.
-func newCatalog(ctx context.Context, spec string, ds []catalog.Detector) (*catalog.Catalog, string, error) {
-	cat := catalog.New()
-	found := cat.Detect(ds...)
-	if len(found) == 0 {
-		return nil, "", fmt.Errorf("no provider: set %s", sources(ds))
-	}
-	if spec == "" {
-		spec = defaultSpec(ds, found)
-	}
-	if spec == "" {
-		return nil, "", fmt.Errorf(
-			"no default model: give a spec with --model, such as %s/<model-id>",
-			found[0].Provider,
-		)
-	}
-	// The harness resolves the spec too, but gopi checks it here, before
-	// it starts the MCP servers.
-	_, err := cat.LanguageModel(spec)
-	var listErrs []error
-	if errors.Is(err, catalog.ErrUnknownModel) {
-		listErrs = fetchModels(ctx, cat, specProvider(spec, found, nil))
-		_, err = cat.LanguageModel(spec)
-	}
-	if err != nil {
-		// A spec of a provider with no credential fails as an unknown
-		// model. The credential is the fix, so the error names it. The
-		// check comes after the resolve, because a bare ID such as
-		// anthropic/claude-sonnet-5.5 can resolve to another provider.
-		if id := specProvider(spec, nil, ds); id != "" {
-			if perr := providerErr(ds, found, id); perr != nil {
-				return nil, "", fmt.Errorf("model %q: %w", spec, perr)
-			}
+	if o.sessionID != "" {
+		dir, err := sessionsDir(os.Getenv)
+		if err != nil {
+			return nil, err
 		}
-		errs := append([]error{withHint(err)}, listErrs...)
-		return nil, "", fmt.Errorf("model %q: %w", spec, errors.Join(errs...))
+		store, err := storefs.Sessions(dir)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, host.Store(store))
 	}
-	return cat, spec, nil
+	return host.Open(ctx, m.cat, opts...)
 }
 
 // specProvider returns the provider of spec if found or ds has it, or
@@ -620,50 +499,19 @@ func setString(c *cli.Command, name string) string {
 	return c.String(name)
 }
 
-// findAgent returns the agent file o.agent of the folders of
-// [defDirs]. A later folder wins.
-func findAgent(ctx context.Context, o options) (def.Agent, error) {
-	dirs := defReaders(o)
-	readers := make([]def.AgentsReader, len(dirs))
-	for i, r := range dirs {
-		readers[i] = r
-	}
-	return def.FindAgent(ctx, o.agent, readers...)
-}
-
-// withAgent fills each unset flag of o from the agent file a. The
-// prompt of a becomes the base text of the system prompt, its
-// disallowed tools go after --deny, and gopi preloads its skills.
-func withAgent(o options, a def.Agent) options {
-	if !strings.EqualFold(a.Model, inheritModel) {
-		o.agentModel = a.Model
-	}
-	o.thinking = cmp.Or(o.thinking, string(a.Effort))
-	o.mode = cmp.Or(o.mode, a.Mode)
-	o.system = a.Prompt
-	o.deny = append(slices.Clip(o.deny), a.Disallowed...)
-	o.skills = a.Skills
-	return o
-}
-
-// modelSpec returns the model of the run: --model, then the model of a
-// resumed session, then the model of the agent file.
-func modelSpec(o options, stored string) string {
-	return cmp.Or(o.model, stored, o.agentModel)
-}
-
-// defReaders returns a reader of each folder of [defDirs].
-func defReaders(o options) []def.Reader {
+// defs returns the definitions of the folders of [defDirs], lowest
+// first.
+func defs(o options) def.Source {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = ""
 	}
 	dirs := defDirs(o, home)
-	readers := make([]def.Reader, len(dirs))
+	sources := make([]def.Source, len(dirs))
 	for i, d := range dirs {
-		readers[i] = storefs.Dir(d, storefs.InstructionFiles(instructionFiles...))
+		sources[i] = storefs.Dir(d, storefs.InstructionFiles(instructionFiles...))
 	}
-	return readers
+	return def.Layers(sources...)
 }
 
 // defDirs returns the folders of the definitions: the --dir flags, or
@@ -680,76 +528,25 @@ func defDirs(o options, home string) []string {
 	return append(dirs, filepath.Join(o.root, claudeDir), o.root)
 }
 
-// newTools returns the tools that names lists, in its order. The
-// sandbox tools share one local sandbox on root. If fenced is true, the
-// sandbox has the [fence.Workspace] policy of root.
-func newTools(root, names string, fenced bool, answers askquestion.Responder) ([]tool.Tool, error) {
-	root, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
-	}
-	var opts []sandbox.Option
-	if fenced {
-		opts = append(opts, sandbox.Policy(fence.Workspace(root)...))
-	}
-	box, err := sandbox.Local(root, opts...)
-	if err != nil {
-		return nil, err
-	}
+// newTools returns the tools of gopi that names keeps, as [tool.Select]
+// reads names: the tools of [harness.Coding], then ask_user_question,
+// which asks with answers. If names is nil, newTools returns each tool.
+func newTools(names []string, answers askquestion.Responder) ([]tool.Tool, error) {
+	all := append(harness.Coding(), askquestion.New(answers))
+	return tool.Select(all, names)
+}
 
-	all := map[string]tool.Tool{
-		read.Name:        read.New(box),
-		write.Name:       write.New(box),
-		edit.Name:        edit.New(box),
-		bash.Name:        bash.New(box),
-		grep.Name:        grep.New(box),
-		find.Name:        find.New(box),
-		todowrite.Name:   todowrite.New(),
-		askquestion.Name: askquestion.New(answers),
-	}
-
-	var tools []tool.Tool
-	for n := range strings.SplitSeq(names, ",") {
+// toolNames returns the names of the --tools value s, with commas. An
+// empty value gives an empty list, so the agent gets no tool.
+func toolNames(s string) []string {
+	names := []string{}
+	for n := range strings.SplitSeq(s, ",") {
 		n = strings.TrimSpace(n)
-		if n == "" {
-			continue
+		if n != "" {
+			names = append(names, n)
 		}
-		t, ok := all[n]
-		if !ok {
-			return nil, fmt.Errorf("unknown tool %q: use %s", n, defaultTools)
-		}
-		tools = append(tools, t)
 	}
-	return tools, nil
-}
-
-// runPrompt runs one prompt and prints its events. An interrupt during
-// the run cancels the run. Outside a run, an interrupt stops gopi.
-func runPrompt(ctx context.Context, a *agent.Agent, t printer, prompt string) error {
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
-	defer stop()
-	// After the first interrupt, a second one stops gopi, in case the
-	// cancel of the run waits.
-	context.AfterFunc(ctx, stop)
-
-	for e, err := range a.Run(ctx, session.Text(prompt)).Events() {
-		if err != nil {
-			return err
-		}
-		t.print(e)
-	}
-	return nil
-}
-
-// maxTurns stops a run before the model call of turn n+1. The agent
-// has no limit on the turns of a run, so the limit is a hook.
-func maxTurns(n int) agent.Option {
-	return agent.BeforeCall(func(ctx context.Context, s agent.State, r agent.Request) (agent.Request, error) {
-		if s.Turn() > n {
-			return r, fmt.Errorf("the run used more than %d turns", n)
-		}
-		return r, nil
-	})
+	return names
 }
 
 // isTerminal reports if f is a terminal, so that the tree writes colors

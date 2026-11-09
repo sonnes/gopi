@@ -10,9 +10,10 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
+	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/permission"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -25,22 +26,24 @@ func Hooks(ctx context.Context, model ai.LanguageModel, tools []tool.Tool) *agen
 	// snippet:hooks
 	a := agent.New(model,
 		agent.Toolset(tools...),
-		agent.BeforeTool(func(
-			ctx context.Context, s agent.State, c ai.ToolCall,
-		) (ai.ToolCall, error) {
-			if c.Name == "close_issue" {
-				return c, agent.Deny("ask a maintainer to close issues")
-			}
-			return c, nil
-		}),
-		agent.BeforeStop(func(
-			ctx context.Context, s agent.State,
-		) ([]session.Entry, error) {
-			if posted(s.Messages()) {
-				return nil, nil
-			}
-			return []session.Entry{session.Text("Post the summary.")}, nil
-		}),
+		agent.Hooks(
+			agent.BeforeTool(func(
+				ctx context.Context, s agent.State, c ai.ToolCall,
+			) (ai.ToolCall, error) {
+				if c.Name == "close_issue" {
+					return c, agent.Deny("ask a maintainer to close issues")
+				}
+				return c, nil
+			}),
+			agent.BeforeStop(func(
+				ctx context.Context, s agent.State,
+			) ([]session.Entry, error) {
+				if posted(s.Messages()) {
+					return nil, nil
+				}
+				return []session.Entry{session.Text("Post the summary.")}, nil
+			}),
+		),
 	)
 	// end
 	return a
@@ -59,8 +62,8 @@ func posted(msgs []ai.Message) bool {
 }
 
 // ClaudeCode is the preview of the harness band: a harness with the
-// parts of Claude Code. Each option is one part, so a caller can change
-// one part and keep the others.
+// parts of Claude Code, and the config of one session. Each option is
+// one part, so a caller can change one part and keep the others.
 func ClaudeCode(
 	ctx context.Context,
 	cat *catalog.Catalog,
@@ -70,7 +73,7 @@ func ClaudeCode(
 	deploy tool.Tool,
 	guard agent.BeforeToolFunc,
 	ask agent.ApproveFunc,
-) (*agent.Agent, error) {
+) (agent.Runner, error) {
 	// snippet:harness
 	store, err := storefs.Sessions(filepath.Join(home, ".gopi"))
 	if err != nil {
@@ -80,30 +83,27 @@ func ClaudeCode(
 
 	h := harness.New(
 		harness.Catalog(cat),
-		harness.Model("anthropic/claude-opus-5-5"),
-		harness.Store(store),
-
-		harness.Defs(
+		harness.Defs(def.Layers(
 			storefs.Dir(filepath.Join(home, ".claude"), md),
 			storefs.Dir(filepath.Join(repo, ".claude"), md),
 			storefs.Dir(repo, md),
-		),
-
-		harness.MCP(github),
+		)),
 		harness.Toolset(harness.Tools(deploy)),
-
-		harness.Mode(permission.AcceptEdits),
 		harness.Allow("bash(go test *)"),
-		harness.Deny("bash(git push *)"),
-		harness.Approve(ask),
-
-		harness.AgentDefaults(
-			agent.Thinking(ai.ThinkingHigh),
-			agent.BeforeTool(guard),
-		),
 	)
 
-	a, err := h.Durable(ctx, "fix-login", harness.Dir(repo))
+	a, err := h.Start(ctx, agent.Config{
+		SessionID: "fix-login",
+		Store:     store,
+		Spec:      "anthropic/claude-opus-5-5",
+		Dir:       repo,
+		Effort:    ai.ThinkingHigh,
+		Mode:      permission.AcceptEdits,
+		Deny:      []string{"bash(git push *)"},
+		Approve:   ask,
+		Hooks:     []agent.Hook{agent.BeforeTool(guard)},
+		MCP:       []agent.MCPServer{github},
+	})
 	// end
 	return a, err
 }

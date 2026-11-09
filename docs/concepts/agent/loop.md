@@ -41,7 +41,9 @@ flowchart TD
 - The tool calls of one message run at the same time, so the slowest call sets the time of the turn. If a message calls a sequential tool, every call of the message runs in order.
 - A Go error from a tool or a tool hook, or an unknown tool, becomes an error result, so the model can correct the call. A canceled or expired context stops the run, because the caller asked for it.
 - A finished tool call runs whatever the stop reason, except a refusal. A provider can stop at the output cap after a complete call, and a call that does not run gives the model no result.
-- Each hook point is its own interface, such as `BeforeToolHook`, so a hook at two points is one value, and a driver sees the points that a hook uses. The cost: a misspelled method compiles and never runs.
+- Each hook point is its own interface, such as `BeforeToolHook`, so a hook at two points is one value, and a driver sees the points that a hook uses. A hook with no point fails `New`. The cost: a misspelled method of a hook with another point compiles and never runs.
+- A constructor such as `BeforeTool` returns a `Hook`, so one value goes in `Hooks` and in `Config.Hooks`.
+- `RunBeforeTool`, `RunAfterTool`, and `RunBeforeStop` run the chains that the CLI agents also run. So the order of the hooks and the answer to `agent.Ask` are the same on each driver.
 - The `BeforeTool` hooks run one call at a time, before the calls start. A hook that asks a person to approve a call then asks one question at a time.
 - `BeforeStop` is the one hook that continues a run, so one place decides the stop. The agent has no turn cap, so a run stops early in one way: a `BeforeCall` hook that reads `State.Turn` returns an error.
 

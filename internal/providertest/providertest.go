@@ -1,6 +1,8 @@
 // Package providertest holds the cases that every text provider must
-// pass. A provider package runs them with [Run], and each case records
-// and replays its traffic like the other provider tests.
+// pass, and the replay of the recorded tests of a provider. A provider
+// package runs the recorded cases with [Run], and the cases on a fake
+// API with [RunFake]. A recorded case replays its traffic with [Open],
+// like the other recorded tests of the provider.
 package providertest
 
 import (
@@ -32,10 +34,15 @@ type Suite struct {
 	// ReminderModel takes no system message in the conversation, so it
 	// gets a system-reminder.
 	ReminderModel ai.Model
+	// ObjectModel is the model of the recorded object case.
+	ObjectModel ai.Model
+	// ObjectOptions are the options of the recorded object case.
+	ObjectOptions ai.Options
 }
 
-// Run runs every case as a subtest of t.
+// Run runs every recorded case as a subtest of t.
 func Run(t *testing.T, s Suite) {
+	t.Run("GenerateObject", s.generateObject)
 	t.Run("TwoTurns", s.twoTurns)
 	t.Run("MathToolCall", s.mathToolCall)
 	t.Run("ImageInput", s.imageInput)
@@ -177,6 +184,9 @@ func (s Suite) emptyContent(t *testing.T) {
 	tests := []struct {
 		name     string
 		messages []ai.Message
+		// wantAnswer is set when the API must answer. Else the API can
+		// refuse a conversation that has no text.
+		wantAnswer bool
 	}{
 		{
 			name:     "empty content",
@@ -197,6 +207,7 @@ func (s Suite) emptyContent(t *testing.T) {
 				ai.AssistantMessage(),
 				ai.UserMessage("Please respond this time."),
 			},
+			wantAnswer: true,
 		},
 	}
 
@@ -205,12 +216,41 @@ func (s Suite) emptyContent(t *testing.T) {
 			p := s.New(t)
 
 			msg, err := run(t, p, s.Model, tt.messages)
-			if err != nil {
-				return
+			if tt.wantAnswer {
+				require.NoError(t, err)
 			}
-			assert.NotEmpty(t, msg.Content, "with no error, the model answers")
+			if err == nil {
+				assert.NotEmpty(t, msg.Content, "with no error, the model answers")
+			}
 		})
 	}
+}
+
+type person struct {
+	Name string `json:"name" jsonschema:"The name of the person"`
+	Age  int    `json:"age" jsonschema:"The age of the person"`
+	City string `json:"city" jsonschema:"The city where the person lives"`
+}
+
+func (s Suite) generateObject(t *testing.T) {
+	p := s.New(t)
+	lm := ai.LanguageModel{
+		Model:    s.ObjectModel,
+		Provider: p,
+	}
+
+	res, err := ai.GenerateObject[person](
+		t.Context(),
+		lm,
+		[]ai.Message{ai.UserMessage("Describe Alice, who is 30 and lives in Lisbon.")},
+		s.ObjectOptions,
+	)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Alice", res.Object.Name)
+	assert.Equal(t, 30, res.Object.Age)
+	assert.Equal(t, "Lisbon", res.Object.City)
+	assert.NotZero(t, res.Usage.Output)
 }
 
 func (s Suite) toolResultImage(t *testing.T) {

@@ -32,7 +32,7 @@ func collectCompact(t *testing.T, s *agent.Stream) ([]agent.Event, error) {
 
 func TestCompactStoresTheCompactionAndNotTheCommand(t *testing.T) {
 	claude.Replay(t, nil, "testdata/compact.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 	ctx := context.Background()
 
@@ -79,7 +79,7 @@ func TestCompactStoresTheCompactionAndNotTheCommand(t *testing.T) {
 
 func TestCompactThatFails(t *testing.T) {
 	claude.Replay(t, nil, "testdata/compact_failed.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, err := collectCompact(t, a.Compact(context.Background(), ""))
@@ -98,7 +98,7 @@ func TestCompactThatFails(t *testing.T) {
 func TestAutoCompactGoesToTheCLI(t *testing.T) {
 	args := filepath.Join(t.TempDir(), "args")
 	body := "echo \"$@\" > " + args + "\nexit 1"
-	a := claude.New(claude.Binary(fakeCLI(t, body)), claude.AutoCompact(300000))
+	a := claude.New(agent.Config{AutoCompact: 300000}, claude.Binary(fakeCLI(t, body)))
 	defer a.Close()
 
 	_, _, err := run(context.Background(), a, "Hi")

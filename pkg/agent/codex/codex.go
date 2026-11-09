@@ -1,44 +1,3 @@
-// Package codex runs the OpenAI Codex CLI as a gopi agent. An [Agent]
-// starts `codex app-server` and talks JSON-RPC to it over stdio. The
-// CLI runs its own loop and its own tools. The Agent turns the output
-// into [agent.Event] values with the same order as [agent.Agent], and
-// it writes each message to a [session.Log].
-//
-// A caller must obey these rules:
-//
-//   - Runs on one Agent are sequential. A second Run fails on its
-//     stream.
-//   - A Run needs an entry with text or a file, because a Codex turn
-//     needs input.
-//   - Call [Agent.Close] when the agent is done. Close stops the
-//     process.
-//
-// The Codex thread ID is a value on the log, so a [Durable] agent over
-// a stored session resumes the same thread.
-//
-// The agent declines every approval request from the CLI, unless an
-// [Approve] function answers it. To let the CLI act without a request,
-// set [Policy] to [ApprovalNever] and pick a [Sandbox] mode.
-//
-// The agent sets the permission keys of the CLI with -c flags, so the
-// config.toml of the user does not decide them. The exec policy rules
-// in ~/.codex/rules still apply, because Codex has no key that turns
-// them off. An allow rule there runs a command outside the sandbox.
-//
-// A subagent of the CLI, which a spawn_agent call starts, keeps its
-// messages in a child session. The stream of the run carries its
-// start, its events, and its end. A run waits for each subagent that
-// still runs when the turn completes. If a direct subagent ends after the
-// turn, the run starts a report turn that gives the model its result. A
-// report turn can start more subagents, so the run sends a report turn
-// after each round of late subagents. The wait has no time limit, and a
-// cancel of the run ends it. A run that ends with a subagent that runs, such as a turn that failed,
-// stops the subagent, and the next run starts a new process. Without
-// [Store], the children are unsaved.
-//
-// The reasons are in docs/concepts/agent/cli-agent.md,
-// docs/concepts/agent/cli-request.md, and
-// docs/concepts/agent/subagent.md.
 package codex
 
 import (
@@ -47,20 +6,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
 )
@@ -72,54 +32,43 @@ var conversation = resume.New("codex")
 // defaultBinary is the command that starts the CLI.
 const defaultBinary = "codex"
 
-// ErrNoConversation is the error of a run whose CLI cannot find the
-// stored thread, such as after its rollout was deleted. The agent clears
-// the stored thread ID, so the next run starts a new thread. The log
-// keeps its messages, and the CLI no longer reads them.
-var ErrNoConversation = errors.New("codex: the CLI has no conversation to resume")
+// cliName starts each error of the agent.
+const cliName = "codex"
 
-// ErrAuth is the error of a run whose CLI is not logged in. Run `codex
-// login`, or set an API key in the environment of the CLI.
-var ErrAuth = errors.New("codex: the CLI is not logged in")
-
-// SandboxMode says what the commands of the CLI can touch.
-type SandboxMode string
+// sandboxMode says what the commands of the CLI can touch.
+type sandboxMode string
 
 const (
-	// SandboxReadOnly lets commands read files and nothing more.
-	SandboxReadOnly SandboxMode = "read-only"
-	// SandboxWorkspaceWrite lets commands write in the working
-	// directory.
-	SandboxWorkspaceWrite SandboxMode = "workspace-write"
-	// SandboxDangerFullAccess turns the sandbox off.
-	SandboxDangerFullAccess SandboxMode = "danger-full-access"
+	// sandboxReadOnly lets commands read files and nothing more.
+	sandboxReadOnly sandboxMode = "read-only"
+	// sandboxWorkspaceWrite lets commands write in the working
+	// directory and in the folders of AddDirs.
+	sandboxWorkspaceWrite sandboxMode = "workspace-write"
+	// sandboxDangerFullAccess turns the sandbox off.
+	sandboxDangerFullAccess sandboxMode = "danger-full-access"
 )
 
-// ApprovalPolicy says when the CLI asks for approval before it acts.
-// An [Approve] function answers each request. Without it, the agent
-// declines every request.
-type ApprovalPolicy string
+// approvalPolicy says when the CLI asks for approval before it acts.
+type approvalPolicy string
 
 const (
-	// ApprovalUntrusted asks before a command that is not known to be
+	// approvalUntrusted asks before a command that is not known to be
 	// safe.
-	ApprovalUntrusted ApprovalPolicy = "untrusted"
-	// ApprovalOnRequest lets the model decide when to ask.
-	ApprovalOnRequest ApprovalPolicy = "on-request"
-	// ApprovalNever never asks. It is the default, because the agent
-	// has no user to ask.
-	ApprovalNever ApprovalPolicy = "never"
+	approvalUntrusted approvalPolicy = "untrusted"
+	// approvalOnRequest lets the model decide when to ask.
+	approvalOnRequest approvalPolicy = "on-request"
+	// approvalNever never asks.
+	approvalNever approvalPolicy = "never"
 )
 
 // Agent runs the Codex CLI. It starts the process on the first Run and
 // keeps it for the next runs.
 type Agent struct {
-	cfg config
-	log *session.Log
-	// store keeps the log and the child sessions of the subagents. It
-	// is nil for an agent of [New], whose children are unsaved too.
-	store session.Storer
-	state *emit.State
+	core *cliagent.Core
+	cfg  config
+	// err is the error of the config. Each run of an agent of [New]
+	// fails with it.
+	err error
 
 	mu sync.Mutex
 	// conn is the open process, or nil.
@@ -128,104 +77,32 @@ type Agent struct {
 	model string
 }
 
-// config collects the options before [New] or [Durable] builds the
-// agent.
+// config is the session config of an agent, its options, and what the
+// agent derives from them.
 type config struct {
-	store       session.Storer
-	name        string
-	binary      string
-	dir         string
-	addDirs     []string
-	model       string
-	sections    agent.SystemFunc
-	autoCompact int
-	thinking    ai.ThinkingLevel
-	env         []string
-	sandbox     SandboxMode
-	approval    ApprovalPolicy
-	approve     agent.ApproveFunc
-	hooks       []agent.Hook
-	mcp         []agent.MCPServer
+	agent.Config
+	binary string
+	env    []string
 	// hookCommand is the gopi binary that relays a hook.
 	hookCommand string
-	// defs is set by [Driver].
-	defs *clidefs.Defs
+	// policy and sandbox are the permissions of the thread. An empty
+	// sandbox keeps the configured mode of the CLI.
+	policy  approvalPolicy
+	sandbox sandboxMode
+	// hooks are the Hooks of the config, then the hooks that block the
+	// tools that the config leaves out.
+	hooks []agent.Hook
 }
 
-// Option configures an [Agent]. [New] and [Durable] take the same
-// options.
+// Option sets how an agent starts the CLI. [New], [Durable], and
+// [Driver] take the same options. The [agent.Config] holds the
+// settings of one session.
 type Option func(*config)
-
-// Store sets the store of a [Durable] agent. Without it, Durable keeps
-// the session in a [session.MemoryStore]. [New] ignores it.
-func Store(s session.Storer) Option {
-	return func(c *config) { c.store = s }
-}
-
-// Name sets the Author of every entry that the agent writes.
-func Name(s string) Option {
-	return func(c *config) { c.name = s }
-}
 
 // Binary sets the path of the codex command. The default is "codex",
 // from PATH.
 func Binary(path string) Option {
 	return func(c *config) { c.binary = path }
-}
-
-// Dir sets the working directory of the process and of the thread.
-// Without it, the process uses the working directory of the caller.
-func Dir(path string) Option {
-	return func(c *config) { c.dir = path }
-}
-
-// AddDirs makes each directory a writable root of the sandbox of the
-// thread, as [Dir] is. Only [SandboxWorkspaceWrite] reads them: the
-// read-only sandbox stays read-only, and the full access sandbox has
-// no limits.
-func AddDirs(dirs ...string) Option {
-	return func(c *config) { c.addDirs = append(c.addDirs, dirs...) }
-}
-
-// Model sets the model of the thread. Without it, the CLI uses its
-// configured model.
-func Model(name string) Option {
-	return func(c *config) { c.model = name }
-}
-
-// System sets the developer instructions of the thread, as one
-// section named [agent.SystemSection]. It is [Sections] with
-// [agent.SystemText].
-func System(s string) Option {
-	return Sections(agent.SystemText(s))
-}
-
-// Sections sets the function that returns the sections of the
-// developer instructions of the thread. The CLI keeps its own base
-// instructions. The agent calls fn before each run. The first sections
-// of a session are the developer instructions, and the log keeps them
-// as its base, so each start and each resume of the thread gets the
-// same instructions. A later change goes as a developer message in the
-// history of the thread, before the next turn, because a Codex model
-// keeps a reminder in a user message only for its own turn. If fn
-// returns an error, the run fails. Without Sections, the thread has no
-// developer instructions.
-func Sections(fn agent.SystemFunc) Option {
-	return func(c *config) { c.sections = fn }
-}
-
-// AutoCompact sets the size of the context, in tokens, that starts a
-// compaction. Without it, the CLI uses its default.
-func AutoCompact(tokens int) Option {
-	return func(c *config) { c.autoCompact = tokens }
-}
-
-// Thinking sets the reasoning effort of each turn. [ai.ThinkingMax]
-// becomes "xhigh", the highest effort of the CLI. [ai.ThinkingOff]
-// keeps the default effort of the model, because not every model
-// accepts an effort of none.
-func Thinking(level ai.ThinkingLevel) Option {
-	return func(c *config) { c.thinking = level }
 }
 
 // Env adds environment variables to the process, as KEY=VALUE strings.
@@ -234,87 +111,49 @@ func Env(vars ...string) Option {
 	return func(c *config) { c.env = append(c.env, vars...) }
 }
 
-// Sandbox sets the sandbox mode of the thread. Without it, the CLI
-// uses its configured mode.
-func Sandbox(mode SandboxMode) Option {
-	return func(c *config) { c.sandbox = mode }
-}
-
-// Policy sets the approval policy of the thread. The default is
-// [ApprovalNever].
-func Policy(policy ApprovalPolicy) Option {
-	return func(c *config) { c.approval = policy }
-}
-
-// MCP gives the CLI the MCP servers servers, as the mcp_servers table
-// of the config of the thread. The CLI connects to them. The servers of
-// the config.toml of the CLI stay, so a server of servers replaces a
-// server of the config with the same name.
-func MCP(servers ...agent.MCPServer) Option {
-	return func(c *config) { c.mcp = append(c.mcp, servers...) }
-}
-
-// Approve sets the function that answers each approval request of the
-// CLI. Without it, the agent declines every request. If fn returns an
-// error, the agent declines the request.
-//
-// The call is the tool call of the item that the request names, as the
-// log has it: a bash call for a command, and an apply_patch call with
-// the changes for a file change. A file change request has no changes.
-// So if it comes before its item, the agent declines it and does not
-// call fn.
-//
-// An Always decision accepts only this action. The agent and the CLI
-// keep no rule for it. The caller keeps the rule of Always, as the host
-// does. Codex cannot change the input of an action, so a decision with
-// an Input declines it. Codex has no field for the Message of a
-// decision, so the model does not read it.
-func Approve(fn agent.ApproveFunc) Option {
-	return func(c *config) { c.approve = fn }
-}
-
-// defsOf sets the definitions of the session.
-func defsOf(d *clidefs.Defs) Option {
-	return func(c *config) { c.defs = d }
-}
-
-// New returns an agent over an unsaved log. New does no I/O. The
-// process starts on the first Run.
-func New(opts ...Option) *Agent {
-	log := session.New()
+// New returns an agent of the config c over an unsaved log. New ignores
+// the Store of c. New does no I/O, so it does not check the names of
+// Skills. The process starts on the first Run. If c is not valid, each
+// run fails with the error that [Durable] returns.
+func New(c agent.Config, opts ...Option) *Agent {
+	core := cliagent.New(cliName, &c)
+	cfg, err := newConfig(c, opts)
 	return &Agent{
-		cfg:   newConfig(opts),
-		log:   log,
-		state: emit.NewState(log),
+		core: core,
+		cfg:  cfg,
+		err:  err,
 	}
 }
 
-// Durable returns an agent over the session id. The [Store] option
-// sets where the session lives. If the session has a thread, the agent
-// resumes it. Otherwise the first Run starts a thread.
-func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
-	cfg := newConfig(opts)
-	store := cfg.store
-	if store == nil {
-		store = session.NewMemoryStore()
+// Durable returns an agent of the config c over the session
+// c.SessionID. Without a Store in c, Durable keeps the session in a
+// [session.MemoryStore]. If the session has a thread, the agent resumes
+// it. Otherwise the first Run starts a thread.
+//
+// Durable fails before it opens the session if c is not valid: a hook
+// at a point that the CLI does not call, a mode that
+// [permission.ParseMode] does not know, the limit BlockReadsOutside, a
+// Deny rule that does not parse, a name of ToolNames that names a tool
+// of the caller, or a name of Skills that no skill has.
+func Durable(ctx context.Context, c agent.Config, opts ...Option) (*Agent, error) {
+	cfg, err := newConfig(c, opts)
+	if err != nil {
+		return nil, err
 	}
-	log, err := session.Open(ctx, store, id)
+	core, err := cliagent.Open(ctx, cliName, c)
 	if err != nil {
 		return nil, err
 	}
 	return &Agent{
-		cfg:   cfg,
-		log:   log,
-		store: store,
-		state: emit.NewState(log),
+		core: core,
+		cfg:  cfg,
 	}, nil
 }
 
-// newConfig applies opts over the defaults.
-func newConfig(opts []Option) config {
+// newOptions applies opts over the defaults.
+func newOptions(opts []Option) config {
 	c := config{
 		binary:      defaultBinary,
-		approval:    ApprovalNever,
 		hookCommand: defaultHookCommand,
 	}
 	for _, opt := range opts {
@@ -323,16 +162,43 @@ func newConfig(opts []Option) config {
 	return c
 }
 
+// newConfig returns the config of an agent of c with opts. It does no
+// I/O.
+func newConfig(c agent.Config, opts []Option) (config, error) {
+	cfg := newOptions(opts)
+	cfg.Config = c
+	rules, err := ruleHooks(c)
+	if err != nil {
+		return config{}, fmt.Errorf("codex: %w", err)
+	}
+	if _, err := permission.ParseMode(string(c.Mode)); err != nil {
+		return config{}, fmt.Errorf("codex: %w", err)
+	}
+	if c.Limits.BlockReadsOutside {
+		return config{}, fmt.Errorf(
+			"codex: the limit BlockReadsOutside: Codex has no control for reads outside the roots: %w",
+			errors.ErrUnsupported,
+		)
+	}
+	hooks := append(slices.Clip(c.Hooks), rules...)
+	if err := checkHooks(hooks); err != nil {
+		return config{}, err
+	}
+	cfg.hooks = hooks
+	cfg.policy, cfg.sandbox = permissions(c)
+	return cfg, nil
+}
+
 // Log returns the log that the agent writes to.
-func (a *Agent) Log() *session.Log { return a.log }
+func (a *Agent) Log() *session.Log { return a.core.Log() }
 
 // State returns a copy of the state of the agent, as
 // [agent.Agent.State] does. Each event of a run changes the state
 // before the stream gets it. [agent.State.Log] is the log of the
-// agent, also in the state that a hook of [Hooks] gets. The agent has
+// agent, also in the state that a hook of the config gets. The agent has
 // no queues, so [agent.State.Steer] and [agent.State.FollowUp] do
 // nothing.
-func (a *Agent) State() agent.State { return a.state.Get() }
+func (a *Agent) State() agent.State { return a.core.State() }
 
 // Run appends entries to the log and runs one Codex turn with their
 // text. It returns the stream of the run. If the context ends, the
@@ -347,7 +213,7 @@ func (a *Agent) State() agent.State { return a.state.Get() }
 // stream fails with no event.
 func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream {
 	return stream.New(func(push func(agent.Event)) ([]ai.Message, error) {
-		if len(emit.Input(entries)) == 0 {
+		if len(cliagent.Input(entries)) == 0 {
 			return nil, errors.New("codex: a run needs an entry with text or a file")
 		}
 		return a.run(ctx, entries, push)
@@ -366,10 +232,7 @@ func (a *Agent) Close() error {
 	if c != nil {
 		closeErr = c.close()
 	}
-	if a.cfg.defs == nil {
-		return closeErr
-	}
-	return errors.Join(closeErr, a.cfg.defs.Remove())
+	return a.core.Close(closeErr)
 }
 
 // run is the producer behind [Agent.Run].
@@ -378,20 +241,9 @@ func (a *Agent) run(
 	entries []session.Entry,
 	push func(agent.Event),
 ) ([]ai.Message, error) {
-	e := emit.New(a.log, a.cfg.name, a.state, push)
-	if err := e.Start(); err != nil {
-		return nil, fmt.Errorf("codex: %w", err)
-	}
-	base, change, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages(), a.log.History().CompactedAt)
+	e, change, err := a.core.StartInput(ctx, push, a.cfg.Sections)
 	if err != nil {
-		return e.Finish(ctx, ai.Usage{}, fmt.Errorf("codex: %w", err))
-	}
-	// The base goes in the log before the thread starts, because the
-	// thread gets it as its developer instructions.
-	if base != nil {
-		if err := e.Input(ctx, []session.Entry{session.NewEntry(*base)}); err != nil {
-			return e.Finish(ctx, ai.Usage{}, err)
-		}
+		return nil, err
 	}
 	// Connect before the input, so that a failed start stores no input
 	// that the CLI never got.
@@ -410,10 +262,8 @@ func (a *Agent) run(
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
 	t := a.newTurn(c, e, threadID)
-	// The error of a hook belongs to the run that called it.
-	_ = c.hookErr()
 	c.bindHooks(ctx)
-	usage, err := t.run(ctx, userInputs(emit.Input(entries), c.skills))
+	usage, err := t.run(ctx, userInputs(cliagent.Input(entries), c.skills))
 	// Codex does not start a turn when a child ends after the turn of
 	// the run completed, so the run gives the model the result itself.
 	// A report turn can start more children, so the run repeats until
@@ -427,7 +277,7 @@ func (a *Agent) run(
 		if err = e.Input(ctx, []session.Entry{entry}); err != nil {
 			break
 		}
-		usage, err = t.run(ctx, userInputs(emit.Input([]session.Entry{entry}), def.Set{}))
+		usage, err = t.run(ctx, userInputs(cliagent.Input([]session.Entry{entry}), def.Set{}))
 	}
 	// A run that ends with a child that runs, such as a turn that failed,
 	// stops the child on the server. The server can still send its
@@ -440,29 +290,28 @@ func (a *Agent) run(
 }
 
 // newTurn returns the turn of a run on the thread.
-func (a *Agent) newTurn(c *conn, e *emit.Emitter, threadID string) *turn {
+func (a *Agent) newTurn(c *conn, e *cliagent.Emitter, threadID string) *turn {
 	t := &turn{
 		conn:     c,
 		emitter:  e,
 		threadID: threadID,
 		model:    a.model,
-		effort:   effort(a.cfg.thinking),
+		effort:   effort(a.cfg.Effort),
 	}
-	if a.store != nil {
-		t.sessionID = a.log.Session().ID
-	}
+	t.sessionID = a.core.SessionID()
 	t.subs = newSubagents(a, t)
 	return t
 }
 
-// endTurns ends the children and the hooks of a run, and returns err with
-// the error of a hook.
+// endTurns ends the children and the hooks of a run, and returns err
+// with the error of a hook and the errors of the logs of the children.
 func (a *Agent) endTurns(ctx context.Context, c *conn, t *turn, err error) error {
-	t.subs.endAll(context.WithoutCancel(ctx))
+	endErr := t.subs.endAll(context.WithoutCancel(ctx))
 	c.bindHooks(nil)
 	if err == nil {
-		err = c.hookErr()
+		err = a.core.Stops().Take()
 	}
+	err = errors.Join(err, endErr)
 	if t.dead {
 		a.drop(c)
 	}
@@ -475,7 +324,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	a.mu.Lock()
 	c := a.conn
 	a.mu.Unlock()
-	threadID, err := conversation.Get(a.log)
+	threadID, err := conversation.Get(a.core.Log())
 	if err != nil {
 		return nil, "", err
 	}
@@ -486,8 +335,8 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		a.drop(c)
 	}
 
-	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
-		return nil, "", fmt.Errorf("codex: %w", err)
+	if a.err != nil {
+		return nil, "", a.err
 	}
 	skills, skillRoot, roles, err := a.writeDefs(ctx)
 	if err != nil {
@@ -502,7 +351,7 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		hooks, err = startHookServer(a.cfg.hooks, a.State, a.cfg.approve)
+		hooks, err = startHookServer(a.cfg.hooks, a.State, a.cfg.Approve, a.core.Stops())
 		if err != nil {
 			return nil, "", err
 		}
@@ -516,18 +365,21 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 		}
 		return nil, "", fmt.Errorf("codex: start %s: %w", cmd.Path, err)
 	}
-	c = dial(p, a.cfg.approve, a.cfg.dir)
+	c = dial(p, a.cfg.Approve, a.cfg.Dir)
 	c.hooks = hooks
 	c.skills = skills
 	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand, roles), skillRoot)
 	if err != nil {
 		c.kill()
 		if threadID != "" && lostThread(err) {
-			err = errors.Join(ErrNoConversation, conversation.Clear(ctx, a.log))
+			err = errors.Join(
+				fmt.Errorf("codex: %w", agent.ErrNoConversation),
+				conversation.Clear(ctx, a.core.Log()),
+			)
 		}
 		return nil, "", err
 	}
-	if err := conversation.Save(ctx, a.log, res.Thread.ID); err != nil {
+	if err := conversation.Save(ctx, a.core.Log(), res.Thread.ID); err != nil {
 		c.kill()
 		return nil, "", err
 	}
@@ -588,7 +440,7 @@ func textInput(t ai.Text) userInput {
 // image.
 func fileInput(f ai.File) userInput {
 	if !strings.HasPrefix(f.MediaType, "image/") {
-		return textInput(emit.Unread(f))
+		return textInput(cliagent.Unread(f))
 	}
 	data := base64.StdEncoding.EncodeToString(f.Data)
 	return userInput{
@@ -628,10 +480,8 @@ func (a *Agent) command() *exec.Cmd {
 func appServer(c config) *exec.Cmd {
 	args := append([]string{"app-server"}, permissionArgs(c)...)
 	cmd := exec.Command(c.binary, args...)
-	cmd.Dir = c.dir
-	if len(c.env) > 0 {
-		cmd.Env = append(os.Environ(), c.env...)
-	}
+	cmd.Dir = c.Dir
+	cmd.Env = cliproc.Environ(nil, c.env)
 	return cmd
 }
 
@@ -643,26 +493,26 @@ func appServer(c config) *exec.Cmd {
 func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand string, roles map[string]any) threadParams {
 	p := threadParams{
 		ThreadID:              threadID,
-		Model:                 a.cfg.model,
-		Cwd:                   a.cfg.dir,
-		ApprovalPolicy:        a.cfg.approval,
+		Model:                 a.cfg.Model.ID,
+		Cwd:                   a.cfg.Dir,
+		ApprovalPolicy:        a.cfg.policy,
 		Sandbox:               a.cfg.sandbox,
-		DeveloperInstructions: sections.Text(a.log.Messages()),
+		DeveloperInstructions: sections.Text(a.core.Log().Messages()),
 	}
 	if hooks != nil {
 		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
 	}
-	if a.cfg.autoCompact > 0 {
+	if a.cfg.AutoCompact > 0 {
 		if p.Config == nil {
 			p.Config = make(map[string]any)
 		}
-		p.Config["model_auto_compact_token_limit"] = a.cfg.autoCompact
+		p.Config["model_auto_compact_token_limit"] = a.cfg.AutoCompact
 	}
-	if len(a.cfg.mcp) > 0 {
+	if len(a.cfg.MCP) > 0 {
 		if p.Config == nil {
 			p.Config = make(map[string]any)
 		}
-		p.Config["mcp_servers"] = mcpServers(a.cfg.mcp)
+		p.Config["mcp_servers"] = mcpServers(a.cfg.MCP)
 	}
 	if len(roles) > 0 {
 		if p.Config == nil {
@@ -678,11 +528,11 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 // them:
 //
 //   - approvals_reviewer is "user", so each approval request reaches
-//     the [Approve] function and no automatic reviewer.
-//   - sandbox_mode is the mode of [Sandbox], if c has one. The mode
+//     the Approve function and no automatic reviewer.
+//   - sandbox_mode is the sandbox of the Mode of c, if c has one. The mode
 //     selects the sandbox model of the modes, so the CLI does not read a
 //     permission profile of default_permissions.
-//   - The sandbox_workspace_write table has the [AddDirs] as the
+//   - The sandbox_workspace_write table has the AddDirs of c as the
 //     writable_roots, no network, and the temp folders as writable.
 //
 // The flags do not set approval_policy. The approvalPolicy of
@@ -693,7 +543,7 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 func permissionArgs(c config) []string {
 	// The value of a -c flag is TOML. A JSON string and a JSON array of
 	// strings are also TOML.
-	dirs := c.addDirs
+	dirs := c.AddDirs
 	if dirs == nil {
 		dirs = []string{}
 	}
@@ -757,14 +607,16 @@ func (a *Agent) findHookCommand() (string, error) {
 }
 
 // effort returns the reasoning effort of the CLI for level, or "" for
-// the default of the model.
+// the default of the model. [ai.ThinkingOff] gives "", because not
+// every model accepts an effort of none.
 func effort(level ai.ThinkingLevel) string {
-	switch level {
-	case ai.ThinkingLow, ai.ThinkingMedium, ai.ThinkingHigh, ai.ThinkingXHigh:
-		return string(level)
-	case ai.ThinkingMax:
-		return string(ai.ThinkingXHigh)
-	default:
+	if level == ai.ThinkingOff {
 		return ""
 	}
+	for name, l := range efforts {
+		if l == level {
+			return name
+		}
+	}
+	return ""
 }

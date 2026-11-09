@@ -3,16 +3,15 @@ package host
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/sonnes/gopi/pkg/def"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 )
 
 // Skills returns the skills of the session id, in the order that the
-// model sees them: the skills of [Skillset], then the skills of each
-// folder of [Config.Dirs], merged as each driver merges them. A skill
-// of a folder replaces a skill of Skillset with the same name.
+// model sees them: the skills of [Defs], then the skills of each folder
+// of [Config.DefDirs], merged with [def.Layers] as each driver merges
+// them. A skill of a folder replaces a skill of Defs with the same name.
 //
 // A user message that starts with "/" and the qualified name of a
 // skill, such as "/deploy now", loads the skill. Each driver reads the
@@ -32,27 +31,30 @@ func (h *Host) Skills(ctx context.Context, id string) ([]def.Skill, error) {
 	if err != nil {
 		return nil, err
 	}
-	config, ok, err := configValue.Get(w)
-	if err == nil && !ok {
-		err = fmt.Errorf("no config: %w", ErrInvalid)
-	}
+	config, err := s.storedConfig(configValue.Get(w))
 	if err != nil {
-		return nil, fmt.Errorf("host: session %s: %w", id, err)
+		return nil, err
 	}
 	return h.ConfigSkills(ctx, config)
 }
 
 // ConfigSkills returns the skills that a session of config gets, as
-// [Host.Skills] does, with no session. It reads only the Dirs of
-// config, so a zero config gives the skills of [Skillset].
+// [Host.Skills] does, with no session. It reads only the DefDirs of
+// config, so a zero config gives the skills of [Defs].
 func (h *Host) ConfigSkills(ctx context.Context, config Config) ([]def.Skill, error) {
-	readers := slices.Clone(h.skillset)
-	for _, dir := range config.Dirs {
-		readers = append(readers, storefs.Dir(dir))
-	}
-	set, err := def.Resolve(ctx, readers, nil)
+	set, err := h.configDefs(config).Load(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("host: the skills: %w", err)
 	}
 	return set.Skills, nil
+}
+
+// configDefs returns the definitions of a session of config: the source
+// of [Defs], then each folder of config.DefDirs.
+func (h *Host) configDefs(config Config) def.Source {
+	sources := []def.Source{h.defs}
+	for _, dir := range config.DefDirs {
+		sources = append(sources, storefs.Dir(dir))
+	}
+	return def.Layers(sources...)
 }

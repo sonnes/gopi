@@ -52,14 +52,14 @@ func TestBeforeCall(t *testing.T) {
 	tests := []struct {
 		name      string
 		responses []ai.Message
-		hooks     func(tr *trace) []agent.Option
+		hooks     func(tr *trace) []agent.Hook
 		check     func(t *testing.T, p *script, a *agent.Agent, tr *trace, err error)
 	}{
 		{
 			name:      "the chain runs in the order of registration",
 			responses: []ai.Message{text("ok")},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeCall(func(_ context.Context, _ agent.State, r agent.Request) (agent.Request, error) {
 						tr.add("first")
 						r.Messages = append(r.Messages, ai.UserMessage("one"))
@@ -85,8 +85,8 @@ func TestBeforeCall(t *testing.T) {
 				toolCall("c1", "echo", `{"s":"x"}`),
 				text("done"),
 			},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeCall(func(_ context.Context, s agent.State, r agent.Request) (agent.Request, error) {
 						if s.Turn() == 2 {
 							r.Options = ai.JoinOptions(r.Options, ai.Thinking(ai.ThinkingHigh))
@@ -109,8 +109,8 @@ func TestBeforeCall(t *testing.T) {
 		{
 			name:      "an error fails the run before the model call",
 			responses: []ai.Message{text("ok")},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeCall(func(_ context.Context, _ agent.State, r agent.Request) (agent.Request, error) {
 						return r, errors.New("boom")
 					}),
@@ -126,8 +126,7 @@ func TestBeforeCall(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var tr trace
 			p := &script{responses: tt.responses}
-			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
-			a := agent.New(model(p), opts...)
+			a := agent.New(model(p), agent.Toolset(echo), agent.Hooks(tt.hooks(&tr)...))
 
 			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			emittest.CheckEvents(t, events)
@@ -140,14 +139,14 @@ func TestAfterCall(t *testing.T) {
 	tests := []struct {
 		name      string
 		responses []ai.Message
-		hooks     func(tr *trace) []agent.Option
+		hooks     func(tr *trace) []agent.Hook
 		check     func(t *testing.T, p *script, a *agent.Agent, tr *trace, events []agent.Event, err error)
 	}{
 		{
 			name:      "the chain changes the message in the order of registration",
 			responses: []ai.Message{text("ok")},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterCall(func(_ context.Context, _ agent.State, _ agent.Request, m ai.Message) (ai.Message, error) {
 						tr.add("first " + m.Text())
 						m.Content = append(m.Content, ai.Text{Text: " one"})
@@ -171,8 +170,8 @@ func TestAfterCall(t *testing.T) {
 		{
 			name:      "a hook reads the request",
 			responses: []ai.Message{text("ok")},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterCall(func(_ context.Context, _ agent.State, r agent.Request, m ai.Message) (ai.Message, error) {
 						tr.add(fmt.Sprint(msgTexts(r.Messages)))
 						return m, nil
@@ -190,8 +189,8 @@ func TestAfterCall(t *testing.T) {
 				toolCall("c1", "echo", `{"s":"x"}`),
 				text("done"),
 			},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterCall(func(_ context.Context, _ agent.State, _ agent.Request, m ai.Message) (ai.Message, error) {
 						if len(m.ToolCalls()) == 0 {
 							return m, nil
@@ -209,8 +208,8 @@ func TestAfterCall(t *testing.T) {
 		{
 			name:      "an error fails the run, and the history does not keep the message",
 			responses: []ai.Message{text("ok")},
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterCall(func(_ context.Context, _ agent.State, _ agent.Request, m ai.Message) (ai.Message, error) {
 						return m, errors.New("boom")
 					}),
@@ -229,8 +228,7 @@ func TestAfterCall(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var tr trace
 			p := &script{responses: tt.responses}
-			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
-			a := agent.New(model(p), opts...)
+			a := agent.New(model(p), agent.Toolset(echo), agent.Hooks(tt.hooks(&tr)...))
 
 			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			emittest.CheckEvents(t, events)
@@ -247,7 +245,7 @@ func TestBeforeTool(t *testing.T) {
 	tests := []struct {
 		name    string
 		call    ai.Message
-		hooks   func(tr *trace) []agent.Option
+		hooks   func(tr *trace) []agent.Hook
 		results []string
 		isError bool
 		steps   []string
@@ -255,8 +253,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "the chain runs in the order of registration",
 			call: toolCall("c1", "echo", `{"s":"x"}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						tr.add("first " + c.Name)
 						return c, nil
@@ -273,8 +271,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "Deny blocks the call",
 			call: toolCall("c1", "echo", `{"s":"x"}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						return c, agent.Deny("not here")
 					}),
@@ -290,8 +288,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "a hook changes the input",
 			call: toolCall("c1", "echo", `{"s":"x"}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						c.Input = json.RawMessage(`{"s":"y"}`)
 						return c, nil
@@ -303,8 +301,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "a hook changes the tool",
 			call: toolCall("c1", "echo", `{"s":"x"}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						c.Name = "upper"
 						return c, nil
@@ -316,8 +314,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "an unknown tool runs no hook",
 			call: toolCall("c1", "nope", `{}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						tr.add("before")
 						return c, nil
@@ -334,8 +332,8 @@ func TestBeforeTool(t *testing.T) {
 		{
 			name: "the history ends with the assistant message",
 			call: toolCall("c1", "echo", `{"s":"x"}`),
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.BeforeTool(func(_ context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 						msgs := s.Messages()
 						tr.add(string(msgs[len(msgs)-1].Role))
@@ -351,8 +349,7 @@ func TestBeforeTool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var tr trace
 			p := &script{responses: []ai.Message{tt.call, text("done")}}
-			opts := append([]agent.Option{agent.Toolset(echo, upper)}, tt.hooks(&tr)...)
-			a := agent.New(model(p), opts...)
+			a := agent.New(model(p), agent.Toolset(echo, upper), agent.Hooks(tt.hooks(&tr)...))
 
 			events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
@@ -373,10 +370,10 @@ func TestBeforeToolCanceled(t *testing.T) {
 	p := &script{responses: []ai.Message{toolCall("c1", "echo", `{"s":"x"}`)}}
 	a := agent.New(model(p),
 		agent.Toolset(echo),
-		agent.BeforeTool(func(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+		agent.Hooks(agent.BeforeTool(func(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 			cancel()
 			return c, ctx.Err()
-		}),
+		})),
 	)
 
 	events, _, err := collect(t, a.Run(ctx, session.Text("hi")))
@@ -392,11 +389,11 @@ func TestBeforeToolStopsAfterCancel(t *testing.T) {
 	p := &script{responses: []ai.Message{toolCalls("echo", "echo")}}
 	a := agent.New(model(p),
 		agent.Toolset(echo),
-		agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+		agent.Hooks(agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 			tr.add(c.ID)
 			cancel()
 			return c, nil
-		}),
+		})),
 	)
 
 	events, _, err := collect(t, a.Run(ctx, session.Text("hi")))
@@ -408,15 +405,15 @@ func TestBeforeToolStopsAfterCancel(t *testing.T) {
 func TestAfterTool(t *testing.T) {
 	tests := []struct {
 		name    string
-		hooks   func(tr *trace) []agent.Option
+		hooks   func(tr *trace) []agent.Hook
 		result  string
 		isError bool
 		steps   []string
 	}{
 		{
 			name: "the chain runs in the order of registration",
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterTool(func(_ context.Context, _ agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
 						tr.add("first " + r.Content[0].(ai.Text).Text)
 						return r, nil
@@ -432,8 +429,8 @@ func TestAfterTool(t *testing.T) {
 		},
 		{
 			name: "a hook changes the result",
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterTool(func(_ context.Context, _ agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
 						r.Content = append(r.Content, ai.Text{Text: " remember"})
 						return r, nil
@@ -444,8 +441,8 @@ func TestAfterTool(t *testing.T) {
 		},
 		{
 			name: "an error is the error result",
-			hooks: func(tr *trace) []agent.Option {
-				return []agent.Option{
+			hooks: func(tr *trace) []agent.Hook {
+				return []agent.Hook{
 					agent.AfterTool(func(_ context.Context, _ agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
 						return r, errors.New("too long")
 					}),
@@ -466,8 +463,7 @@ func TestAfterTool(t *testing.T) {
 				toolCall("c1", "echo", `{"s":"x"}`),
 				text("done"),
 			}}
-			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks(&tr)...)
-			a := agent.New(model(p), opts...)
+			a := agent.New(model(p), agent.Toolset(echo), agent.Hooks(tt.hooks(&tr)...))
 
 			events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
@@ -499,11 +495,11 @@ func TestAfterToolInParallel(t *testing.T) {
 	}}
 	a := agent.New(model(p),
 		agent.Toolset(first, second),
-		agent.AfterTool(func(_ context.Context, _ agent.State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
+		agent.Hooks(agent.AfterTool(func(_ context.Context, _ agent.State, c ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
 			tr.add(c.Name)
 			r.Content = append(r.Content, ai.Text{Text: "!"})
 			return r, nil
-		}),
+		})),
 	)
 
 	events, msgs, err := collect(t, a.Run(ctx, session.Text("hi")))
@@ -518,14 +514,14 @@ func TestAfterTurn(t *testing.T) {
 	tests := []struct {
 		name      string
 		responses []ai.Message
-		hooks     []agent.Option
+		hooks     []agent.Hook
 		calls     int
 		history   []string
 	}{
 		{
 			name:      "an append starts no turn",
 			responses: []ai.Message{text("ok")},
-			hooks: []agent.Option{
+			hooks: []agent.Hook{
 				agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 					return []session.Entry{session.Text("note")}, nil
 				}),
@@ -539,7 +535,7 @@ func TestAfterTurn(t *testing.T) {
 				toolCall("c1", "echo", `{"s":"x"}`),
 				text("done"),
 			},
-			hooks: []agent.Option{
+			hooks: []agent.Hook{
 				agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
 					return []session.Entry{session.Text(fmt.Sprintf("after %d", s.Turn()))}, nil
 				}),
@@ -550,7 +546,7 @@ func TestAfterTurn(t *testing.T) {
 		{
 			name:      "a hook sees the appends of the hooks before it",
 			responses: []ai.Message{text("ok")},
-			hooks: []agent.Option{
+			hooks: []agent.Hook{
 				agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 					return []session.Entry{session.Text("one")}, nil
 				}),
@@ -566,8 +562,7 @@ func TestAfterTurn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &script{responses: tt.responses}
-			opts := append([]agent.Option{agent.Toolset(echo)}, tt.hooks...)
-			a := agent.New(model(p), opts...)
+			a := agent.New(model(p), agent.Toolset(echo), agent.Hooks(tt.hooks...))
 
 			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
@@ -582,12 +577,12 @@ func TestAfterTurn(t *testing.T) {
 func TestAfterTurnEvents(t *testing.T) {
 	p := &script{responses: []ai.Message{text("ok")}}
 	a := agent.New(model(p),
-		agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+		agent.Hooks(agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 			return []session.Entry{
 				session.Text("note"),
 				session.Text("now"),
 			}, nil
-		}),
+		})),
 	)
 
 	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
@@ -614,14 +609,14 @@ func TestBeforeStop(t *testing.T) {
 	tests := []struct {
 		name      string
 		responses []ai.Message
-		opts      []agent.Option
+		hooks     []agent.Hook
 		calls     int
 		history   []string
 	}{
 		{
 			name:      "messages continue the run",
 			responses: []ai.Message{text("one"), text("two")},
-			opts: []agent.Option{
+			hooks: []agent.Hook{
 				agent.BeforeStop(once("go on")),
 			},
 			calls:   2,
@@ -630,7 +625,7 @@ func TestBeforeStop(t *testing.T) {
 		{
 			name:      "the first hook with messages wins",
 			responses: []ai.Message{text("one"), text("two"), text("three")},
-			opts: []agent.Option{
+			hooks: []agent.Hook{
 				agent.BeforeStop(func(context.Context, agent.State) ([]session.Entry, error) {
 					return nil, nil
 				}),
@@ -644,7 +639,7 @@ func TestBeforeStop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &script{responses: tt.responses}
-			a := agent.New(model(p), tt.opts...)
+			a := agent.New(model(p), agent.Hooks(tt.hooks...))
 
 			events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
 			require.NoError(t, err)
@@ -680,10 +675,10 @@ func TestHooks(t *testing.T) {
 	}}
 	a := agent.New(model(p),
 		agent.Toolset(echo),
-		agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+		agent.Hooks(agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 			tr.add("first")
 			return c, nil
-		}),
+		})),
 		agent.Hooks(policy{tr: &tr}),
 	)
 

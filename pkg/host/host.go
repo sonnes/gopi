@@ -17,6 +17,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -53,12 +54,11 @@ type Storer interface {
 type Host struct {
 	cat   *catalog.Catalog
 	store Storer
-	hooks []agent.Hook
 	// compaction is the strategy of [Compaction], or nil.
 	compaction agent.Compactor
 	tools      []tool.Tool
-	// skillset reads the skills of [Skillset].
-	skillset []def.SkillsReader
+	// defs is the source of [Defs], or nil.
+	defs def.Source
 	// sections returns the sections of a session, by ID.
 	sections SectionsFunc
 	// rules reads the rules of [Rules], or is nil.
@@ -90,12 +90,6 @@ func Store(s Storer) Option {
 	return func(h *Host) { h.store = s }
 }
 
-// Hooks adds hooks to each session. A driver that cannot call a point
-// of a hook fails the start of the agent.
-func Hooks(hs ...agent.Hook) Option {
-	return func(h *Host) { h.hooks = append(h.hooks, hs...) }
-}
-
 // Compaction sets the strategy that compacts the history of each session
 // of the harness. Without it, the harness uses its default strategy. A
 // driver of a CLI ignores it.
@@ -118,14 +112,15 @@ func Tools(ts ...tool.Tool) Option {
 	}
 }
 
-// Skillset adds readers of skills to each session, such as skills that
-// ship in the program. Each driver gets them. They are lower than
-// [Config.Dirs], so a skill of a folder replaces a skill of Skillset with
-// the same name. A reader is code, so the config value of a session
-// cannot keep it, and a session that started earlier gets the skills at
-// its next start.
-func Skillset(readers ...def.SkillsReader) Option {
-	return func(h *Host) { h.skillset = append(h.skillset, readers...) }
+// Defs sets the source of the definitions of each session, such as
+// skills that ship in the program. Each driver gets them. They are lower
+// than the folders of [Config.DefDirs], so a definition of a folder
+// replaces a definition of src with the same name. [Config.Agent] can
+// name an agent of src. A source is code, so the config value of a
+// session cannot keep it, and a session that started earlier gets the
+// definitions at its next start.
+func Defs(src def.Source) Option {
+	return func(h *Host) { h.defs = src }
 }
 
 // SectionsFunc returns the sections of the prompt of the session id, in
@@ -209,11 +204,12 @@ type Config struct {
 	// ID is the ID of the session. If it is empty, Create makes a new
 	// ID with the function of [IDs].
 	ID string `json:"id,omitempty"`
-	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
+	// DefDirs are folders with agents/, skills/, and AGENTS.md, lowest
 	// first. A later folder wins for a name. The host reads only the
-	// file of Agent. The driver gets Dirs.
-	Dirs []string `json:"dirs,omitempty"`
-	// Agent names an agent file in Dirs. The file fills each empty field
+	// file of Agent. The driver gets the definitions of the folders after
+	// the definitions of [Defs].
+	DefDirs []string `json:"def_dirs,omitempty"`
+	// Agent names an agent file in DefDirs or in [Defs]. The file fills each empty field
 	// of Model, Mode, Effort, and a nil ToolNames. Its disallowed tools
 	// go after Deny, and its skills go after Skills. Create reads these
 	// once, so an edit of them changes only the sessions that start
@@ -226,13 +222,12 @@ type Config struct {
 	// It picks the driver. It is required if Agent gives no model.
 	Model string `json:"model"`
 	// Effort is the thinking level of each model call. If it is empty,
-	// the driver keeps the default of the model. A value that is not a
-	// level fails Create.
+	// the driver keeps the default of the model.
 	Effort ai.ThinkingLevel `json:"effort,omitempty"`
 	// Mode is the permission mode of the agent. If it is empty, the
 	// driver keeps its own mode. A driver that cannot honor the mode
 	// fails the start of the agent.
-	Mode agent.Mode `json:"mode,omitempty"`
+	Mode permission.Mode `json:"mode,omitempty"`
 	// Dir is the working directory of the agent.
 	Dir string `json:"dir,omitempty"`
 	// AddDirs are folders outside Dir that the agent can read and write,
@@ -243,8 +238,8 @@ type Config struct {
 	// ToolNames names the tools of the host that the agent can call, as
 	// the tools key of an agent file does. A name can be a gopi name or a
 	// Claude Code name, such as "Glob". If ToolNames is nil, the agent
-	// keeps each tool of [Tools]. A name of no tool of the host fails
-	// Create and Update with [tool.ErrUnknownTool].
+	// keeps each tool of [Tools]. The error of a name of no tool of the
+	// host also wraps [tool.ErrUnknownTool].
 	ToolNames []string `json:"tools,omitempty"`
 	// Allow, Ask, and Deny are the permission rules of the agent, in
 	// the format "Tool" or "Tool(content)". A rule can use a gopi name
@@ -269,7 +264,11 @@ type Config struct {
 // agent. The session is idle, and [Host.Send] gives it its first
 // message.
 //
-// If the store has a session with the ID, Create returns [ErrExists].
+// Create returns [ErrInvalid] for an effort that is not a thinking
+// level, an unknown mode, a rule that does not parse, a name of no tool
+// of the host, or an agent file that the definitions do not have. Such a
+// config makes no session. If the store has a session with the ID,
+// Create returns [ErrExists].
 // If the host closed, Create returns [ErrClosed]. If the driver fails,
 // Create returns its error. The session then stays idle, with
 // [StopError], and the next message starts the agent again.
@@ -278,18 +277,9 @@ func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
 		config.ID = h.newID()
 	}
 	fromFile := config.ToolNames == nil && config.Agent != ""
-	config, err := withAgent(ctx, config)
+	config, err := h.withAgent(ctx, config)
 	if err == nil {
-		err = checkEffort(config)
-	}
-	if err == nil {
-		err = checkMode(config)
-	}
-	if err == nil {
-		err = h.checkTools(config, fromFile)
-	}
-	if err == nil {
-		_, _, err = h.cat.Driver(config.Model)
+		_, err = h.check(config, fromFile)
 	}
 	if err != nil {
 		return Session{}, fmt.Errorf("host: session %s: %w", config.ID, err)
@@ -301,6 +291,34 @@ func (h *Host) Create(ctx context.Context, config Config) (Session, error) {
 	}
 	err = s.startAgent(ctx)
 	return s.snapshot(), err
+}
+
+// check returns an error that wraps [ErrInvalid] for each field of
+// config that a start of its agent cannot take, so a bad config fails
+// [Host.Create] and [Host.Update], and not the next run. fromFile
+// reports that the tool names came from the agent file. check returns
+// the driver of the model of config.
+func (h *Host) check(config Config, fromFile bool) (agent.Driver, error) {
+	err := errors.Join(
+		checkEffort(config),
+		checkMode(config),
+		config.rules().Validate(),
+		h.checkTools(config, fromFile),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", err, ErrInvalid)
+	}
+	d, _, err := h.cat.Driver(config.Model)
+	return d, err
+}
+
+// rules returns the Allow, Ask, and Deny rules of config.
+func (config Config) rules() permission.Rules {
+	return permission.Rules{
+		Allow: config.Allow,
+		Ask:   config.Ask,
+		Deny:  config.Deny,
+	}
 }
 
 // checkTools returns an error that wraps [tool.ErrUnknownTool] for a
@@ -345,13 +363,10 @@ func (h *Host) add(ctx context.Context, config Config) (*hosted, error) {
 	sess := Session{
 		ID:        config.ID,
 		Status:    StatusIdle,
-		Model:     config.Model,
-		Mode:      config.Mode,
-		Effort:    config.Effort,
-		Dir:       config.Dir,
 		CreatedAt: created,
 		UpdatedAt: created,
 	}
+	sess.setConfig(config)
 	if err := setStored(ctx, h.store, config.ID, configValue, config); err != nil {
 		return nil, err
 	}
@@ -450,8 +465,8 @@ func (h *Host) Events(ctx context.Context) (State, iter.Seq2[Event, error]) {
 
 // Close stops the agent of each session, and then ends each stream of
 // the host. A run that Close cuts ends with [StopRestarted]. The logs
-// stay. A second Close does nothing. Do not call Close from a hook,
-// because Close waits for each run.
+// stay. A second Close does nothing. Do not call Close from a tool or
+// from a [RulesReader], because Close waits for each run.
 func (h *Host) Close() error {
 	h.mu.Lock()
 	closed := h.closed

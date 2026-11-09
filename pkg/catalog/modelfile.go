@@ -3,11 +3,8 @@ package catalog
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"maps"
-	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -52,25 +49,12 @@ func ReadModelFile(ctx context.Context, src string) (ModelFile, error) {
 	return ParseModelFile(data)
 }
 
-// readSource returns the content of the path or the URL src.
 func readSource(ctx context.Context, src string) ([]byte, error) {
 	isURL := strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://")
 	if !isURL {
 		return os.ReadFile(src)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New(resp.Status)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, maxModelFile))
+	return modelsfile.Get(ctx, src, maxModelFile)
 }
 
 // MarshalJSON returns the file in the form of models.json, so a program
@@ -122,8 +106,5 @@ func (f ModelFile) IDs() []string {
 
 // cloneModel returns m with its own copy of each slice.
 func cloneModel(m ai.Model) ai.Model {
-	m.Input = slices.Clone(m.Input)
-	m.ThinkingLevels = slices.Clone(m.ThinkingLevels)
-	m.Pricing.Tiers = slices.Clone(m.Pricing.Tiers)
-	return m
+	return FillModel(m, ai.Model{})
 }

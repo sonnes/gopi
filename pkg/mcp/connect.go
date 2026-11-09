@@ -135,7 +135,7 @@ func connect(
 	tools, err := Tools(
 		ctx,
 		session,
-		Prefix("mcp__"+srv.Name+"__"),
+		Prefix(tool.MCPName(srv.Name, "")),
 		Deferred(),
 	)
 	if err != nil {

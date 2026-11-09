@@ -28,10 +28,10 @@ func TestWriteSkills_RoundTrip(t *testing.T) {
 		Extra:        def.Extra{"license": "MIT"},
 	}
 
-	err := storefs.WriteSkills(dir, []def.Skill{skill}, []string{"deploy"})
+	err := storefs.WriteSkills(filepath.Join(dir, "skills"), []def.Skill{skill}, []string{"deploy"})
 	require.NoError(t, err)
 
-	got, err := storefs.Skills(os.DirFS(dir), ".").ReadSkills(t.Context())
+	got, err := skillsOf(t.Context(), os.DirFS(dir))
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	got[0].Files = nil
@@ -96,10 +96,10 @@ func TestWriteAgents_RoundTrip(t *testing.T) {
 		Extra:       def.Extra{"color": "blue"},
 	}
 
-	err := storefs.WriteAgents(dir, []def.Agent{agent})
+	err := storefs.WriteAgents(filepath.Join(dir, "agents"), []def.Agent{agent})
 	require.NoError(t, err)
 
-	got, err := storefs.Agents(os.DirFS(dir), ".").ReadAgents(t.Context())
+	got, err := agentsOf(t.Context(), os.DirFS(dir))
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	got[0].Path = ""
@@ -113,10 +113,10 @@ func TestWriteAgents_KeepsNoToolsAndAllTools(t *testing.T) {
 		{Name: "none", Description: "None.", Tools: []string{}, Prompt: "p"},
 	}
 
-	err := storefs.WriteAgents(dir, agents)
+	err := storefs.WriteAgents(filepath.Join(dir, "agents"), agents)
 	require.NoError(t, err)
 
-	got, err := storefs.Agents(os.DirFS(dir), ".").ReadAgents(t.Context())
+	got, err := agentsOf(t.Context(), os.DirFS(dir))
 	require.NoError(t, err)
 	require.Len(t, got, 2)
 	assert.Nil(t, got[0].Tools)
@@ -126,43 +126,46 @@ func TestWriteAgents_KeepsNoToolsAndAllTools(t *testing.T) {
 
 // A name comes from a file of a folder that a person can clone, so it
 // must not write outside the folder.
-func TestWrite_SkipsANameThatLeavesTheFolder(t *testing.T) {
+func TestWrite_FailsOnANameThatLeavesTheFolder(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "out")
 
 	err := storefs.WriteAgents(dir, []def.Agent{
 		{Name: "../evil", Description: "E.", Prompt: "p"},
-		{Name: "good", Description: "G.", Prompt: "p"},
 	})
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "../evil")
 	err = storefs.WriteSkills(
 		dir,
 		[]def.Skill{{Name: "x", Description: "E.", Body: "b"}},
 		[]string{"../evil-skill"},
 	)
-	require.NoError(t, err)
+	assert.ErrorContains(t, err, "../evil-skill")
 
 	assert.NoFileExists(t, filepath.Join(root, "evil.md"))
 	assert.NoDirExists(t, filepath.Join(root, "evil-skill"))
-	assert.FileExists(t, filepath.Join(dir, "good.md"))
 }
 
-func TestOneElement(t *testing.T) {
+func TestCheckName(t *testing.T) {
 	tests := []struct {
 		name string
-		want bool
+		ok   bool
 	}{
-		{name: "deploy", want: true},
-		{name: "ops:deploy", want: true},
-		{name: "", want: false},
-		{name: ".", want: false},
-		{name: "..", want: false},
-		{name: "a/b", want: false},
-		{name: `a\b`, want: false},
+		{name: "deploy", ok: true},
+		{name: "ops:deploy", ok: true},
+		{name: ""},
+		{name: "."},
+		{name: ".."},
+		{name: "a/b"},
+		{name: `a\b`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, storefs.OneElement(tt.name))
+			err := storefs.CheckName(tt.name)
+			if tt.ok {
+				assert.NoError(t, err)
+				return
+			}
+			assert.Error(t, err)
 		})
 	}
 }

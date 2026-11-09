@@ -5,13 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/sonnes/gopi/internal/httpget"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -23,9 +22,6 @@ const tokensPerPriceUnit = 1_000_000
 // that the conversion to a price for one million tokens has no float
 // error.
 const priceDigits = 6
-
-// maxErrorBody is the most bytes of an error body that an error holds.
-const maxErrorBody = 1024
 
 // listResponse is the body of GET /models.
 type listResponse struct {
@@ -80,27 +76,6 @@ var modalities = map[string]ai.Modality{
 	"file":  ai.ModalityPDF,
 }
 
-// efforts maps a reasoning effort of OpenRouter to an
-// [ai.ThinkingLevel]. "minimal" has no level.
-var efforts = map[string]ai.ThinkingLevel{
-	"none":   ai.ThinkingOff,
-	"low":    ai.ThinkingLow,
-	"medium": ai.ThinkingMedium,
-	"high":   ai.ThinkingHigh,
-	"xhigh":  ai.ThinkingXHigh,
-	"max":    ai.ThinkingMax,
-}
-
-// levelOrder is the order of the thinking levels of a listed model.
-var levelOrder = []ai.ThinkingLevel{
-	ai.ThinkingOff,
-	ai.ThinkingLow,
-	ai.ThinkingMedium,
-	ai.ThinkingHigh,
-	ai.ThinkingXHigh,
-	ai.ThinkingMax,
-}
-
 // modalityOrder is the order of the input modalities of a listed model.
 var modalityOrder = []ai.Modality{
 	ai.ModalityText,
@@ -129,7 +104,8 @@ const toolModels = "supported_parameters=tools"
 // stays zero. The output cap is at most the context window, and a tier
 // that starts after the context window is not in the list.
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
-	body, err := p.get(ctx, "/models?"+toolModels)
+	url := p.cfg.baseURL + "/models?" + toolModels
+	body, err := httpget.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("openrouter: list models: %w", err)
 	}
@@ -146,30 +122,6 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 		models = append(models, m.model())
 	}
 	return models, nil
-}
-
-// get sends a GET request to path under the base URL, and returns the
-// body of a response with status 200.
-func (p *Provider) get(ctx context.Context, path string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.cfg.baseURL+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	if p.cfg.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+p.cfg.apiKey)
-	}
-	client := cmp.Or(p.cfg.httpClient, http.DefaultClient)
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-		return nil, fmt.Errorf("%s: %s", resp.Status, body)
-	}
-	return io.ReadAll(resp.Body)
 }
 
 // model returns m as an [ai.Model].
@@ -231,14 +183,13 @@ func input(names []string) []ai.Modality {
 	return out
 }
 
-// levels returns the thinking levels of efforts, in [levelOrder].
-func levels(names []string) []ai.ThinkingLevel {
+// levels returns the thinking levels of the reasoning efforts of
+// OpenRouter, in the order of [ai.ThinkingLevels]. An effort with no
+// level, such as "minimal", is not in the list.
+func levels(efforts []string) []ai.ThinkingLevel {
 	var out []ai.ThinkingLevel
-	for _, level := range levelOrder {
-		known := slices.ContainsFunc(names, func(name string) bool {
-			return efforts[name] == level
-		})
-		if known {
+	for _, level := range ai.ThinkingLevels() {
+		if slices.Contains(efforts, level.Effort()) {
 			out = append(out, level)
 		}
 	}

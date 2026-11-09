@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 
+	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 )
@@ -27,7 +28,7 @@ type usageBase struct {
 }
 
 // baseValue keeps the [usageBase] of the agent in its session.
-var baseValue = session.Value[usageBase]{Namespace: "gopi.cli", Key: "claude.model_usage"}
+var baseValue = resume.Value[usageBase](cliName, "model_usage")
 
 // loadBase returns the modelUsage that the CLI of conversation starts
 // from. A new conversation starts from zero.

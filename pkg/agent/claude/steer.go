@@ -7,7 +7,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -85,7 +85,7 @@ func (r *runner) sendSteer(ctx context.Context) error {
 	if len(entries) == 0 {
 		return nil
 	}
-	content := blocks(emit.Input(entries))
+	content := blocks(cliagent.Input(entries))
 	if len(content) == 0 {
 		// A steer with no text and no file has nothing for the model,
 		// so the log keeps it at once.
@@ -145,7 +145,7 @@ func (r *runner) sendHeld() error {
 
 // sendNow sends entries to the CLI as a steer with the priority now.
 func (r *runner) sendNow(entries []session.Entry) error {
-	content := blocks(emit.Input(entries))
+	content := blocks(cliagent.Input(entries))
 	id := newUUID()
 	err := r.proc.send(outUser{
 		Type: "user",

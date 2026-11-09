@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -112,12 +112,12 @@ type agentInput struct {
 }
 
 // newRunner returns the runner of one run of a.
-func newRunner(a *Agent, proc *process, em *emit.Emitter) *runner {
+func newRunner(a *Agent, proc *process, em *cliagent.Emitter) *runner {
 	return &runner{
 		a:         a,
 		proc:      proc,
 		em:        em,
-		sessionID: a.sessionID(),
+		sessionID: a.core.SessionID(),
 		subs:      a.subs,
 	}
 }
@@ -210,45 +210,32 @@ func (s *subagents) openChild(ctx context.Context, l *line) error {
 	var in agentInput
 	_ = json.Unmarshal(c.tc.Input, &in)
 	name := cmp.Or(in.SubagentType, defaultChildName)
-	id := agent.ChildID(c.owner.sessionID, name, l.TaskID)
-	ref := agent.ParentRef{
-		SessionID:  c.owner.sessionID,
-		ToolCallID: l.ToolUseID,
-	}
-
-	// The CLI goes on after an interrupt, so the child keeps its lines.
-	store := context.WithoutCancel(ctx)
-	log, err := emit.OpenChild(store, s.a.store, id, ref)
-	if err != nil {
-		return err
-	}
-
 	ch := &child{
 		callID:     l.ToolUseID,
-		sessionID:  id,
 		name:       name,
 		title:      l.Description,
 		prompt:     l.Prompt,
 		model:      in.Model,
-		log:        log,
 		background: c.result == agent.SubagentBackground,
 	}
 	if c.owner.isChild() {
 		ch.owner = c.owner
 	}
-	push := func(ev agent.Event) {
-		s.sink(ch)(agent.EventSubagent{
-			ToolCallID: ch.callID,
-			SessionID:  id,
-			Event:      ev,
-		})
+	// The sink of a child changes with its carrier, so each event reads
+	// it again.
+	send := func(ev agent.Event) { s.sink(ch)(ev) }
+	opened, err := s.a.core.OpenChild(ctx, c.owner.sessionID, name, l.TaskID, ch.callID, send)
+	if err != nil {
+		return err
 	}
-	em := emit.New(log, s.a.name, emit.NewState(log), push)
+	ch.sessionID = opened.SessionID
+	ch.log = opened.Log
+	em := opened.Emitter
 	s.sink(ch)(ch.start())
 	if err := em.Start(); err != nil {
 		s.sink(ch)(agent.EventSubagentEnd{
 			ToolCallID: ch.callID,
-			SessionID:  id,
+			SessionID:  ch.sessionID,
 			Status:     agent.SubagentFailed,
 			Text:       err.Error(),
 		})
@@ -259,10 +246,12 @@ func (s *subagents) openChild(ctx context.Context, l *line) error {
 	ch.run = &runner{
 		a:         s.a,
 		em:        em,
-		sessionID: id,
+		sessionID: ch.sessionID,
 		subs:      s,
 	}
 	s.open[ch.callID] = ch
+	// The CLI goes on after an interrupt, so the child keeps its lines.
+	store := context.WithoutCancel(ctx)
 	if err := em.Input(store, []session.Entry{session.Text(ch.prompt)}); err != nil {
 		return err
 	}
@@ -417,22 +406,27 @@ func (s *subagents) end(ctx context.Context, c *child, status, summary string) e
 	if status != agent.SubagentCompleted {
 		runErr = subagentError(status)
 	}
-	if _, err := run.em.Finish(store, run.em.Usage(), runErr); err != nil && !errors.Is(err, runErr) {
+	// Finish returns runErr as it is when each write works, and joins a
+	// failed write to it.
+	if _, err := run.em.Finish(store, run.em.Usage(), runErr); err != runErr {
 		errs = append(errs, err)
 	}
 
-	text := agent.LastText(c.log.Messages())
-	if status == agent.SubagentFailed {
-		text = cmp.Or(summary, runErr.Error())
-		if writeErr != nil {
-			text = writeErr.Error()
-		}
+	// The error of a write wins over the summary of the CLI, which wins
+	// over the status.
+	failErr := writeErr
+	switch {
+	case failErr != nil:
+	case summary != "":
+		failErr = errors.New(summary)
+	default:
+		failErr = runErr
 	}
 	s.sink(c)(agent.EventSubagentEnd{
 		ToolCallID: c.callID,
 		SessionID:  c.sessionID,
 		Status:     status,
-		Text:       text,
+		Text:       cliagent.EndText(c.log.Messages(), status, failErr),
 	})
 	return errors.Join(errs...)
 }

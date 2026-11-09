@@ -14,9 +14,6 @@ import (
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// skillToolName is the name of the skill tool.
-const skillToolName = tool.Skill
-
 // skillFile is the file that defines a skill. The skill tool does not
 // list it as a support file, because its body is the result.
 const skillFile = "SKILL.md"
@@ -37,25 +34,23 @@ const skillToolDescription = "Load the instructions of a skill. " +
 // prompt stays the same for the whole session, and a provider can cache
 // it.
 type skillTool struct {
-	// names holds the name that the model sees for each skill, in order.
+	// names holds the name that the model sees for each skill that the
+	// model can call, in order.
 	names []string
-	// byName finds a skill by the name that the model sees, and by its
+	// defs finds a skill by the name that the model sees, and by its
 	// qualified name.
-	byName map[string]def.Skill
+	defs def.Set
 }
 
-// newSkillTool returns the skill tool for skills, which the model sees
-// as names. It leaves out a skill that the model cannot call. With no
-// skill left, it returns nil.
-func newSkillTool(skills []def.Skill, names []string) *skillTool {
-	t := &skillTool{byName: make(map[string]def.Skill, len(skills))}
-	for i, s := range skills {
-		if s.NoModelCall {
-			continue
+// newSkillTool returns the skill tool for the skills of defs, which the
+// model sees as names. It leaves out a skill that the model cannot call.
+// With no skill left, it returns nil.
+func newSkillTool(defs def.Set, names []string) *skillTool {
+	t := &skillTool{defs: defs}
+	for i, s := range defs.Skills {
+		if !s.NoModelCall {
+			t.names = append(t.names, names[i])
 		}
-		t.names = append(t.names, names[i])
-		t.byName[names[i]] = s
-		t.byName[s.QualifiedName()] = s
 	}
 	if len(t.names) == 0 {
 		return nil
@@ -79,7 +74,7 @@ func (t *skillTool) Info() ai.ToolInfo {
 		Description: "The path of a support file, relative to the skill. Leave it out to load the instructions.",
 	}
 	return ai.ToolInfo{
-		Name:        skillToolName,
+		Name:        tool.Skill,
 		Description: skillToolDescription,
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
@@ -106,8 +101,8 @@ func (t *skillTool) Run(_ context.Context, call ai.ToolCall) (ai.ToolResult, err
 		return errorResult(fmt.Sprintf("invalid input: %s", err)), nil
 	}
 
-	s, ok := t.byName[in.Name]
-	if !ok {
+	s, ok := t.defs.Skill(in.Name)
+	if !ok || s.NoModelCall {
 		text := fmt.Sprintf("no skill is named %q. The skills are: %s.", in.Name, strings.Join(t.names, ", "))
 		return errorResult(text), nil
 	}

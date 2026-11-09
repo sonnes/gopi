@@ -23,20 +23,6 @@ func TestMCPCallKeepsThePrefix(t *testing.T) {
 	assert.Equal(t, "mcp__docs__search", call.Name)
 }
 
-func TestHookToolNames(t *testing.T) {
-	tests := []struct {
-		in   string
-		want string
-	}{
-		{in: "Bash", want: "bash"},
-		{in: "apply_patch", want: "apply_patch"},
-		{in: "mcp__docs__search", want: "mcp__docs__search"},
-	}
-	for _, tt := range tests {
-		assert.Equal(t, tt.want, toolName(tt.in))
-	}
-}
-
 func TestRuleHooks(t *testing.T) {
 	hooks, err := ruleHooks(agent.Config{
 		Dir:       workDir,
@@ -45,7 +31,7 @@ func TestRuleHooks(t *testing.T) {
 		ToolNames: []string{"bash", "apply_patch", "mcp__docs__write", "mcp__docs__drop"},
 	})
 	require.NoError(t, err)
-	srv, err := startHookServer(hooks, noState, nil)
+	srv, err := startHookServer(hooks, noState, nil, newStops())
 	require.NoError(t, err)
 	defer srv.close()
 

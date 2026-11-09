@@ -13,17 +13,11 @@ import (
 	"unicode/utf8"
 
 	"github.com/sonnes/gopi/pkg/sandbox"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
 const (
-	// maxLines is the largest number of lines of output that the tool
-	// returns. It keeps the last lines, because the error of a failed
-	// command is usually at the end.
-	maxLines = 2000
-	// maxBytes is the largest number of bytes of output that the tool
-	// returns.
-	maxBytes = 50 * 1024
 	// defaultTimeout is the timeout of a command when the model gives
 	// no timeout. A command with no timeout that waits for input stops
 	// the agent until a person ends the process.
@@ -65,9 +59,10 @@ var description string
 
 // New returns the bash tool on box. The tool runs a command in the
 // directory of the sandbox and returns stdout, then stderr. It keeps the
-// last maxLines lines and maxBytes bytes, and writes the full output to
-// a file in [sandbox.ScratchDir]. A command that ends with a nonzero
-// exit code is an error result.
+// last [output.MaxLines] lines and [output.MaxBytes] bytes, because the
+// error of a failed command is usually at the end. It writes the full
+// output to a file in [sandbox.ScratchDir]. A command that ends with a
+// nonzero exit code is an error result.
 //
 // Each command starts in the directory of the sandbox, so a cd does not
 // carry over to the next call. Every sandbox starts a new shell for each
@@ -129,7 +124,8 @@ func withStatus(out, status string) string {
 	return out + "\n\n" + status
 }
 
-// tail returns the last lines of full that fit in maxLines and maxBytes.
+// tail returns the last lines of full that fit in [output.MaxLines] and
+// [output.MaxBytes].
 // If it cuts full, it writes full to a file in [sandbox.ScratchDir] and
 // adds a note with the path of the file.
 func tail(ctx context.Context, box sandbox.Sandbox, full string) string {
@@ -139,12 +135,12 @@ func tail(ctx context.Context, box sandbox.Sandbox, full string) string {
 	size := 0
 	first := total
 	byBytes := false
-	for first > 0 && total-first < maxLines {
+	for first > 0 && total-first < output.MaxLines {
 		next := len(lines[first-1])
 		if first < total {
 			next++
 		}
-		if size+next > maxBytes {
+		if size+next > output.MaxBytes {
 			byBytes = true
 			break
 		}
@@ -162,9 +158,9 @@ func tail(ctx context.Context, box sandbox.Sandbox, full string) string {
 	}
 
 	if first == total {
-		// The last line alone is over maxBytes. Keep its end.
+		// The last line alone is over MaxBytes. Keep its end.
 		last := lines[total-1]
-		cut := len(last) - maxBytes
+		cut := len(last) - output.MaxBytes
 		for cut < len(last) && !utf8.RuneStart(last[cut]) {
 			cut++
 		}

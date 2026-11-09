@@ -9,6 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -77,7 +78,7 @@ type Session struct {
 	// Effort is the thinking level of the config, or empty.
 	Effort ai.ThinkingLevel `json:"effort,omitempty"`
 	// Mode is the permission mode of the config, or empty.
-	Mode agent.Mode `json:"mode,omitempty"`
+	Mode permission.Mode `json:"mode,omitempty"`
 	// Dir is the working directory of the config, or empty. It does not
 	// change after [Host.Create], so a caller that shows the files of the
 	// agent reads them here.
@@ -99,6 +100,14 @@ func (i Session) clone() Session {
 	return i
 }
 
+// setConfig copies the fields of config that a [Session] shows.
+func (i *Session) setConfig(config Config) {
+	i.Model = config.Model
+	i.Effort = config.Effort
+	i.Mode = config.Mode
+	i.Dir = config.Dir
+}
+
 // The values that the host keeps in each session. The namespace
 // "gopi.host" is reserved for the host.
 var (
@@ -115,6 +124,19 @@ var (
 		Key:       "config",
 	}
 )
+
+// storedConfig returns the config of s from a read of configValue. The
+// session of a subagent has no config, so it gets an error that wraps
+// [ErrInvalid].
+func (s *hosted) storedConfig(config Config, ok bool, err error) (Config, error) {
+	if err != nil {
+		return Config{}, fmt.Errorf("host: session %s: read the config: %w", s.id, err)
+	}
+	if !ok {
+		return Config{}, fmt.Errorf("host: session %s: no config: %w", s.id, ErrInvalid)
+	}
+	return config, nil
+}
 
 // now returns the time in UTC. UTC drops the reading of the monotonic
 // clock, so a time equals itself after a round trip through a value.
@@ -146,10 +168,7 @@ func (h *Host) recover(ctx context.Context, snap session.Snapshot) (Session, err
 	if isChild {
 		sess.Parent = &parent
 	} else {
-		sess.Model = config.Model
-		sess.Mode = config.Mode
-		sess.Effort = config.Effort
-		sess.Dir = config.Dir
+		sess.setConfig(config)
 	}
 	stopped := !ok || sess.Status == StatusIdle
 	sess.Status = StatusIdle

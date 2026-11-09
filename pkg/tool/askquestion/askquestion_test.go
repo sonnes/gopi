@@ -232,11 +232,8 @@ func TestRun_RejectsInvalidJSON(t *testing.T) {
 	assert.Contains(t, text, "Expected shape")
 }
 
-func TestRun_ReportsAMissingResponder(t *testing.T) {
-	res, text := call(t, New(nil), validInput())
-
-	assert.True(t, res.IsError)
-	assert.Contains(t, text, "no responder configured")
+func TestNew_PanicsOnANilResponder(t *testing.T) {
+	assert.Panics(t, func() { New(nil) })
 }
 
 func TestRun_ReturnsAResponderError(t *testing.T) {

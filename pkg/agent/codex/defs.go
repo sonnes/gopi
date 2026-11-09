@@ -28,16 +28,17 @@ const (
 	roleFilePerm = 0o600
 )
 
-// writeDefs writes the skills and the roles of the session. It returns
-// the merged set, the folder of the skills, and the agents table of the
-// next thread. A thread reads a role from its file, so each role needs a
-// file. A skill file of Codex has no key for the model or the allowed
-// tools.
+// writeDefs loads the Defs of the config and writes the skills and the
+// roles of the session. It returns the set, the folder of the skills,
+// and the agents table of the next thread. A thread reads a role from
+// its file, so each role needs a file. A skill file of Codex has no key
+// for the model or the allowed tools.
 func (a *Agent) writeDefs(ctx context.Context) (def.Set, string, map[string]any, error) {
-	if a.cfg.defs == nil {
-		return def.Set{}, "", nil, nil
+	set, err := clidefs.Load(ctx, a.cfg.Defs)
+	if err != nil {
+		return def.Set{}, "", nil, err
 	}
-	set, folder, err := a.cfg.defs.Prepare(ctx)
+	folder, err := a.core.Defs().Prepare(set)
 	if err != nil || folder == "" {
 		return set, "", nil, err
 	}
@@ -50,11 +51,11 @@ func (a *Agent) writeDefs(ctx context.Context) (def.Set, string, map[string]any,
 			files[i].Model = ""
 			files[i].AllowedTools = nil
 		}
-		if err := storefs.WriteSkills(skillRoot, files, set.Names); err != nil {
+		if err := storefs.WriteSkills(skillRoot, files, set.SkillNames()); err != nil {
 			return def.Set{}, "", nil, err
 		}
 	}
-	roles, err := writeRoles(filepath.Join(folder, filepath.FromSlash(rolesDir)), set.Agents, a.cfg.defs)
+	roles, err := writeRoles(filepath.Join(folder, filepath.FromSlash(rolesDir)), set.Agents, a.core.Defs())
 	if err != nil {
 		return def.Set{}, "", nil, err
 	}
@@ -67,9 +68,9 @@ func (a *Agent) writeDefs(ctx context.Context) (def.Set, string, map[string]any,
 // each tool of the session. The role file has no key for the Mode of an
 // agent, because Codex 0.163 runs a role with the sandbox of the session
 // even if the file sets sandbox_mode. It has no key for the Skills of an
-// agent: the CLI lists each skill to the role. It skips a name that
-// leaves dir.
-func writeRoles(dir string, agents []def.Agent, d *clidefs.Defs) (map[string]any, error) {
+// agent: the CLI lists each skill to the role. A name that
+// [storefs.CheckName] rejects fails the write.
+func writeRoles(dir string, agents []def.Agent, f *clidefs.Folder) (map[string]any, error) {
 	if len(agents) == 0 {
 		return nil, nil
 	}
@@ -79,11 +80,11 @@ func writeRoles(dir string, agents []def.Agent, d *clidefs.Defs) (map[string]any
 
 	roles := make(map[string]any, len(agents))
 	for _, a := range agents {
-		if !storefs.OneElement(a.Name) {
-			continue
+		if err := storefs.CheckName(a.Name); err != nil {
+			return nil, err
 		}
 		file := filepath.Join(dir, a.Name+roleExt)
-		data, err := roleData(a, d.Model(a.Model))
+		data, err := roleData(a, f.Model(a.Model))
 		if err != nil {
 			return nil, fmt.Errorf("write the role %s: %w", a.Name, err)
 		}

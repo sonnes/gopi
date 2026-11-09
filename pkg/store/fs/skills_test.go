@@ -31,6 +31,12 @@ func skillNames(skills []def.Skill) []string {
 	return out
 }
 
+// skillsOf returns the skills that [storefs.FS] reads from fsys.
+func skillsOf(ctx context.Context, fsys fs.FS) ([]def.Skill, error) {
+	set, err := storefs.FS(fsys).Load(ctx)
+	return set.Skills, err
+}
+
 // brokenFS is a MapFS that fails to open the file broken.
 // It has only the Open method, so each call of the io/fs functions
 // goes through Open.
@@ -53,7 +59,7 @@ func readSkill(t *testing.T, text string) def.Skill {
 		"skills/deploy/SKILL.md": file(text),
 	}
 
-	got, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
+	got, err := skillsOf(context.Background(), fsys)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	return got[0]
@@ -61,22 +67,22 @@ func readSkill(t *testing.T, text string) def.Skill {
 
 func TestSkillsReadsEachSkillFolder(t *testing.T) {
 	fsys := fstest.MapFS{
-		".agents/skills/deploy/SKILL.md":       skillFile("Deploy the service.", "\nRun scripts/run.sh.\n"),
-		".agents/skills/deploy/scripts/run.sh": file("echo deploy\n"),
-		".agents/skills/review/SKILL.md":       skillFile("Review a diff.", "Read the diff.\n"),
-		".agents/skills/notes/README.md":       file("not a skill\n"),
-		".agents/skills/README.md":             file("not a skill\n"),
-		".agents/skills/deep/nested/SKILL.md":  skillFile("Too deep.", "body"),
+		"skills/deploy/SKILL.md":       skillFile("Deploy the service.", "\nRun scripts/run.sh.\n"),
+		"skills/deploy/scripts/run.sh": file("echo deploy\n"),
+		"skills/review/SKILL.md":       skillFile("Review a diff.", "Read the diff.\n"),
+		"skills/notes/README.md":       file("not a skill\n"),
+		"skills/README.md":             file("not a skill\n"),
+		"skills/deep/nested/SKILL.md":  skillFile("Too deep.", "body"),
 	}
 
-	got, err := storefs.Skills(fsys, ".agents/skills").ReadSkills(context.Background())
+	got, err := skillsOf(context.Background(), fsys)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"deploy", "review"}, skillNames(got))
 	deploy := got[0]
 	assert.Equal(t, "Deploy the service.", deploy.Description)
 	assert.Equal(t, "Run scripts/run.sh.", deploy.Body)
-	assert.Equal(t, ".agents/skills/deploy/SKILL.md", deploy.Path)
+	assert.Equal(t, "skills/deploy/SKILL.md", deploy.Path)
 	assert.Empty(t, deploy.Qualifier)
 	assert.Nil(t, deploy.Extra)
 
@@ -252,7 +258,7 @@ func TestSkillsSkipBadSkills(t *testing.T) {
 				"skills/good/SKILL.md": skillFile("Works.", "body"),
 			}
 
-			got, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
+			got, err := skillsOf(context.Background(), fsys)
 			require.NoError(t, err)
 
 			assert.Equal(t, []string{"good"}, skillNames(got))
@@ -267,7 +273,7 @@ func TestSkillsReadWindowsLineEnds(t *testing.T) {
 	assert.Equal(t, "Run it.", got.Body)
 }
 
-func TestSkillsOnDisk(t *testing.T) {
+func TestSkillsOfASubfolder(t *testing.T) {
 	repo := t.TempDir()
 	dir := filepath.Join(repo, ".claude", "skills", "deploy")
 	require.NoError(t, os.MkdirAll(dir, 0o755))
@@ -276,8 +282,10 @@ func TestSkillsOnDisk(t *testing.T) {
 	root, err := os.OpenRoot(repo)
 	require.NoError(t, err)
 	t.Cleanup(func() { root.Close() })
+	claude, err := fs.Sub(root.FS(), ".claude")
+	require.NoError(t, err)
 
-	got, err := storefs.Skills(root.FS(), ".claude/skills").ReadSkills(context.Background())
+	got, err := skillsOf(context.Background(), claude)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"deploy"}, skillNames(got))
@@ -289,7 +297,7 @@ func TestSkillsThatFindNothingGiveNothing(t *testing.T) {
 	missing := os.DirFS(filepath.Join(t.TempDir(), "missing"))
 
 	for _, fsys := range []fs.FS{empty, missing} {
-		got, err := storefs.Skills(fsys, ".agents/skills").ReadSkills(ctx)
+		got, err := skillsOf(ctx, fsys)
 		require.NoError(t, err)
 		assert.Empty(t, got)
 	}
@@ -303,6 +311,6 @@ func TestSkillsFailOnAFileThatCannotBeRead(t *testing.T) {
 		broken: "skills/deploy/SKILL.md",
 	}
 
-	_, err := storefs.Skills(fsys, "skills").ReadSkills(context.Background())
+	_, err := skillsOf(context.Background(), fsys)
 	assert.Error(t, err)
 }

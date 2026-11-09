@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 )
 
 // waitingSession is a session with a call that waits.
@@ -27,7 +28,7 @@ var waitingSession = host.Session{
 		Rule:   "Bash(mkdir x)",
 	}},
 	Model:     "fake/m",
-	Mode:      agent.ModeDefault,
+	Mode:      permission.Default,
 	UpdatedAt: time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC),
 }
 

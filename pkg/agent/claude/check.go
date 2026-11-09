@@ -7,9 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
@@ -30,6 +27,9 @@ type authStatus struct {
 	SubscriptionType string `json:"subscriptionType"`
 }
 
+// planBrand starts the name of a subscription, such as "Claude Max".
+const planBrand = "Claude"
+
 // clouds names the clouds that Claude Code signs in to.
 var clouds = map[string]string{
 	"bedrock": "Amazon Bedrock",
@@ -42,19 +42,19 @@ var clouds = map[string]string{
 // exits with an error when no account is signed in, and still prints
 // its JSON, so a check reads the JSON and not the exit code.
 func (d driver) Check(ctx context.Context) (agent.Status, error) {
-	c := newConfig(d.opts)
-	env := environ(c.env)
+	c := newOptions(d.opts)
+	env := cliproc.Environ(dropped, c.env)
 
 	out, stderr, err := cliproc.Command(ctx, c.binary, env, "--version")
 	if err != nil {
-		return agent.Status{}, checkErr(err, stderr)
+		return agent.Status{}, cliproc.CheckErr(cliName, err, stderr)
 	}
 	status := agent.Status{Version: cliproc.Version(out)}
 
 	out, stderr, err = cliproc.Command(ctx, c.binary, env, "auth", "status", "--json")
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
-		return status, checkErr(err, stderr)
+		return status, cliproc.CheckErr(cliName, err, stderr)
 	}
 	var auth authStatus
 	if jsonErr := json.Unmarshal(out, &auth); jsonErr != nil {
@@ -69,7 +69,7 @@ func (d driver) Check(ctx context.Context) (agent.Status, error) {
 	switch auth.AuthMethod {
 	case "claude.ai", "oauth_token":
 		status.Method = agent.AuthSubscription
-		status.Plan = planName(auth.SubscriptionType)
+		status.Plan = cliproc.PlanName(planBrand, auth.SubscriptionType)
 	case "api_key", "api_key_helper":
 		status.Method = agent.AuthAPIKey
 	case "third_party":
@@ -77,23 +77,4 @@ func (d driver) Check(ctx context.Context) (agent.Status, error) {
 		status.Plan = cmp.Or(clouds[auth.APIProvider], auth.APIProvider)
 	}
 	return status, nil
-}
-
-// planName returns the name of a subscription for a person, such as
-// "Claude Max" for "max". It returns "" for no subscription.
-func planName(subscription string) string {
-	if subscription == "" {
-		return ""
-	}
-	first, size := utf8.DecodeRuneInString(subscription)
-	return "Claude " + string(unicode.ToUpper(first)) + subscription[size:]
-}
-
-// checkErr adds the end of stderr to the error of a check command.
-func checkErr(err error, stderr []byte) error {
-	reason := strings.TrimSpace(string(stderr))
-	if reason == "" {
-		return fmt.Errorf("claude: %w", err)
-	}
-	return fmt.Errorf("claude: %w: %s", err, reason)
 }

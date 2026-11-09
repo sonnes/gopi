@@ -98,9 +98,9 @@ func TestRunMessageEvents(t *testing.T) {
 			name: "a failed hook on a message with no model events closes the message",
 			p:    fixed{msg: &hello},
 			opts: []agent.Option{
-				agent.AfterCall(func(_ context.Context, _ agent.State, _ agent.Request, m ai.Message) (ai.Message, error) {
+				agent.Hooks(agent.AfterCall(func(_ context.Context, _ agent.State, _ agent.Request, m ai.Message) (ai.Message, error) {
 					return m, errors.New("boom")
-				}),
+				})),
 			},
 			wantErr: "boom",
 			want:    []string{"hi"},

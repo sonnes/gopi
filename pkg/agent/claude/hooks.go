@@ -1,92 +1,68 @@
 package claude
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/hooktext"
-	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/tool"
+	"github.com/sonnes/gopi/pkg/agent/internal/clihook"
 )
 
-// The hook events of the CLI at the points of a gopi hook. The agent
+// The hook events of the CLI that Codex does not have. The agent
 // registers each event as one callback with the name of the event.
 const (
-	eventPreToolUse         = "PreToolUse"
-	eventPostToolUse        = "PostToolUse"
 	eventPostToolUseFailure = "PostToolUseFailure"
 	eventPostToolBatch      = "PostToolBatch"
-	eventStop               = "Stop"
 )
 
-// hookPoints are the points of a gopi hook that the CLI calls. The CLI
-// has no hook at a model call, so BeforeCall and AfterCall are not in
-// it.
-var hookPoints = []agent.Point{
-	agent.PointBeforeTool,
-	agent.PointAfterTool,
-	agent.PointAfterTurn,
-	agent.PointBeforeStop,
+// hookEvents maps each point of a gopi hook that the CLI calls to the
+// hook events of the CLI at that point. The CLI fires PostToolUse after
+// a call that succeeds, and PostToolUseFailure after a call that fails,
+// so AfterTool has both. The CLI has no hook at a model call.
+var hookEvents = map[agent.Point][]string{
+	agent.PointBeforeTool: {clihook.EventPreToolUse},
+	agent.PointAfterTool:  {clihook.EventPostToolUse, eventPostToolUseFailure},
+	agent.PointAfterTurn:  {eventPostToolBatch},
+	agent.PointBeforeStop: {clihook.EventStop},
 }
 
-// permissionAsk is the PreToolUse decision that sends the call to the
-// permission prompt of the CLI. It skips the permission mode and the
-// rules of the CLI.
-const permissionAsk = "ask"
+// checkHooks returns an error for a hook at a point that the CLI does
+// not call, or for a hook that implements no point.
+func checkHooks(hooks []agent.Hook) error {
+	points := slices.Collect(maps.Keys(hookEvents))
+	if err := agent.CheckHooks(hooks, points...); err != nil {
+		return fmt.Errorf("claude: %w", err)
+	}
+	return nil
+}
 
 // renameText is the reason of a deny when a hook renames a tool call.
 const renameText = "claude: a hook cannot rename a tool call of Claude Code"
 
-// Hooks adds hooks that the CLI calls at its own hook events, over the
-// control protocol:
-//
-//   - BeforeTool at PreToolUse. An error denies the call with its text.
-//     An [agent.AskError] sends the call to the permission prompt of
-//     the CLI, and [Approve] answers the prompt. A new input replaces
-//     the input. The CLI cannot rename a call, so a new name denies it.
-//   - AfterTool at PostToolUse. The result has the text of the
-//     tool_response. A built-in tool such as Bash gives a JSON object,
-//     so its result is the JSON of that object. A new text replaces the
-//     output that the model reads. If the tool_response is an object
-//     and the new text is valid JSON, the CLI gets the JSON. Otherwise
-//     the CLI gets a string. The CLI ignores an output whose shape is
-//     not the shape of the tool_response. So a hook must keep the JSON
-//     shape of a built-in tool. An error adds its text to the result.
-//   - AfterTool also at PostToolUseFailure, after a call that fails.
-//     The result is an error with the error text of the CLI. The CLI
-//     cannot replace the output of a failed call. So the model reads
-//     the error, and a new text or the text of an error comes after it
-//     as context.
-//   - AfterTurn at PostToolBatch, after a turn with tool calls only.
-//     The text of the entries reaches the model before its next call.
-//   - BeforeStop at Stop. The text of the entries continues the run.
-//
-// Each hook gets the state of [Agent.State], with the log of the agent.
-// A hook gives only text entries. An error of AfterTurn or
-// BeforeStop stops the CLI and fails the run. If a hook uses BeforeCall
-// or AfterCall, the run fails with an error that wraps
-// [errors.ErrUnsupported].
-func Hooks(hs ...agent.Hook) Option {
-	return func(c *config) { c.hooks = append(c.hooks, hs...) }
-}
-
 // hookMatcher registers one callback for a hook event.
 type hookMatcher struct {
 	HookCallbackIDs []string `json:"hookCallbackIds"`
+	// Timeout is the time limit of the callback, in seconds. Zero keeps
+	// the default limit of the CLI.
+	Timeout int `json:"timeout,omitempty"`
 }
 
 // registration returns the hooks field of the initialize request: one
-// callback for each event that a hook uses.
+// callback for each event that a hook uses. PreToolUse gets
+// [clihook.AskTimeout], because a BeforeTool hook can wait for a person.
 func registration(hooks []agent.Hook) map[string][]hookMatcher {
 	events := make(map[string][]hookMatcher)
 	for _, h := range hooks {
 		for _, p := range agent.Points(h) {
-			for _, event := range eventsOf(p) {
-				events[event] = []hookMatcher{{HookCallbackIDs: []string{event}}}
+			for _, event := range hookEvents[p] {
+				m := hookMatcher{HookCallbackIDs: []string{event}}
+				if event == clihook.EventPreToolUse {
+					m.Timeout = clihook.AskTimeout
+				}
+				events[event] = []hookMatcher{m}
 			}
 		}
 	}
@@ -96,148 +72,70 @@ func registration(hooks []agent.Hook) map[string][]hookMatcher {
 	return events
 }
 
-// eventsOf returns the hook events of the CLI at the point p. The CLI
-// fires PostToolUse after a call that succeeds, and PostToolUseFailure
-// after a call that fails, so AfterTool has both.
-func eventsOf(p agent.Point) []string {
-	switch p {
-	case agent.PointBeforeTool:
-		return []string{eventPreToolUse}
-	case agent.PointAfterTool:
-		return []string{eventPostToolUse, eventPostToolUseFailure}
-	case agent.PointAfterTurn:
-		return []string{eventPostToolBatch}
-	case agent.PointBeforeStop:
-		return []string{eventStop}
-	}
-	return nil
-}
-
-// hookInput is the input of a hook callback.
-type hookInput struct {
-	HookEventName string          `json:"hook_event_name"`
-	ToolName      string          `json:"tool_name"`
-	ToolInput     json.RawMessage `json:"tool_input"`
-	ToolResponse  json.RawMessage `json:"tool_response"`
-	ToolUseID     string          `json:"tool_use_id"`
-	// Error is the error of a failed call, at PostToolUseFailure.
-	Error string `json:"error"`
-}
-
-// hookOutput is the answer to a hook callback. The zero value changes
-// nothing.
-type hookOutput struct {
-	// Continue false stops the CLI, with StopReason.
-	Continue   *bool  `json:"continue,omitempty"`
-	StopReason string `json:"stopReason,omitempty"`
-	// Decision "block" with a Reason continues a stop, or adds the
-	// reason to a tool result.
-	Decision           string        `json:"decision,omitempty"`
-	Reason             string        `json:"reason,omitempty"`
-	HookSpecificOutput *hookSpecific `json:"hookSpecificOutput,omitempty"`
-}
-
-type hookSpecific struct {
-	HookEventName            string          `json:"hookEventName"`
-	PermissionDecision       string          `json:"permissionDecision,omitempty"`
-	PermissionDecisionReason string          `json:"permissionDecisionReason,omitempty"`
-	UpdatedInput             json.RawMessage `json:"updatedInput,omitempty"`
-	UpdatedToolOutput        json.RawMessage `json:"updatedToolOutput,omitempty"`
-	AdditionalContext        string          `json:"additionalContext,omitempty"`
-}
-
 // callHook runs the hooks of one hook_callback request, in the order
 // of registration, and returns the answer.
-func (pr *process) callHook(ctx context.Context, req *controlRequest) (hookOutput, error) {
-	var in hookInput
+func (pr *process) callHook(ctx context.Context, req *controlRequest) (clihook.Output, error) {
+	var in clihook.Input
 	if err := json.Unmarshal(req.Input, &in); err != nil {
-		return hookOutput{}, fmt.Errorf("claude: decode the input of the hook %q: %w", req.CallbackID, err)
+		return clihook.Output{}, fmt.Errorf("claude: decode the input of the hook %q: %w", req.CallbackID, err)
 	}
 	switch req.CallbackID {
-	case eventPreToolUse:
+	case clihook.EventPreToolUse:
 		return pr.beforeTool(ctx, in), nil
-	case eventPostToolUse:
+	case clihook.EventPostToolUse:
 		return pr.afterTool(ctx, in), nil
 	case eventPostToolUseFailure:
 		return pr.afterToolFailure(ctx, in), nil
 	case eventPostToolBatch:
 		return pr.afterTurn(ctx), nil
-	case eventStop:
-		return pr.beforeStop(ctx), nil
+	case clihook.EventStop:
+		return clihook.BeforeStop(ctx, pr.hooks, pr.state, pr.stops), nil
 	}
-	return hookOutput{}, fmt.Errorf("claude: gopi has no hook %q", req.CallbackID)
+	return clihook.Output{}, fmt.Errorf("claude: gopi has no hook %q", req.CallbackID)
 }
 
-func (pr *process) beforeTool(ctx context.Context, in hookInput) hookOutput {
-	orig := ai.ToolCall{
-		ID:    in.ToolUseID,
-		Name:  tool.Canonical(in.ToolName),
-		Input: in.ToolInput,
-	}
-	call := orig
-	// ask is the reason of the first hook that asks. The other hooks
-	// still run, so a deny or a new input of a later hook counts.
-	var ask *agent.AskError
-	for _, h := range pr.hooks {
-		bt, ok := h.(agent.BeforeToolHook)
-		if !ok {
-			continue
-		}
-		next, err := bt.BeforeTool(ctx, pr.state(), call)
-		var asks *agent.AskError
-		switch {
-		case errors.As(err, &asks):
-			if ask == nil {
-				ask = asks
-			}
-		case err != nil:
-			return denyTool(err.Error())
-		}
-		call = next
+func (pr *process) beforeTool(ctx context.Context, in clihook.Input) clihook.Output {
+	orig := in.Call()
+	call, err := agent.RunBeforeTool(
+		ctx,
+		pr.hooks,
+		pr.state,
+		pr.approve,
+		orig,
+	)
+	if err != nil {
+		return clihook.Deny(err.Error())
 	}
 	if call.Name != orig.Name {
-		return denyTool(renameText)
+		return clihook.Deny(renameText)
 	}
-	out := &hookSpecific{HookEventName: eventPreToolUse}
-	if !bytes.Equal(call.Input, orig.Input) {
-		out.UpdatedInput = call.Input
+	if clihook.SameInput(call.Input, orig.Input) {
+		return clihook.Output{}
 	}
-	// An ask goes to the permission prompt of the CLI, which has no
-	// time limit. A hook that waits for a person can time out, and the
-	// CLI then runs the call.
-	if ask != nil {
-		out.PermissionDecision = permissionAsk
-		out.PermissionDecisionReason = ask.Error()
-	}
-	if out.UpdatedInput == nil && ask == nil {
-		return hookOutput{}
-	}
-	return hookOutput{HookSpecificOutput: out}
-}
-
-func denyTool(reason string) hookOutput {
-	return hookOutput{HookSpecificOutput: &hookSpecific{
-		HookEventName:            eventPreToolUse,
-		PermissionDecision:       "deny",
-		PermissionDecisionReason: reason,
+	return clihook.Output{HookSpecificOutput: &clihook.Specific{
+		HookEventName: clihook.EventPreToolUse,
+		UpdatedInput:  call.Input,
 	}}
 }
 
-func (pr *process) afterTool(ctx context.Context, in hookInput) hookOutput {
-	orig := hooktext.Response(in.ToolResponse)
-	result, err := pr.runAfterTool(ctx, in, hooktext.ToolResult(orig))
+func (pr *process) afterTool(ctx context.Context, in clihook.Input) clihook.Output {
+	orig := clihook.Response(in.ToolResponse)
+	result, err := agent.RunAfterTool(
+		ctx,
+		pr.hooks,
+		pr.state,
+		in.Call(),
+		clihook.ToolResult(orig),
+	)
 	if err != nil {
-		return hookOutput{
-			Decision: "block",
-			Reason:   err.Error(),
-		}
+		return clihook.Block(err.Error())
 	}
-	text := hooktext.Result(result)
+	text := clihook.Result(result)
 	if text == orig {
-		return hookOutput{}
+		return clihook.Output{}
 	}
-	return hookOutput{HookSpecificOutput: &hookSpecific{
-		HookEventName:     eventPostToolUse,
+	return clihook.Output{HookSpecificOutput: &clihook.Specific{
+		HookEventName:     clihook.EventPostToolUse,
 		UpdatedToolOutput: toolOutput(in.ToolResponse, text),
 	}}
 }
@@ -246,47 +144,27 @@ func (pr *process) afterTool(ctx context.Context, in hookInput) hookOutput {
 // result is an error with the error text of the CLI. The CLI takes only
 // context at PostToolUseFailure, so a new text or the text of an error
 // goes to the model next to the error.
-func (pr *process) afterToolFailure(ctx context.Context, in hookInput) hookOutput {
-	failed := hooktext.ToolResult(in.Error)
+func (pr *process) afterToolFailure(ctx context.Context, in clihook.Input) clihook.Output {
+	failed := clihook.ToolResult(in.Error)
 	failed.IsError = true
-	result, err := pr.runAfterTool(ctx, in, failed)
-	text := hooktext.Result(result)
+	result, err := agent.RunAfterTool(
+		ctx,
+		pr.hooks,
+		pr.state,
+		in.Call(),
+		failed,
+	)
+	text := clihook.Result(result)
 	if err != nil {
 		text = err.Error()
 	}
 	if text == in.Error {
-		return hookOutput{}
+		return clihook.Output{}
 	}
-	return hookOutput{HookSpecificOutput: &hookSpecific{
+	return clihook.Output{HookSpecificOutput: &clihook.Specific{
 		HookEventName:     eventPostToolUseFailure,
 		AdditionalContext: text,
 	}}
-}
-
-// runAfterTool runs the AfterTool hooks on the result of the call in
-// in, in the order of registration. It stops at the first error.
-func (pr *process) runAfterTool(
-	ctx context.Context,
-	in hookInput,
-	result ai.ToolResult,
-) (ai.ToolResult, error) {
-	call := ai.ToolCall{
-		ID:    in.ToolUseID,
-		Name:  tool.Canonical(in.ToolName),
-		Input: in.ToolInput,
-	}
-	for _, h := range pr.hooks {
-		at, ok := h.(agent.AfterToolHook)
-		if !ok {
-			continue
-		}
-		next, err := at.AfterTool(ctx, pr.state(), call, result)
-		if err != nil {
-			return result, err
-		}
-		result = next
-	}
-	return result, nil
 }
 
 // toolOutput returns the updatedToolOutput for the new text of a
@@ -304,7 +182,7 @@ func toolOutput(response json.RawMessage, text string) json.RawMessage {
 	return data
 }
 
-func (pr *process) afterTurn(ctx context.Context) hookOutput {
+func (pr *process) afterTurn(ctx context.Context) clihook.Output {
 	var texts []string
 	for _, h := range pr.hooks {
 		at, ok := h.(agent.AfterTurnHook)
@@ -313,65 +191,20 @@ func (pr *process) afterTurn(ctx context.Context) hookOutput {
 		}
 		entries, err := at.AfterTurn(ctx, pr.state())
 		if err != nil {
-			return pr.stopFor(eventPostToolBatch, err)
+			return pr.stops.Stop(eventPostToolBatch, err)
 		}
-		text, err := hooktext.Entries(entries)
+		text, err := clihook.Entries(entries)
 		if err != nil {
-			return pr.stopFor(eventPostToolBatch, err)
+			return pr.stops.Stop(eventPostToolBatch, err)
 		}
 		texts = append(texts, text)
 	}
-	extra := hooktext.Join(texts)
+	extra := clihook.Join(texts)
 	if extra == "" {
-		return hookOutput{}
+		return clihook.Output{}
 	}
-	return hookOutput{HookSpecificOutput: &hookSpecific{
+	return clihook.Output{HookSpecificOutput: &clihook.Specific{
 		HookEventName:     eventPostToolBatch,
 		AdditionalContext: extra,
 	}}
-}
-
-func (pr *process) beforeStop(ctx context.Context) hookOutput {
-	for _, h := range pr.hooks {
-		bs, ok := h.(agent.BeforeStopHook)
-		if !ok {
-			continue
-		}
-		entries, err := bs.BeforeStop(ctx, pr.state())
-		if err != nil {
-			return pr.stopFor(eventStop, err)
-		}
-		if len(entries) == 0 {
-			continue
-		}
-		text, err := hooktext.Entries(entries)
-		if err != nil {
-			return pr.stopFor(eventStop, err)
-		}
-		return hookOutput{
-			Decision: "block",
-			Reason:   text,
-		}
-	}
-	return hookOutput{}
-}
-
-// stopFor keeps the error of a hook at event, so that the run fails,
-// and returns the answer that stops the CLI.
-func (pr *process) stopFor(event string, err error) hookOutput {
-	if pr.hookErr == nil {
-		pr.hookErr = fmt.Errorf("claude: the hook at %s: %w", event, err)
-	}
-	stop := false
-	return hookOutput{
-		Continue:   &stop,
-		StopReason: err.Error(),
-	}
-}
-
-// takeHookErr returns the error of a hook in this run, and clears it.
-func (pr *process) takeHookErr() error {
-	err := pr.hookErr
-	pr.hookErr = nil
-	return err
 }

@@ -2,13 +2,11 @@ package claude
 
 import (
 	"context"
-	"fmt"
 	"slices"
 
 	"github.com/sonnes/gopi/internal/transcript"
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
-	"github.com/sonnes/gopi/pkg/agent/internal/sections"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
@@ -48,26 +46,18 @@ func (a *Agent) Continue(ctx context.Context) *agent.Stream {
 // stops the idle reader, runs, and starts the idle reader again if the
 // CLI goes on.
 func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []session.Entry) ([]ai.Message, error) {
-	em := emit.New(a.log, a.name, a.state, push)
-	if err := em.Start(); err != nil {
-		return nil, fmt.Errorf("claude: %w", err)
-	}
 	// A run with input gets the sections. The turn of Continue has no
 	// input to carry a change.
-	var change *ai.Message
-	if entries != nil {
-		base, c, err := sections.ForCLI(ctx, a.cfg.sections, a.log.Messages(), a.log.History().CompactedAt)
+	if entries == nil {
+		em, err := a.core.Start(push)
 		if err != nil {
-			return em.Finish(ctx, ai.Usage{}, fmt.Errorf("claude: %w", err))
+			return nil, err
 		}
-		// The base goes in the log before the CLI starts, because the
-		// CLI gets it as its system prompt.
-		if base != nil {
-			if err := em.Input(ctx, []session.Entry{session.NewEntry(*base)}); err != nil {
-				return em.Finish(ctx, ai.Usage{}, err)
-			}
-		}
-		change = c
+		return a.drive(ctx, em, nil, nil, false)
+	}
+	em, change, err := a.core.StartInput(ctx, push, a.cfg.Sections)
+	if err != nil {
+		return nil, err
 	}
 	return a.drive(ctx, em, entries, change, false)
 }
@@ -76,7 +66,7 @@ func (a *Agent) runWith(ctx context.Context, push func(agent.Event), entries []s
 // kept. With command, entries are a command of the CLI.
 func (a *Agent) drive(
 	ctx context.Context,
-	em *emit.Emitter,
+	em *cliagent.Emitter,
 	entries []session.Entry,
 	change *ai.Message,
 	command bool,
@@ -89,8 +79,6 @@ func (a *Agent) drive(
 		a.endBackground()
 		return em.Finish(ctx, ai.Usage{}, err)
 	}
-	// The error of a hook belongs to the run that called it.
-	proc.hookErr = nil
 	r := newRunner(a, proc, em)
 	r.command = command
 	if change != nil {
@@ -256,15 +244,15 @@ func (a *Agent) requeue(lines []*line) {
 
 // signalWake calls the Wake function, if the agent has one.
 func (a *Agent) signalWake() {
-	if a.cfg.wake != nil {
-		a.cfg.wake()
+	if a.cfg.Wake != nil {
+		a.cfg.Wake()
 	}
 }
 
 // sendIdle sends an event between runs to the Idle function.
 func (a *Agent) sendIdle(ev agent.Event) {
-	if a.cfg.idle != nil {
-		a.cfg.idle(ev)
+	if a.cfg.Idle != nil {
+		a.cfg.Idle(ev)
 	}
 }
 
@@ -273,12 +261,4 @@ func (a *Agent) sendIdle(ev agent.Event) {
 func (a *Agent) endBackground() {
 	a.subs.carry(a.sendIdle)
 	a.releaseIdle(context.Background(), false)
-}
-
-// sessionID returns the ID of the session of a, or "" if it is unsaved.
-func (a *Agent) sessionID() string {
-	if a.store == nil {
-		return ""
-	}
-	return a.log.Session().ID
 }

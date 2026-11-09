@@ -2,11 +2,13 @@ package harness_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
@@ -18,6 +20,14 @@ var review = def.Skill{
 	Body:        "Read the diff.",
 }
 
+// skillConfig returns the config of a test with the skills skills.
+func skillConfig(t *testing.T, skills ...def.Skill) agent.Config {
+	t.Helper()
+	c := config(t)
+	c.Defs = def.Set{Skills: skills}
+	return c
+}
+
 // callSkill runs an agent whose model calls the skill tool once with
 // input, and returns the tool result message.
 func callSkill(t *testing.T, input string) ai.Message {
@@ -26,15 +36,14 @@ func callSkill(t *testing.T, input string) ai.Message {
 		callTool("c1", "skill", input),
 		reply("done"),
 	}}
-	h := harness.New(with(base(t, p), harness.Skillset(deploy, review))...)
-	a, err := h.New(context.Background())
+	a, err := harness.New(with(base(p), skillTool)...).New(context.Background(), skillConfig(t, deploy, review))
 	require.NoError(t, err)
 	run(t, a, "go")
 	return toolResult(t, a)
 }
 
 func TestSkillToolSchemaListsTheSkills(t *testing.T) {
-	asm := assemblyOf(t, with(base(t, &script{}), harness.Skillset(deploy, review)))
+	asm := assemblyOf(t, with(base(&script{}), skillTool), skillConfig(t, deploy, review))
 	require.Len(t, asm.Tools, 1)
 
 	info := asm.Tools[0]
@@ -44,7 +53,7 @@ func TestSkillToolSchemaListsTheSkills(t *testing.T) {
 }
 
 func TestAnAssemblyWithNoSkillsHasNoSkillTool(t *testing.T) {
-	asm := assemblyOf(t, base(t, &script{}))
+	asm := assemblyOf(t, with(base(&script{}), skillTool), config(t))
 
 	assert.Empty(t, asm.Tools)
 }
@@ -100,12 +109,12 @@ func lastUser(t *testing.T, p *script) []string {
 	defer p.mu.Unlock()
 	require.NotEmpty(t, p.calls)
 	msgs := p.calls[len(p.calls)-1]
-	for i := len(msgs) - 1; i >= 0; i-- {
-		if msgs[i].Role != ai.RoleUser {
+	for _, msg := range slices.Backward(msgs) {
+		if msg.Role != ai.RoleUser {
 			continue
 		}
 		var out []string
-		for _, c := range msgs[i].Content {
+		for _, c := range msg.Content {
 			if text, ok := c.(ai.Text); ok {
 				out = append(out, text.Text)
 			}
@@ -152,8 +161,8 @@ func TestASlashCallLoadsTheSkillBeforeTheText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &script{responses: []ai.Message{reply("done")}}
-			h := harness.New(with(base(t, p), harness.Skillset(deploy, review, userOnly))...)
-			a, err := h.New(context.Background())
+			c := skillConfig(t, deploy, review, userOnly)
+			a, err := harness.New(with(base(p), skillTool)...).New(context.Background(), c)
 			require.NoError(t, err)
 
 			run(t, a, tt.input)

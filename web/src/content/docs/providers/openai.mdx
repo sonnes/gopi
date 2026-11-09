@@ -93,6 +93,8 @@ opts := ai.JoinOptions(
 
 GPT-6 and GPT-5.6 take a developer message in the conversation, and the provider sends a system message there. A tool that a system message adds goes in place as an `additional_tools` item, so the cached prefix stays the same. A tool that a system message removes stays in the tool list, and an `allowed_tools` tool choice limits the model to the current tools. Every other model gets the text as a `<system-reminder>` in a user message.
 
+The provider finds a GPT-6 or GPT-5.6 model by the start of its ID. So a later model of the family, such as `gpt-6.1-sol`, gets the same features.
+
 ## Objects
 
 `ai.GenerateObject` uses structured outputs in strict mode. The schema comes from your struct.

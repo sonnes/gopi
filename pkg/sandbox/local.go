@@ -21,8 +21,8 @@ type Option func(*local)
 
 // Policy fences the sandbox with a policy. Each command runs inside a
 // [fence.Fence] with the policy, and the file tools obey the same file
-// rules: they cannot read a hidden path, and they write only where a
-// fenced command can write. The shell of each command does not load the
+// rules: they cannot read a hidden path ([ErrHidden]), and they write
+// only where a fenced command can write ([ErrNotWritable]). The shell of each command does not load the
 // profile of the user. Without Policy, the sandbox has no limits. For
 // the policy of an agent that works in one project directory:
 //
@@ -110,13 +110,33 @@ func (l *local) ReadFile(_ context.Context, path string) ([]byte, error) {
 	return io.ReadAll(f)
 }
 
+// FileSize returns the size of a file. It opens the file as ReadFile
+// does, so it checks the same rules. The read tool and the grep tool
+// reach FileSize through [host.Sizer].
+func (l *local) FileSize(path string) (int64, error) {
+	abs, err := l.HostPath(path)
+	if err != nil {
+		return 0, err
+	}
+	f, err := l.open(abs, path, false)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return info.Size(), nil
+}
+
 func (l *local) WriteFile(_ context.Context, path string, data []byte) error {
 	abs, err := l.HostPath(path)
 	if err != nil {
 		return err
 	}
 	if l.rules != nil && !l.rules.CanWrite(abs) {
-		return fmt.Errorf("path is not writable under the sandbox policy: %s", path)
+		return fmt.Errorf("%w: %s", ErrNotWritable, path)
 	}
 
 	err = os.MkdirAll(filepath.Dir(abs), 0o755) //nolint:gosec // Standard directory permissions
@@ -177,8 +197,7 @@ func (l *local) Exec(ctx context.Context, cmd Command) (Result, error) {
 		return res, nil
 	}
 
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		res.ExitCode = exitErr.ExitCode()
 		// A signal gives -1. A shell reports 128 plus the signal.
 		if ws, ok := exitErr.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
@@ -218,7 +237,7 @@ func (l *local) HostPath(path string) (string, error) {
 
 	abs := l.abs(path)
 	if l.rules != nil && !l.rules.CanRead(abs) {
-		return "", fmt.Errorf("path is hidden by the sandbox policy: %s", path)
+		return "", fmt.Errorf("%w: %s", ErrHidden, path)
 	}
 	return abs, nil
 }

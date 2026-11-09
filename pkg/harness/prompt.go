@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/session"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // PromptBuilder builds the sections of the system prompt from an
@@ -21,7 +22,7 @@ import (
 // the section named [SystemSection]. A builder does not repeat it.
 //
 // An error from the builder fails the run before the model call. It
-// does not fail [Harness.New] or [Harness.Durable].
+// does not fail [Harness.New] or [Harness.Start].
 type PromptBuilder func(ctx context.Context, asm *Assembly) ([]ai.Section, error)
 
 // Seeder builds the first entries of a new session from an [Assembly].
@@ -56,14 +57,17 @@ const agentsIntro = "A subagent does a task in its own context with the `agent` 
 // DefaultPrompt is the prompt builder that the harness uses when none
 // is set. It returns up to three sections, in this order:
 //
-//   - "instructions": the text of each instruction, in the order of the readers.
+//   - "instructions": the text of each instruction, in order.
 //   - "skills": the name and the description of each skill that the
-//     model can call, not the body.
-//   - "agents": the name and the description of each subagent.
+//     model can call, not the body. It needs the skill tool.
+//   - "agents": the name and the description of each subagent. It
+//     needs the agent tool.
 //
-// It leaves out a section with nothing to list. DefaultPrompt writes no
-// fact that changes between sessions, such as the date, so a provider
-// can cache the prompt. Those facts go in the seed.
+// It leaves out a section with nothing to list, and a section whose
+// tool the assembly does not have, so the prompt names no missing
+// tool. DefaultPrompt writes no fact that changes between sessions,
+// such as the date, so a provider can cache the prompt. Those facts go
+// in the seed.
 func DefaultPrompt(_ context.Context, asm *Assembly) ([]ai.Section, error) {
 	var out []ai.Section
 	if len(asm.Instructions) > 0 {
@@ -77,12 +81,12 @@ func DefaultPrompt(_ context.Context, asm *Assembly) ([]ai.Section, error) {
 		}
 		skills = append(skills, "- "+asm.SkillName(i)+": "+s.Description)
 	}
-	if len(skills) > 0 {
+	if len(skills) > 0 && asm.hasTool(tool.Skill) {
 		text := strings.Join([]string{"## Skills", skillsIntro, strings.Join(skills, "\n")}, "\n\n")
 		out = append(out, ai.Section{Name: skillsSection, Text: text})
 	}
 
-	if asm.agentTool() {
+	if len(asm.Agents) > 0 && asm.hasTool(tool.Agent) {
 		var agents []string
 		for _, a := range asm.Agents {
 			agents = append(agents, "- "+a.Name+": "+a.Description)

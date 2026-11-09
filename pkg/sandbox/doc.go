@@ -21,6 +21,9 @@
 //     with the policy. The file tools and the search tools obey the file
 //     rules of the policy. [Local] returns an error if the fence cannot
 //     run.
+//   - The read, grep, and find tools read each file through
+//     [Sandbox.ReadFile], so a type that wraps a sandbox keeps its file
+//     rules.
 //   - The grep and find tools check the search path against the policy
 //     of a [Local] sandbox only when they get the sandbox itself. A type
 //     that wraps a local sandbox skips this check. rg still runs through

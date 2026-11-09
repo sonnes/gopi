@@ -93,7 +93,7 @@ func TestLoadMCP(t *testing.T) {
 	info := tools[0].Info()
 	assert.Equal(t, "mcp__remote__echo", info.Name)
 	assert.True(t, info.Deferred)
-	assert.Contains(t, warn.String(), `mcp server "broken"`)
+	assert.Regexp(t, `(?s)^gopi: mcp server "broken": .*\ngopi continues without the tools of the servers that failed\n$`, warn.String())
 
 	call := ai.ToolCall{Name: info.Name, Input: []byte(`{"message":"hi"}`)}
 	got, err := tools[0].Run(t.Context(), call)

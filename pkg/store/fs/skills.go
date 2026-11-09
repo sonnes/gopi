@@ -24,33 +24,18 @@ const descriptionSep = "\n\n"
 
 var errNoDescription = errors.New("the skill has no description and no body")
 
-// SkillDir reads skills from the folders in one directory of an fs.FS.
-// [Skills] returns one.
-type SkillDir struct {
-	fsys fs.FS
-	dir  string
-}
-
-// Skills returns a reader that reads one skill from each folder in dir
-// that holds a SKILL.md file:
+// readSkills reads one skill from each folder in dir that holds a
+// SKILL.md file, in name order:
 //
 //	dir/<name>/SKILL.md  one skill; the other files of <name> are its support files
 //
-// The reader looks one level deep only, as Claude Code does. A folder
-// with no SKILL.md is not a skill.
-func Skills(fsys fs.FS, dir string) SkillDir {
-	return SkillDir{
-		fsys: fsys,
-		dir:  dir,
-	}
-}
-
-// ReadSkills reads each dir/<name>/SKILL.md in name order. The name of
-// a skill is the name of its folder, so two skills of one dir never
-// have the same name. If the frontmatter gives another name, the skill
-// keeps it in Extra["name"]. ReadSkills skips a malformed file.
-func (d SkillDir) ReadSkills(ctx context.Context) ([]def.Skill, error) {
-	entries, err := readDir(d.fsys, d.dir)
+// It looks one level deep only, as Claude Code does. A folder with no
+// SKILL.md is not a skill. The name of a skill is the name of its
+// folder, so two skills of one dir never have the same name. If the
+// frontmatter gives another name, the skill keeps it in Extra["name"].
+// readSkills skips a malformed file.
+func readSkills(ctx context.Context, fsys fs.FS, dir string) ([]def.Skill, error) {
+	entries, err := readDir(fsys, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +49,9 @@ func (d SkillDir) ReadSkills(ctx context.Context) ([]def.Skill, error) {
 			continue
 		}
 
-		dir := path.Join(d.dir, e.Name())
-		name := path.Join(dir, skillFile)
-		data, err := fs.ReadFile(d.fsys, name)
+		folder := path.Join(dir, e.Name())
+		name := path.Join(folder, skillFile)
+		data, err := fs.ReadFile(fsys, name)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -79,7 +64,7 @@ func (d SkillDir) ReadSkills(ctx context.Context) ([]def.Skill, error) {
 			continue
 		}
 
-		files, err := fs.Sub(d.fsys, dir)
+		files, err := fs.Sub(fsys, folder)
 		if err != nil {
 			return nil, err
 		}

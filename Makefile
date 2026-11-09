@@ -1,4 +1,4 @@
-.PHONY: test check build tidy fmt record record-cli models \
+.PHONY: test check modernize build tidy fmt record record-cli models \
 	site-install site-dev site-build site-preview site-check site-test site-demo site-og \
 	docs-links
 
@@ -29,6 +29,12 @@ check: tidy
 		echo "$$files"; \
 		exit 1; \
 	fi
+
+# Apply the fixes of go fix in each module. To print the fixes as a
+# diff and change no file, run `make modernize ARGS=-diff`. The target
+# runs each module, then fails if one module failed.
+modernize:
+	@status=0; for m in $(MODULES); do (cd $$m && go fix $(ARGS) ./...) || status=1; done; exit $$status
 
 # Format every Go file in place.
 fmt:

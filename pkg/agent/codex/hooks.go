@@ -6,33 +6,38 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/hooktext"
-	"github.com/sonnes/gopi/pkg/agent/internal/jsonx"
+	"github.com/sonnes/gopi/pkg/agent/internal/clihook"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// The hook events of the CLI at the points of a gopi hook.
-const (
-	eventPreToolUse  = "PreToolUse"
-	eventPostToolUse = "PostToolUse"
-	eventStop        = "Stop"
-)
+// hookEvents maps each point of a gopi hook that the CLI calls to the
+// hook event of the CLI at that point. The CLI has no hook at a model
+// call and no hook after each turn.
+var hookEvents = map[agent.Point]string{
+	agent.PointBeforeTool: clihook.EventPreToolUse,
+	agent.PointAfterTool:  clihook.EventPostToolUse,
+	agent.PointBeforeStop: clihook.EventStop,
+}
 
-// hookPoints are the points of a gopi hook that the CLI calls. The CLI
-// has no hook at a model call and no hook after each turn.
-var hookPoints = []agent.Point{
-	agent.PointBeforeTool,
-	agent.PointAfterTool,
-	agent.PointBeforeStop,
+// checkHooks returns an error for a hook at a point that the CLI does
+// not call, or for a hook that implements no point.
+func checkHooks(hooks []agent.Hook) error {
+	points := slices.Collect(maps.Keys(hookEvents))
+	if err := agent.CheckHooks(hooks, points...); err != nil {
+		return fmt.Errorf("codex: %w", err)
+	}
+	return nil
 }
 
 // defaultHookCommand is the program that relays a hook of the CLI to
@@ -45,32 +50,6 @@ const (
 	commandText     = "codex: a hook must give Bash and apply_patch an input with a string command"
 	unreachableText = "the gopi host of the hook is not reachable"
 )
-
-// Hooks adds hooks that the CLI calls at its own hook events. Codex has
-// no hook callback over its protocol, so the agent adds a command hook
-// to each thread through the config of thread/start, with the hook
-// trust bypassed. The command, [HookCommand], relays each call to a
-// socket of the agent:
-//
-//   - BeforeTool at PreToolUse. An error denies the call with its text.
-//     A new input allows the call with it. A new name denies the call.
-//     For Bash and apply_patch, a new input must be an object with a
-//     string command. A new input of another shape denies the call.
-//   - AfterTool at PostToolUse. A new text, or the text of an error,
-//     replaces the output that the model reads.
-//   - BeforeStop at Stop. The text of the entries continues the turn.
-//     An error stops the turn and fails the run.
-//
-// If the command fails or times out, Codex runs the tool. If the
-// command cannot reach the agent, it denies a call at PreToolUse, gives
-// the error as the output at PostToolUse, and ends the turn at Stop.
-// The hooks do not see a hosted tool, such as web search. A hook gives
-// only text entries. If a hook uses BeforeCall, AfterCall, or
-// AfterTurn, the run fails with an error that wraps
-// [errors.ErrUnsupported].
-func Hooks(hs ...agent.Hook) Option {
-	return func(c *config) { c.hooks = append(c.hooks, hs...) }
-}
 
 // HookCommand sets the path of the gopi binary, which relays a hook of
 // the CLI to the agent with "gopi hook". The default is "gopi" on the
@@ -90,6 +69,9 @@ func HookCommand(path string) Option {
 type hookHandler struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
+	// Timeout is the time limit of the command, in seconds. Zero keeps
+	// the default limit of the CLI.
+	Timeout int `json:"timeout,omitempty"`
 }
 
 // hookGroup is the list of handlers of one hook event.
@@ -99,20 +81,22 @@ type hookGroup struct {
 
 // hookConfig returns the config of thread/start that adds a command
 // hook for each event that a hook uses. The command relays the hook to
-// socket.
+// socket. PreToolUse gets [clihook.AskTimeout], because a BeforeTool
+// hook can wait for a person.
 func hookConfig(command, socket string, hooks []agent.Hook) map[string]any {
 	line := shellQuote(command) + " hook " + shellQuote(socket)
 	events := make(map[string][]hookGroup)
 	for _, h := range hooks {
 		for _, p := range agent.Points(h) {
-			event := eventOf(p)
-			if event == "" {
-				continue
-			}
-			events[event] = []hookGroup{{Hooks: []hookHandler{{
+			event := hookEvents[p]
+			handler := hookHandler{
 				Type:    "command",
 				Command: line,
-			}}}}
+			}
+			if event == clihook.EventPreToolUse {
+				handler.Timeout = clihook.AskTimeout
+			}
+			events[event] = []hookGroup{{Hooks: []hookHandler{handler}}}
 		}
 	}
 	if len(events) == 0 {
@@ -124,48 +108,9 @@ func hookConfig(command, socket string, hooks []agent.Hook) map[string]any {
 	}
 }
 
-// eventOf returns the hook event of the CLI at the point p, or "".
-func eventOf(p agent.Point) string {
-	switch p {
-	case agent.PointBeforeTool:
-		return eventPreToolUse
-	case agent.PointAfterTool:
-		return eventPostToolUse
-	case agent.PointBeforeStop:
-		return eventStop
-	}
-	return ""
-}
-
 // shellQuote quotes s for a POSIX shell.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
-}
-
-// hookInput is the input of a command hook, on its stdin.
-type hookInput struct {
-	HookEventName string          `json:"hook_event_name"`
-	ToolName      string          `json:"tool_name"`
-	ToolInput     json.RawMessage `json:"tool_input"`
-	ToolResponse  json.RawMessage `json:"tool_response"`
-	ToolUseID     string          `json:"tool_use_id"`
-}
-
-// hookOutput is the answer of a command hook, on its stdout. The zero
-// value changes nothing.
-type hookOutput struct {
-	Continue           *bool         `json:"continue,omitempty"`
-	StopReason         string        `json:"stopReason,omitempty"`
-	Decision           string        `json:"decision,omitempty"`
-	Reason             string        `json:"reason,omitempty"`
-	HookSpecificOutput *hookSpecific `json:"hookSpecificOutput,omitempty"`
-}
-
-type hookSpecific struct {
-	HookEventName            string          `json:"hookEventName"`
-	PermissionDecision       string          `json:"permissionDecision,omitempty"`
-	PermissionDecisionReason string          `json:"permissionDecisionReason,omitempty"`
-	UpdatedInput             json.RawMessage `json:"updatedInput,omitempty"`
 }
 
 // hookServer answers the hook calls of one process of the CLI on a unix
@@ -178,6 +123,8 @@ type hookServer struct {
 	state  func() agent.State
 	// approve answers a hook that returns an [agent.AskError].
 	approve agent.ApproveFunc
+	// stops keeps the error of a hook that stopped the turn.
+	stops *clihook.StopErr
 	// ctx ends when the server closes. A hook between runs gets it. A
 	// hook in a run gets a context that ends with the run or with ctx.
 	ctx    context.Context
@@ -185,8 +132,6 @@ type hookServer struct {
 	wg     sync.WaitGroup
 
 	mu sync.Mutex
-	// err is the error of a hook that stopped the turn.
-	err error
 	// runCtx is the context of the run in progress, or nil.
 	runCtx context.Context
 }
@@ -226,8 +171,14 @@ func hookDir() (string, error) {
 }
 
 // startHookServer listens on a socket in a new folder, and serves the
-// hooks. approve answers a hook that asks a person.
-func startHookServer(hooks []agent.Hook, state func() agent.State, approve agent.ApproveFunc) (*hookServer, error) {
+// hooks. approve answers a hook that asks a person. A hook that stops
+// the turn keeps its error in stops.
+func startHookServer(
+	hooks []agent.Hook,
+	state func() agent.State,
+	approve agent.ApproveFunc,
+	stops *clihook.StopErr,
+) (*hookServer, error) {
 	dir, err := hookDir()
 	if err != nil {
 		return nil, fmt.Errorf("codex: make the folder of the hook socket: %w", err)
@@ -246,6 +197,7 @@ func startHookServer(hooks []agent.Hook, state func() agent.State, approve agent
 		hooks:   hooks,
 		state:   state,
 		approve: approve,
+		stops:   stops,
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -261,11 +213,9 @@ func (s *hookServer) serve() {
 		if err != nil {
 			return
 		}
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
+		s.wg.Go(func() {
 			s.handle(conn)
-		}()
+		})
 	}
 }
 
@@ -291,10 +241,10 @@ func (s *hookServer) handle(conn net.Conn) {
 
 // fail returns the answer to a call at event that the server could not
 // answer. A failed Stop also fails the run.
-func (s *hookServer) fail(event string, err error) hookOutput {
+func (s *hookServer) fail(event string, err error) clihook.Output {
 	err = fmt.Errorf("the hook failed: %w", err)
-	if event == eventStop {
-		return s.stopFor(eventStop, err)
+	if event == clihook.EventStop {
+		return s.stops.Stop(clihook.EventStop, err)
 	}
 	return failure(event, "codex: "+err.Error())
 }
@@ -317,26 +267,19 @@ func eventName(data []byte) string {
 //   - Stop ends the turn.
 //
 // A call at another event gets the answer of PreToolUse.
-func failure(event, text string) hookOutput {
+func failure(event, text string) clihook.Output {
 	switch event {
-	case eventPostToolUse:
-		return hookOutput{
-			Decision: "block",
-			Reason:   text,
-		}
-	case eventStop:
-		stop := false
-		return hookOutput{
-			Continue:   &stop,
-			StopReason: text,
-		}
+	case clihook.EventPostToolUse:
+		return clihook.Block(text)
+	case clihook.EventStop:
+		return clihook.Stop(text)
 	}
-	return denyTool(text)
+	return clihook.Deny(text)
 }
 
 // reply returns the answer to the hook input data as JSON.
 func (s *hookServer) reply(data []byte) ([]byte, error) {
-	var in hookInput
+	var in clihook.Input
 	if err := json.Unmarshal(data, &in); err != nil {
 		return nil, err
 	}
@@ -375,61 +318,45 @@ func (s *hookServer) callContext() (context.Context, context.CancelFunc) {
 
 // answer runs the hooks at the point of the event of in, in the order
 // of registration.
-func (s *hookServer) answer(ctx context.Context, in hookInput) hookOutput {
-	call := ai.ToolCall{
-		ID:    in.ToolUseID,
-		Name:  toolName(in.ToolName),
-		Input: in.ToolInput,
-	}
+func (s *hookServer) answer(ctx context.Context, in clihook.Input) clihook.Output {
 	switch in.HookEventName {
-	case eventPreToolUse:
-		return s.beforeTool(ctx, call)
-	case eventPostToolUse:
-		return s.afterTool(ctx, call, hooktext.Response(in.ToolResponse))
-	case eventStop:
-		return s.beforeStop(ctx)
+	case clihook.EventPreToolUse:
+		return s.beforeTool(ctx, in.Call())
+	case clihook.EventPostToolUse:
+		return s.afterTool(ctx, in.Call(), clihook.Response(in.ToolResponse))
+	case clihook.EventStop:
+		return clihook.BeforeStop(ctx, s.hooks, s.state, s.stops)
 	}
-	return hookOutput{}
+	return clihook.Output{}
 }
 
-// toolName returns the gopi name of a tool of a hook, as the log names
-// it. The hooks of Codex name the shell "Bash", as Claude Code does.
-func toolName(name string) string {
-	return tool.Canonical(name)
-}
-
-func (s *hookServer) beforeTool(ctx context.Context, orig ai.ToolCall) hookOutput {
-	call := orig
-	for _, h := range s.hooks {
-		bt, ok := h.(agent.BeforeToolHook)
-		if !ok {
-			continue
-		}
-		next, err := bt.BeforeTool(ctx, s.state(), call)
-		if err != nil {
-			// Codex has no prompt that a hook can send a call to, so the
-			// hook waits for the answer of a person.
-			next, err = agent.AnswerAsk(ctx, s.approve, call, err)
-		}
-		if err != nil {
-			return denyTool(err.Error())
-		}
-		call = next
+// beforeTool runs the BeforeTool hooks on orig, and returns the answer
+// at PreToolUse.
+func (s *hookServer) beforeTool(ctx context.Context, orig ai.ToolCall) clihook.Output {
+	call, err := agent.RunBeforeTool(
+		ctx,
+		s.hooks,
+		s.state,
+		s.approve,
+		orig,
+	)
+	if err != nil {
+		return clihook.Deny(err.Error())
 	}
 	if call.Name != orig.Name {
-		return denyTool(renameText)
+		return clihook.Deny(renameText)
 	}
-	if jsonx.Same(call.Input, orig.Input) {
-		return hookOutput{}
+	if clihook.SameInput(call.Input, orig.Input) {
+		return clihook.Output{}
 	}
 	// Codex reads a new input of another shape as a failed hook, and
 	// runs the original call.
 	badShape := needsCommand(orig.Name) && !hasCommand(call.Input)
 	if badShape {
-		return denyTool(commandText)
+		return clihook.Deny(commandText)
 	}
-	return hookOutput{HookSpecificOutput: &hookSpecific{
-		HookEventName:      eventPreToolUse,
+	return clihook.Output{HookSpecificOutput: &clihook.Specific{
+		HookEventName:      clihook.EventPreToolUse,
 		PermissionDecision: "allow",
 		UpdatedInput:       call.Input,
 	}}
@@ -438,7 +365,7 @@ func (s *hookServer) beforeTool(ctx context.Context, orig ai.ToolCall) hookOutpu
 // needsCommand reports whether Codex reads a new input of the tool name
 // only as an object with a string command.
 func needsCommand(name string) bool {
-	return name == toolBash || name == toolApplyPatch
+	return name == tool.Bash || name == tool.ApplyPatch
 }
 
 // hasCommand reports whether input is an object with a string command.
@@ -450,84 +377,22 @@ func hasCommand(input json.RawMessage) bool {
 	return err == nil && v.Command != nil
 }
 
-func denyTool(reason string) hookOutput {
-	return hookOutput{HookSpecificOutput: &hookSpecific{
-		HookEventName:            eventPreToolUse,
-		PermissionDecision:       "deny",
-		PermissionDecisionReason: reason,
-	}}
-}
-
-func (s *hookServer) afterTool(ctx context.Context, call ai.ToolCall, orig string) hookOutput {
-	result := hooktext.ToolResult(orig)
-	for _, h := range s.hooks {
-		at, ok := h.(agent.AfterToolHook)
-		if !ok {
-			continue
-		}
-		next, err := at.AfterTool(ctx, s.state(), call, result)
-		if err != nil {
-			return hookOutput{
-				Decision: "block",
-				Reason:   err.Error(),
-			}
-		}
-		result = next
+func (s *hookServer) afterTool(ctx context.Context, call ai.ToolCall, orig string) clihook.Output {
+	result, err := agent.RunAfterTool(
+		ctx,
+		s.hooks,
+		s.state,
+		call,
+		clihook.ToolResult(orig),
+	)
+	if err != nil {
+		return clihook.Block(err.Error())
 	}
-	text := hooktext.Result(result)
+	text := clihook.Result(result)
 	if text == orig {
-		return hookOutput{}
+		return clihook.Output{}
 	}
-	return hookOutput{
-		Decision: "block",
-		Reason:   text,
-	}
-}
-
-func (s *hookServer) beforeStop(ctx context.Context) hookOutput {
-	for _, h := range s.hooks {
-		bs, ok := h.(agent.BeforeStopHook)
-		if !ok {
-			continue
-		}
-		entries, err := bs.BeforeStop(ctx, s.state())
-		if err != nil {
-			return s.stopFor(eventStop, err)
-		}
-		if len(entries) == 0 {
-			continue
-		}
-		text, err := hooktext.Entries(entries)
-		if err != nil {
-			return s.stopFor(eventStop, err)
-		}
-		return hookOutput{
-			Decision: "block",
-			Reason:   text,
-		}
-	}
-	return hookOutput{}
-}
-
-// stopFor keeps the error of a hook at event, so that the run fails,
-// and returns the answer that stops the turn.
-func (s *hookServer) stopFor(event string, err error) hookOutput {
-	s.mu.Lock()
-	if s.err == nil {
-		s.err = fmt.Errorf("codex: the hook at %s: %w", event, err)
-	}
-	s.mu.Unlock()
-	return failure(eventStop, err.Error())
-}
-
-// takeErr returns the error of a hook that stopped the turn, and
-// clears it.
-func (s *hookServer) takeErr() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	err := s.err
-	s.err = nil
-	return err
+	return clihook.Block(text)
 }
 
 // close ends the context of the calls in flight, stops the server,
@@ -560,7 +425,7 @@ func HookShim(ctx context.Context, socket string, stdin io.Reader, stdout io.Wri
 	}
 
 	event := eventName(input)
-	known := event == eventPreToolUse || event == eventPostToolUse || event == eventStop
+	known := event == clihook.EventPreToolUse || event == clihook.EventPostToolUse || event == clihook.EventStop
 	if !known {
 		return nil
 	}

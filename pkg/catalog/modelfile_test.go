@@ -25,7 +25,6 @@ const repoFile = "../../models.json"
 // this version does not know.
 const smallFile = `{
   "codex": {
-    "kind": "driver",
     "default": "b",
     "new_field": true,
     "models": [{"id": "a", "name": "A"}, {"id": "b", "name": "B"}]
@@ -139,7 +138,6 @@ func TestRepoFile(t *testing.T) {
 
 	for id, e := range file {
 		t.Run(id, func(t *testing.T) {
-			assert.Contains(t, []string{modelsfile.KindProvider, modelsfile.KindDriver}, e.Kind)
 			require.NotEmpty(t, e.Models)
 
 			got := make([]string, len(e.Models))

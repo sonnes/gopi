@@ -175,17 +175,16 @@
               <th><span class="lbl">Objects</span><code>GenerateObject[T]</code><code class="if">ObjectProvider</code></th>
               <th><span class="lbl">Token counts</span><code>CountTokens</code><code class="if">TokenCounter</code></th>
               <th><span class="lbl">Images</span><code>GenerateImage</code><code class="if">ImageProvider</code></th>
-              <th><span class="lbl">Speech</span><code>GenerateSpeech</code><code class="if">SpeechProvider</code></th>
             </tr></thead>
             <tbody>
-              <tr><td>Anthropic<small>anthropic</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
-              <tr><td>OpenAI<small>openai</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no"></span></td></tr>
-              <tr><td>OpenAI Chat<small>openaichat</small></td><td><span class="yes">✓</span></td><td><span class="no"></span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
+              <tr><td>Anthropic<small>anthropic</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="no"></span></td></tr>
+              <tr><td>OpenAI<small>openai</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+              <tr><td>OpenAI Chat<small>openaichat</small></td><td><span class="yes">✓</span></td><td><span class="no"></span></td><td><span class="no"></span></td></tr>
             </tbody>
           </table>
           <div class="lbl foot"><span><span class="yes">✓</span>implements the interface</span><span><span class="no"></span>the function returns an error</span><span>every provider: StreamText</span></div>
         </figure>
-        <p class="why"><b>Why:</b> One grid answers both questions on the page: which interface a function needs, and which provider has it. The empty Speech column shows that no provider implements it. <span class="cost">Cost: A new provider or capability adds a row or a column, and the column heads are already at the width limit.</span></p>
+        <p class="why"><b>Why:</b> One grid answers both questions on the page: which interface a function needs, and which provider has it. <span class="cost">Cost: A new provider or capability adds a row or a column, and the column heads are already at the width limit.</span></p>
       </div>
 
       <div class="option">

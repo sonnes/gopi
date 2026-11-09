@@ -7,17 +7,12 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/sonnes/gopi/pkg/sandbox"
-	"github.com/sonnes/gopi/pkg/sandbox/internal/host"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/search"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -31,13 +26,6 @@ type findInput struct {
 	Pattern string `json:"pattern" jsonschema:"glob, e.g. **/*.go"`
 	Path    string `json:"path,omitempty" jsonschema:"directory to search, default the working directory"`
 	Limit   *int   `json:"limit,omitempty" jsonschema:"max paths, default 1000"`
-}
-
-func (in findInput) limit() int {
-	if in.Limit != nil && *in.Limit > 0 {
-		return *in.Limit
-	}
-	return findDefaultLimit
 }
 
 // Name is the name of the tool.
@@ -62,7 +50,7 @@ func find(ctx context.Context, box sandbox.Sandbox, in findInput) (string, error
 	if in.Pattern == "" {
 		return "", errors.New("pattern is required")
 	}
-	base, err := search.Base(box, in.Path)
+	root, err := search.NewRoot(box, in.Path)
 	if err != nil {
 		return "", err
 	}
@@ -73,20 +61,16 @@ func find(ctx context.Context, box sandbox.Sandbox, in findInput) (string, error
 		"--sortr=modified",
 		"--glob", search.SkipHidden,
 	}
-	res, err := search.RunRG(ctx, box, base, args)
+	res, err := root.RunRG(ctx, args)
 	if err != nil {
 		return "", err
 	}
 	if res.ExitCode == search.ExitNotFound {
-		hp, ok := box.(host.Pather)
-		if !ok {
-			return "", search.ErrNoRG
-		}
-		return walkFind(hp, base, in)
+		return walkFind(root, in)
 	}
 
-	res.Stdout = []byte(search.FilterGlob(string(res.Stdout), base, in.Pattern, false))
-	out, ok := search.Output(res, in.limit())
+	res.Stdout = []byte(root.FilterGlob(string(res.Stdout), in.Pattern, false))
+	out, ok := search.Output(res, search.Limit(in.Limit, findDefaultLimit))
 	if !ok {
 		return "", search.Error(res)
 	}
@@ -97,57 +81,33 @@ func find(ctx context.Context, box sandbox.Sandbox, in findInput) (string, error
 }
 
 // walkFind is the find tool without rg. It walks the directory on this
-// host.
-func walkFind(hp host.Pather, base string, in findInput) (string, error) {
+// host. rg lists a root that is a file if its name matches, and so does
+// the walk.
+func walkFind(root search.Root, in findInput) (string, error) {
 	if !doublestar.ValidatePattern(in.Pattern) {
 		return "", fmt.Errorf("invalid glob: %s", in.Pattern)
 	}
-
-	root, err := hp.HostPath(base)
-	if err != nil {
-		return "", err
-	}
-	info, err := os.Stat(root)
-	if err != nil {
-		return "", err
-	}
-	// rg lists a file path that matches. The walk skips its root.
-	if !info.IsDir() {
-		if search.MatchGlob(in.Pattern, filepath.Base(root)) {
-			return base, nil
-		}
-		return "No files found", nil
-	}
-	rels, err := search.WalkFiles(hp, root)
+	files, err := root.Walk()
 	if err != nil {
 		return "", err
 	}
 
-	type file struct {
-		path    string
-		modTime time.Time
-	}
-	var files []file
-	for _, rel := range rels {
-		if !search.MatchGlob(in.Pattern, rel) {
-			continue
+	var found []search.File
+	for _, f := range files {
+		if search.MatchGlob(in.Pattern, f.Rel) {
+			found = append(found, f)
 		}
-		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel)))
-		if err != nil {
-			continue
-		}
-		files = append(files, file{path: path.Join(base, rel), modTime: info.ModTime()})
 	}
-	if len(files) == 0 {
+	if len(found) == 0 {
 		return "No files found", nil
 	}
 
-	slices.SortStableFunc(files, func(a, b file) int {
-		return b.modTime.Compare(a.modTime)
+	slices.SortStableFunc(found, func(a, b search.File) int {
+		return b.ModTime.Compare(a.ModTime)
 	})
-	paths := make([]string, len(files))
-	for i, f := range files {
-		paths[i] = f.path
+	paths := make([]string, len(found))
+	for i, f := range found {
+		paths[i] = f.Path
 	}
-	return search.CapLines(strings.Join(paths, "\n"), in.limit()), nil
+	return search.CapLines(strings.Join(paths, "\n"), search.Limit(in.Limit, findDefaultLimit)), nil
 }

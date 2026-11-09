@@ -20,10 +20,9 @@ func lists(err error, models ...ai.Model) func(context.Context) ([]ai.Model, err
 	}
 }
 
-// entry returns a provider entry with the default def and models.
+// entry returns an entry with the default def and models.
 func entry(def string, models ...modelsfile.Model) modelsfile.Entry {
 	return modelsfile.Entry{
-		Kind:    modelsfile.KindProvider,
 		Default: def,
 		Models:  models,
 	}
@@ -32,14 +31,13 @@ func entry(def string, models ...modelsfile.Model) modelsfile.Entry {
 func TestSync_MergesAList(t *testing.T) {
 	f := modelsfile.File{"p": entry("a",
 		modelsfile.Model{
-			Model: ai.Model{ID: "a", Name: "A", Pricing: ai.Pricing{Input: 5}},
-			Note:  "Keep me.",
+			ID: "a", Name: "A", Pricing: ai.Pricing{Input: 5},
+			Note: "Keep me.",
 		},
-		modelsfile.Model{Model: ai.Model{ID: "old", Name: "Old"}},
+		modelsfile.Model{ID: "old", Name: "Old"},
 	)}
 	src := source{
-		ID:   "p",
-		Kind: modelsfile.KindProvider,
+		ID: "p",
 		List: lists(nil,
 			ai.Model{ID: "a", ContextWindow: 1000, Pricing: ai.Pricing{Input: 1}},
 			ai.Model{ID: "b", Name: "B"},
@@ -50,11 +48,11 @@ func TestSync_MergesAList(t *testing.T) {
 
 	assert.Equal(t, entry("a",
 		modelsfile.Model{
-			Model: ai.Model{ID: "a", Name: "A", ContextWindow: 1000, Pricing: ai.Pricing{Input: 5}},
-			Note:  "Keep me.",
+			ID: "a", Name: "A", ContextWindow: 1000, Pricing: ai.Pricing{Input: 5},
+			Note: "Keep me.",
 		},
-		modelsfile.Model{Model: ai.Model{ID: "b", Name: "B"}},
-		modelsfile.Model{Model: ai.Model{ID: "old", Name: "Old"}},
+		modelsfile.Model{ID: "b", Name: "B"},
+		modelsfile.Model{ID: "old", Name: "Old"},
 	), got["p"], "a registered price and a note stay, and a model that the list leaves out stays")
 	assert.Equal(t, []string{
 		"p: listed 2: 1 added, 1 changed, 0 removed",
@@ -65,14 +63,14 @@ func TestSync_MergesAList(t *testing.T) {
 
 func TestSync_Prune(t *testing.T) {
 	f := modelsfile.File{"p": entry("a",
-		modelsfile.Model{Model: ai.Model{ID: "a", Name: "A"}},
-		modelsfile.Model{Model: ai.Model{ID: "old", Name: "Old"}},
+		modelsfile.Model{ID: "a", Name: "A"},
+		modelsfile.Model{ID: "old", Name: "Old"},
 	)}
-	src := source{ID: "p", Kind: modelsfile.KindProvider, List: lists(nil, ai.Model{ID: "a", Name: "A"})}
+	src := source{ID: "p", List: lists(nil, ai.Model{ID: "a", Name: "A"})}
 
 	got, report := syncFile(context.Background(), f, []source{src}, nil, true)
 
-	assert.Equal(t, entry("a", modelsfile.Model{Model: ai.Model{ID: "a", Name: "A"}}), got["p"])
+	assert.Equal(t, entry("a", modelsfile.Model{ID: "a", Name: "A"}), got["p"])
 	assert.Equal(t, []string{
 		"p: listed 1: 0 added, 0 changed, 1 removed",
 		"  - old",
@@ -80,11 +78,11 @@ func TestSync_Prune(t *testing.T) {
 }
 
 func TestSync_FailedOrMissingList(t *testing.T) {
-	old := entry("a", modelsfile.Model{Model: ai.Model{ID: "a", Name: "A"}})
+	old := entry("a", modelsfile.Model{ID: "a", Name: "A"})
 	f := modelsfile.File{"p": old, "q": old}
 	sources := []source{
-		{ID: "p", Kind: modelsfile.KindProvider, List: lists(errors.New("401 Unauthorized"))},
-		{ID: "q", Kind: modelsfile.KindProvider, Skip: "set Q_KEY"},
+		{ID: "p", List: lists(errors.New("401 Unauthorized"))},
+		{ID: "q", Skip: "set Q_KEY"},
 	}
 
 	got, report := syncFile(context.Background(), f, sources, nil, true)
@@ -100,13 +98,11 @@ func TestSync_FailedOrMissingList(t *testing.T) {
 func TestSync_NewEntryDefault(t *testing.T) {
 	src := source{
 		ID:   "new",
-		Kind: modelsfile.KindProvider,
 		List: lists(nil, ai.Model{ID: "z", Name: "Z"}, ai.Model{ID: "m", Name: "M"}),
 	}
 
 	got, report := syncFile(context.Background(), modelsfile.File{}, []source{src}, nil, false)
 
-	assert.Equal(t, modelsfile.KindProvider, got["new"].Kind)
 	assert.Equal(t, "m", got["new"].Default, "a new provider entry takes its first model by ID")
 	assert.Contains(t, report, "new: the default is now m. Check it.")
 }
@@ -122,21 +118,20 @@ func readDev(t *testing.T) devCatalog {
 
 func TestSync_FillsFromModelsDev(t *testing.T) {
 	f := modelsfile.File{"anthropic": entry("claude-sonnet-5-5",
-		modelsfile.Model{Model: ai.Model{
+		modelsfile.Model{
 			ID:      "claude-sonnet-5-5",
 			Name:    "Claude Sonnet 5.5",
-			Pricing: ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4},
-		}},
-		modelsfile.Model{Model: ai.Model{ID: "claude-haiku-5-5", Name: "Claude Haiku 5.5"}},
+			Pricing: ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4}},
+		modelsfile.Model{ID: "claude-haiku-5-5", Name: "Claude Haiku 5.5"},
 	)}
-	src := source{ID: "anthropic", Kind: modelsfile.KindProvider, Skip: "set ANTHROPIC_API_KEY", Dev: "anthropic"}
+	src := source{ID: "anthropic", Skip: "set ANTHROPIC_API_KEY", Dev: "anthropic"}
 
 	got, report := syncFile(context.Background(), f, []source{src}, readDev(t), false)
 
 	levels := []ai.ThinkingLevel{ai.ThinkingLow, ai.ThinkingMedium, ai.ThinkingHigh, ai.ThinkingXHigh, ai.ThinkingMax}
 	documents := []ai.Modality{ai.ModalityText, ai.ModalityImage, ai.ModalityPDF}
 	assert.Equal(t, entry("claude-sonnet-5-5",
-		modelsfile.Model{Model: ai.Model{
+		modelsfile.Model{
 			ID:             "claude-haiku-5-5",
 			Name:           "Claude Haiku 5.5",
 			MaxTokens:      128_000,
@@ -156,9 +151,8 @@ func TestSync_FillsFromModelsDev(t *testing.T) {
 					CacheRead:  0.05,
 					CacheWrite: 0.625,
 				}},
-			},
-		}},
-		modelsfile.Model{Model: ai.Model{
+			}},
+		modelsfile.Model{
 			ID:             "claude-sonnet-5-5",
 			Name:           "Claude Sonnet 5.5",
 			MaxTokens:      128_000,
@@ -166,8 +160,7 @@ func TestSync_FillsFromModelsDev(t *testing.T) {
 			Input:          documents,
 			Reasoning:      true,
 			ThinkingLevels: levels,
-			Pricing:        ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4},
-		}},
+			Pricing:        ai.Pricing{Input: 2, Output: 10, CacheRead: 0.2, CacheWrite: 2.5, CacheWriteLong: 4}},
 	), got["anthropic"], "models.dev fills empty values, and a price in the file stays")
 	assert.Equal(t, []string{
 		"anthropic: no list: set ANTHROPIC_API_KEY",
@@ -178,7 +171,7 @@ func TestSync_FillsFromModelsDev(t *testing.T) {
 }
 
 func TestSync_ModelsDevAdds(t *testing.T) {
-	src := source{ID: "fireworks", Kind: modelsfile.KindProvider, Skip: "models.dev is the source", Dev: "fireworks-ai", DevAdds: true}
+	src := source{ID: "fireworks", Skip: "models.dev is the source", Dev: "fireworks-ai", DevAdds: true}
 
 	got, report := syncFile(context.Background(), modelsfile.File{}, []source{src}, readDev(t), false)
 
@@ -200,7 +193,6 @@ func TestSync_ModelsDevAdds(t *testing.T) {
 func TestSync_DevAdmits(t *testing.T) {
 	src := source{
 		ID:        "openai",
-		Kind:      modelsfile.KindProvider,
 		List:      lists(nil, ai.Model{ID: "gpt-6.1-sol"}, ai.Model{ID: "text-embedding-3-small"}, ai.Model{ID: "dall-e-9"}),
 		Dev:       "openai",
 		DevAdmits: true,
@@ -217,33 +209,54 @@ func TestSync_DevAdmits(t *testing.T) {
 
 func TestSelect(t *testing.T) {
 	all := []source{{ID: "a"}, {ID: "b"}, {ID: "c"}}
+	f := modelsfile.File{"a": entry("x"), "c": entry("y")}
 
-	got, err := selectSources(all, "")
+	got, err := selectSources(all, f, "")
 	require.NoError(t, err)
-	assert.Equal(t, all, got)
+	assert.Equal(t, []source{{ID: "a"}, {ID: "c"}}, got, "with no IDs, only the IDs of the file")
 
-	got, err = selectSources(all, "c, a")
+	got, err = selectSources(all, f, "c, b")
 	require.NoError(t, err)
-	assert.Equal(t, []source{{ID: "a"}, {ID: "c"}}, got)
+	assert.Equal(t, []source{{ID: "b"}, {ID: "c"}}, got, "an ID adds its entry")
 
-	_, err = selectSources(all, "a,typo")
+	_, err = selectSources(all, f, "a,typo")
 	assert.EqualError(t, err, `no source "typo": use one of a, b, c`, "a typo does not rewrite the file in silence")
+}
+
+// TestAllSources checks that each entry of models.json has a source.
+func TestAllSources(t *testing.T) {
+	data, err := os.ReadFile("../../models.json")
+	require.NoError(t, err)
+	f, err := modelsfile.Parse(data)
+	require.NoError(t, err)
+
+	got, err := selectSources(allSources(), f, "")
+	require.NoError(t, err)
+
+	ids := make([]string, 0, len(got))
+	for _, s := range got {
+		ids = append(ids, s.ID)
+	}
+	assert.Equal(t, []string{"anthropic", "openai", "openrouter", "fireworks", "claude-code", "codex"}, ids)
+	for _, s := range got {
+		assert.Equal(t, s.ID == "claude-code" || s.ID == "codex", s.Driver, s.ID)
+		assert.True(t, s.List != nil || s.Skip != "", "%s has a list or a reason to skip it", s.ID)
+	}
 }
 
 func TestSync_Driver(t *testing.T) {
 	high := []ai.ThinkingLevel{ai.ThinkingHigh}
 	more := []ai.ThinkingLevel{ai.ThinkingLow, ai.ThinkingHigh}
 	f := modelsfile.File{"cli": {
-		Kind:    modelsfile.KindDriver,
 		Default: "a",
 		Models: []modelsfile.Model{
-			{Model: ai.Model{ID: "a", ThinkingLevels: high}},
-			{Model: ai.Model{ID: "b", ThinkingLevels: high}},
+			{ID: "a", ThinkingLevels: high},
+			{ID: "b", ThinkingLevels: high},
 		},
 	}}
 	src := source{
-		ID:   "cli",
-		Kind: modelsfile.KindDriver,
+		ID:     "cli",
+		Driver: true,
 		List: lists(nil,
 			ai.Model{ID: "b", ThinkingLevels: more},
 			ai.Model{ID: "a", ThinkingLevels: high},
@@ -258,8 +271,8 @@ func TestSync_Driver(t *testing.T) {
 }
 
 func TestSync_PruneEmptyList(t *testing.T) {
-	f := modelsfile.File{"p": entry("a", modelsfile.Model{Model: ai.Model{ID: "a"}})}
-	src := source{ID: "p", Kind: modelsfile.KindProvider, List: lists(nil)}
+	f := modelsfile.File{"p": entry("a", modelsfile.Model{ID: "a"})}
+	src := source{ID: "p", List: lists(nil)}
 
 	got, report := syncFile(context.Background(), f, []source{src}, nil, true)
 
@@ -281,7 +294,7 @@ func TestSync_KeepsThinking(t *testing.T) {
 		Pricing:        ai.Pricing{Input: 0.1},
 	}
 	f := modelsfile.File{"anthropic": entry(haiku.ID, modelsfile.Model{Model: haiku})}
-	src := source{ID: "anthropic", Kind: modelsfile.KindProvider, Skip: "no key", Dev: "anthropic"}
+	src := source{ID: "anthropic", Skip: "no key", Dev: "anthropic"}
 
 	got, _ := syncFile(context.Background(), f, []source{src}, readDev(t), false)
 

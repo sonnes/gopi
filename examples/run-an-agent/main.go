@@ -86,7 +86,7 @@ func main() {
 		agent.System(func(context.Context) ([]ai.Section, error) {
 			return []ai.Section{{Name: "base", Text: "Answer in one sentence."}}, nil
 		}),
-		capTurns,
+		agent.Hooks(capTurns),
 	)
 
 	stream := a.Run(ctx, session.Text("Is it warmer in Lisbon or in Oslo?"))

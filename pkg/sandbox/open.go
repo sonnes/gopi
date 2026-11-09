@@ -88,12 +88,12 @@ func (l *local) check(f *os.File, path string, write bool) (string, error) {
 
 	if !write {
 		if !l.rules.CanRead(real) {
-			return real, fmt.Errorf("path is hidden by the sandbox policy: %s", path)
+			return real, fmt.Errorf("%w: %s", ErrHidden, path)
 		}
 		return real, nil
 	}
 	if !l.rules.CanWrite(real) {
-		return real, fmt.Errorf("path is not writable under the sandbox policy: %s", path)
+		return real, fmt.Errorf("%w: %s", ErrNotWritable, path)
 	}
 	if hardLinks(info) > 1 {
 		return real, fmt.Errorf("path has more than one hard link: %s", path)

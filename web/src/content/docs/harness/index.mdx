@@ -1,14 +1,14 @@
 ---
 title: Harness
-summary: A harness assembles a coding agent from options. It reads the instruction texts, the skills, and the subagents that its readers give, and it checks each tool call against a permission mode and rules.
+summary: A harness assembles a coding agent from options and the config of a session. It loads the instruction texts, the skills, and the subagents of its definition sources, and it checks each tool call against a permission mode and rules.
 ---
 
 import LayerStack from "../../../components/figures/LayerStack.astro";
 
-An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs the rules of the repository, skills that it loads on demand, subagents for side tasks, and a decision for each command that it wants to run. Without a harness, you build each of these with agent options. With a harness, you give options, and each call of `New` or `Durable` assembles the agent again from its readers.
+An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs the rules of the repository, skills that it loads on demand, subagents for side tasks, and a decision for each command that it wants to run. Without a harness, you build each of these with agent options. With a harness, you give options and a config, and each call of `New` or `Start` assembles the agent again from its definition sources.
 
 <LayerStack
-  alt="The layers of a harness. pkg/harness assembles the agent from the definitions of its readers. pkg/harness/permission checks each tool call. pkg/agent runs the loop. pkg/catalog resolves the model spec."
+  alt="The layers of a harness. pkg/harness assembles the agent from its definition sources. pkg/permission checks each tool call. pkg/agent runs the loop. pkg/catalog resolves the model spec."
   layers={[
     {
       name: "pkg/harness",
@@ -16,7 +16,7 @@ An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs 
       hue: "harness",
       plug: { label: "definitions", items: ["AGENTS.md", "skills", "agents"] },
     },
-    { name: "pkg/harness/permission", job: "runs, asks, or denies each tool call", hue: "harness" },
+    { name: "pkg/permission", job: "runs, asks, or denies each tool call", hue: "harness" },
     { name: "pkg/agent", job: "runs the model with tools", hue: "agent" },
     { name: "pkg/catalog", job: "resolves the model spec", hue: "ai" },
   ]}
@@ -24,69 +24,73 @@ An [agent](../agent/index.mdx) is a model with tools. A coding agent also needs 
 
 ## Assemble an Agent
 
-Give the options that all sessions share to `harness.New`. Then call `Durable` with the ID of a session.
+Give the options that all sessions share to `harness.New`. Then call `Start` with the `agent.Config` of a session.
 
 ```go
 h := harness.New(
 	harness.Catalog(cat),
-	harness.Model("fake/one"),
-	harness.Dir(dir),
 	harness.Toolset(harness.Tools(harness.Coding()...)),
 	harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool())),
-	harness.Mode(permission.AcceptEdits),
-	harness.Deny("bash(git push *)"),
 )
 
-a, err := h.Durable(ctx, "fix-login")
-msgs, err := a.Run(ctx, session.Text("Fix the login test.")).Wait()
+r, err := h.Start(ctx, agent.Config{
+	SessionID: "fix-login",
+	Spec:      "fake/one",
+	Dir:       dir,
+	Mode:      permission.AcceptEdits,
+	Deny:      []string{"bash(git push *)"},
+})
+msgs, err := r.Run(ctx, session.Text("Fix the login test.")).Wait()
 ```
 
 `Toolset` gives each tool of the agent. The harness adds no tool of its own. `Coding` gives the tools that read files, change files, and run commands. A tool of `Sandboxed` runs in the sandbox of each session, and `SkillTool` and `AgentTool` bind to the skills and the subagents of each session.
 
-`Durable` returns an `*agent.Agent`, so you read its events and its log as for any agent. A call can add its own options, such as the `Dir` of another repository. A resumed session keeps its model spec. A `Model` on the call changes it.
+The runner of `Start` is an `*agent.Agent`, so you read its events and its log as for any agent. The config holds the settings of one session, such as the `Dir` of one repository. A resumed session keeps its model spec. A `Spec` in the config changes it. A harness is an `agent.Driver`, so a catalog or a host can start it for a session.
 
 ## Definitions
 
-`Defs` takes a reader of each folder, lowest first. `storefs.Dir` reads the `agents/`, `skills/`, and `AGENTS.md` of one folder:
+`Defs` takes one source of definitions. `storefs.Dir` reads the `agents/`, `skills/`, and `AGENTS.md` of one folder, and `def.Layers` merges the folders, lowest first:
 
 ```go
-harness.Defs(
+harness.Defs(def.Layers(
 	storefs.Dir(filepath.Join(home, ".claude")),
 	storefs.Dir(dir),
-),
+)),
 ```
 
-Without `Defs`, the harness reads no file. If two folders have a skill or a subagent with one name, the later folder wins.
+Without `Defs`, the harness reads no file. If two folders have a skill or a subagent with one name, the later folder wins. `storefs.FS` reads the same layout from an `fs.FS`, such as an `embed.FS`. The `Defs` of the config go after the `Defs` of the harness.
 
 ## Skills and Subagents
 
-A skill in code goes in `Skillset`, and a subagent in code goes in `Agents`:
+A `def.Set` holds skills and subagents in code. It is a source too, so it goes in the `Defs` of the config, or in the layers of the harness:
 
 ```go
-harness.Skillset(def.Skill{
+Defs: def.Set{Skills: []def.Skill{{
 	Name:        "deploy",
 	Description: "Deploy the service.",
 	Body:        "Run make deploy.",
-}),
-harness.Agents(def.Agent{
+}}},
+```
+
+```go
+def.Set{Agents: []def.Agent{{
 	Name:        "reviewer",
 	Description: "Review a diff.",
 	Prompt:      "You review code.",
-}),
+}}},
 ```
 
 The model loads a skill with the `skill` tool, and gives a task to a subagent with the `agent` tool. Give both tools in `Toolset`. A subagent runs in a child session of the store, and the result gives its `agent_id`, so the model can resume it. The run stream of the parent carries the start, each event, and the end of the child.
 
 ## Tools
 
-The agent gets the tools of `Toolset`. `harness.Tools` makes a reader of tools in code. `MCP` connects to each server on each call of `New` or `Durable`, and the agent gets its tools as deferred tools named `mcp__<server>__<tool>`.
+The agent gets the tools of `Toolset`, then the `Tools` of the config. `harness.Tools` makes a reader of tools in code. The harness connects to each server in the `MCP` field of the config on each call of `New` or `Start`. The agent gets the tools of the server as deferred tools named `mcp__<server>__<tool>`.
 
 ```go
-harness.MCP(github),
-harness.Toolset(harness.Tools(deploy)),
+MCP: []agent.MCPServer{github},
 ```
 
-If a server does not connect, `New` and `Durable` fail. `Close` on the agent closes the MCP sessions.
+If a server does not connect, `New` and `Start` fail. `Close` on the agent closes the MCP sessions.
 
 ## Permissions
 
@@ -96,19 +100,19 @@ If a server does not connect, `New` and `Durable` fail. `Close` on the agent clo
 | `AcceptEdits`       | run        | run        | run            | ask        | ask         |
 | `Bypass`            | run        | run        | run            | run        | run         |
 
-The table is for paths in the roots: `Dir` and each folder of `AddDirs`. A read outside the roots asks, and an edit outside the roots asks in `AcceptEdits`. An edit of a protected path, such as `.git/hooks` or `.bashrc`, asks. A read-only bash command is a command such as `ls`, `cat`, `grep`, or `git status`, with flags that only read.
+The table is for paths in the roots: the `Dir` of the config and each folder of its `AddDirs`. With `Sandbox`, the `Dir` of that sandbox replaces the `Dir` of the config. A read outside the roots asks, and an edit outside the roots asks in `AcceptEdits`. An edit of a protected path, such as `.git/hooks` or `.bashrc`, asks. A read-only bash command is a command such as `ls`, `cat`, `grep`, or `git status`, with flags that only read.
 
-A `Deny` rule wins over every mode. Then an `Ask` rule, then an `Allow` rule. The rules have the format of Claude Code settings. `Approve` asks a person. Without it, each call that needs an approval is denied.
+A `Deny` rule of the config wins over every mode. Then an `Allow` rule of the harness. The rules have the format of Claude Code settings. The `Approve` function of the config asks a person. Without it, each call that needs an approval is denied.
 
 A tool of `Sandboxed` runs in a local sandbox in `Dir`, with no fence. To keep the writes of each command in `Dir` and `AddDirs`, give `Fence`. The fence runs only on macOS. On another OS, an assembly with `Fence` fails, so give a sandbox with `Sandbox`.
 
 ## Agent Options and the First Entries
 
-`AgentDefaults` adds options for the agent, such as `agent.Thinking` or a hook. The prompt and the store of the harness win over an `agent.System` or an `agent.Store` there.
+`AgentDefaults` adds options for the agent, such as a hook. The `Effort`, the `Hooks`, and the `Compaction` of the config go after them. The prompt of the harness and the store of the config win over an `agent.System` or an `agent.Store` there.
 
 A new session starts with the entries of `Seed`. Without `Seed`, `DefaultSeed` writes one entry with the working directory, the platform, and the date. `NoSeed` writes no entry.
 
-Each call of `New` or `Durable` reads its readers again, so an edit to `AGENTS.md` or a skill reaches the next agent. The other options are in [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/harness).
+Each call of `New` or `Start` loads the source of `Defs` again, so an edit to `AGENTS.md` or a skill reaches the next agent. The other options are in [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/harness).
 
 ## Related
 

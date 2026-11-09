@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/httpget"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
 )
@@ -268,6 +269,9 @@ func TestListModels_Error(t *testing.T) {
 
 	require.ErrorContains(t, err, "openrouter: list models: 401 Unauthorized: ")
 	require.ErrorContains(t, err, "No auth credentials found")
+	var status *httpget.StatusError
+	require.ErrorAs(t, err, &status)
+	assert.Equal(t, http.StatusUnauthorized, status.Code)
 }
 
 func TestNew_APIKey(t *testing.T) {

@@ -1,6 +1,6 @@
 // Package search holds the parts that the grep and find tools share: the
-// rg command line, the output of rg, and the walk of a directory when rg
-// is not installed.
+// root of a search, the rg command line, the output of rg, and the walk
+// of a directory when rg is not installed.
 package search
 
 import (
@@ -8,14 +8,17 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/host"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 )
 
 // ExitNotFound is the exit code of a POSIX shell when it cannot find
@@ -30,38 +33,65 @@ const SkipHidden = "!.*"
 // ErrNoRG is the error of a search in a remote sandbox without rg.
 var ErrNoRG = errors.New("rg is not installed in the sandbox: install ripgrep in its image")
 
-// Base returns the clean path that a search starts at. An empty path is
-// the working directory. A clean path gives the same paths in the output
-// of rg and of the walk. In a sandbox with host paths, Base checks that
-// the sandbox allows the path.
-func Base(box sandbox.Sandbox, p string) (string, error) {
+// Limit returns the limit that the model gave, or def if the model gave
+// no limit or a limit below 1.
+func Limit(limit *int, def int) int {
+	if limit != nil && *limit > 0 {
+		return *limit
+	}
+	return def
+}
+
+// Root is the path that a search starts at.
+type Root struct {
+	// Path is the clean path of the model. A clean path gives the same
+	// paths in the output of rg and of the walk.
+	Path string
+
+	box sandbox.Sandbox
+	// hp and host are the sandbox and the host path of Path, in a
+	// sandbox with host paths.
+	hp   host.Pather
+	host string
+}
+
+// NewRoot returns the root of a search at p in box. An empty p is the
+// working directory. In a sandbox with host paths, NewRoot checks that
+// the sandbox allows p.
+func NewRoot(box sandbox.Sandbox, p string) (Root, error) {
 	if p == "" {
 		p = "."
 	}
-	p = path.Clean(p)
-	if hp, ok := box.(host.Pather); ok {
-		if _, err := hp.HostPath(p); err != nil {
-			return "", err
-		}
+	r := Root{
+		Path: path.Clean(p),
+		box:  box,
 	}
-	return p, nil
+	if hp, ok := box.(host.Pather); ok {
+		hostPath, err := hp.HostPath(r.Path)
+		if err != nil {
+			return Root{}, err
+		}
+		r.hp = hp
+		r.host = hostPath
+	}
+	return r, nil
 }
 
-// RunRG runs rg in box with args on the search path base. For a
-// directory, rg starts in base and searches ".". Then a glob with a
-// slash matches the path from base, and RunRG puts base back before each
-// path. Exec cannot start a command in a file, so for a file, RunRG runs
-// rg again with base as its argument.
-func RunRG(ctx context.Context, box sandbox.Sandbox, base string, args []string) (sandbox.Result, error) {
-	res, err := box.Exec(ctx, sandbox.Command{Line: rgLine(args, "."), Dir: base})
+// RunRG runs rg in the sandbox with args on the root. For a directory,
+// rg starts in the root and searches ".". Then a glob with a slash
+// matches the path from the root, and RunRG puts the root back before
+// each path. Exec cannot start a command in a file, so for a file, RunRG
+// runs rg again with the root as its argument.
+func (r Root) RunRG(ctx context.Context, args []string) (sandbox.Result, error) {
+	res, err := r.box.Exec(ctx, sandbox.Command{Line: rgLine(args, "."), Dir: r.Path})
 	if err == nil {
-		res.Stdout = []byte(rebase(string(res.Stdout), base))
+		res.Stdout = []byte(rebase(string(res.Stdout), r.prefix()))
 		return res, nil
 	}
 	if ctx.Err() != nil {
 		return res, err
 	}
-	return box.Exec(ctx, sandbox.Command{Line: rgLine(args, base)})
+	return r.box.Exec(ctx, sandbox.Command{Line: rgLine(args, r.Path)})
 }
 
 // rgLine returns the shell line that runs rg with args on path.
@@ -69,20 +99,25 @@ func rgLine(args []string, path string) string {
 	quoted := make([]string, 0, len(args)+3)
 	quoted = append(quoted, "rg")
 	for _, arg := range args {
-		quoted = append(quoted, quote(arg))
+		quoted = append(quoted, output.Quote(arg))
 	}
-	quoted = append(quoted, "--", quote(path))
+	quoted = append(quoted, "--", output.Quote(path))
 	return strings.Join(quoted, " ")
 }
 
-// rebase changes each path in the output of rg from a path in base to a
-// path that starts with base. rg puts "./" before each path, and prints
-// "--" between groups of context lines.
-func rebase(out, base string) string {
-	prefix := ""
-	if base != "." {
-		prefix = strings.TrimSuffix(base, "/") + "/"
+// prefix returns the text before each path under the root: the path of
+// the root and a slash, or "" for the working directory.
+func (r Root) prefix() string {
+	if r.Path == "." {
+		return ""
 	}
+	return strings.TrimSuffix(r.Path, "/") + "/"
+}
+
+// rebase changes each path in the output of rg from a path under the
+// root to a path that starts with prefix. rg puts "./" before each path,
+// and prints "--" between groups of context lines.
+func rebase(out, prefix string) string {
 	lines := strings.Split(out, "\n")
 	for i, line := range lines {
 		if line == "" || line == "--" {
@@ -133,19 +168,15 @@ func firstError(stderr string) string {
 }
 
 // FilterGlob keeps the lines of the rg output out whose path matches
-// pattern, as [MatchGlob] matches it. A path is relative to base. If
+// pattern, as [MatchGlob] matches it. A path is relative to the root. If
 // null is true, each line has a NUL after its path, as with rg --null,
 // and FilterGlob changes the NUL to a colon.
 //
 // rg obeys .gitignore for a file that a --glob matches, but not for a
 // directory that it matches: --glob '*' lists all of node_modules. So
 // the tools filter the paths after rg, with no --glob.
-func FilterGlob(out, base, pattern string, null bool) string {
-	prefix := ""
-	if base != "." {
-		prefix = strings.TrimSuffix(base, "/") + "/"
-	}
-
+func (r Root) FilterGlob(out, pattern string, null bool) string {
+	prefix := r.prefix()
 	var kept []string
 	for line := range strings.Lines(out) {
 		line = strings.TrimSuffix(line, "\n")
@@ -172,11 +203,6 @@ func Error(res sandbox.Result) error {
 		msg = fmt.Sprintf("rg ended with exit code %d", res.ExitCode)
 	}
 	return errors.New(msg)
-}
-
-// quote makes s one word for a POSIX shell.
-func quote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // CapLines returns at most limit lines of out, with a note when it
@@ -209,41 +235,82 @@ func MatchGlob(pattern, rel string) bool {
 	return ok
 }
 
-// WalkFiles returns the files under the host directory root, in lexical
-// order, as slash paths relative to root. It skips hidden files and
-// hidden directories, and symlinks, as rg does. It also skips each path
-// that hp does not let the tools read, such as a path that a policy
-// hides.
-func WalkFiles(hp host.Pather, root string) ([]string, error) {
-	var files []string
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+// File is a file that [Root.Walk] finds.
+type File struct {
+	// Path is the path of the file for [sandbox.Sandbox.ReadFile]: the
+	// path of the root, then the path under it.
+	Path string
+	// Rel is the slash path of the file under the root. For a root that
+	// is a file, Rel is the name of the file.
+	Rel string
+	// ModTime is the time of the last change of the file.
+	ModTime time.Time
+}
+
+// Walk returns the regular files under the root, in lexical order. It
+// skips hidden files and hidden directories, symlinks, and each file
+// that is not a regular file, such as a FIFO, as rg does. It also skips
+// each path that the sandbox does not let the tools read, such as a
+// path that a policy hides. For a root that is a regular file, Walk
+// returns the file alone. In a sandbox without host paths, Walk returns
+// [ErrNoRG], because it walks only a directory of this host.
+func (r Root) Walk() ([]File, error) {
+	if r.hp == nil {
+		return nil, ErrNoRG
+	}
+	info, err := os.Stat(r.host)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		if !info.Mode().IsRegular() {
+			return nil, nil
+		}
+		return []File{{
+			Path:    r.Path,
+			Rel:     filepath.Base(r.host),
+			ModTime: info.ModTime(),
+		}}, nil
+	}
+
+	var files []File
+	err = filepath.WalkDir(r.host, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			// rg skips a directory that it cannot read. The root must open.
-			if p != root && d != nil && d.IsDir() {
+			if p != r.host && d != nil && d.IsDir() {
 				return fs.SkipDir
 			}
 			return err
 		}
-		if p == root || d.Type()&fs.ModeSymlink != 0 {
+		if p == r.host {
 			return nil
 		}
 
 		hidden := strings.HasPrefix(d.Name(), ".")
-		if _, err := hp.HostPath(p); err != nil {
+		if _, err := r.hp.HostPath(p); err != nil {
 			hidden = true
 		}
 		if hidden && d.IsDir() {
 			return fs.SkipDir
 		}
-		if hidden || d.IsDir() {
+		if hidden || !d.Type().IsRegular() {
 			return nil
 		}
 
-		rel, err := filepath.Rel(root, p)
+		info, err := d.Info()
+		if err != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(r.host, p)
 		if err != nil {
 			return err
 		}
-		files = append(files, filepath.ToSlash(rel))
+		rel = filepath.ToSlash(rel)
+		files = append(files, File{
+			Path:    path.Join(r.Path, rel),
+			Rel:     rel,
+			ModTime: info.ModTime(),
+		})
 		return nil
 	})
 	return files, err

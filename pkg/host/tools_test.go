@@ -35,12 +35,12 @@ func TestCreateFailsOnANameOutsideTheToolList(t *testing.T) {
 		{
 			name:    "a name of the config",
 			config:  host.Config{ToolNames: []string{"Read", "lookup2"}},
-			errText: `host: session s1: tool: unknown tool: "lookup2" is not in the tool list; add the tool to host.Tools`,
+			errText: `host: session s1: tool: unknown tool: "lookup2" is not in the tool list; add the tool to host.Tools: host: invalid input`,
 		},
 		{
 			name:    "a name of the agent file",
-			config:  host.Config{Dirs: []string{dir}, Agent: "browser"},
-			errText: `host: session s1: agent file "browser": tool: unknown tool: "WebFetch" is not in the tool list; add the tool to host.Tools`,
+			config:  host.Config{DefDirs: []string{dir}, Agent: "browser"},
+			errText: `host: session s1: agent file "browser": tool: unknown tool: "WebFetch" is not in the tool list; add the tool to host.Tools: host: invalid input`,
 		},
 	}
 	for _, tt := range tests {
@@ -69,6 +69,7 @@ func TestUpdateFailsOnANameOutsideTheToolList(t *testing.T) {
 	})
 
 	assert.ErrorIs(t, err, tool.ErrUnknownTool)
+	assert.ErrorIs(t, err, host.ErrInvalid)
 }
 
 func TestTheHarnessFailsOnANameOutsideTheToolList(t *testing.T) {

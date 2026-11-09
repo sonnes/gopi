@@ -101,7 +101,7 @@ Put the stable part of a prompt first, so the prefix stays the same between call
 
 ## System Messages
 
-Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 take a system message in the conversation, and the provider sends it in its place. On these models, if `ai.Tools` holds at least one tool, a tool change goes in place too. Then the cached prefix stays the same. An OpenRouter ID of these models never gets a tool change in place. Every other model gets the text as a `<system-reminder>` in a user message. If a tool change does not go in place, the tool list of the request holds the current tools.
+Fable 5.1, Opus 5.5, Opus 5, and Sonnet 5.5 take a system message in the conversation, and the provider sends it in its place. On these models, if `ai.Tools` holds at least one tool, a tool change goes in place too. Then the cached prefix stays the same. A dated ID of these models, such as `claude-sonnet-5-5-20261101`, gets the same features. An OpenRouter ID of these models never gets a tool change in place. Every other model gets the text as a `<system-reminder>` in a user message. If a tool change does not go in place, the tool list of the request holds the current tools.
 
 ## Objects
 

@@ -137,21 +137,10 @@ func (a *Agent) prepare(ctx context.Context, declared []ai.ToolInfo, tc ai.ToolC
 		return pending{call: tc, result: a.notFound(tc.Name)}
 	}
 
-	call := tc
-	for _, h := range a.cfg.hooks {
-		bt, ok := h.(BeforeToolHook)
-		if !ok {
-			continue
-		}
-		next, err := bt.BeforeTool(ctx, a.State(), call)
-		if err != nil {
-			next, err = AnswerAsk(ctx, a.cfg.approve, call, err)
-		}
-		if err != nil {
-			result, err := failure(ctx, err)
-			return pending{call: call, result: result, err: err}
-		}
-		call = next
+	call, err := RunBeforeTool(ctx, a.cfg.hooks, a.State, a.cfg.approve, tc)
+	if err != nil {
+		result, err := failure(ctx, err)
+		return pending{call: call, result: result, err: err}
 	}
 
 	if call.Name != tc.Name {
@@ -176,15 +165,9 @@ func (a *Agent) execute(ctx context.Context, p pending) (ai.ToolResult, error) {
 	if err != nil {
 		return failure(ctx, err)
 	}
-	for _, h := range a.cfg.hooks {
-		at, ok := h.(AfterToolHook)
-		if !ok {
-			continue
-		}
-		result, err = at.AfterTool(ctx, a.State(), p.call, result)
-		if err != nil {
-			return failure(ctx, err)
-		}
+	result, err = RunAfterTool(ctx, a.cfg.hooks, a.State, p.call, result)
+	if err != nil {
+		return failure(ctx, err)
 	}
 	return result, nil
 }
@@ -203,7 +186,7 @@ func failure(ctx context.Context, err error) (ai.ToolResult, error) {
 // so the model loads it and calls again.
 func (a *Agent) notFound(name string) ai.ToolResult {
 	if t := a.known(name); t != nil && t.Info().Deferred {
-		return errorResult(fmt.Sprintf("tool %q is deferred. Load it with %s first.", name, searchToolName))
+		return errorResult(fmt.Sprintf("tool %q is deferred. Load it with %s first.", name, tool.ToolSearch))
 	}
 	return errorResult(fmt.Sprintf("tool %q not found", name))
 }

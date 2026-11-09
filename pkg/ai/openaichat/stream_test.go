@@ -1,19 +1,19 @@
 package openaichat_test
 
 import (
-	"sync/atomic"
-
 	"encoding/json"
 	"fmt"
-	sdk "github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/packages/param"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	sdk "github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/packages/param"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 )
@@ -315,22 +315,13 @@ func TestStream_ReasoningRoundTrip(t *testing.T) {
 	assert.Equal(t, "Think.", sent[1].(map[string]any)["reasoning_content"])
 }
 
-func TestStreamText_RetryHeadersAndPayload(t *testing.T) {
-	var calls atomic.Int32
+func TestStreamText_HeadersAndPayload(t *testing.T) {
 	var last *http.Request
 	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		last = r
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		if calls.Add(1) == 1 {
-			w.Header().Set("retry-after-ms", "1")
-			w.WriteHeader(http.StatusTooManyRequests)
-			fmt.Fprint(w, `{"error":{"message":"busy"}}`)
-			return
-		}
-		w.Header().Set("Content-Type", "text/event-stream")
-		fmt.Fprintf(w, "data: %s\n\n", chunk(`{"content":"Hi"}`, "stop"))
-		fmt.Fprint(w, "data: [DONE]\n\n")
+		textStream(w, r)
 	}))
 	t.Cleanup(srv.Close)
 	p := openaichat.New(openaichat.APIKey("test-key"), openaichat.BaseURL(srv.URL))
@@ -339,18 +330,36 @@ func TestStreamText_RetryHeadersAndPayload(t *testing.T) {
 		params.MaxCompletionTokens = param.NewOpt[int64](7)
 		return nil
 	})
-	msg, err := p.StreamText(
+	_, err := p.StreamText(
 		t.Context(),
 		luna,
 		[]ai.Message{ai.UserMessage("Hi")},
-		ai.JoinOptions(ai.MaxRetries(1), ai.Headers(map[string]string{"X-Team": "infra"}), hook),
+		ai.JoinOptions(ai.Headers(map[string]string{"X-Team": "infra"}), hook),
 	).Wait()
 	require.NoError(t, err)
 
-	assert.Equal(t, "Hi", msg.Text())
-	assert.Equal(t, int32(2), calls.Load(), "one retry")
 	assert.Equal(t, "infra", last.Header.Get("X-Team"))
 	assert.Equal(t, 7.0, body["max_completion_tokens"], "the hook changes the request")
+}
+
+// textStream answers with a stream of the text "Hi".
+func textStream(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	fmt.Fprintf(w, "data: %s\n\n", chunk(`{"content":"Hi"}`, "stop"))
+	fmt.Fprint(w, "data: [DONE]\n\n")
+}
+
+func TestRequestPath(t *testing.T) {
+	providertest.RunFake(t, providertest.Fake{
+		New: func(baseURL string) ai.TextProvider {
+			return openaichat.New(
+				openaichat.APIKey("test-key"),
+				openaichat.BaseURL(baseURL),
+			)
+		},
+		Text:   textStream,
+		Object: objectAnswer,
+	})
 }
 
 func TestStreamText_ContextExceeded(t *testing.T) {
@@ -365,4 +374,11 @@ func TestStreamText_ContextExceeded(t *testing.T) {
 	_, _, err := run(t, p)
 
 	assert.ErrorIs(t, err, ai.ErrContextExceeded)
+}
+
+// objectAnswer answers with the object {} and its usage.
+func objectAnswer(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, `{"choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"{}"}}],`+
+		`"usage":{"prompt_tokens":10,"completion_tokens":4}}`)
 }

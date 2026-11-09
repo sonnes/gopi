@@ -81,7 +81,8 @@ var inputModalities = map[string]ai.Modality{
 }
 
 // efforts maps a reasoning effort of the CLI to an [ai.ThinkingLevel].
-// "ultra" has no level.
+// The agent reads the efforts of a model with it, and writes the effort
+// of a turn with it. "ultra" has no level.
 var efforts = map[string]ai.ThinkingLevel{
 	"none":   ai.ThinkingOff,
 	"low":    ai.ThinkingLow,

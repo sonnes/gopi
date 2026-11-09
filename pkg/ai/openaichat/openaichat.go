@@ -40,6 +40,7 @@ import (
 
 	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/ai/openai"
 )
 
 // The capabilities of the provider, checked at compile time.
@@ -56,6 +57,8 @@ type Error = sdk.Error
 type Provider struct {
 	client sdk.Client
 	cfg    config
+	// models lists the models with the same key, URL, and client.
+	models *openai.Provider
 }
 
 // Option configures [New].
@@ -126,7 +129,24 @@ func New(opts ...Option) *Provider {
 	return &Provider{
 		client: sdk.NewClient(clientOpts...),
 		cfg:    c,
+		models: openai.New(c.openaiOptions()...),
 	}
+}
+
+// openaiOptions returns the options of an openai provider with the same
+// key, URL, and HTTP client.
+func (c config) openaiOptions() []openai.Option {
+	var opts []openai.Option
+	if c.apiKeySet {
+		opts = append(opts, openai.APIKey(c.apiKey))
+	}
+	if c.baseURL != "" {
+		opts = append(opts, openai.BaseURL(c.baseURL))
+	}
+	if c.httpClient != nil {
+		opts = append(opts, openai.HTTPClient(c.httpClient))
+	}
+	return opts
 }
 
 // OnPayload sets a hook that reads or changes the request of a stream
@@ -169,9 +189,16 @@ func retryStatus(err error) (retry.Status, bool) {
 	}, true
 }
 
-// openStream sends the request and returns the stream. It retries with
-// the policy. The SDK sends the request before it returns the stream,
-// so a retry happens before the first event.
+// call sends one request through [retry.Call], so each call of the
+// provider retries, marks a refused size, and names the provider in its
+// error.
+func call[T any](ctx context.Context, opts ai.Options, send func() (T, error)) (T, error) {
+	return retry.Call(ctx, opts, "openaichat", retryStatus, send)
+}
+
+// openStream sends the request and returns the stream. The SDK sends
+// the request before it returns the stream, so a retry happens before
+// the first event.
 func (p *Provider) openStream(
 	ctx context.Context,
 	params sdk.ChatCompletionNewParams,
@@ -183,12 +210,7 @@ func (p *Provider) openStream(
 		return stream, stream.Err()
 	}
 
-	stream, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
-	if err != nil {
-		err = retry.MarkContextExceeded(err, retryStatus)
-		return nil, fmt.Errorf("openaichat: %w", err)
-	}
-	return stream, nil
+	return call(ctx, opts, send)
 }
 
 // StreamText streams one response. A new kind of delta closes the open
@@ -533,9 +555,9 @@ func (p *Provider) GenerateObject(
 	send := func() (*sdk.ChatCompletion, error) {
 		return p.client.Chat.Completions.New(ctx, params, reqOpts...)
 	}
-	resp, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
+	resp, err := call(ctx, opts, send)
 	if err != nil {
-		return nil, fmt.Errorf("openaichat: %w", err)
+		return nil, err
 	}
 	if len(resp.Choices) == 0 {
 		return nil, errors.New("openaichat: no choice in response")
@@ -549,8 +571,11 @@ func (p *Provider) GenerateObject(
 		return nil, fmt.Errorf("openaichat: no object in response, finish reason %q", choice.FinishReason)
 	}
 
+	usage := mapUsage(resp.Usage)
+	usage.Cost = model.Pricing.Cost(usage)
+
 	return &ai.ObjectResponse{
 		Raw:   choice.Message.Content,
-		Usage: mapUsage(resp.Usage),
+		Usage: usage,
 	}, nil
 }

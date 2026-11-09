@@ -2,7 +2,7 @@ package openaichat
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/sonnes/gopi/pkg/ai"
@@ -10,32 +10,21 @@ import (
 
 var _ ai.ModelLister = (*Provider)(nil)
 
-// listedModel holds the fields of a listed model that the SDK type
-// drops. OpenAI sends no name, and a compatible server such as
-// OpenRouter does.
-type listedModel struct {
-	Name string `json:"name"`
-}
-
-// ListModels lists the models of GET /models. OpenAI sends only the ID
-// of each model. The name comes from a compatible server that sends one,
-// and the output cap stays zero.
+// ListModels lists the models of GET /models through the provider of
+// package openai, because both APIs serve the same list. OpenAI sends
+// only the ID of each model. The name comes from a compatible server
+// that sends one, and the output cap stays zero. An API error wraps
+// [Error].
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
-	pager := p.client.Models.ListAutoPaging(ctx)
-
-	var models []ai.Model
-	for pager.Next() {
-		m := pager.Current()
-		var extra listedModel
-		// A body with no name, or one that does not decode, gives no name.
-		_ = json.Unmarshal([]byte(m.RawJSON()), &extra)
-		models = append(models, ai.Model{
-			ID:   m.ID,
-			Name: extra.Name,
-		})
-	}
-	if err := pager.Err(); err != nil {
-		return nil, fmt.Errorf("openaichat: list models: %w", err)
+	models, err := p.models.ListModels(ctx)
+	if err != nil {
+		// The error of the openai provider starts with its own prefix.
+		// Its cause is the error of the SDK.
+		cause := errors.Unwrap(err)
+		if cause == nil {
+			cause = err
+		}
+		return nil, fmt.Errorf("openaichat: list models: %w", cause)
 	}
 	return models, nil
 }

@@ -1,6 +1,5 @@
 {
   "anthropic": {
-    "kind": "provider",
     "default": "claude-sonnet-5-5",
     "models": [
       {
@@ -162,7 +161,6 @@
     ]
   },
   "chatgpt": {
-    "kind": "provider",
     "default": "gpt-6.1-sol",
     "models": [
       {
@@ -186,7 +184,6 @@
     ]
   },
   "claude-code": {
-    "kind": "driver",
     "default": "default",
     "models": [
       {
@@ -400,7 +397,6 @@
     ]
   },
   "codex": {
-    "kind": "driver",
     "default": "gpt-6.1-sol",
     "models": [
       {
@@ -518,7 +514,6 @@
     ]
   },
   "fireworks": {
-    "kind": "provider",
     "default": "accounts/fireworks/models/kimi-k3",
     "models": [
       {
@@ -1019,7 +1014,6 @@
     ]
   },
   "openai": {
-    "kind": "provider",
     "default": "gpt-6-sol",
     "models": [
       {
@@ -1183,7 +1177,6 @@
     ]
   },
   "openrouter": {
-    "kind": "provider",
     "default": "anthropic/claude-sonnet-5.5",
     "models": [
       {

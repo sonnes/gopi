@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 )
@@ -362,6 +363,20 @@ func failing(code int, headers map[string]string) http.HandlerFunc {
 	}
 }
 
+func TestRequestPath(t *testing.T) {
+	providertest.RunFake(t, providertest.Fake{
+		New: func(baseURL string) ai.TextProvider {
+			return openai.New(
+				openai.APIKey("test-key"),
+				openai.BaseURL(baseURL),
+			)
+		},
+		Text:   completed,
+		Object: answer(objectBody),
+		Count:  answer(`{"input_tokens":7}`),
+	})
+}
+
 func sequenceProvider(t *testing.T, s *sequence) *openai.Provider {
 	t.Helper()
 	srv := httptest.NewServer(s)
@@ -370,28 +385,6 @@ func sequenceProvider(t *testing.T, s *sequence) *openai.Provider {
 		openai.APIKey("test-key"),
 		openai.BaseURL(srv.URL),
 	)
-}
-
-func TestStreamText_Retry(t *testing.T) {
-	s := &sequence{handlers: []http.HandlerFunc{
-		failing(http.StatusTooManyRequests, map[string]string{"retry-after-ms": "1"}),
-		completed,
-	}}
-	p := sequenceProvider(t, s)
-
-	msg, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, ai.MaxRetries(1)).Wait()
-	require.NoError(t, err)
-	assert.Equal(t, "Hi", msg.Text())
-	assert.Equal(t, int32(2), s.calls.Load())
-}
-
-func TestStreamText_NoRetryByDefault(t *testing.T) {
-	s := &sequence{handlers: []http.HandlerFunc{failing(http.StatusTooManyRequests, nil), completed}}
-	p := sequenceProvider(t, s)
-
-	_, err := p.StreamText(t.Context(), luna, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
-	require.Error(t, err)
-	assert.Equal(t, int32(1), s.calls.Load())
 }
 
 func TestStreamText_HeadersAndPayload(t *testing.T) {
@@ -414,4 +407,29 @@ func TestStreamText_HeadersAndPayload(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(s.body, &body))
 	assert.Equal(t, 7.0, body["max_output_tokens"], "the hook changes the request")
+}
+
+// answer answers with a JSON body.
+func answer(body string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, body)
+	}
+}
+
+// retryLater is a server error that asks for a short wait.
+var retryLater = failing(http.StatusServiceUnavailable, map[string]string{"retry-after-ms": "1"})
+
+// objectBody is a completed response that holds an object.
+const objectBody = `{"status":"completed","usage":{"input_tokens":10,"output_tokens":4},` +
+	`"output":[{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"{}"}]}]}`
+
+func TestGenerateImage_Retry(t *testing.T) {
+	s := &sequence{handlers: []http.HandlerFunc{retryLater, answer(`{"data":[{"url":"https://example.com/a.png"}]}`)}}
+	p := sequenceProvider(t, s)
+
+	resp, err := p.GenerateImage(t.Context(), ai.Model{ID: "gpt-image-2"}, "a cat", ai.MaxRetries(1))
+	require.NoError(t, err)
+	require.Len(t, resp.Images, 1)
+	assert.Equal(t, int32(2), s.calls.Load())
 }

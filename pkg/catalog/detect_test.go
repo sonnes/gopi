@@ -66,17 +66,12 @@ func TestCatalog_Detect_FirstSourceWins(t *testing.T) {
 func TestCatalog_Detect_RegistersCapabilities(t *testing.T) {
 	c := catalog.New()
 
-	c.Detect(
-		found("paint", "PAINT_KEY", imageProvider{}, pixel),
-		found("voice", "VOICE_KEY", speechProvider{}, alpha),
-	)
+	c.Detect(found("paint", "PAINT_KEY", imageProvider{}, pixel))
 
 	_, textErr := c.LanguageModel("paint/pixel")
 	_, imageErr := c.ImageModel("paint/pixel")
-	_, speechErr := c.SpeechModel("voice/alpha")
 	require.NoError(t, textErr)
 	require.NoError(t, imageErr)
-	require.NoError(t, speechErr)
 }
 
 // driverDetector returns a driver detector that finds d if ok is true.

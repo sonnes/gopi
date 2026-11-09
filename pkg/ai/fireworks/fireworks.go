@@ -2,8 +2,7 @@
 // Completions API of Fireworks through the provider of package
 // openaichat, and lists the models of a Fireworks account with their
 // context windows and input modalities. It implements
-// [ai.TextProvider], [ai.ObjectProvider], [ai.ModelLister], and
-// [ai.KeyChecker].
+// [ai.TextProvider], [ai.ObjectProvider], and [ai.ModelLister].
 //
 // A caller must obey these rules:
 //
@@ -52,7 +51,6 @@ var (
 	_ ai.TextProvider   = (*Provider)(nil)
 	_ ai.ObjectProvider = (*Provider)(nil)
 	_ ai.ModelLister    = (*Provider)(nil)
-	_ ai.KeyChecker     = (*Provider)(nil)
 )
 
 // Provider calls Fireworks. Create one with [New].

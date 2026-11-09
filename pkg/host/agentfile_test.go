@@ -14,6 +14,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/host"
+	"github.com/sonnes/gopi/pkg/permission"
 )
 
 // reviewer is an agent file on the fake model.
@@ -63,22 +64,24 @@ func TestStartWithAnAgentFillsTheSpec(t *testing.T) {
 	writeAgent(t, dir, "reviewer", reviewer)
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:     "s1",
-		Dirs:   []string{dir},
-		Agent:  "reviewer",
-		Deny:   []string{"write_file"},
-		Skills: []string{"lint"},
+		ID:      "s1",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
+		Deny:    []string{"write_file"},
+		Skills:  []string{"lint"},
 	})
 	require.NoError(t, err)
 
 	c := f.lastConfig(t)
 	assert.Equal(t, "fake/m", c.Spec)
 	assert.Equal(t, ai.ThinkingHigh, c.Effort)
-	assert.Equal(t, agent.Mode("acceptEdits"), c.Mode)
+	assert.Equal(t, permission.Mode("acceptEdits"), c.Mode)
 	assert.Equal(t, []string{"write_file", "Bash"}, c.Deny)
 	assert.Equal(t, []string{"Read", "Grep"}, c.ToolNames)
 	assert.Equal(t, []string{"lint", "deploy"}, c.Skills)
-	assert.Equal(t, []string{dir}, c.Dirs)
+	set, err := c.Defs.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "reviewer", set.Agents[0].Name, "the driver gets the folders")
 }
 
 func TestAFieldOfTheSpecWinsOverTheAgentFile(t *testing.T) {
@@ -87,16 +90,16 @@ func TestAFieldOfTheSpecWinsOverTheAgentFile(t *testing.T) {
 	writeAgent(t, dir, "reviewer", reviewer)
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:     "s1",
-		Dirs:   []string{dir},
-		Agent:  "reviewer",
-		Mode:   "acceptEdits",
-		Effort: ai.ThinkingLow,
+		ID:      "s1",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
+		Mode:    "acceptEdits",
+		Effort:  ai.ThinkingLow,
 	})
 	require.NoError(t, err)
 
 	c := f.lastConfig(t)
-	assert.Equal(t, agent.ModeAcceptEdits, c.Mode)
+	assert.Equal(t, permission.AcceptEdits, c.Mode)
 	assert.Equal(t, ai.ThinkingLow, c.Effort)
 }
 
@@ -108,9 +111,9 @@ func TestTheAgentOfALaterDirWins(t *testing.T) {
 	writeAgent(t, later, "reviewer", "---\nname: reviewer\ndescription: Later.\nmodel: fake/m\n---\nYou review later.\n")
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:    "s1",
-		Dirs:  []string{first, later},
-		Agent: "reviewer",
+		ID:      "s1",
+		DefDirs: []string{first, later},
+		Agent:   "reviewer",
 	})
 	require.NoError(t, err)
 
@@ -121,13 +124,13 @@ func TestStartWithAnUnknownAgentFails(t *testing.T) {
 	f := newFixture(t)
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:    "s1",
-		Model: "fake/m",
-		Dirs:  []string{t.TempDir()},
-		Agent: "reviewer",
+		ID:      "s1",
+		Model:   "fake/m",
+		DefDirs: []string{t.TempDir()},
+		Agent:   "reviewer",
 	})
 
-	assert.ErrorIs(t, err, def.ErrNotFound)
+	assert.ErrorIs(t, err, host.ErrInvalid)
 	_, ok := f.h.Get("s1")
 	assert.False(t, ok)
 }
@@ -137,9 +140,9 @@ func TestAStoredSessionRunsItsAgent(t *testing.T) {
 	dir := t.TempDir()
 	writeAgent(t, dir, "reviewer", reviewer)
 	f.create(t, host.Config{
-		ID:    "s1",
-		Dirs:  []string{dir},
-		Agent: "reviewer",
+		ID:      "s1",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
 	})
 	f = f.restart(t)
 
@@ -160,7 +163,7 @@ func TestStartWithAnUnknownEffortFails(t *testing.T) {
 	}{
 		{
 			name:   "in the agent file",
-			config: host.Config{Dirs: []string{dir}, Agent: "typo"},
+			config: host.Config{DefDirs: []string{dir}, Agent: "typo"},
 			want:   `"hgih"`,
 		},
 		{
@@ -175,6 +178,7 @@ func TestStartWithAnUnknownEffortFails(t *testing.T) {
 
 			_, err := f.h.Create(context.Background(), tt.config)
 
+			assert.ErrorIs(t, err, host.ErrInvalid)
 			assert.ErrorContains(t, err, tt.want)
 		})
 	}
@@ -187,9 +191,9 @@ func TestTheSessionKeepsItsSpecBeforeTheDriverStarts(t *testing.T) {
 	writeAgent(t, dir, "reviewer", reviewer)
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:    "s1",
-		Dirs:  []string{dir},
-		Agent: "reviewer",
+		ID:      "s1",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
 	})
 	require.Error(t, err)
 
@@ -206,7 +210,7 @@ func TestTheToolsOfTheSpecWinOverTheAgentFile(t *testing.T) {
 
 	_, err := f.h.Create(context.Background(), host.Config{
 		ID:        "s1",
-		Dirs:      []string{dir},
+		DefDirs:   []string{dir},
 		Agent:     "reviewer",
 		ToolNames: []string{"bash"},
 	})
@@ -215,15 +219,49 @@ func TestTheToolsOfTheSpecWinOverTheAgentFile(t *testing.T) {
 	assert.Equal(t, []string{"bash"}, f.lastConfig(t).ToolNames)
 }
 
-func TestSkillsetReachesEachDriverStart(t *testing.T) {
+func TestDefsReachEachDriverStart(t *testing.T) {
 	inline := def.Skill{Name: "deploy", Description: "D.", Body: "b"}
-	f := newFixture(t, host.Skillset(inline))
+	f := newFixture(t, host.Defs(def.Set{Skills: []def.Skill{inline}}))
 
 	f.create(t, host.Config{ID: "s1"})
 
-	c := f.lastConfig(t)
-	require.Len(t, c.Skillset, 1)
-	assert.Equal(t, inline, c.Skillset[0])
+	set, err := f.lastConfig(t).Defs.Load(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, []def.Skill{inline}, set.Skills)
+}
+
+func TestAnAgentFileOfTheHostDefs(t *testing.T) {
+	f := newFixture(t, host.Defs(def.Set{Agents: []def.Agent{{
+		Name:        "reviewer",
+		Description: "Review.",
+		Model:       "fake/m",
+		Prompt:      "You review.",
+	}}}))
+
+	_, err := f.h.Create(context.Background(), host.Config{
+		ID:    "s1",
+		Agent: "reviewer",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "fake/m", f.lastConfig(t).Spec)
+	assert.Equal(t, "You review.", agentPrompt(t, f.lastConfig(t)))
+}
+
+func TestAnInheritModelInAnyCaseGivesNoModel(t *testing.T) {
+	f := newFixture(t)
+	dir := t.TempDir()
+	writeAgent(t, dir, "reviewer", "---\nname: reviewer\ndescription: R.\nmodel: Inherit\n---\nYou review.\n")
+
+	_, err := f.h.Create(context.Background(), host.Config{
+		ID:      "s1",
+		Model:   "fake/m",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "fake/m", f.lastConfig(t).Spec)
 }
 
 // noCompactor is a strategy that makes no edits.

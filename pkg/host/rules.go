@@ -9,7 +9,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -51,43 +51,60 @@ func (h *Host) needsRulesHook(config Config) bool {
 	return h.rules != nil || len(config.Ask) > 0 || len(config.Deny) > 0
 }
 
-// rulesHook checks each tool call with the Deny rules and the Ask rules
-// of its session. A Deny rule blocks the call. An Ask rule asks a
-// person with [agent.Ask], so the hook does not wait in the CLI.
-type rulesHook struct {
-	agent.BaseHook
-	s *hosted
+// rulesHook returns a BeforeTool hook that checks each tool call with
+// the Deny rules and the Ask rules of s. A Deny rule blocks the call. An
+// Ask rule returns an [agent.AskError], and the agent asks its approve
+// function.
+func rulesHook(s *hosted) agent.Hook {
+	return agent.BeforeTool(s.checkRules)
 }
 
-func (h rulesHook) BeforeTool(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
-	if h.s.personAllowed(c) {
-		return c, nil
-	}
-	rules, dir, err := h.s.ruleSet(ctx)
+// checkRules blocks the call c if a Deny rule of s matches it, and asks
+// about c if an Ask rule matches it.
+func (s *hosted) checkRules(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+	d, _, err := s.decide(ctx, c, false)
 	if err != nil {
 		return c, agent.Deny(err.Error())
 	}
-	match, rule, err := rules.Check(c, dir)
-	if err != nil {
-		return c, agent.Deny(err.Error())
-	}
-	switch match {
+	switch d.Match {
 	case permission.DenyMatch:
-		return c, agent.Deny(denyText(rule, c.Name))
+		return c, agent.Deny(d.Reason)
 	case permission.AskMatch:
-		return c, agent.Ask(askText(rule, c.Name))
+		return c, agent.Ask(d.Reason)
 	}
 	return c, nil
 }
 
-// denyText is the reason of a call that the Deny rule blocks.
-func denyText(rule, name string) string {
-	return fmt.Sprintf("the rule %q denies the tool call %q", rule, name)
-}
-
-// askText is the reason of a call that the Ask rule asks about.
-func askText(rule, name string) string {
-	return fmt.Sprintf("the rule %q asks before the tool call %q", rule, name)
+// decide returns what the rules of s say about the call c, and the
+// folder of the rule paths. A Deny match and an Ask match have a reason.
+// A call that a person allowed in the active run gets
+// [permission.AllowMatch]. Otherwise an Allow rule does not approve a
+// safety call, which gets [permission.AskMatch] with Safety set. The
+// rules hook and [hosted.approve] both call decide, so they check a call
+// in the same order.
+func (s *hosted) decide(ctx context.Context, c ai.ToolCall, safety bool) (permission.Decision, string, error) {
+	if s.personAllowed(c) {
+		return permission.Decision{Match: permission.AllowMatch}, "", nil
+	}
+	rules, dir, err := s.ruleSet(ctx)
+	if err != nil {
+		return permission.Decision{}, "", err
+	}
+	match, rule, err := rules.Check(c, dir)
+	if err != nil {
+		return permission.Decision{}, "", fmt.Errorf("host: session %s: %w", s.id, err)
+	}
+	d := permission.Decision{Match: match}
+	switch {
+	case match == permission.DenyMatch:
+		d.Reason = permission.DenyReason(rule, c.Name)
+	case match == permission.AskMatch:
+		d.Reason = fmt.Sprintf("the rule %q asks before the tool call %q", rule, c.Name)
+	case match == permission.AllowMatch && safety:
+		d.Match = permission.AskMatch
+		d.Safety = true
+	}
+	return d, dir, nil
 }
 
 // ruleSet returns the rules of a call of s, and the folder of a rule

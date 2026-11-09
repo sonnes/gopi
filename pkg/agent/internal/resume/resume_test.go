@@ -67,3 +67,21 @@ func TestEachCLIHasItsOwnID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
+
+func TestValueDoesNotTouchTheID(t *testing.T) {
+	ctx := context.Background()
+	log := session.New()
+	id := resume.New("claude")
+	require.NoError(t, id.Save(ctx, log, "sess-1"))
+
+	usage := resume.Value[int]("claude", "usage")
+	require.NoError(t, usage.Set(ctx, log.Writer(), 7))
+
+	got, err := id.Get(log)
+	require.NoError(t, err)
+	assert.Equal(t, "sess-1", got)
+	n, ok, err := usage.Get(log)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, 7, n)
+}

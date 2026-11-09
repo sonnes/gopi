@@ -463,7 +463,7 @@ func TestSummarizeInAnAgent(t *testing.T) {
 	big := ai.AssistantMessage(ai.Text{Text: words(100)})
 	big.StopReason = ai.StopReasonStop
 	big.Usage = ai.Usage{Input: 1000}
-	p := &scripted{messages: []ai.Message{big}, provider: provider{replies: []reply{{text: "the summary"}, {text: "again"}}}}
+	p := &scripted{messages: []ai.Message{big}, replies: []reply{{text: "the summary"}, {text: "again"}}}
 	a := agent.New(
 		ai.LanguageModel{Provider: p},
 		agent.Compaction(compact.Summarize(compact.Limit(500, 0), compact.KeepRecent(0))),

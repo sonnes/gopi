@@ -1,6 +1,7 @@
 package env_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -120,7 +121,7 @@ func TestDetectors_Capabilities(t *testing.T) {
 	// OpenRouter and Fireworks have no image API.
 	c.RegisterModel("openrouter", ai.Model{ID: "openai/gpt-image-2"})
 	_, err = c.ImageModel("openrouter/openai/gpt-image-2")
-	require.EqualError(t, err, `catalog: provider "openrouter" does not support image generation`)
+	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 
 func TestDetectors_ListedProviders(t *testing.T) {

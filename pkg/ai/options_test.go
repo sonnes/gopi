@@ -154,3 +154,76 @@ func TestParseThinking(t *testing.T) {
 		})
 	}
 }
+
+func TestMaxTokensOf(t *testing.T) {
+	capped := ai.Model{ID: "m", MaxTokens: 100}
+	tests := []struct {
+		name   string
+		model  ai.Model
+		opts   ai.Options
+		want   int
+		wantOK bool
+	}{
+		{name: "the option wins", model: capped, opts: ai.MaxTokens(10), want: 10, wantOK: true},
+		{name: "the cap of the model", model: capped, want: 100, wantOK: true},
+		{name: "neither", model: ai.Model{ID: "m"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ai.MaxTokensOf(tt.model, tt.opts)
+			assert.Equal(t, tt.wantOK, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRetentionOf(t *testing.T) {
+	assert.Equal(t, ai.CacheShort, ai.RetentionOf(nil))
+	assert.Equal(t, ai.CacheNone, ai.RetentionOf(ai.CacheRetention(ai.CacheNone)))
+}
+
+func TestThinkingOf(t *testing.T) {
+	level, ok, err := ai.ThinkingOf(ai.Thinking(ai.ThinkingXHigh))
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, ai.ThinkingXHigh, level)
+
+	_, ok, err = ai.ThinkingOf(nil)
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	_, _, err = ai.ThinkingOf(ai.Thinking("huge"))
+	require.ErrorContains(t, err, `unknown thinking level "huge"`)
+}
+
+func TestThinkingLevel_Effort(t *testing.T) {
+	var efforts []string
+	for _, level := range ai.ThinkingLevels() {
+		efforts = append(efforts, level.Effort())
+	}
+	assert.Equal(t, []string{"none", "low", "medium", "high", "xhigh", "max"}, efforts)
+}
+
+func TestToolChoiceOf(t *testing.T) {
+	choice, ok, err := ai.ToolChoiceOf(ai.ToolChoice(ai.ToolChoiceTool("read")))
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.True(t, choice.Named())
+
+	_, ok, err = ai.ToolChoiceOf(nil)
+	require.NoError(t, err)
+	assert.False(t, ok)
+
+	_, _, err = ai.ToolChoiceOf(ai.ToolChoice(ai.ToolChoiceMode{Type: "some"}))
+	require.ErrorContains(t, err, `unknown tool choice "some"`)
+}
+
+func TestSystemPromptOf(t *testing.T) {
+	opts := ai.SystemPrompt([]ai.Content{
+		ai.Text{Text: "Be brief."},
+		ai.File{MediaType: "image/png"},
+		ai.Section{Name: "rules", Text: "Cite."},
+	})
+	assert.Equal(t, []string{"Be brief.", "Cite."}, ai.SystemPromptOf(opts))
+}

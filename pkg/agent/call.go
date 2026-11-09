@@ -96,7 +96,7 @@ func (a *Agent) call(
 // and the run fails.
 func (a *Agent) endMessage(ctx context.Context, em *emitter, m ai.Message) error {
 	entry := session.NewEntry(m, session.Author(a.cfg.name))
-	err := em.commit(ctx, []session.Entry{entry}, EventMessageEnd{Message: m})
+	err := em.commit(ctx, entry, EventMessageEnd{Message: m})
 	if err != nil {
 		em.emit(emptyEnd(m.Usage))
 	}

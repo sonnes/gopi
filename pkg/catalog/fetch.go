@@ -87,7 +87,6 @@ func withUnlisted(results []FetchResult, ids, listed []string) []FetchResult {
 	return results
 }
 
-// providerIDs returns the ID of each provider of any capability, sorted.
 func (c *Catalog) providerIDs() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -98,21 +97,17 @@ func (c *Catalog) providerIDs() []string {
 	for id := range c.imageProviders {
 		ids[id] = true
 	}
-	for id := range c.speechProviders {
-		ids[id] = true
-	}
 	return slices.Sorted(maps.Keys(ids))
 }
 
 // lister returns the first provider of id that lists models: text, then
-// image, then speech.
+// image.
 func (c *Catalog) lister(id string) ai.ModelLister {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	for _, p := range []any{
 		c.textProviders[id],
 		c.imageProviders[id],
-		c.speechProviders[id],
 	} {
 		if l, ok := p.(ai.ModelLister); ok {
 			return l
@@ -187,7 +182,6 @@ func named(ids []string, id string) bool {
 	return len(ids) == 0 || slices.Contains(ids, id)
 }
 
-// mergeModels merges models into index under the ID id with merge.
 func (c *Catalog) mergeModels(
 	index map[string]ai.Model,
 	id string,
@@ -203,6 +197,29 @@ func (c *Catalog) mergeModels(
 	}
 }
 
+// FillModel returns m with each zero field taken from d. The fields
+// are filled one by one, apart from the prices: a model with any price
+// keeps all of its prices, because a price list is complete or wrong.
+// A false Reasoning is zero, so a true Reasoning of d wins. The result
+// has its own copy of each slice.
+//
+// [MergeModel], [MergeDriverModel], and the generator of models.json
+// build on it, so each field of [ai.Model] is merged in one place.
+func FillModel(m, d ai.Model) ai.Model {
+	m.ID = cmp.Or(m.ID, d.ID)
+	m.Name = cmp.Or(m.Name, d.Name)
+	m.MaxTokens = cmp.Or(m.MaxTokens, d.MaxTokens)
+	m.ContextWindow = cmp.Or(m.ContextWindow, d.ContextWindow)
+	m.Input = slices.Clone(firstSet(m.Input, d.Input))
+	m.Reasoning = m.Reasoning || d.Reasoning
+	m.ThinkingLevels = slices.Clone(firstSet(m.ThinkingLevels, d.ThinkingLevels))
+	if !hasPrices(m.Pricing) {
+		m.Pricing = d.Pricing
+	}
+	m.Pricing.Tiers = slices.Clone(m.Pricing.Tiers)
+	return m
+}
+
 // MergeModel returns listed with the registered values that the list
 // does not have. [Catalog.FetchModels] merges with it, and so does the
 // generator of models.json for a provider. A field that the list leaves
@@ -213,20 +230,11 @@ func (c *Catalog) mergeModels(
 // a model can turn thinking off. A model with no registered prices
 // keeps the listed prices, such as the prices of OpenRouter.
 func MergeModel(registered, listed ai.Model) ai.Model {
-	pricing := registered.Pricing
-	if !hasPrices(pricing) {
-		pricing = listed.Pricing
-	}
-	return ai.Model{
-		ID:             listed.ID,
-		Name:           cmp.Or(listed.Name, registered.Name),
-		MaxTokens:      cmp.Or(listed.MaxTokens, registered.MaxTokens),
-		ContextWindow:  cmp.Or(listed.ContextWindow, registered.ContextWindow),
-		Input:          firstSet(listed.Input, registered.Input),
-		Reasoning:      listed.Reasoning || registered.Reasoning,
-		ThinkingLevels: firstSet(registered.ThinkingLevels, listed.ThinkingLevels),
-		Pricing:        pricing,
-	}
+	kept := FillModel(registered, listed)
+	m := FillModel(listed, registered)
+	m.ThinkingLevels = kept.ThinkingLevels
+	m.Pricing = kept.Pricing
+	return m
 }
 
 // MergeDriverModel is [MergeModel] for the model of a driver, with one
@@ -236,11 +244,10 @@ func MergeModel(registered, listed ai.Model) ai.Model {
 // generator of models.json.
 func MergeDriverModel(registered, listed ai.Model) ai.Model {
 	m := MergeModel(registered, listed)
-	m.ThinkingLevels = firstSet(listed.ThinkingLevels, registered.ThinkingLevels)
+	m.ThinkingLevels = FillModel(listed, registered).ThinkingLevels
 	return m
 }
 
-// hasPrices reports whether p has any price.
 func hasPrices(p ai.Pricing) bool {
 	base := p.Input + p.Output + p.CacheRead + p.CacheWrite + p.CacheWriteLong
 	return base != 0 || len(p.Tiers) > 0

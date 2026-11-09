@@ -40,7 +40,7 @@ func checkByModel(t *testing.T, end agent.EventAgentEnd, want map[string]ai.Usag
 
 func TestUsageByModelIsTheDifferenceOfEachRun(t *testing.T) {
 	claude.Replay(t, nil, "testdata/model_usage.trace")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, _, err := run(context.Background(), a, "Say hello")
@@ -64,13 +64,13 @@ func TestUsageByModelOfAResumedSession(t *testing.T) {
 	store := session.NewMemoryStore()
 	claude.Replay(t, nil, "testdata/model_usage_first.trace", "testdata/model_usage_resume.trace")
 
-	first, err := claude.Durable(ctx, "s1", claude.Store(store))
+	first, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	_, _, err = run(ctx, first, "Say hello")
 	require.NoError(t, err)
 	require.NoError(t, first.Close())
 
-	second, err := claude.Durable(ctx, "s1", claude.Store(store))
+	second, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
 	require.NoError(t, err)
 	defer closeAgent(t, second)
 	events, _, err := run(ctx, second, "Again")

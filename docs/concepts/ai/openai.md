@@ -31,7 +31,7 @@ ai.LanguageModel --+
 - A thinking block from `openai` holds the ID and the encrypted content of its reasoning item as JSON in `Signature`. The API needs both, and the block has one opaque field. On send, the provider drops a thinking block with a signature that does not decode, such as one from Anthropic.
 - `openai` builds the final message from the output of the terminal event, because that output holds the encrypted content and the item order. If that output is empty, as on the plan route of [ChatGPT Plan](chatgpt.md), the message comes from the items of the `response.output_item.done` events.
 - The `openai` stream opens a block for each item in output order, so the index of an event matches the final message.
-- `openai` sends the system prompt as a developer message, because a cache breakpoint needs a content part. Only the GPT-6 and GPT-5.6 models get the breakpoint, because an older model such as GPT-5.4 mini returns a 400 for it.
+- `openai` sends the system prompt as a developer message, because a cache breakpoint needs a content part. Only the models of the GPT-6 and GPT-5.6 families get the breakpoint, because an older model such as GPT-5.4 mini returns a 400 for it.
 - Neither provider sends `prompt_cache_options`, because OpenRouter rejects it.
 - On a known GPT model, a removal keeps the tool list and limits the model with an `allowed_tools` tool choice, so the cache holds. On Responses, an addition on that model goes in place as an `additional_tools` item for the same reason. The form of each other change is in [Tool Change](../agent/tool-change.md).
 - `openaichat` sends only the fields that OpenAI, OpenRouter, and Fireworks all accept, because Fireworks rejects an unknown field. The cache breakpoint goes only with `CacheBreakpoints` of `openaichat.New`, and the cache key and the long retention go only when the call sets them.
@@ -49,7 +49,7 @@ ai.LanguageModel --+
 | Build a Chat Completions request      | `pkg/ai/openaichat/params.go`                                          |
 | Convert messages for Chat Completions | `pkg/ai/openaichat/convert.go`                                         |
 | Read a Chat Completions stream        | `pkg/ai/openaichat/openaichat.go`                                      |
-| Mark what an OpenAI model accepts     | `pkg/ai/openai/compat.go`, `pkg/ai/openaichat/compat.go`               |
+| Mark what an OpenAI model accepts     | `internal/family/family.go`                                            |
 | Record a provider test                | `pkg/ai/openai/openai_test.go`, `pkg/ai/openaichat/openaichat_test.go` |
 
 ## Related Concepts

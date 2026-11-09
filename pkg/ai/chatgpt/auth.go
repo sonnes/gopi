@@ -330,3 +330,14 @@ func (a Auth) postForm(ctx context.Context, endpoint string, form url.Values) (i
 	}
 	return res.StatusCode, body, nil
 }
+
+// maxErrorBody is the most bytes of an error body that an error holds.
+const maxErrorBody = 1024
+
+// truncate returns at most [maxErrorBody] bytes of body as a string.
+func truncate(body []byte) string {
+	if len(body) > maxErrorBody {
+		body = body[:maxErrorBody]
+	}
+	return string(body)
+}

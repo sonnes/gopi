@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -53,16 +54,18 @@ func ok(w http.ResponseWriter, _ *http.Request) {
 	_, _ = io.WriteString(w, sseBody(`"end_turn"`))
 }
 
-// status answers with an API error and the headers.
-func status(code int, headers map[string]string) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		for k, v := range headers {
-			w.Header().Set(k, v)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"api_error","message":"busy"}}`)
-	}
+func TestRequestPath(t *testing.T) {
+	providertest.RunFake(t, providertest.Fake{
+		New: func(baseURL string) ai.TextProvider {
+			return New(
+				APIKey("test"),
+				BaseURL(baseURL),
+			)
+		},
+		Text:   ok,
+		Object: ok,
+		Count:  counted,
+	})
 }
 
 func newFakeProvider(t *testing.T, api *fakeAPI) *Provider {
@@ -73,70 +76,6 @@ func newFakeProvider(t *testing.T, api *fakeAPI) *Provider {
 		APIKey("test"),
 		BaseURL(server.URL),
 	)
-}
-
-func TestStreamText_Retry(t *testing.T) {
-	api := &fakeAPI{handlers: []http.HandlerFunc{
-		status(http.StatusTooManyRequests, map[string]string{"retry-after-ms": "1"}),
-		status(http.StatusServiceUnavailable, map[string]string{"retry-after-ms": "1"}),
-		ok,
-	}}
-	p := newFakeProvider(t, api)
-
-	msg, err := p.StreamText(
-		t.Context(),
-		testModel,
-		[]ai.Message{ai.UserMessage("Hi")},
-		ai.MaxRetries(2),
-	).Wait()
-	require.NoError(t, err)
-	assert.Equal(t, "Hi", msg.Text())
-	assert.Equal(t, int32(3), api.calls.Load())
-}
-
-func TestStreamText_NoRetryByDefault(t *testing.T) {
-	api := &fakeAPI{handlers: []http.HandlerFunc{status(http.StatusTooManyRequests, nil), ok}}
-	p := newFakeProvider(t, api)
-
-	_, err := p.StreamText(t.Context(), testModel, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
-	require.Error(t, err)
-	assert.Equal(t, int32(1), api.calls.Load())
-}
-
-func TestStreamText_NoRetryOnClientError(t *testing.T) {
-	api := &fakeAPI{handlers: []http.HandlerFunc{status(http.StatusBadRequest, nil), ok}}
-	p := newFakeProvider(t, api)
-
-	_, err := p.StreamText(
-		t.Context(),
-		testModel,
-		[]ai.Message{ai.UserMessage("Hi")},
-		ai.MaxRetries(3),
-	).Wait()
-	require.Error(t, err)
-
-	var apiErr *Error
-	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, http.StatusBadRequest, apiErr.StatusCode)
-	assert.Equal(t, int32(1), api.calls.Load())
-}
-
-func TestStreamText_RetryDelayCap(t *testing.T) {
-	api := &fakeAPI{handlers: []http.HandlerFunc{
-		status(http.StatusTooManyRequests, map[string]string{"retry-after": "120"}),
-		ok,
-	}}
-	p := newFakeProvider(t, api)
-
-	_, err := p.StreamText(
-		t.Context(),
-		testModel,
-		[]ai.Message{ai.UserMessage("Hi")},
-		ai.MaxRetries(3),
-	).Wait()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "retry")
-	assert.Equal(t, int32(1), api.calls.Load(), "a wait over the cap fails at once")
 }
 
 func TestStreamText_Headers(t *testing.T) {
@@ -229,11 +168,8 @@ func TestStreamText_ContextExceeded(t *testing.T) {
 	assert.ErrorIs(t, err, ai.ErrContextExceeded)
 }
 
-func TestStreamText_OtherClientErrorIsNotContextExceeded(t *testing.T) {
-	p := newFakeProvider(t, &fakeAPI{handlers: []http.HandlerFunc{status(http.StatusBadRequest, nil)}})
-
-	_, err := p.StreamText(t.Context(), testModel, []ai.Message{ai.UserMessage("Hi")}, nil).Wait()
-
-	require.Error(t, err)
-	assert.NotErrorIs(t, err, ai.ErrContextExceeded)
+// counted answers a token count.
+func counted(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = io.WriteString(w, `{"input_tokens":7}`)
 }

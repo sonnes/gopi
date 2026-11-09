@@ -56,7 +56,7 @@ func TestSectionsChangeInTheNextUserMessage(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/sections.trace")
 	p := &prompt{}
 	p.set(projectSection, emptyMemory)
-	a := claude.New(claude.Sections(p.get))
+	a := claude.New(agent.Config{Sections: p.get})
 	defer closeAgent(t, a)
 
 	events, _, err := run(context.Background(), a, "Say hello")
@@ -87,14 +87,14 @@ func TestSectionsResumeKeepsTheBase(t *testing.T) {
 	p := &prompt{}
 	p.set(projectSection, emptyMemory)
 
-	first, err := claude.Durable(ctx, "s1", claude.Store(store), claude.Sections(p.get))
+	first, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store, Sections: p.get})
 	require.NoError(t, err)
 	_, _, err = run(ctx, first, "Say hello")
 	require.NoError(t, err)
 	require.NoError(t, first.Close())
 
 	p.set(projectSection, notedMemory)
-	second, err := claude.Durable(ctx, "s1", claude.Store(store), claude.Sections(p.get))
+	second, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store, Sections: p.get})
 	require.NoError(t, err)
 	defer closeAgent(t, second)
 	_, _, err = run(ctx, second, "Again")
@@ -108,7 +108,7 @@ func TestSectionsResumeKeepsTheBase(t *testing.T) {
 
 func TestSystemIsOneSection(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	a := claude.New(claude.System("Be brief."))
+	a := claude.New(agent.Config{Sections: agent.SystemText("Be brief.")})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Say hello")

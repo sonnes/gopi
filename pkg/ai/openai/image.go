@@ -26,10 +26,13 @@ func (p *Provider) GenerateImage(
 	opts ai.Options,
 ) (*ai.ImageResponse, error) {
 	params := buildImageParams(model, prompt, opts)
-
-	resp, err := p.client.Images.Generate(ctx, params)
+	reqOpts := requestOptions(opts)
+	send := func() (*sdk.ImagesResponse, error) {
+		return p.client.Images.Generate(ctx, params, reqOpts...)
+	}
+	resp, err := call(ctx, opts, send)
 	if err != nil {
-		return nil, fmt.Errorf("openai: %w", err)
+		return nil, err
 	}
 
 	format := string(resp.OutputFormat)

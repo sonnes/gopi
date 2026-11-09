@@ -1,13 +1,12 @@
-// Package clidefs gives the definitions of a list of folders to the
-// driver of a CLI. It merges them with [def.Resolve], as the harness
-// does, and it gives the driver a clean folder for the files that the
-// CLI reads.
+// Package clidefs gives the driver of a CLI a clean folder for the
+// definition files that the CLI reads. The driver loads the
+// [def.Source] of its config and writes the files in the folder.
 //
 // A caller must obey these rules:
 //
-//   - Call [Defs.Prepare] before each start of the CLI, so an edit of a
-//     folder reaches the next process.
-//   - Call [Defs.Remove] when the agent closes.
+//   - Call [Folder.Prepare] before each start of the CLI, so an edit of
+//     a definition reaches the next process.
+//   - Call [Folder.Remove] when the agent closes.
 package clidefs
 
 import (
@@ -15,7 +14,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/def"
@@ -29,110 +27,81 @@ const rootName = "gopi-defs"
 // dirPerm keeps the folder of a session private to the user.
 const dirPerm = 0o700
 
-// Defs is the definitions of one session of a CLI.
-type Defs struct {
-	skillset []def.SkillsReader
-	dirs     []string
-	root     string
-	session  string
-	spec     string
-}
-
-// New returns the skills of skillset, then the definitions of dirs,
-// lowest first. The folder of the session is <session> in the folder
-// gopi-defs of [os.TempDir]. spec is the model spec of the session.
-func New(skillset []def.SkillsReader, dirs []string, session, spec string) *Defs {
-	root := filepath.Join(os.TempDir(), rootName)
-	return &Defs{
-		skillset: skillset,
-		dirs:     dirs,
-		root:     root,
-		session:  session,
-		spec:     spec,
+// Load returns the definitions of src. A nil src gives an empty set.
+func Load(ctx context.Context, src def.Source) (def.Set, error) {
+	if src == nil {
+		return def.Set{}, nil
 	}
+	return src.Load(ctx)
 }
 
-// Check returns an error for the first name that no skill has. The
-// harness fails on such a name too. Without names, it reads nothing.
-func (d *Defs) Check(ctx context.Context, names []string) error {
+// CheckSkills returns an error for the first name that no skill of src
+// has. The harness fails on such a name too. Without names, it loads
+// nothing.
+func CheckSkills(ctx context.Context, src def.Source, names []string) error {
 	if len(names) == 0 {
 		return nil
 	}
-	set, err := d.resolve(ctx)
+	set, err := Load(ctx, src)
 	if err != nil {
 		return err
 	}
 	for _, name := range names {
-		if _, ok := set.Find(name); !ok {
+		if _, ok := set.Skill(name); !ok {
 			return fmt.Errorf("clidefs: the skill %q: no skill has this name", name)
 		}
 	}
 	return nil
 }
 
-// Prepare merges the folders and clears the folder of the session, so
-// that a definition that went away leaves no file. It returns the
-// merged set and the path of the folder. The path is empty if the set
-// is empty: the CLI then needs no folder, and the folder of an earlier
-// start goes away. A skill name that is not a folder name fails, because
-// the CLI reads the name of a skill from its folder.
-func (d *Defs) Prepare(ctx context.Context) (def.Set, string, error) {
-	set, err := d.resolve(ctx)
-	if err != nil {
-		return def.Set{}, "", err
-	}
-	if len(set.Skills) == 0 && len(set.Agents) == 0 {
-		return set, "", d.Remove()
-	}
+// Folder is the folder of the definition files of one session of a CLI.
+type Folder struct {
+	root    string
+	session string
+	spec    string
+}
 
-	if !d.validSession() {
-		return def.Set{}, "", fmt.Errorf("clidefs: the session %q is not a folder name", d.session)
+// New returns the folder of the session: <session> in the folder
+// gopi-defs of [os.TempDir]. spec is the model spec of the session.
+func New(session, spec string) *Folder {
+	return &Folder{
+		root:    filepath.Join(os.TempDir(), rootName),
+		session: session,
+		spec:    spec,
 	}
-	for _, name := range set.Names {
-		if !storefs.OneElement(name) {
-			return def.Set{}, "", fmt.Errorf("clidefs: the skill %q is not a folder name", name)
-		}
+}
+
+// Prepare clears the folder of the session for set, so that a
+// definition that went away leaves no file, and returns the path of the
+// folder. The path is empty if set has no skill and no agent: the CLI
+// then needs no folder, and the folder of an earlier start goes away.
+func (f *Folder) Prepare(set def.Set) (string, error) {
+	if len(set.Skills) == 0 && len(set.Agents) == 0 {
+		return "", f.Remove()
 	}
-	dir := filepath.Join(d.root, d.session)
+	if err := storefs.CheckName(f.session); err != nil {
+		return "", fmt.Errorf("clidefs: the session: %w", err)
+	}
+	dir := filepath.Join(f.root, f.session)
 	if err := os.RemoveAll(dir); err != nil {
-		return def.Set{}, "", fmt.Errorf("clidefs: clear the folder: %w", err)
+		return "", fmt.Errorf("clidefs: clear the folder: %w", err)
 	}
 	if err := os.MkdirAll(dir, dirPerm); err != nil {
-		return def.Set{}, "", fmt.Errorf("clidefs: make the folder: %w", err)
+		return "", fmt.Errorf("clidefs: make the folder: %w", err)
 	}
-	return set, dir, nil
+	return dir, nil
 }
 
 // Remove removes the folder of the session. A folder that does not
 // exist is not an error.
-func (d *Defs) Remove() error {
-	if !d.validSession() {
+func (f *Folder) Remove() error {
+	if storefs.CheckName(f.session) != nil {
 		return nil
 	}
-	if err := os.RemoveAll(filepath.Join(d.root, d.session)); err != nil {
+	if err := os.RemoveAll(filepath.Join(f.root, f.session)); err != nil {
 		return fmt.Errorf("clidefs: remove the folder: %w", err)
 	}
 	return nil
-}
-
-// validSession reports whether the folder of the session stays in the
-// root.
-func (d *Defs) validSession() bool {
-	return storefs.OneElement(d.session)
-}
-
-// resolve merges the skills of the skillset and the definitions of the
-// folders. A folder that does not exist gives nothing.
-func (d *Defs) resolve(ctx context.Context) (def.Set, error) {
-	skillReaders := slices.Clone(d.skillset)
-	agentReaders := make([]def.AgentsReader, len(d.dirs))
-	for i, dir := range d.dirs {
-		folder := storefs.Dir(dir)
-		skillReaders = append(skillReaders, folder)
-		agentReaders[i] = folder
-	}
-
-	return def.Resolve(ctx, skillReaders, agentReaders)
 }
 
 // Model returns the model of a definition for the CLI of the parent
@@ -140,9 +109,9 @@ func (d *Defs) resolve(ctx context.Context) (def.Set, error) {
 // "claude-code/claude-sonnet-5-5", gives its model ID. The CLI runs on
 // one account, so another spec, a bare model, and "inherit" give "", and
 // the definition runs the model of the parent.
-func (d *Defs) Model(model string) string {
+func (f *Folder) Model(model string) string {
 	account, id, ok := strings.Cut(model, "/")
-	own, _, _ := strings.Cut(d.spec, "/")
+	own, _, _ := strings.Cut(f.spec, "/")
 	if !ok || account != own {
 		return ""
 	}

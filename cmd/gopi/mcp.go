@@ -17,24 +17,9 @@ import (
 )
 
 // mcpFile is the format of an mcp.json file, as Claude Code reads it.
+// The key of each server is its name.
 type mcpFile struct {
-	Servers map[string]mcpServer `json:"mcpServers"`
-}
-
-// mcpServer is one server of an mcp.json file. Type is "stdio" or
-// "http". The default is "stdio".
-type mcpServer struct {
-	Type string `json:"type"`
-
-	// Command, Args, and Env start a stdio server. Env adds to the
-	// environment of gopi.
-	Command string            `json:"command"`
-	Args    []string          `json:"args"`
-	Env     map[string]string `json:"env"`
-
-	// URL and Headers reach an HTTP server.
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
+	Servers map[string]agent.MCPServer `json:"mcpServers"`
 }
 
 // loadMCP connects to each server of the mcp.json file at path and
@@ -68,26 +53,15 @@ func loadMCP(
 	}
 
 	tools, closeMCP, err := mcp.Connect(ctx, servers, environ)
-	for _, e := range joined(err) {
-		fmt.Fprintf(warn, "gopi: %v. gopi continues without its tools\n", e)
+	if err != nil {
+		fmt.Fprintf(warn, "gopi: %v\ngopi continues without the tools of the servers that failed\n", err)
 	}
 	return tools, closeMCP, nil
 }
 
-// joined returns the errors that err joins, or err alone.
-func joined(err error) []error {
-	if err == nil {
-		return nil
-	}
-	if j, ok := err.(interface{ Unwrap() []error }); ok {
-		return j.Unwrap()
-	}
-	return []error{err}
-}
-
 // expandServer returns srv as the server name, with ${VAR} expanded in
 // each string.
-func expandServer(name string, srv mcpServer, getenv func(string) string) agent.MCPServer {
+func expandServer(name string, srv agent.MCPServer, getenv func(string) string) agent.MCPServer {
 	expand := func(s string) string { return expandEnv(s, getenv) }
 	expandMap := func(m map[string]string) map[string]string {
 		out := make(map[string]string, len(m))

@@ -60,7 +60,7 @@ func isToolStart(ev agent.Event) bool {
 func TestSteerWhileToolRuns(t *testing.T) {
 	claude.Replay(t, nil, "testdata/steer_tool.trace")
 	claude.SetUUIDs(t, "steer-1")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, err := steerOn(t, a, "Run sleep 30", "Reply with: second", isToolStart)
@@ -81,7 +81,7 @@ func TestSteerWhileToolRuns(t *testing.T) {
 func TestSteerWhileTextStreams(t *testing.T) {
 	claude.Replay(t, nil, "testdata/steer_stream.trace")
 	claude.SetUUIDs(t, "steer-1")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	events, err := steerOn(t, a, "Write a poem", "Reply with: second", func(ev agent.Event) bool {
@@ -102,7 +102,7 @@ func TestSteerWhileTextStreams(t *testing.T) {
 func TestSteerMovesASubagentToTheBackground(t *testing.T) {
 	claude.Replay(t, nil, "testdata/steer_subagent.trace")
 	claude.SetUUIDs(t, "steer-1")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	_, err := steerOn(t, a, "Ask a subagent", "Reply with: second", isToolStart)
@@ -115,7 +115,7 @@ func TestSteerMovesASubagentToTheBackground(t *testing.T) {
 func TestSteerThatTheCLIDidNotTakeComesBack(t *testing.T) {
 	claude.Replay(t, nil, "testdata/steer_cancel.trace")
 	claude.SetUUIDs(t, "steer-1")
-	a := claude.New()
+	a := claude.New(agent.Config{})
 	defer closeAgent(t, a)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -142,7 +142,7 @@ func TestSteerThatTheCLIDidNotTakeComesBack(t *testing.T) {
 }
 
 func TestSteerWithNoRunWaitsForTakeSteer(t *testing.T) {
-	a := claude.New()
+	a := claude.New(agent.Config{})
 
 	a.Steer(session.Text("later"))
 

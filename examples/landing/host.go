@@ -34,9 +34,9 @@ func Manage(
 		return err
 	}
 	notes, err := h.Create(ctx, host.Config{
-		Model: "codex/gpt-6-astra",
-		Dir:   "repos/site",
-		Dirs:  []string{"repos/site/.agents"},
+		Model:   "codex/gpt-6-astra",
+		Dir:     "repos/site",
+		DefDirs: []string{"repos/site/.agents"},
 	})
 	if err != nil {
 		return err

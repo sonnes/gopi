@@ -27,7 +27,7 @@ var (
 // the command without a sandbox.
 var seatbeltPath = "/usr/bin/sandbox-exec"
 
-// probeTimeout is how long [Seatbelt] waits for its test command.
+// probeTimeout is how long newSeatbelt waits for its test command.
 const probeTimeout = 10 * time.Second
 
 // seatbeltRules are the rules that come after the base profile and the
@@ -44,32 +44,25 @@ var seatbeltRules = []string{
 	`(deny system-fcntl (fcntl-command 80 110))`,
 }
 
+// seatbelt is the fence of macOS. It runs each command with
+// sandbox-exec.
 type seatbelt struct {
 	// args are the arguments of sandbox-exec before the command.
 	args []string
-	// env are the names of the environment variables that the command
-	// gets. If env is empty, the command gets the whole environment.
-	env []string
 	// setEnv are the name=value variables that the command gets on top
-	// of env.
+	// of the environment of the caller.
 	setEnv []string
 }
 
-// Seatbelt returns a fence that runs each command with sandbox-exec, the
-// sandbox of macOS. Seatbelt runs a test command in the fence first. If
-// the test fails, for example on another OS, Seatbelt returns an error.
-//
-// A command can read all files except the hidden ones, and it can use
-// only a short list of system services. A setuid program, such as ps,
-// does not run in the fence.
-func Seatbelt(opts ...Option) (Fence, error) {
+// newSeatbelt returns the fence of macOS. It runs a test command in the
+// fence first, and returns an error if the test fails.
+func newSeatbelt(opts ...Option) (Fence, error) {
 	c := newConfig(opts...).resolved()
 	if err := checkPatternRoots(c); err != nil {
 		return nil, err
 	}
 	s := &seatbelt{
 		args:   seatbeltArgs(c),
-		env:    c.env,
 		setEnv: c.setEnv,
 	}
 	if err := s.probe(); err != nil {
@@ -86,9 +79,9 @@ func (s *seatbelt) Command(ctx context.Context, dir string, argv ...string) (*ex
 	args := append(slices.Clone(s.args), argv...)
 	cmd := exec.CommandContext(ctx, seatbeltPath, args...)
 	cmd.Dir = dir
-	if len(s.env) > 0 || len(s.setEnv) > 0 {
+	if len(s.setEnv) > 0 {
 		// exec.Cmd uses the last value of a name, so setEnv wins.
-		cmd.Env = append(keepEnv(os.Environ(), s.env), s.setEnv...)
+		cmd.Env = append(os.Environ(), s.setEnv...)
 	}
 	return cmd, nil
 }
@@ -178,21 +171,6 @@ func seatbeltArgs(c config) []string {
 		}
 	}
 
-	for i, h := range c.hideExcept {
-		p := param(fmt.Sprintf("HIDEEXCEPT_%d", i), h.dir)
-		filters := []string{fmt.Sprintf(`(subpath (param "%s"))`, p)}
-		for j, keep := range h.keep {
-			k := param(fmt.Sprintf("HIDEEXCEPT_%d_KEEP_%d", i, j), keep)
-			filters = append(filters, fmt.Sprintf(`(require-not (subpath (param "%s")))`, k))
-		}
-		// The metadata stays readable. A tool that resolves a kept path
-		// reads the metadata of each parent.
-		rules = append(rules, fmt.Sprintf(
-			"(deny file-read-data file-read-xattr file-write* (require-all %s))",
-			strings.Join(filters, " "),
-		))
-	}
-
 	for i, path := range c.hide {
 		p := param(fmt.Sprintf("HIDE_%d", i), path)
 		rules = append(rules, fmt.Sprintf(
@@ -213,7 +191,7 @@ func seatbeltArgs(c config) []string {
 func readOnlyParents(write []string, path string) []string {
 	renamable := func(p string) bool {
 		for _, w := range write {
-			if w != p && within(w, p) {
+			if w != p && Within(w, p) {
 				return true
 			}
 		}
@@ -228,14 +206,4 @@ func readOnlyParents(write []string, path string) []string {
 		parents = append(parents, p)
 	}
 	return parents
-}
-
-// within reports whether p is base or is in the subtree of base.
-func within(base, p string) bool {
-	rel, err := filepath.Rel(base, p)
-	if err != nil {
-		return false
-	}
-	parent := ".." + string(filepath.Separator)
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, parent))
 }

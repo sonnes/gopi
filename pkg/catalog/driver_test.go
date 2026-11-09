@@ -27,8 +27,9 @@ var (
 )
 
 // driverCatalog returns a catalog with a text provider "anthropic", a
-// driver "claude-code", and the default driver. Both serve the model
-// "opus". Only the driver serves "codex-mini".
+// driver "claude-code", an image provider "paint", and the default
+// driver. "anthropic" and "claude-code" both serve the model "opus".
+// Only the driver serves "codex-mini".
 func driverCatalog() *catalog.Catalog {
 	cat := catalog.New()
 	cat.RegisterTextProvider("anthropic", textProvider{}, ai.Model{ID: "opus", MaxTokens: 100})
@@ -38,7 +39,7 @@ func driverCatalog() *catalog.Catalog {
 		ai.Model{ID: "opus", MaxTokens: 200},
 		ai.Model{ID: "codex-mini"},
 	)
-	cat.RegisterSpeechProvider("voice", speechProvider{}, ai.Model{ID: "tts"})
+	cat.RegisterImageProvider("paint", imageProvider{}, pixel)
 	cat.DefaultDriver(harnessDriver)
 	return cat
 }
@@ -49,7 +50,7 @@ func TestCatalog_Driver(t *testing.T) {
 		spec       string
 		wantDriver agent.Driver
 		wantModel  ai.Model
-		errText    string
+		wantErr    error
 	}{
 		{
 			name:       "a provider with a driver",
@@ -60,12 +61,12 @@ func TestCatalog_Driver(t *testing.T) {
 		{
 			name:    "an unregistered model of a driver",
 			spec:    "claude-code/haiku",
-			errText: `catalog: unknown model "claude-code/haiku": driver "claude-code" has no model "haiku"`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 		{
 			name:    "an unregistered model of a text provider",
 			spec:    "anthropic/haiku",
-			errText: `catalog: unknown model "anthropic/haiku": provider "anthropic" has no model "haiku"`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 		{
 			name:       "a text provider runs on the default driver",
@@ -87,20 +88,20 @@ func TestCatalog_Driver(t *testing.T) {
 		},
 		{
 			name:    "a provider with no text and no driver",
-			spec:    "voice/tts",
-			errText: `catalog: provider "voice" has no driver and no text generation`,
+			spec:    "paint/pixel",
+			wantErr: catalog.ErrNoDriver,
 		},
 		{
 			name:    "an unknown provider",
 			spec:    "nope/opus",
-			errText: `catalog: unknown model "nope/opus": no provider "nope": use one of anthropic, claude-code, voice`,
+			wantErr: catalog.ErrUnknownModel,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			d, m, err := driverCatalog().Driver(tt.spec)
-			if tt.errText != "" {
-				require.EqualError(t, err, tt.errText)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
@@ -115,14 +116,27 @@ func TestCatalog_DriverWithoutDefault(t *testing.T) {
 	cat.RegisterTextProvider("anthropic", textProvider{}, ai.Model{ID: "opus"})
 
 	_, _, err := cat.Driver("anthropic/opus")
-	require.EqualError(t, err, `catalog: provider "anthropic" needs the default driver: set one with DefaultDriver`)
+	require.ErrorIs(t, err, catalog.ErrNoDriver)
+}
+
+func TestCatalog_DriverUnknownModelError(t *testing.T) {
+	_, _, err := driverCatalog().Driver("claude-code/haiku")
+
+	var got *catalog.UnknownModelError
+	require.ErrorAs(t, err, &got)
+	assert.Equal(t, catalog.UnknownModelError{
+		Spec:     "claude-code/haiku",
+		Provider: "claude-code",
+		Driver:   true,
+	}, *got)
+	assert.EqualError(t, err, `catalog: unknown model "claude-code/haiku": driver "claude-code" has no model "haiku"`)
 }
 
 func TestCatalog_DriverSpecs(t *testing.T) {
 	cat := driverCatalog()
 
 	assert.Equal(t,
-		[]string{"anthropic/opus", "voice/tts"},
+		[]string{"anthropic/opus", "paint/pixel"},
 		cat.Specs(),
 		"Specs lists the models of the providers only",
 	)
@@ -147,16 +161,16 @@ func TestCatalog_ProvidersSkipDrivers(t *testing.T) {
 	assert.Equal(t, ai.Model{ID: "opus", MaxTokens: 100}, lm.Model)
 
 	_, err = cat.LanguageModel("codex-mini")
-	require.EqualError(t, err, `catalog: unknown model "codex-mini"`)
+	require.ErrorIs(t, err, catalog.ErrUnknownModel)
 
 	_, err = cat.Model("codex-mini")
-	require.EqualError(t, err, `catalog: unknown model "codex-mini"`)
+	require.ErrorIs(t, err, catalog.ErrUnknownModel)
 
 	_, err = cat.Model("claude-code/opus")
-	require.EqualError(t, err, `catalog: provider "claude-code" has only a driver: start its agent with Driver`)
+	require.ErrorIs(t, err, catalog.ErrDriverOnly)
 
 	_, err = cat.LanguageModel("claude-code/codex-mini")
-	require.EqualError(t, err, `catalog: provider "claude-code" has only a driver: start its agent with Driver`)
+	require.ErrorIs(t, err, catalog.ErrDriverOnly)
 }
 
 // TestCatalog_DriverOfATextProvider checks that a provider with a text
@@ -197,14 +211,14 @@ func TestCatalog_FetchDriverModels(t *testing.T) {
 	var cliCalls, brokenCalls int
 	boom := errors.New("boom")
 	cli := listingDriver{
-		fakeDriver: fakeDriver{name: "cli"},
-		models:     []ai.Model{{ID: "opus", Name: "Opus"}, {ID: "next"}},
-		calls:      &cliCalls,
+		name:   "cli",
+		models: []ai.Model{{ID: "opus", Name: "Opus"}, {ID: "next"}},
+		calls:  &cliCalls,
 	}
 	broken := listingDriver{
-		fakeDriver: fakeDriver{name: "broken"},
-		err:        boom,
-		calls:      &brokenCalls,
+		name:  "broken",
+		err:   boom,
+		calls: &brokenCalls,
 	}
 	provider := &lister{models: []ai.Model{{ID: "alpha"}}}
 	cat := catalog.New()

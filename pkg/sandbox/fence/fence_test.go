@@ -19,15 +19,12 @@ func TestOptions(t *testing.T) {
 		Hide("/secret"),
 		Network(true),
 		Network(false),
-		Env("PATH"),
-		Env("HOME"),
 	)
 
 	assert.Equal(t, []string{"/a", "/b"}, c.write)
 	assert.Equal(t, []string{"/a/.git/hooks"}, c.readOnly)
 	assert.Equal(t, []string{"/secret"}, c.hide)
 	assert.False(t, c.network)
-	assert.Equal(t, []string{"PATH", "HOME"}, c.env)
 }
 
 func TestWorkspace(t *testing.T) {
@@ -47,12 +44,34 @@ func TestWorkspace(t *testing.T) {
 	assert.Contains(t, c.names[0].names, ".git/commondir")
 	assert.Contains(t, c.names[0].names, ".gitmodules")
 	assert.Contains(t, c.names[0].names, ".bashrc")
-	assert.Empty(t, c.hideExcept, "the command reads the home directory")
 	assert.Empty(t, c.hide, "the command reads each path")
 	assert.True(t, c.network)
-	assert.Empty(t, c.env, "the command gets the whole environment")
 	assert.Contains(t, c.setEnv, "XDG_CACHE_HOME="+cache)
 	assert.Contains(t, c.setEnv, "GOCACHE="+filepath.Join(cache, "go-build"))
+}
+
+func TestWorkspaceProtectsTheFilesThatRunCode(t *testing.T) {
+	root := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(root, ".git"), 0o755))
+	rules := NewRules(Workspace(root)...)
+
+	for _, name := range []string{
+		".git/hooks/pre-commit",
+		".git/commondir",
+		".bashrc",
+		".zshenv",
+		".envrc",
+		".npmrc",
+		".husky/pre-commit",
+		".cargo/config.toml",
+		".config/git/config",
+		"sub/.devcontainer/devcontainer.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.False(t, rules.CanWrite(filepath.Join(root, filepath.FromSlash(name))))
+		})
+	}
+	assert.True(t, rules.CanWrite(filepath.Join(root, ".git", "index")), "git writes in .git")
 }
 
 func TestWorkspaceWithAGitDirectory(t *testing.T) {
@@ -81,39 +100,12 @@ func TestWorkspaceThenAnOption(t *testing.T) {
 	assert.False(t, c.network)
 }
 
-func TestKeepEnv(t *testing.T) {
-	env := []string{"PATH=/bin", "HOME=/home/a", "API_KEY=k", "PATHX=/x", "NOVALUE"}
-
-	tests := []struct {
-		name  string
-		names []string
-		want  []string
-	}{
-		{
-			name:  "no names keeps all",
-			names: nil,
-			want:  env,
-		},
-		{
-			name:  "names keep only these",
-			names: []string{"PATH", "HOME"},
-			want:  []string{"PATH=/bin", "HOME=/home/a"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, keepEnv(env, tt.names))
-		})
-	}
-}
-
 func TestRealPath(t *testing.T) {
 	dir := t.TempDir()
 	real, err := filepath.EvalSymlinks(dir)
 	require.NoError(t, err)
 	require.NoError(t, os.Symlink(dir, filepath.Join(dir, "link")))
 	require.NoError(t, os.Symlink(filepath.Join(dir, "target", "f"), filepath.Join(dir, "dangling")))
-	require.NoError(t, os.Symlink("loop", filepath.Join(dir, "loop")))
 
 	tests := []struct {
 		name string
@@ -124,13 +116,24 @@ func TestRealPath(t *testing.T) {
 		{name: "a symlink", path: filepath.Join(dir, "link"), want: real},
 		{name: "a path that does not exist", path: filepath.Join(dir, "link", "new", "f"), want: filepath.Join(real, "new", "f")},
 		{name: "a symlink to a path that does not exist", path: filepath.Join(dir, "dangling"), want: filepath.Join(real, "target", "f")},
-		{name: "a symlink loop", path: filepath.Join(dir, "loop"), want: filepath.Join(real, "loop")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, realPath(tt.path))
+			got, err := RealPath(tt.path)
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestRealPathOfASymlinkLoop(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Symlink("loop", filepath.Join(dir, "loop")))
+
+	_, err := RealPath(filepath.Join(dir, "loop", "f"))
+
+	require.Error(t, err)
 }
 
 func TestRules(t *testing.T) {
@@ -189,15 +192,13 @@ func TestRulesIgnoreTheCaseOfADeniedPathOnMacOS(t *testing.T) {
 	assert.False(t, rules.CanWrite(strings.ToUpper(filepath.Join(root, "a.txt"))))
 }
 
-func TestNameHideAndEnvOptions(t *testing.T) {
+func TestNameAndEnvOptions(t *testing.T) {
 	c := newConfig(
 		ReadOnlyNames("/w", ".bashrc", ".git/hooks"),
-		HideExcept("/home/a", "/home/a/go"),
 		SetEnv("GOCACHE", "/tmp/c"),
 	)
 
 	assert.Equal(t, []nameRule{{root: "/w", names: []string{".bashrc", ".git/hooks"}}}, c.names)
-	assert.Equal(t, []hideExceptRule{{dir: "/home/a", keep: []string{"/home/a/go"}}}, c.hideExcept)
 	assert.Equal(t, []string{"GOCACHE=/tmp/c"}, c.setEnv)
 }
 
@@ -226,35 +227,6 @@ func TestRulesReadOnlyNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.True(t, rules.CanRead(tt.path))
-			assert.Equal(t, tt.wantWrite, rules.CanWrite(tt.path))
-		})
-	}
-}
-
-func TestRulesHideExcept(t *testing.T) {
-	home := t.TempDir()
-	root := filepath.Join(home, "work", "app")
-	rules := NewRules(
-		Write(root),
-		HideExcept(home, root, filepath.Join(home, "go"), filepath.Join(home, ".gitconfig")),
-	)
-
-	tests := []struct {
-		name      string
-		path      string
-		wantRead  bool
-		wantWrite bool
-	}{
-		{name: "a file in the hidden directory", path: filepath.Join(home, ".zsh_history")},
-		{name: "a kept directory", path: filepath.Join(home, "go", "pkg", "mod", "x"), wantRead: true},
-		{name: "a kept file", path: filepath.Join(home, ".gitconfig"), wantRead: true},
-		{name: "a file in the root", path: filepath.Join(root, "a.txt"), wantRead: true, wantWrite: true},
-		{name: "a sibling of the root", path: filepath.Join(home, "work", "other", ".envrc")},
-		{name: "a path outside the hidden directory", path: "/etc/hosts", wantRead: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.wantRead, rules.CanRead(tt.path))
 			assert.Equal(t, tt.wantWrite, rules.CanWrite(tt.path))
 		})
 	}

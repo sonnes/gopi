@@ -13,30 +13,19 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 )
 
 // inboxSize is the number of messages that the reader holds for the
 // run before it waits.
 const inboxSize = 64
 
-// errExited is the error of a run whose process stops.
-var errExited = errors.New("codex: the app server exited")
-
 // start starts cmd. Tests replace it to replay a trace.
 var start = cliproc.Start
 
-// exitErr returns the error for a process whose stdout ended, with the
-// read error or the end of its stderr.
+// exitErr returns the error for a process whose stdout ended.
 func (c *conn) exitErr() error {
-	if err := c.p.ReadErr(); err != nil {
-		return fmt.Errorf("%w: read the output: %w", errExited, err)
-	}
-	text := c.p.Stderr()
-	if text == "" {
-		return errExited
-	}
-	return fmt.Errorf("%w: %s", errExited, text)
+	return fmt.Errorf("codex: %w", c.p.Exited())
 }
 
 // conn is a JSON-RPC connection to one app server. One reader
@@ -87,15 +76,6 @@ func (c *conn) bindHooks(ctx context.Context) {
 	if c.hooks != nil {
 		c.hooks.bind(ctx)
 	}
-}
-
-// hookErr returns the error of a hook that stopped the turn, and
-// clears it.
-func (c *conn) hookErr() error {
-	if c.hooks == nil {
-		return nil
-	}
-	return c.hooks.takeErr()
 }
 
 // dial starts the reader of p. approve answers the approval requests,
@@ -285,9 +265,7 @@ func (c *conn) write(v any) error {
 	err = c.p.Write(data)
 	c.mu.Unlock()
 	if err != nil {
-		// A process that rejects its flags exits at once, so the first
-		// write can fail before stdout ends. Stderr says why.
-		return c.exitErr()
+		return fmt.Errorf("codex: %w", err)
 	}
 	return nil
 }
@@ -404,7 +382,7 @@ func (c *conn) handshake(ctx context.Context, params threadParams, skillRoot str
 		var result json.RawMessage
 		err := c.call(ctx, methodSkillRoots, roots, &result)
 		if unknownMethod(err, methodSkillRoots) {
-			return res, fmt.Errorf("%w: the config fields Skillset and Dirs: %w", errors.ErrUnsupported, err)
+			return res, fmt.Errorf("%w: the config field Defs: %w", errors.ErrUnsupported, err)
 		}
 		if err != nil {
 			return res, fmt.Errorf("codex: set the skill roots: %w", err)

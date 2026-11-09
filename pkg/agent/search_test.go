@@ -95,7 +95,7 @@ func TestSearchOutlivesTheRun(t *testing.T) {
 		failed = true
 		return nil, errors.New("stop")
 	})
-	a := agent.New(model(p), agent.Toolset(echo, weather), stopOnce)
+	a := agent.New(model(p), agent.Toolset(echo, weather), agent.Hooks(stopOnce))
 
 	_, _, err := collect(t, a.Run(ctx, session.Text("weather?")))
 	require.Error(t, err, "the run ends after the search and before the next model call")

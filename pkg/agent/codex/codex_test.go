@@ -21,6 +21,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -69,11 +70,11 @@ func collect(s *agent.Stream) ([]agent.Event, []ai.Message, error) {
 
 // checkLog fails t if an assistant message in the log of a has a tool
 // call with no tool result, or if the state of a does not hold the
-// messages of the log.
+// messages and the entry IDs of the log.
 func checkLog(t *testing.T, a *Agent) {
 	t.Helper()
 	log := a.Log()
-	assert.Equal(t, log.Messages(), a.State().Messages(), "the state has the messages of the log")
+	emittest.CheckState(t, log, a.State())
 	assert.False(t, a.State().Running())
 	results := map[string]bool{}
 	for _, en := range log.Entries() {
@@ -109,25 +110,30 @@ func deltas(events []agent.Event, typ ai.EventType) []string {
 	return out
 }
 
-// newAgent returns an agent over an unsaved log in workDir, and closes
-// it at the end of the test.
-func newAgent(t *testing.T, opts ...Option) *Agent {
+// newAgent returns an agent of c over an unsaved log, and closes it at
+// the end of the test. A config with no Dir works in workDir, and a
+// config with no tools gets [allTools].
+func newAgent(t *testing.T, c agent.Config, opts ...Option) *Agent {
 	t.Helper()
-	opts = append([]Option{Dir(workDir)}, opts...)
-	a := New(opts...)
+	if c.Dir == "" {
+		c.Dir = workDir
+	}
+	if c.Tools == nil {
+		c.Tools = allTools
+	}
+	a := New(c, opts...)
 	t.Cleanup(func() { a.Close() })
 	return a
 }
 
 func TestRunText(t *testing.T) {
 	useTraces(t, []string{"text.trace"})
-	a := newAgent(t,
-		Model("gpt-5-codex"),
-		System("Be brief."),
-		Sandbox(SandboxReadOnly),
-		Thinking(ai.ThinkingHigh),
-		Name("codex"),
-	)
+	a := newAgent(t, agent.Config{
+		Model:    ai.Model{ID: "gpt-5-codex"},
+		Sections: agent.SystemText("Be brief."),
+		Mode:     permission.Default,
+		Effort:   ai.ThinkingHigh,
+	})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
 	require.NoError(t, err)
@@ -147,7 +153,6 @@ func TestRunText(t *testing.T) {
 	require.Len(t, entries, 3)
 	assert.Equal(t, ai.RoleSystem, entries[0].Message.Role, "the log keeps the base")
 	assert.Equal(t, ai.RoleUser, entries[1].Message.Role)
-	assert.Equal(t, "codex", entries[2].Author)
 
 	thread, err := conversation.Get(a.Log())
 	require.NoError(t, err)
@@ -156,7 +161,7 @@ func TestRunText(t *testing.T) {
 
 func TestRunThinking(t *testing.T) {
 	useTraces(t, []string{"thinking.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Think, then answer.")))
 	require.NoError(t, err)
@@ -191,7 +196,7 @@ func TestRunTool(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
-			a := newAgent(t)
+			a := newAgent(t, agent.Config{})
 
 			events, msgs, err := collect(a.Run(context.Background(), session.Text("Run echo hi.")))
 			require.NoError(t, err)
@@ -249,12 +254,12 @@ func TestRunTool(t *testing.T) {
 
 func TestRunEphemeralInput(t *testing.T) {
 	useTraces(t, []string{"ephemeral.trace"})
-	a := newAgent(t,
-		Model("gpt-5-codex"),
-		System("Be brief."),
-		Sandbox(SandboxReadOnly),
-		Thinking(ai.ThinkingHigh),
-	)
+	a := newAgent(t, agent.Config{
+		Model:    ai.Model{ID: "gpt-5-codex"},
+		Sections: agent.SystemText("Be brief."),
+		Mode:     permission.Default,
+		Effort:   ai.ThinkingHigh,
+	})
 
 	events, _, err := collect(a.Run(context.Background(),
 		session.Text("Say hello."),
@@ -275,7 +280,7 @@ func TestRunEphemeralInput(t *testing.T) {
 
 func TestRunTwice(t *testing.T) {
 	useTraces(t, []string{"two_runs.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	for _, input := range []string{"One.", "Two."} {
 		events, _, err := collect(a.Run(context.Background(), session.Text(input)))
@@ -295,14 +300,24 @@ func TestDurableResume(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()
 
-	first, err := Durable(ctx, "s1", Store(store), Dir(workDir))
+	first, err := Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Tools:     allTools,
+		Store:     store,
+		Dir:       workDir,
+	})
 	require.NoError(t, err)
 	events, _, err := collect(first.Run(ctx, session.Text("Remember 7.")))
 	require.NoError(t, err)
 	emittest.CheckEvents(t, events)
 	require.NoError(t, first.Close())
 
-	second, err := Durable(ctx, "s1", Store(store), Dir(workDir))
+	second, err := Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Tools:     allTools,
+		Store:     store,
+		Dir:       workDir,
+	})
 	require.NoError(t, err)
 	t.Cleanup(func() { second.Close() })
 	assert.Len(t, second.State().Messages(), 2, "the state starts with the stored messages")
@@ -317,7 +332,7 @@ func TestDurableResume(t *testing.T) {
 
 func TestRunCancel(t *testing.T) {
 	useTraces(t, []string{"cancel.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -344,7 +359,7 @@ func TestRunCancel(t *testing.T) {
 
 func TestRunFailed(t *testing.T) {
 	useTraces(t, []string{"failed.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 	require.ErrorContains(t, err, "usage limit reached")
@@ -357,28 +372,27 @@ func TestServerRequests(t *testing.T) {
 		name     string
 		file     string
 		input    string
-		approval ApprovalPolicy
+		mode     permission.Mode
 		wantText string
 	}{
 		{
 			name:     "approval is declined",
-			file:     "approval.trace",
+			file:     "approval_default.trace",
 			input:    "Remove /tmp/x.",
-			approval: ApprovalUntrusted,
+			mode:     permission.Default,
 			wantText: "The command was declined.",
 		},
 		{
 			name:     "unknown request gets an error",
 			file:     "unknown_request.trace",
 			input:    "Ask me.",
-			approval: ApprovalNever,
 			wantText: "No answer.",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
-			a := newAgent(t, Policy(tt.approval))
+			a := newAgent(t, agent.Config{Mode: tt.mode})
 
 			events, msgs, err := collect(a.Run(context.Background(), session.Text(tt.input)))
 			require.NoError(t, err)
@@ -392,8 +406,8 @@ func TestServerRequests(t *testing.T) {
 }
 
 func TestDeclinedCommandIsError(t *testing.T) {
-	useTraces(t, []string{"approval.trace"})
-	a := newAgent(t, Policy(ApprovalUntrusted))
+	useTraces(t, []string{"approval_default.trace"})
+	a := newAgent(t, agent.Config{Mode: permission.Default})
 
 	_, msgs, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
 	require.NoError(t, err)
@@ -419,7 +433,7 @@ func TestRunWithoutText(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, nil)
-			a := newAgent(t)
+			a := newAgent(t, agent.Config{})
 
 			_, err := a.Run(context.Background(), tt.entries...).Wait()
 			assert.ErrorContains(t, err, "a run needs an entry with text")
@@ -430,7 +444,7 @@ func TestRunWithoutText(t *testing.T) {
 
 func TestRunFailedKeepsCompletedItems(t *testing.T) {
 	useTraces(t, []string{"failed_message.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Fix the test.")))
 	require.ErrorContains(t, err, "usage limit reached")
@@ -445,7 +459,7 @@ func TestRunFailedKeepsCompletedItems(t *testing.T) {
 
 func TestRunCancelKeepsCompletedItems(t *testing.T) {
 	useTraces(t, []string{"cancel_completed.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -472,7 +486,7 @@ func TestRunCancelKeepsCompletedItems(t *testing.T) {
 
 func TestRunReasoningWithoutFinalText(t *testing.T) {
 	useTraces(t, []string{"reasoning_empty.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Think.")))
 	require.NoError(t, err)
@@ -484,7 +498,7 @@ func TestRunReasoningWithoutFinalText(t *testing.T) {
 
 func TestRunCountsEachRequestOnce(t *testing.T) {
 	useTraces(t, []string{"usage_repeat.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 	require.NoError(t, err)
@@ -500,24 +514,24 @@ func TestRunCountsEachRequestOnce(t *testing.T) {
 func TestRunReadError(t *testing.T) {
 	// The line is 1 byte longer than the limit of a line.
 	body := "read line\nprintf '%67108865s\\n' ''"
-	a := New(Binary(fakeCLI(t, body)))
+	a := New(agent.Config{Tools: allTools}, Binary(fakeCLI(t, body)))
 	defer a.Close()
 
 	_, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
-	require.ErrorIs(t, err, errExited)
+	require.ErrorIs(t, err, cliproc.ErrExited)
 	assert.ErrorContains(t, err, "token too long", "the error holds the read error")
 }
 
 func TestRunLostThread(t *testing.T) {
 	ctx := context.Background()
 	useTraces(t, []string{"lost_thread.trace", "lost_thread_new.trace"})
-	a := newAgent(t)
-	require.NoError(t, conversation.Save(ctx, a.log, "th0"))
+	a := newAgent(t, agent.Config{})
+	require.NoError(t, conversation.Save(ctx, a.Log(), "th0"))
 
 	events, _, err := collect(a.Run(ctx, session.Text("Hi.")))
-	require.ErrorIs(t, err, ErrNoConversation)
+	require.ErrorIs(t, err, agent.ErrNoConversation)
 	emittest.CheckEvents(t, events)
-	id, err := conversation.Get(a.log)
+	id, err := conversation.Get(a.Log())
 	require.NoError(t, err)
 	assert.Empty(t, id, "the agent forgets the lost thread")
 
@@ -537,7 +551,7 @@ func TestRunConcurrent(t *testing.T) {
 		<-release
 		return replay(cmd)
 	}
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	first := a.Run(context.Background(), session.Text("Hi."))
 	<-entered
@@ -563,7 +577,7 @@ func TestEffort(t *testing.T) {
 		{level: ai.ThinkingMedium, want: "medium"},
 		{level: ai.ThinkingHigh, want: "high"},
 		{level: ai.ThinkingXHigh, want: "xhigh"},
-		{level: ai.ThinkingMax, want: "xhigh"},
+		{level: ai.ThinkingMax, want: "max"},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.level), func(t *testing.T) {
@@ -609,12 +623,12 @@ func TestRecorded(t *testing.T) {
 		replaceScrub(jsonString(home), "/home/me"),
 		machineScrub,
 	)
-	a := New(
-		Dir(dir),
-		Sandbox(SandboxReadOnly),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-	)
+	a := New(agent.Config{
+		Tools:  allTools,
+		Dir:    dir,
+		Mode:   permission.Default,
+		Effort: ai.ThinkingLow,
+	})
 	t.Cleanup(func() { a.Close() })
 
 	prompt := "Run `echo hi` in the shell, then reply with its output only."
@@ -638,7 +652,7 @@ func TestRecorded(t *testing.T) {
 
 func TestRunIgnoresOtherTurns(t *testing.T) {
 	useTraces(t, []string{"stale.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 	require.NoError(t, err)
@@ -651,7 +665,7 @@ func TestRunIgnoresOtherTurns(t *testing.T) {
 
 func TestRunParallelTools(t *testing.T) {
 	useTraces(t, []string{"parallel.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Run both.")))
 	require.NoError(t, err)
@@ -672,7 +686,7 @@ func TestRunParallelTools(t *testing.T) {
 
 func TestRunTextDuringTool(t *testing.T) {
 	useTraces(t, []string{"text_during_tool.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Run it and talk.")))
 	require.NoError(t, err)
@@ -689,7 +703,7 @@ func TestRunTextDuringTool(t *testing.T) {
 
 func TestRunCancelDuringTool(t *testing.T) {
 	useTraces(t, []string{"cancel_tool.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -724,7 +738,7 @@ func TestRunCancelDuringTool(t *testing.T) {
 
 func TestRunToolUnfinished(t *testing.T) {
 	useTraces(t, []string{"tool_unfinished.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Run it.")))
 	require.NoError(t, err)
@@ -740,7 +754,7 @@ func TestRunToolUnfinished(t *testing.T) {
 
 func TestRunDuplicateItem(t *testing.T) {
 	useTraces(t, []string{"duplicate.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Run it.")))
 	require.NoError(t, err)
@@ -755,7 +769,7 @@ func TestRunDuplicateItem(t *testing.T) {
 
 func TestRunReasoningParts(t *testing.T) {
 	useTraces(t, []string{"reasoning_parts.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Think.")))
 	require.NoError(t, err)
@@ -811,7 +825,7 @@ func TestRunConnectFails(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.start(t)
-			a := newAgent(t)
+			a := newAgent(t, agent.Config{})
 
 			events, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 			require.Error(t, err)
@@ -823,7 +837,7 @@ func TestRunConnectFails(t *testing.T) {
 
 func TestRunRestartsAfterError(t *testing.T) {
 	useTraces(t, []string{"bad_item.trace", "bad_item_restart.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("One.")))
 	require.Error(t, err)
@@ -838,7 +852,7 @@ func TestRunRestartsAfterError(t *testing.T) {
 
 func TestRunSummaryParts(t *testing.T) {
 	useTraces(t, []string{"summary_parts.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(context.Background(), session.Text("Think.")))
 	require.NoError(t, err)
@@ -862,7 +876,7 @@ func TestRunSummaryParts(t *testing.T) {
 
 func TestRunUnmappedItem(t *testing.T) {
 	useTraces(t, []string{"unmapped.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("Plan, then answer.")))
 	require.ErrorContains(t, err, "stopped")
@@ -874,7 +888,7 @@ func TestRunUnmappedItem(t *testing.T) {
 
 func TestRunBadTurnCompleted(t *testing.T) {
 	useTraces(t, []string{"bad_completed.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 	require.ErrorContains(t, err, "turn/completed")
@@ -908,12 +922,12 @@ func TestRunStderrOnExit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := New(Binary(fakeCLI(t, tt.body)))
+			a := New(agent.Config{Tools: allTools}, Binary(fakeCLI(t, tt.body)))
 			defer a.Close()
 
 			_, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
 			require.Error(t, err)
-			assert.ErrorIs(t, err, errExited)
+			assert.ErrorIs(t, err, cliproc.ErrExited)
 			assert.Contains(t, err.Error(), reason, "the error holds stderr without color codes")
 			assert.Empty(t, a.Log().Entries(), "the log holds no input that the CLI did not get")
 		})
@@ -922,7 +936,7 @@ func TestRunStderrOnExit(t *testing.T) {
 
 func TestRunSendsFiles(t *testing.T) {
 	useTraces(t, []string{"files.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	input := session.NewEntry(ai.Message{
 		Role: ai.RoleUser,
@@ -1003,14 +1017,13 @@ func TestApprove(t *testing.T) {
 				got     []ai.ToolCall
 				reasons []string
 			)
-			a := newAgent(t,
-				Policy(ApprovalUntrusted),
-				Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			a := newAgent(t, agent.Config{
+				Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 					got = append(got, req.Call)
 					reasons = append(reasons, req.Reason)
 					return tt.decision, tt.err
-				}),
-			)
+				},
+			})
 
 			events, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
 			require.NoError(t, err, "the trace matches the decision")
@@ -1027,10 +1040,10 @@ func TestApprove(t *testing.T) {
 
 func TestRunNotLoggedIn(t *testing.T) {
 	useTraces(t, []string{"unauthorized.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("Hi.")))
-	require.ErrorIs(t, err, ErrAuth)
+	require.ErrorIs(t, err, agent.ErrNotLoggedIn)
 	assert.ErrorContains(t, err, "401 Unauthorized")
 	emittest.CheckEvents(t, events)
 }
@@ -1059,13 +1072,12 @@ func TestApproveBeforeItem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
 			var got []ai.ToolCall
-			a := newAgent(t,
-				Policy(ApprovalUntrusted),
-				Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			a := newAgent(t, agent.Config{
+				Approve: func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 					got = append(got, req.Call)
 					return agent.Decision{Allow: true}, nil
-				}),
-			)
+				},
+			})
 
 			events, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
 			require.NoError(t, err, "the trace matches the decision")
@@ -1099,15 +1111,15 @@ func TestRecordedApproval(t *testing.T) {
 		userHookScrub,
 	)
 	var asked []string
-	a := New(
-		Dir(dir),
-		Policy(ApprovalUntrusted),
-		Thinking(ai.ThinkingLow),
-		Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+	a := New(agent.Config{
+		Tools:  allTools,
+		Dir:    dir,
+		Effort: ai.ThinkingLow,
+		Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 			asked = append(asked, req.Call.Name)
 			return agent.Decision{Allow: true}, nil
-		}),
-	)
+		},
+	})
 	t.Cleanup(func() { a.Close() })
 
 	prompt := "Run the shell command `touch a.txt`. Then reply with the word done."
@@ -1119,11 +1131,10 @@ func TestRecordedApproval(t *testing.T) {
 }
 
 func TestUserInputsMentionASkill(t *testing.T) {
-	skills, err := def.Resolve(context.Background(), []def.SkillsReader{
-		def.Skill{Name: "deploy", Qualifier: "ops"},
-		def.Skill{Name: "lw-tasks"},
-	}, nil)
-	require.NoError(t, err)
+	skills := def.Set{Skills: []def.Skill{
+		{Name: "deploy", Qualifier: "ops"},
+		{Name: "lw-tasks"},
+	}}
 	image := ai.File{MediaType: "image/png", Data: []byte("png")}
 
 	tests := []struct {
@@ -1188,13 +1199,12 @@ func TestApproveSafetyCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			useTraces(t, []string{tt.file})
 			var got []agent.ApprovalRequest
-			a := newAgent(t,
-				Policy(ApprovalUntrusted),
-				Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+			a := newAgent(t, agent.Config{
+				Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 					got = append(got, req)
 					return agent.Decision{}, nil
-				}),
-			)
+				},
+			})
 
 			_, _, err := collect(a.Run(context.Background(), session.Text("Remove /tmp/x.")))
 			require.NoError(t, err)

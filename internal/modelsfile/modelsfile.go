@@ -1,24 +1,27 @@
 // Package modelsfile reads and writes the format of models.json: the
 // default models of each provider and each driver, by ID. The command
 // cmd/modelsync writes the file, and
-// [github.com/sonnes/gopi/pkg/catalog.ReadModelFile] reads it.
+// [github.com/sonnes/gopi/pkg/catalog.ReadModelFile] reads it. [Get]
+// downloads a file of model data for both of them.
 package modelsfile
 
 import (
 	"bytes"
 	"cmp"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
-// The kinds of an entry.
-const (
-	KindProvider = "provider"
-	KindDriver   = "driver"
-)
+// ErrTooLarge is the error of a body that is larger than the limit of
+// [Get].
+var ErrTooLarge = errors.New("modelsfile: the body is larger than the limit")
 
 // indent is the indent of one level of the file.
 const indent = "  "
@@ -28,8 +31,6 @@ type File map[string]Entry
 
 // Entry is the models of one provider or one driver.
 type Entry struct {
-	// Kind is [KindProvider] or [KindDriver].
-	Kind string `json:"kind"`
 	// Default is the ID of the model that a caller uses when it names
 	// no model. It is the ID of one of Models.
 	Default string `json:"default"`
@@ -78,4 +79,30 @@ func Marshal(f File) ([]byte, error) {
 		return nil, fmt.Errorf("modelsfile: encode models.json: %w", err)
 	}
 	return buf.Bytes(), nil
+}
+
+// Get returns the body of a GET of url with [http.DefaultClient]. A
+// status other than 200 is an error. A body of more than limit bytes
+// fails with [ErrTooLarge], because a cut body is not the file.
+func Get(ctx context.Context, url string, limit int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New(resp.Status)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%w of %d bytes", ErrTooLarge, limit)
+	}
+	return body, nil
 }

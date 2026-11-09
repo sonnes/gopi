@@ -1,10 +1,14 @@
 package def
 
 import (
-	"context"
+	"strings"
 
 	"github.com/sonnes/gopi/pkg/ai"
 )
+
+// inheritModel is the value of [Agent.Model] that gives the model of the
+// parent.
+const inheritModel = "inherit"
 
 // Agent is the definition of an agent. The host starts an agent by its
 // name. As a subagent, the main agent sees the name and the
@@ -32,8 +36,9 @@ type Agent struct {
 	Disallowed []string
 	// Model is the model of the agent, as the file writes it. The
 	// frontmatter key is "model". It is "inherit", "", a bare model ID,
-	// or a "provider/id" spec. If it is "" or "inherit", the agent uses
-	// the model of the parent. Other values depend on the reader:
+	// or a "provider/id" spec. If it is "" or "inherit", in any case,
+	// the agent uses the model of the parent: [Agent.InheritsModel]
+	// reports it. Other values depend on the reader:
 	//
 	//   - An agent file of a session: the host gives the value to the
 	//     catalog, and an unknown value fails Create.
@@ -70,8 +75,8 @@ type Agent struct {
 	Extra Extra
 }
 
-// ReadAgents returns a as the one agent of a reader. An Agent is then
-// an agents reader, and an agent in code goes in the list of readers.
-func (a Agent) ReadAgents(context.Context) ([]Agent, error) {
-	return []Agent{a}, nil
+// InheritsModel reports whether the agent uses the model of its parent:
+// Model is "" or "inherit", in any case.
+func (a Agent) InheritsModel() bool {
+	return a.Model == "" || strings.EqualFold(a.Model, inheritModel)
 }

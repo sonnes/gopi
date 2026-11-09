@@ -42,7 +42,7 @@ flowchart LR
 | Task                                          | File                                   |
 | --------------------------------------------- | -------------------------------------- |
 | Add a well-known tool, a name, or a fact      | `pkg/tool/name.go`                     |
-| Change how a rule reads its tool names        | `pkg/harness/permission/rule.go`       |
+| Change how a rule reads its tool names        | `pkg/permission/rule.go`       |
 | Change how a tools list filters the tools     | `pkg/tool/select.go`, `pkg/harness/agent_tool.go`, `pkg/agent/only.go` |
 | Change how the Claude Code driver writes names | `pkg/agent/claude/names.go`           |
 | Change how a host checks the rules            | `pkg/host/rules.go`                    |
@@ -52,6 +52,6 @@ flowchart LR
 
 - [Tool](tool.md)
 - [Tool List](tool-list.md)
-- [Permission](../harness/permission.md)
+- [Permission](../permission/permission.md)
 - [Driver](../agent/driver.md)
 - [Definition](../def/definition.md)

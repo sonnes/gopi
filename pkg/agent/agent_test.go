@@ -63,6 +63,12 @@ func TestDuplicateToolName(t *testing.T) {
 	})
 }
 
+func TestHookWithNoPoint(t *testing.T) {
+	assert.PanicsWithError(t, "agent: hook 1 (agent.BaseHook) implements no point", func() {
+		agent.New(model(&script{}), agent.Hooks(agent.BaseHook{}))
+	})
+}
+
 func TestClose(t *testing.T) {
 	var closed []string
 	errDB := errors.New("db")

@@ -1,8 +1,8 @@
 // Package openrouter is the provider for OpenRouter. It calls the
 // Responses API of OpenRouter through the provider of package openai,
-// lists the models of OpenRouter with their limits and prices, and
-// checks a key with its credit. It implements [ai.TextProvider],
-// [ai.ObjectProvider], [ai.ModelLister], and [ai.KeyChecker].
+// and lists the models of OpenRouter with their limits and prices. It
+// implements [ai.TextProvider], [ai.ObjectProvider], and
+// [ai.ModelLister].
 //
 // A caller must obey these rules:
 //
@@ -38,7 +38,6 @@ var (
 	_ ai.TextProvider   = (*Provider)(nil)
 	_ ai.ObjectProvider = (*Provider)(nil)
 	_ ai.ModelLister    = (*Provider)(nil)
-	_ ai.KeyChecker     = (*Provider)(nil)
 )
 
 // Provider calls OpenRouter. Create one with [New].

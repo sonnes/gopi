@@ -36,7 +36,7 @@ ai.SystemPrompt([]ai.Content{
 })
 ```
 
-A provider retries only when you set `ai.MaxRetries`, and never after the first event of the stream. The error must be one that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. The Anthropic provider does not send `ai.Temperature` to a model that rejects it, or when thinking is on. The OpenAI providers send it when you set it.
+A provider retries only when you set `ai.MaxRetries`, and never after the first event of the stream. An object call, a token count, and an image call retry in the same way. The error must be one that can pass, such as a rate limit. If the server asks for a wait longer than `ai.MaxRetryDelay`, the call fails at once. The Anthropic provider does not send `ai.Temperature` to a model that rejects it, or when thinking is on. The OpenAI providers send it when you set it.
 
 ## Two Rules
 

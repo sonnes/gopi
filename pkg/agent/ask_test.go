@@ -78,7 +78,7 @@ func TestAskHook(t *testing.T) {
 			var seen []agent.ApprovalRequest
 			opts := []agent.Option{
 				agent.Toolset(echo),
-				asks,
+				agent.Hooks(asks),
 			}
 			if tt.approve != nil {
 				opts = append(opts, agent.Approve(func(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {

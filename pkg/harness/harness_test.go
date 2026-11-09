@@ -18,13 +18,15 @@ import (
 
 func TestNewAssemblesTheAgent(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("hi")}}
-	h := harness.New(with(base(t, p),
+	h := harness.New(with(base(p),
 		harness.System("You are a test agent."),
-		harness.Skillset(deploy),
+		skillTool,
 		harness.Toolset(harness.Tools(echo)),
 	)...)
+	c := config(t)
+	c.Defs = def.Set{Skills: []def.Skill{deploy}}
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), c)
 	require.NoError(t, err)
 	run(t, a, "hello")
 
@@ -38,20 +40,17 @@ func TestNewAssemblesTheAgent(t *testing.T) {
 }
 
 func TestNewSeedsTheLog(t *testing.T) {
-	dir := t.TempDir()
-	h := harness.New(with(base(t, &script{}),
-		harness.Seed(harness.DefaultSeed),
-		harness.Dir(dir),
-	)...)
+	h := harness.New(with(base(&script{}), harness.Seed(harness.DefaultSeed))...)
+	c := config(t)
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), c)
 	require.NoError(t, err)
 
 	entries := a.Log().Entries()
 	require.Len(t, entries, 1)
 	seed := entries[0]
 	assert.Equal(t, harness.SeedAuthor, seed.Author)
-	assert.Contains(t, seed.Message.Text(), "Working directory: "+dir)
+	assert.Contains(t, seed.Message.Text(), "Working directory: "+c.Dir)
 	assert.Contains(t, seed.Message.Text(), runtime.GOOS)
 }
 
@@ -61,9 +60,12 @@ func TestNewRunsTheSeedersInOrder(t *testing.T) {
 			return []session.Entry{session.Text(text)}, nil
 		}
 	}
-	h := harness.New(with(base(t, &script{}), harness.Seed(note("first")))...)
+	h := harness.New(with(base(&script{}),
+		harness.Seed(note("first")),
+		harness.Seed(note("second")),
+	)...)
 
-	a, err := h.New(context.Background(), harness.Seed(note("second")))
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 
 	entries := a.Log().Entries()
@@ -74,15 +76,32 @@ func TestNewRunsTheSeedersInOrder(t *testing.T) {
 
 func TestNewPassesTheAgentDefaults(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("hi")}}
-	h := harness.New(with(base(t, p), harness.AgentDefaults(agent.Name("base")))...)
+	h := harness.New(with(base(p), harness.AgentDefaults(agent.Name("base")))...)
 
-	a, err := h.New(context.Background(), harness.AgentDefaults(agent.Name("call")))
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "hello")
 
 	entries := a.Log().Entries()
 	require.Len(t, entries, 2)
-	assert.Equal(t, "call", entries[1].Author)
+	assert.Equal(t, "base", entries[1].Author)
+}
+
+func TestTheEffortOfTheConfigWinsOverTheAgentDefaults(t *testing.T) {
+	p := &script{responses: []ai.Message{reply("hi")}}
+	h := harness.New(with(base(p), harness.AgentDefaults(agent.Thinking(ai.ThinkingLow)))...)
+	c := config(t)
+	c.Effort = ai.ThinkingHigh
+
+	a, err := h.New(context.Background(), c)
+	require.NoError(t, err)
+	run(t, a, "hello")
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	level, ok := ai.GetOption(p.opts[0], ai.Thinking)
+	assert.True(t, ok)
+	assert.Equal(t, ai.ThinkingHigh, level)
 }
 
 func TestNewUsesThePromptBuilder(t *testing.T) {
@@ -92,9 +111,9 @@ func TestNewUsesThePromptBuilder(t *testing.T) {
 		seen = asm
 		return []ai.Section{{Name: "custom", Text: "custom prompt"}}, nil
 	}
-	h := harness.New(with(base(t, p), harness.Prompt(prompt))...)
+	h := harness.New(with(base(p), harness.Prompt(prompt))...)
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "hello")
 
@@ -103,37 +122,85 @@ func TestNewUsesThePromptBuilder(t *testing.T) {
 	assert.Equal(t, "fake/one", seen.Spec)
 }
 
+func TestTheDefaultPromptListsOnlyTheBoundTools(t *testing.T) {
+	tests := []struct {
+		name      string
+		tools     []harness.Option
+		toolNames []string
+		want      []string
+	}{
+		{
+			name:  "the skill tool and the agent tool",
+			tools: []harness.Option{skillTool, agentTool},
+			want:  []string{"skills", "agents"},
+		},
+		{
+			name: "no binder",
+		},
+		{
+			name:      "the ToolNames of the config leave out the agent tool",
+			tools:     []harness.Option{harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool()))},
+			toolNames: []string{"skill"},
+			want:      []string{"skills"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := with(base(&script{}), tt.tools...)
+			c := config(t)
+			c.Defs = def.Set{
+				Skills: []def.Skill{deploy},
+				Agents: []def.Agent{reviewer},
+			}
+			c.ToolNames = tt.toolNames
+
+			sections, err := harness.DefaultPrompt(context.Background(), assemblyOf(t, opts, c))
+			require.NoError(t, err)
+
+			var names []string
+			for _, s := range sections {
+				names = append(names, s.Name)
+			}
+			assert.Equal(t, tt.want, names)
+		})
+	}
+}
+
 func TestNewReportsASeedError(t *testing.T) {
 	errBuild := errors.New("build failed")
-	h := harness.New(base(t, &script{})...)
+	h := harness.New(with(base(&script{}),
+		harness.Seed(func(context.Context, *harness.Assembly) ([]session.Entry, error) {
+			return nil, errBuild
+		}),
+	)...)
 
-	_, err := h.New(context.Background(), harness.Seed(func(context.Context, *harness.Assembly) ([]session.Entry, error) {
-		return nil, errBuild
-	}))
+	_, err := h.New(context.Background(), config(t))
 	assert.ErrorIs(t, err, errBuild)
 }
 
 func TestNewReportsTwoToolsWithOneName(t *testing.T) {
-	h := harness.New(with(base(t, &script{}), harness.Toolset(harness.Tools(echo, echo)))...)
+	h := harness.New(with(base(&script{}), harness.Toolset(harness.Tools(echo, echo)))...)
 
-	_, err := h.New(context.Background())
+	_, err := h.New(context.Background(), config(t))
 	assert.ErrorContains(t, err, `"echo"`)
 }
 
 func TestNewNeedsAModel(t *testing.T) {
+	withCatalog := harness.Catalog(newCatalog(&script{}))
 	tests := []struct {
 		name string
 		opts []harness.Option
+		spec string
 		want string
 	}{
-		{"no catalog", []harness.Option{harness.Model("fake/one")}, "Catalog"},
-		{"no spec", []harness.Option{harness.Catalog(newCatalog(&script{}))}, "Model"},
-		{"unknown provider", []harness.Option{harness.Catalog(newCatalog(&script{})), harness.Model("nine/x")}, "nine/x"},
+		{"no catalog", nil, "fake/one", "Catalog"},
+		{"no spec", []harness.Option{withCatalog}, "", "Spec"},
+		{"unknown provider", []harness.Option{withCatalog}, "nine/x", "nine/x"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			opts := tt.opts
-			_, err := harness.New(opts...).New(context.Background())
+			c := agent.Config{Spec: tt.spec}
+			_, err := harness.New(tt.opts...).New(context.Background(), c)
 			assert.ErrorContains(t, err, tt.want)
 		})
 	}
@@ -142,39 +209,39 @@ func TestNewNeedsAModel(t *testing.T) {
 func TestRunReportsAPromptError(t *testing.T) {
 	errBuild := errors.New("build failed")
 	p := &script{responses: []ai.Message{reply("hi")}}
-	h := harness.New(with(base(t, p),
+	h := harness.New(with(base(p),
 		harness.Prompt(func(context.Context, *harness.Assembly) ([]ai.Section, error) {
 			return nil, errBuild
 		}),
 	)...)
 
-	a, err := h.New(context.Background())
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err, "the builder runs before each model call")
 	_, err = a.Run(context.Background(), session.Text("hello")).Wait()
 	assert.ErrorIs(t, err, errBuild)
 	assert.Empty(t, p.called(), "the run fails before the model call")
 }
 
-func TestDurableUpdatesTheSkillsSection(t *testing.T) {
-	ctx := context.Background()
+func TestStartUpdatesTheSkillsSection(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("a"), reply("b"), reply("c")}}
-	h := harness.New(with(base(t, p), harness.Store(session.NewMemoryStore()))...)
-	withSkill := func(description string) harness.Option {
-		return harness.Skillset(def.Skill{Name: "deploy", Description: description, Body: "Run make deploy."})
-	}
+	h := harness.New(with(base(p), skillTool)...)
+	c := config(t)
+	c.Store = session.NewMemoryStore()
 
 	for _, r := range []struct{ description, input string }{
 		{"Deploy the service.", "first"},
 		{"Deploy the service.", "second"},
 		{"Deploy with the release script.", "third"},
 	} {
-		a, err := h.Durable(ctx, "s1", withSkill(r.description))
-		require.NoError(t, err)
+		withSkill := c
+		withSkill.Defs = def.Set{Skills: []def.Skill{
+			{Name: "deploy", Description: r.description, Body: "Run make deploy."},
+		}}
+		a := start(t, h, withSkill)
 		run(t, a, r.input)
 	}
 
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	var changes []string
 	for _, msg := range a.Log().Messages() {
 		for _, c := range msg.Content {
@@ -188,75 +255,73 @@ func TestDurableUpdatesTheSkillsSection(t *testing.T) {
 	assert.Contains(t, changes[1], "Deploy with the release script.")
 }
 
-func TestDurableKeepsTheSpecOfTheSession(t *testing.T) {
-	ctx := context.Background()
+func TestStartKeepsTheSpecOfTheSession(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("a"), reply("b"), reply("c")}}
-	h := harness.New(with(base(t, p), harness.Store(session.NewMemoryStore()))...)
+	h := harness.New(base(p)...)
+	c := config(t)
+	c.Store = session.NewMemoryStore()
 
 	// The first call picks fake/two, and the session keeps it.
-	a, err := h.Durable(ctx, "s1", harness.Model("fake/two"))
-	require.NoError(t, err)
+	two := c
+	two.Spec = "fake/two"
+	a := start(t, h, two)
 	run(t, a, "first")
 
-	// A resume with no spec uses the spec of the session, not the default.
-	a, err = h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	// A resume with no spec uses the spec of the session.
+	noSpec := c
+	noSpec.Spec = ""
+	a = start(t, h, noSpec)
 	run(t, a, "second")
 
-	// A new session uses the default.
-	a, err = h.Durable(ctx, "s2")
-	require.NoError(t, err)
+	// A spec changes the model of the session.
+	a = start(t, h, c)
 	run(t, a, "third")
 
 	assert.Equal(t, []string{"two", "two", "one"}, p.called())
 }
 
-func TestDurableSeedsOnlyANewSession(t *testing.T) {
-	ctx := context.Background()
-	h := harness.New(with(base(t, &script{}),
-		harness.Store(session.NewMemoryStore()),
-		harness.Seed(harness.DefaultSeed),
-	)...)
+func TestStartSeedsOnlyANewSession(t *testing.T) {
+	h := harness.New(with(base(&script{}), harness.Seed(harness.DefaultSeed))...)
+	c := config(t)
+	c.Store = session.NewMemoryStore()
 
 	for range 2 {
-		a, err := h.Durable(ctx, "s1")
-		require.NoError(t, err)
+		a := start(t, h, c)
 		assert.Len(t, a.Log().Entries(), 1)
 	}
 }
 
-func TestDurableWithoutAStoreResumesTheSession(t *testing.T) {
-	ctx := context.Background()
+func TestStartWithoutAStoreResumesTheSession(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("a")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(base(p)...)
+	c := config(t)
 
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "first")
 
-	a, err = h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	a = start(t, h, c)
 	assert.Equal(t, "s1", a.Log().Session().ID)
 	assert.Len(t, a.Log().Entries(), 2)
 }
 
-func TestDurableRejectsAnEmptyID(t *testing.T) {
-	h := harness.New(base(t, &script{})...)
+func TestStartRejectsAnEmptyID(t *testing.T) {
+	h := harness.New(base(&script{})...)
+	c := config(t)
+	c.SessionID = ""
 
-	_, err := h.Durable(context.Background(), "")
+	_, err := h.Start(context.Background(), c)
 	assert.Error(t, err)
 }
 
-func TestDurableStoreWinsOverTheAgentStore(t *testing.T) {
+func TestStartStoreWinsOverTheAgentStore(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()
 	other := session.NewMemoryStore()
-	h := harness.New(with(base(t, &script{}),
-		harness.Store(store),
-		harness.AgentDefaults(agent.Store(other)),
-	)...)
+	h := harness.New(with(base(&script{}), harness.AgentDefaults(agent.Store(other)))...)
+	c := config(t)
+	c.Store = store
 
-	_, err := h.Durable(ctx, "s1")
+	_, err := h.Start(ctx, c)
 	require.NoError(t, err)
 
 	_, err = store.Load(ctx, "s1")
@@ -265,17 +330,21 @@ func TestDurableStoreWinsOverTheAgentStore(t *testing.T) {
 	assert.ErrorIs(t, err, session.ErrNotFound)
 }
 
-func TestDurableLoadsTheSessionOnce(t *testing.T) {
+func TestStartLoadsTheSessionOnce(t *testing.T) {
 	ctx := context.Background()
 	store := &loadCounter{MemoryStore: session.NewMemoryStore()}
-	h := harness.New(with(base(t, &script{}), harness.Store(store))...)
+	h := harness.New(base(&script{})...)
+	c := config(t)
+	c.Store = store
+	two := c
+	two.Spec = "fake/two"
 
-	_, err := h.Durable(ctx, "s1", harness.Model("fake/two"))
+	_, err := h.Start(ctx, two)
 	require.NoError(t, err)
 	store.loads = 0
 
-	a, err := h.Durable(ctx, "s1")
-	require.NoError(t, err)
+	c.Spec = ""
+	a := start(t, h, c)
 	assert.Equal(t, 1, store.loads)
 
 	spec, _, err := harness.SessionModel.Get(a.Log())

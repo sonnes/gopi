@@ -1,5 +1,6 @@
-// Package emittest checks the event order of a run in a test. It is a
-// separate package, so that the agent package does not link testify.
+// Package emittest checks the event order and the state of a run in a
+// test. It is a separate package, so that the agent package does not
+// link testify.
 package emittest
 
 import (
@@ -7,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -111,6 +114,28 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 	assert.False(t, inMsg, "the run left a message open")
 	assert.Empty(t, tools, "the run left tool calls open")
 	assert.Empty(t, subs, "the run left subagents open")
+}
+
+// CheckState fails t if st does not hold the messages of log, each with
+// the ID of its entry, as the state of a new agent over log does.
+func CheckState(t testing.TB, log *session.Log, st agent.State) {
+	t.Helper()
+	want := agent.NewState(log)
+	assert.Equal(t, want.Messages(), st.Messages(), "the state has the messages of the log")
+	assert.Equal(t, stateIDs(t, want), stateIDs(t, st), "the state has the entry ID of each message")
+}
+
+// stateIDs returns the entry IDs of the messages of st. The JSON of a
+// state is the one place that shows them.
+func stateIDs(t testing.TB, st agent.State) []string {
+	t.Helper()
+	data, err := json.Marshal(st)
+	require.NoError(t, err)
+	var v struct {
+		IDs []string `json:"ids"`
+	}
+	require.NoError(t, json.Unmarshal(data, &v))
+	return v.IDs
 }
 
 // Types returns the JSON type name of each event, such as

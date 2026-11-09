@@ -2,7 +2,8 @@
 // such as the session of Claude Code or the thread of Codex. The ID is
 // a [session.Value], so a Durable agent over the same session resumes
 // the same conversation of the CLI. A CLI agent reads and writes the ID
-// only through an [ID], and a caller of the agent never sees it.
+// only through an [ID], and a caller of the agent never sees it. The
+// package owns the namespace of these values.
 package resume
 
 import (
@@ -11,8 +12,20 @@ import (
 	"github.com/sonnes/gopi/pkg/session"
 )
 
-// namespace is the namespace of the IDs of every CLI agent.
+// namespace is the namespace of the IDs of every CLI agent, and of the
+// values of [Value].
 const namespace = "gopi.cli"
+
+// Value returns the value key of the CLI named cli. It is for a value
+// that belongs to a conversation of the CLI, such as a sum that the CLI
+// keeps over the conversation. The key of the value is cli, a dot, and
+// key, so it does not collide with the ID of [New].
+func Value[T any](cli, key string) session.Value[T] {
+	return session.Value[T]{
+		Namespace: namespace,
+		Key:       cli + "." + key,
+	}
+}
 
 // ID is the stored conversation ID of one CLI.
 type ID struct {

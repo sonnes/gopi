@@ -17,5 +17,7 @@ func TestCases(t *testing.T) {
 		Model:         testModel,
 		SystemModel:   testModel,
 		ReminderModel: reminderModel,
+		ObjectModel:   testModel,
+		ObjectOptions: ai.Thinking(ai.ThinkingOff),
 	})
 }

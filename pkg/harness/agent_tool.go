@@ -16,7 +16,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/def"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -27,16 +27,9 @@ type childCall struct {
 	parent agent.ParentRef
 }
 
-// agentToolName is the name of the agent tool.
-const agentToolName = tool.Agent
-
 // idBytes is the count of random bytes in the ID of a child session.
 // The ID shows them as hex digits.
 const idBytes = 3
-
-// inheritModel is the model of a subagent that runs on the model of its
-// parent.
-const inheritModel = "inherit"
 
 // noText is the tool result of a subagent that ended with no text, so
 // that the model does not read an empty result as a failure.
@@ -58,20 +51,15 @@ const agentToolDescription = "Give a task to a subagent. The subagent works in i
 // [oh-my-pi]: https://github.com/can1357/oh-my-pi
 // [Claude Code]: https://code.claude.com/docs/en/sub-agents
 type agentTool struct {
-	asm    *Assembly
-	names  []string
-	byName map[string]def.Agent
+	asm   *Assembly
+	names []string
 }
 
 // newAgentTool returns the agent tool for the subagents of asm.
 func newAgentTool(asm *Assembly) *agentTool {
-	t := &agentTool{
-		asm:    asm,
-		byName: make(map[string]def.Agent, len(asm.Agents)),
-	}
+	t := &agentTool{asm: asm}
 	for _, a := range asm.Agents {
 		t.names = append(t.names, a.Name)
-		t.byName[a.Name] = a
 	}
 	return t
 }
@@ -87,7 +75,7 @@ func (t *agentTool) Info() ai.ToolInfo {
 		name.Enum = append(name.Enum, n)
 	}
 	return ai.ToolInfo{
-		Name:        agentToolName,
+		Name:        tool.Agent,
 		Description: agentToolDescription,
 		InputSchema: &jsonschema.Schema{
 			Type: "object",
@@ -126,7 +114,7 @@ func (t *agentTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, e
 	if err := json.Unmarshal(call.Input, &in); err != nil {
 		return errorResult(fmt.Sprintf("invalid input: %s", err)), nil
 	}
-	sub, ok := t.byName[in.Agent]
+	sub, ok := t.asm.defs.Agent(in.Agent)
 	if !ok {
 		text := fmt.Sprintf("no subagent is named %q. The subagents are: %s.", in.Agent, strings.Join(t.names, ", "))
 		return errorResult(text), nil
@@ -139,7 +127,7 @@ func (t *agentTool) Run(ctx context.Context, call ai.ToolCall) (ai.ToolResult, e
 	if err != nil {
 		return errorResult(err.Error()), nil
 	}
-	spec, err := childSpec(t.asm.h.cat, t.asm.Spec, sub.Model)
+	spec, err := childSpec(t.asm.h.cat, t.asm.Spec, sub)
 	if err != nil {
 		return errorResult(fmt.Sprintf("the subagent did not start: %s", err)), nil
 	}
@@ -192,33 +180,47 @@ func newChildID(parentID, name string) (string, error) {
 	return agent.ChildID(parentID, name, hex.EncodeToString(b)), nil
 }
 
+// childMode returns the mode of a subagent. parent is the mode of the
+// parent, and file is the mode that the file of the subagent sets. If
+// file is empty or unknown, the child gets the mode of the parent.
+// Otherwise the child gets the stricter mode, so a file cannot give
+// more access than the parent has.
+func childMode(parent permission.Mode, file string) permission.Mode {
+	if file == "" {
+		return parent
+	}
+	mode, err := permission.ParseMode(file)
+	if err != nil {
+		return parent
+	}
+	return permission.Stricter(parent, mode)
+}
+
 // start returns the child agent of sub on the model spec, over the
 // session id, or over an unsaved log if id is "".
 func (t *agentTool) start(ctx context.Context, sub def.Agent, spec, id, callID string) (*agent.Agent, error) {
 	h := t.asm.h
-	mode, err := permission.ParseMode(sub.Mode)
+	c := h.cfg
+	c.SessionID = id
+	c.Spec = spec
+	c.Mode = childMode(h.cfg.Mode, sub.Mode)
+	c.Sections = nil
+	call, err := h.call(c)
 	if err != nil {
-		mode = h.policy.Mode
+		return nil, err
 	}
-	opts := []Option{
-		func(c *Harness) {
-			c.sections = nil
-			c.child = &childCall{
-				sub: sub,
-				parent: agent.ParentRef{
-					SessionID:  t.asm.sessionID,
-					ToolCallID: callID,
-				},
-			}
+	call.system = t.childSystem(sub)
+	call.child = &childCall{
+		sub: sub,
+		parent: agent.ParentRef{
+			SessionID:  t.asm.sessionID,
+			ToolCallID: callID,
 		},
-		Model(spec),
-		System(t.childSystem(sub)),
-		Mode(permission.Stricter(h.policy.Mode, mode)),
 	}
 	if id == "" {
-		return h.New(ctx, opts...)
+		return call.newAgent(ctx)
 	}
-	return h.Durable(ctx, id, opts...)
+	return call.start(ctx)
 }
 
 // childSystem returns the base text of the prompt of a child: the prompt
@@ -320,15 +322,16 @@ func (s agentStats) trailer() string {
 	return b.String()
 }
 
-// childSpec returns the model spec of a subagent with the model key
-// file. "inherit", no model, or a model that cat does not know, such as
-// the alias "opus", gives the spec of the parent. Any other error of cat
-// is an error, such as a bare ID that two providers serve. The child
-// then does not run on a model that its file did not name.
-func childSpec(cat *catalog.Catalog, parent, file string) (string, error) {
-	if file == "" || file == inheritModel {
+// childSpec returns the model spec of the subagent sub. A model that
+// [def.Agent.InheritsModel] reports, or a model that cat does not know,
+// such as the alias "opus", gives the spec of the parent. Any other
+// error of cat is an error, such as a bare ID that two providers serve.
+// The child then does not run on a model that its file did not name.
+func childSpec(cat *catalog.Catalog, parent string, sub def.Agent) (string, error) {
+	if sub.InheritsModel() {
 		return parent, nil
 	}
+	file := sub.Model
 	_, err := cat.Model(file)
 	if errors.Is(err, catalog.ErrUnknownModel) {
 		return parent, nil

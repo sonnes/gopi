@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -19,11 +18,13 @@ import (
 type source struct {
 	// ID is the provider or driver ID of models.json.
 	ID string
-	// Kind is the kind of a new entry.
-	Kind string
+	// Driver reports that ID is a driver. The list of a driver puts its
+	// default first, and its thinking levels replace the levels of the
+	// file.
+	Driver bool
 	// List lists the models, or is nil if no list is available. Skip
 	// says why.
-	List func(context.Context) ([]ai.Model, error)
+	List listFunc
 	Skip string
 	// Dev is the provider ID of models.dev, or empty for none.
 	Dev string
@@ -123,17 +124,13 @@ func syncEntry(
 		lines = append(lines, "  filled from models.dev: "+strings.Join(filled, ", "))
 	}
 
-	e := modelsfile.Entry{
-		Kind:    cmp.Or(old.Kind, s.Kind),
-		Default: old.Default,
-	}
+	e := modelsfile.Entry{Default: old.Default}
 	for _, id := range slices.Sorted(maps.Keys(byID)) {
 		e.Models = append(e.Models, byID[id])
 	}
 	// The list of a CLI puts its default first. A provider list has no
 	// default, so a person sets the default of a provider.
-	isDriver := s.Kind == modelsfile.KindDriver
-	if isDriver && len(listed) > 0 && listed[0].ID != e.Default {
+	if s.Driver && len(listed) > 0 && listed[0].ID != e.Default {
 		e.Default = listed[0].ID
 		lines = append(lines, fmt.Sprintf("%s: the default is now %s, the default of its list", s.ID, e.Default))
 	}
@@ -172,7 +169,7 @@ func mergeList(
 			continue
 		}
 		merge := catalog.MergeModel
-		if s.Kind == modelsfile.KindDriver {
+		if s.Driver {
 			merge = catalog.MergeDriverModel
 		}
 		next := modelsfile.Model{
@@ -220,39 +217,23 @@ func mergeList(
 	return lines
 }
 
-// fill returns m with each empty value taken from d. A model with a
-// price keeps all of its prices. A model with thinking levels keeps its
-// thinking: a false Reasoning is a choice, and JSON cannot tell it from
-// a missing value.
+// fill returns m with each empty value taken from d, with the rule of
+// [catalog.FillModel]. A model with thinking levels keeps its
+// Reasoning: a false Reasoning is a choice, and JSON cannot tell it
+// from a missing value.
 func fill(m, d ai.Model) ai.Model {
-	m.Name = cmp.Or(m.Name, d.Name)
-	m.MaxTokens = cmp.Or(m.MaxTokens, d.MaxTokens)
-	m.ContextWindow = cmp.Or(m.ContextWindow, d.ContextWindow)
-	if len(m.Input) == 0 {
-		m.Input = d.Input
+	out := catalog.FillModel(m, d)
+	if len(m.ThinkingLevels) > 0 {
+		out.Reasoning = m.Reasoning
 	}
-	if len(m.ThinkingLevels) == 0 {
-		m.Reasoning = m.Reasoning || d.Reasoning
-		m.ThinkingLevels = d.ThinkingLevels
-	}
-	if !hasPrices(m.Pricing) {
-		m.Pricing = d.Pricing
-	}
-	return m
-}
-
-// hasPrices reports whether p has any price.
-func hasPrices(p ai.Pricing) bool {
-	base := p.Input + p.Output + p.CacheRead + p.CacheWrite + p.CacheWriteLong
-	return base != 0 || len(p.Tiers) > 0
+	return out
 }
 
 // priceDiffs returns a line for each base price of file that differs
 // from dev. A price that models.dev does not have is not compared.
+// file is a model after [fill], so a model with no prices in the file
+// has the prices of dev, and gives no line.
 func priceDiffs(spec string, file, dev ai.Pricing) []string {
-	if !hasPrices(file) || !hasPrices(dev) {
-		return nil
-	}
 	var lines []string
 	for _, p := range []struct {
 		name      string

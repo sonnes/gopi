@@ -93,17 +93,40 @@ func newCatalog(p *script) *catalog.Catalog {
 }
 
 // base returns the options of a harness for a test: the catalog of p,
-// the model fake/one, the skill tool and the agent tool, no seed, and a
-// work folder in an empty temporary folder.
-func base(t *testing.T, p *script) []harness.Option {
-	t.Helper()
+// and no seed. The harness has no tool.
+func base(p *script) []harness.Option {
 	return []harness.Option{
 		harness.Catalog(newCatalog(p)),
-		harness.Model("fake/one"),
-		harness.Toolset(harness.Tools(harness.SkillTool(), harness.AgentTool())),
 		harness.Seed(harness.NoSeed),
-		harness.Dir(t.TempDir()),
 	}
+}
+
+// skillTool and agentTool bind the skill tool and the agent tool, for a
+// test that needs them.
+var (
+	skillTool = harness.Toolset(harness.Tools(harness.SkillTool()))
+	agentTool = harness.Toolset(harness.Tools(harness.AgentTool()))
+)
+
+// config returns the config of the session s1 of a test: the model
+// fake/one, and a work folder in an empty temporary folder.
+func config(t *testing.T) agent.Config {
+	t.Helper()
+	return agent.Config{
+		SessionID: "s1",
+		Spec:      "fake/one",
+		Dir:       t.TempDir(),
+	}
+}
+
+// start starts the session of c on h, and returns its agent.
+func start(t *testing.T, h *harness.Harness, c agent.Config) *agent.Agent {
+	t.Helper()
+	r, err := h.Start(context.Background(), c)
+	require.NoError(t, err)
+	a, ok := r.(*agent.Agent)
+	require.True(t, ok, "the harness starts an *agent.Agent")
+	return a
 }
 
 // with returns opts, then more.
@@ -150,8 +173,8 @@ func toolResult(t *testing.T, a *agent.Agent) ai.Message {
 	return ai.Message{}
 }
 
-// assemblyOf returns the assembly of one call of h.New.
-func assemblyOf(t *testing.T, opts []harness.Option) *harness.Assembly {
+// assemblyOf returns the assembly of one call of h.New with c.
+func assemblyOf(t *testing.T, opts []harness.Option, c agent.Config) *harness.Assembly {
 	t.Helper()
 	var seen *harness.Assembly
 	capture := func(_ context.Context, asm *harness.Assembly) ([]session.Entry, error) {
@@ -159,7 +182,7 @@ func assemblyOf(t *testing.T, opts []harness.Option) *harness.Assembly {
 		return nil, nil
 	}
 	h := harness.New(with(opts, harness.Seed(capture))...)
-	_, err := h.New(context.Background())
+	_, err := h.New(context.Background(), c)
 	require.NoError(t, err)
 	require.NotNil(t, seen)
 	return seen

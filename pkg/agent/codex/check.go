@@ -6,14 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
@@ -29,19 +26,19 @@ const loggedInPrefix = "Logged in using "
 // a ChatGPT account, a check also reads auth.json in the Codex home for
 // the plan, the email, and the organization.
 func (d driver) Check(ctx context.Context) (agent.Status, error) {
-	c := newConfig(d.opts)
-	env := append(os.Environ(), c.env...)
+	c := newOptions(d.opts)
+	env := cliproc.Environ(nil, c.env)
 
 	out, stderr, err := cliproc.Command(ctx, c.binary, env, "--version")
 	if err != nil {
-		return agent.Status{}, checkErr(err, stderr)
+		return agent.Status{}, cliproc.CheckErr(cliName, err, stderr)
 	}
 	status := agent.Status{Version: cliproc.Version(out)}
 
 	out, stderr, err = cliproc.Command(ctx, c.binary, env, "login", "status")
 	var exitErr *exec.ExitError
 	if err != nil && !errors.As(err, &exitErr) {
-		return status, checkErr(err, stderr)
+		return status, cliproc.CheckErr(cliName, err, stderr)
 	}
 	line := strings.TrimSpace(string(stderr) + string(out))
 	method, loggedIn := strings.CutPrefix(line, loggedInPrefix)
@@ -133,13 +130,11 @@ func readClaims(home string) (idClaims, bool) {
 // plan returns the name of the ChatGPT plan, such as "ChatGPT Plus" for
 // "plus". It returns "" for no plan.
 func (c idClaims) plan() string {
-	t := c.Auth.PlanType
-	if t == "" {
-		return ""
-	}
-	first, size := utf8.DecodeRuneInString(t)
-	return "ChatGPT " + string(unicode.ToUpper(first)) + t[size:]
+	return cliproc.PlanName(planBrand, c.Auth.PlanType)
 }
+
+// planBrand starts the name of a ChatGPT plan.
+const planBrand = "ChatGPT"
 
 // org returns the title of the default organization, or "".
 func (c idClaims) org() string {
@@ -149,13 +144,4 @@ func (c idClaims) org() string {
 		}
 	}
 	return ""
-}
-
-// checkErr adds the end of stderr to the error of a check command.
-func checkErr(err error, stderr []byte) error {
-	reason := strings.TrimSpace(string(stderr))
-	if reason == "" {
-		return fmt.Errorf("codex: %w", err)
-	}
-	return fmt.Errorf("codex: %w: %s", err, reason)
 }

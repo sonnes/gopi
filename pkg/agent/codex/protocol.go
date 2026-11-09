@@ -76,8 +76,8 @@ type threadParams struct {
 	ThreadID              string         `json:"threadId,omitempty"`
 	Model                 string         `json:"model,omitempty"`
 	Cwd                   string         `json:"cwd,omitempty"`
-	ApprovalPolicy        ApprovalPolicy `json:"approvalPolicy,omitempty"`
-	Sandbox               SandboxMode    `json:"sandbox,omitempty"`
+	ApprovalPolicy        approvalPolicy `json:"approvalPolicy,omitempty"`
+	Sandbox               sandboxMode    `json:"sandbox,omitempty"`
 	DeveloperInstructions string         `json:"developerInstructions,omitempty"`
 	// Config overrides the config of the CLI for the thread.
 	Config map[string]any `json:"config,omitempty"`

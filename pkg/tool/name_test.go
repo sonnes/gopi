@@ -101,3 +101,9 @@ func TestSplitRule(t *testing.T) {
 func TestMCPName(t *testing.T) {
 	assert.Equal(t, "mcp__linear__get_issue", tool.MCPName("linear", "get_issue"))
 }
+
+func TestWholeTools(t *testing.T) {
+	got := tool.WholeTools([]string{"web_fetch", "bash(git push *)", "Read", "mcp__github"})
+
+	assert.Equal(t, []string{"web_fetch", "Read", "mcp__github"}, got)
+}

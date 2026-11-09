@@ -1,7 +1,7 @@
 // Package openai is the provider for the OpenAI Responses API. It
 // implements [ai.TextProvider], [ai.ObjectProvider], [ai.TokenCounter],
-// [ai.ImageProvider], [ai.ModelLister], and [ai.KeyChecker]. It also serves a compatible Responses API,
-// such as the one of OpenRouter, through [BaseURL].
+// [ai.ImageProvider], and [ai.ModelLister]. It also serves a compatible
+// Responses API, such as the one of OpenRouter, through [BaseURL].
 //
 // A caller must obey these rules:
 //
@@ -167,9 +167,16 @@ func retryStatus(err error) (retry.Status, bool) {
 	}, true
 }
 
-// openStream sends the request and returns the stream. It retries with
-// the policy. The SDK sends the request before it returns the stream,
-// so a retry happens before the first event.
+// call sends one request through [retry.Call], so each call of the
+// provider retries, marks a refused size, and names the provider in its
+// error.
+func call[T any](ctx context.Context, opts ai.Options, send func() (T, error)) (T, error) {
+	return retry.Call(ctx, opts, "openai", retryStatus, send)
+}
+
+// openStream sends the request and returns the stream. The SDK sends
+// the request before it returns the stream, so a retry happens before
+// the first event.
 func (p *Provider) openStream(
 	ctx context.Context,
 	params responses.ResponseNewParams,
@@ -181,12 +188,7 @@ func (p *Provider) openStream(
 		return stream, stream.Err()
 	}
 
-	stream, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
-	if err != nil {
-		err = retry.MarkContextExceeded(err, retryStatus)
-		return nil, fmt.Errorf("openai: %w", err)
-	}
-	return stream, nil
+	return call(ctx, opts, send)
 }
 
 // StreamText streams one response. Each block pushes its start, delta,
@@ -452,9 +454,12 @@ func (p *Provider) GenerateObject(
 		return nil, fmt.Errorf("openai: no object in response, status %q", resp.Status)
 	}
 
+	usage := mapUsage(resp.Usage)
+	usage.Cost = model.Pricing.Cost(usage)
+
 	return &ai.ObjectResponse{
 		Raw:   raw,
-		Usage: mapUsage(resp.Usage),
+		Usage: usage,
 	}, nil
 }
 
@@ -474,11 +479,7 @@ func (p *Provider) objectResponse(
 	send := func() (*responses.Response, error) {
 		return p.client.Responses.New(ctx, params, reqOpts...)
 	}
-	resp, err := retry.Do(ctx, retry.PolicyOf(opts), send, retryStatus)
-	if err != nil {
-		return nil, fmt.Errorf("openai: %w", err)
-	}
-	return resp, nil
+	return call(ctx, opts, send)
 }
 
 // streamedResponse streams the request and returns the response of its
@@ -511,25 +512,25 @@ func (p *Provider) streamedResponse(
 }
 
 // CountTokens counts the input tokens of a call. It sends the same
-// input, tools, and reasoning config as a call. With [ChatGPTPlan], it
-// returns [ErrNotOnPlan].
+// input, tools, and reasoning config as a call.
 func (p *Provider) CountTokens(
 	ctx context.Context,
 	model ai.Model,
 	messages []ai.Message,
 	opts ai.Options,
 ) (*ai.TokenCount, error) {
-	if p.plan {
-		return nil, ErrNotOnPlan
-	}
 	params, err := buildCountTokensParams(model, messages, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := p.client.Responses.InputTokens.Count(ctx, params, requestOptions(opts)...)
+	reqOpts := requestOptions(opts)
+	send := func() (*responses.InputTokenCountResponse, error) {
+		return p.client.Responses.InputTokens.Count(ctx, params, reqOpts...)
+	}
+	resp, err := call(ctx, opts, send)
 	if err != nil {
-		return nil, fmt.Errorf("openai: %w", err)
+		return nil, err
 	}
 
 	return &ai.TokenCount{Total: int(resp.InputTokens)}, nil

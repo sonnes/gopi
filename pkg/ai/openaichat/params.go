@@ -1,9 +1,7 @@
 package openaichat
 
 import (
-	"encoding/json"
 	"fmt"
-	"slices"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	sdk "github.com/openai/openai-go/v3"
@@ -29,7 +27,7 @@ func buildParams(
 	messages []ai.Message,
 	opts ai.Options,
 ) (sdk.ChatCompletionNewParams, error) {
-	retention := cacheRetention(opts)
+	retention := ai.RetentionOf(opts)
 	f := featuresOf(model.ID)
 	params := sdk.ChatCompletionNewParams{
 		Model:    shared.ChatModel(model.ID),
@@ -38,21 +36,24 @@ func buildParams(
 
 	// Every server accepts max_completion_tokens. OpenAI rejects
 	// max_tokens for a reasoning model.
-	if n, ok := maxTokens(model, opts); ok {
-		params.MaxCompletionTokens = param.NewOpt(n)
+	if n, ok := ai.MaxTokensOf(model, opts); ok {
+		params.MaxCompletionTokens = param.NewOpt(int64(n))
 	}
 
-	if level, ok := ai.GetOption(opts, ai.Thinking); ok {
-		effort, ok := efforts[level]
-		if !ok {
-			return params, fmt.Errorf("openaichat: unknown thinking level %q", level)
-		}
-		params.ReasoningEffort = effort
+	// Off is the effort none. A model that cannot turn reasoning off
+	// rejects it.
+	level, ok, err := ai.ThinkingOf(opts)
+	if err != nil {
+		return params, err
+	}
+	if ok {
+		params.ReasoningEffort = shared.ReasoningEffort(level.Effort())
 	}
 
 	tools := requestTools(messages, opts, f)
-	if len(tools.list) > 0 {
-		params.Tools = convertTools(tools.list)
+	params.Tools, err = convertTools(tools.list)
+	if err != nil {
+		return params, err
 	}
 
 	if key, ok := ai.GetOption(opts, openai.PromptCacheKey); ok && key != "" && retention != ai.CacheNone {
@@ -68,12 +69,16 @@ func buildParams(
 		params.Temperature = param.NewOpt(t)
 	}
 
-	choice, ok, err := requestToolChoice(opts, tools)
+	c, set, err := ai.ToolChoiceOf(opts)
 	if err != nil {
 		return params, err
 	}
-	if ok {
-		params.ToolChoice = choice
+	choice, send, limit := transcript.LimitChoice(c, set, tools.allowed)
+	switch {
+	case limit:
+		params.ToolChoice = allowedTools(choice, tools.allowed)
+	case send:
+		params.ToolChoice = toolChoiceParam(choice)
 	}
 
 	return params, nil
@@ -91,93 +96,33 @@ type toolPlan struct {
 
 // requestTools returns the tools of a request. The API has no way to
 // change the tools in place, so the list holds the tools after the
-// changes of the messages, from [transcript.CurrentTools]. A model that
-// takes allowed_tools gets every tool that the messages declared, and
-// a removal limits the model to the current tools. The list then stays
-// the same after a removal, so the cache holds. A replacement changes a
-// definition, so the list then holds the current tools.
+// changes of the messages. A model that takes allowed_tools gets every
+// tool that the messages declared, and a removal limits the model to
+// the current tools. The list then stays the same after a removal, so
+// the cache holds. A replacement changes a definition, so the list then
+// holds the current tools.
 func requestTools(messages []ai.Message, opts ai.Options, f features) toolPlan {
 	tools, _ := ai.GetOption(opts, ai.Tools)
-	current := transcript.CurrentTools(tools, messages)
-	if !f.allowedTools {
-		return toolPlan{list: current}
+	changes := transcript.ChangesOf(tools, messages)
+	if !f.allowedTools || changes.Replaced {
+		return toolPlan{list: changes.Current}
 	}
-
-	declared := slices.Clone(tools)
-	seen := make(map[string]bool, len(tools))
-	for _, t := range tools {
-		seen[t.Name] = true
+	return toolPlan{
+		list:    changes.Declared,
+		allowed: changes.Allowed(),
 	}
-	removed := false
-	replaced := false
-	for _, m := range messages {
-		if m.Role != ai.RoleSystem {
-			continue
-		}
-		for _, c := range m.Content {
-			switch v := c.(type) {
-			case ai.ToolRemoved:
-				removed = true
-			case ai.ToolAdded:
-				if seen[v.Tool.Name] {
-					replaced = true
-					continue
-				}
-				seen[v.Tool.Name] = true
-				declared = append(declared, v.Tool)
-			}
-		}
-	}
-
-	if replaced {
-		return toolPlan{list: current}
-	}
-	plan := toolPlan{list: declared}
-	if removed {
-		plan.allowed = make([]string, 0, len(current))
-		for _, t := range current {
-			plan.allowed = append(plan.allowed, t.Name)
-		}
-	}
-	return plan
 }
 
-// requestToolChoice returns the tool choice of a request, and false if
-// the request sends none. If the tool plan limits the tools, the choice
-// limits the model to them with allowed_tools. A choice that names one
-// tool, or none, is narrower than the limit, so it goes as it is.
-func requestToolChoice(opts ai.Options, plan toolPlan) (sdk.ChatCompletionToolChoiceOptionUnionParam, bool, error) {
-	c, set := ai.GetOption(opts, ai.ToolChoice)
-	if plan.allowed == nil {
-		if !set {
-			return sdk.ChatCompletionToolChoiceOptionUnionParam{}, false, nil
-		}
-		choice, err := toolChoiceParam(c)
-		return choice, true, err
-	}
-
-	narrower := set && (c.Type == ai.ToolChoiceNone.Type || c.Type == "tool")
-	if narrower {
-		choice, err := toolChoiceParam(c)
-		return choice, true, err
-	}
-	if len(plan.allowed) == 0 {
-		choice, err := toolChoiceParam(ai.ToolChoiceNone)
-		return choice, true, err
-	}
-
+// allowedTools limits the model to the allowed tools with an
+// allowed_tools choice. Any is "required" in this API.
+func allowedTools(c ai.ToolChoiceMode, allowed []string) sdk.ChatCompletionToolChoiceOptionUnionParam {
 	mode := sdk.ChatCompletionAllowedToolsModeAuto
-	if set {
-		if _, err := toolChoiceParam(c); err != nil {
-			return sdk.ChatCompletionToolChoiceOptionUnionParam{}, false, err
-		}
-		if c.Type == ai.ToolChoiceAny.Type {
-			mode = sdk.ChatCompletionAllowedToolsModeRequired
-		}
+	if c.Type == ai.ToolChoiceAny.Type {
+		mode = sdk.ChatCompletionAllowedToolsModeRequired
 	}
 
-	tools := make([]map[string]any, 0, len(plan.allowed))
-	for _, name := range plan.allowed {
+	tools := make([]map[string]any, 0, len(allowed))
+	for _, name := range allowed {
 		tools = append(tools, map[string]any{
 			"type":     "function",
 			"function": map[string]any{"name": name},
@@ -190,36 +135,26 @@ func requestToolChoice(opts ai.Options, plan toolPlan) (sdk.ChatCompletionToolCh
 				Tools: tools,
 			},
 		},
-	}, true, nil
-}
-
-// cacheRetention is the [ai.CacheRetention] option, or [ai.CacheShort].
-func cacheRetention(opts ai.Options) ai.Retention {
-	if r, ok := ai.GetOption(opts, ai.CacheRetention); ok {
-		return r
 	}
-	return ai.CacheShort
 }
 
-// toolChoiceParam maps a tool choice to the API. Any is "required" in
-// this API. An unknown type is an error.
-func toolChoiceParam(c ai.ToolChoiceMode) (sdk.ChatCompletionToolChoiceOptionUnionParam, error) {
+// toolChoiceParam maps a tool choice that [ai.ToolChoiceOf] returned to
+// the API. Any is "required" in this API.
+func toolChoiceParam(c ai.ToolChoiceMode) sdk.ChatCompletionToolChoiceOptionUnionParam {
 	mode := func(m string) sdk.ChatCompletionToolChoiceOptionUnionParam {
 		return sdk.ChatCompletionToolChoiceOptionUnionParam{OfAuto: param.NewOpt(m)}
 	}
 
 	switch c.Type {
 	case ai.ToolChoiceAuto.Type:
-		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoAuto)), nil
+		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoAuto))
 	case ai.ToolChoiceAny.Type:
-		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoRequired)), nil
+		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoRequired))
 	case ai.ToolChoiceNone.Type:
-		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoNone)), nil
-	case "tool":
-		named := sdk.ChatCompletionNamedToolChoiceFunctionParam{Name: c.Name}
-		return sdk.ToolChoiceOptionFunctionToolChoice(named), nil
+		return mode(string(sdk.ChatCompletionToolChoiceOptionAutoNone))
 	default:
-		return sdk.ChatCompletionToolChoiceOptionUnionParam{}, fmt.Errorf("openaichat: unknown tool choice %q", c.Type)
+		named := sdk.ChatCompletionNamedToolChoiceFunctionParam{Name: c.Name}
+		return sdk.ToolChoiceOptionFunctionToolChoice(named)
 	}
 }
 
@@ -237,9 +172,9 @@ func buildObjectParams(
 		return params, err
 	}
 
-	schemaMap, err := toMap(schema)
+	schemaMap, err := transcript.Schema(schema)
 	if err != nil {
-		return params, err
+		return params, fmt.Errorf("openaichat: %w", err)
 	}
 	params.ResponseFormat = sdk.ChatCompletionNewParamsResponseFormatUnion{
 		OfJSONSchema: &shared.ResponseFormatJSONSchemaParam{
@@ -264,28 +199,21 @@ func buildMessages(
 	opts ai.Options,
 ) []sdk.ChatCompletionMessageParamUnion {
 	var out []sdk.ChatCompletionMessageParamUnion
-	system, _ := ai.GetOption(opts, ai.SystemPrompt)
-	breakpoint := cfg.cacheBreakpoints && cacheRetention(opts) != ai.CacheNone
-	if m, ok := systemMessage(system, breakpoint); ok {
+	breakpoint := cfg.cacheBreakpoints && ai.RetentionOf(opts) != ai.CacheNone
+	if m, ok := systemMessage(ai.SystemPromptOf(opts), breakpoint); ok {
 		out = append(out, m)
 	}
 	return append(out, convertMessages(messages, convertConfig{systemMessages: f.systemMessages})...)
 }
 
-// systemMessage returns the [ai.SystemPrompt] option as a system
-// message. Each [ai.Text] and [ai.Section] block is one text part, in
-// order. If breakpoint is true, the last part carries a cache
-// breakpoint. One part with no breakpoint goes as a string. The bool is
-// false if the prompt has no text.
-func systemMessage(system []ai.Content, breakpoint bool) (sdk.ChatCompletionMessageParamUnion, bool) {
+// systemMessage returns the system prompt as a system message. Each
+// text is one text part, in order. If breakpoint is true, the last part
+// carries a cache breakpoint. One part with no breakpoint goes as a
+// string. The bool is false if the prompt has no text.
+func systemMessage(system []string, breakpoint bool) (sdk.ChatCompletionMessageParamUnion, bool) {
 	var parts []sdk.ChatCompletionContentPartTextParam
-	for _, c := range system {
-		switch v := c.(type) {
-		case ai.Text:
-			parts = append(parts, sdk.ChatCompletionContentPartTextParam{Text: v.Text})
-		case ai.Section:
-			parts = append(parts, sdk.ChatCompletionContentPartTextParam{Text: v.Text})
-		}
+	for _, text := range system {
+		parts = append(parts, sdk.ChatCompletionContentPartTextParam{Text: text})
 	}
 
 	switch {
@@ -301,39 +229,21 @@ func systemMessage(system []ai.Content, breakpoint bool) (sdk.ChatCompletionMess
 	return sdk.SystemMessage(parts), true
 }
 
-// maxTokens is the option, else the cap of the model. If neither is set,
-// the request omits the cap and the server uses its default. The
-// default of Fireworks is 2048 tokens, so a model for Fireworks sets
-// [ai.Model.MaxTokens].
-func maxTokens(model ai.Model, opts ai.Options) (int64, bool) {
-	if n, ok := ai.GetOption(opts, ai.MaxTokens); ok {
-		return int64(n), true
-	}
-	if model.MaxTokens > 0 {
-		return int64(model.MaxTokens), true
-	}
-	return 0, false
-}
-
-// efforts maps a thinking level to the reasoning effort of the API. Off
-// is the effort none. A model that cannot turn reasoning off rejects it.
-var efforts = map[ai.ThinkingLevel]shared.ReasoningEffort{
-	ai.ThinkingOff:    shared.ReasoningEffortNone,
-	ai.ThinkingLow:    shared.ReasoningEffortLow,
-	ai.ThinkingMedium: shared.ReasoningEffortMedium,
-	ai.ThinkingHigh:   shared.ReasoningEffortHigh,
-	ai.ThinkingXHigh:  shared.ReasoningEffortXhigh,
-	ai.ThinkingMax:    shared.ReasoningEffortMax,
-}
+// emptyParameters is the parameters of a tool with no schema. The API
+// needs an object schema for a function tool.
+var emptyParameters = map[string]any{"type": "object", "properties": map[string]any{}}
 
 // convertTools maps each tool to a function tool. The request omits
 // strict, because strict mode needs every property to be required.
-func convertTools(tools []ai.ToolInfo) []sdk.ChatCompletionToolUnionParam {
-	out := make([]sdk.ChatCompletionToolUnionParam, 0, len(tools))
+func convertTools(tools []ai.ToolInfo) ([]sdk.ChatCompletionToolUnionParam, error) {
+	var out []sdk.ChatCompletionToolUnionParam
 	for _, t := range tools {
-		parameters, err := toMap(t.InputSchema)
-		if err != nil || parameters == nil {
-			parameters = map[string]any{"type": "object", "properties": map[string]any{}}
+		parameters, err := transcript.Schema(t.InputSchema)
+		if err != nil {
+			return nil, fmt.Errorf("openaichat: tool %q: %w", t.Name, err)
+		}
+		if parameters == nil {
+			parameters = emptyParameters
 		}
 
 		fn := shared.FunctionDefinitionParam{
@@ -345,23 +255,5 @@ func convertTools(tools []ai.ToolInfo) []sdk.ChatCompletionToolUnionParam {
 		}
 		out = append(out, sdk.ChatCompletionFunctionTool(fn))
 	}
-	return out
-}
-
-// toMap converts a schema to the map shape that the API takes.
-func toMap(schema *jsonschema.Schema) (map[string]any, error) {
-	if schema == nil {
-		return nil, nil
-	}
-
-	data, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("openaichat: encode schema: %w", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("openaichat: decode schema: %w", err)
-	}
-	return m, nil
+	return out, nil
 }

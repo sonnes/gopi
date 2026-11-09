@@ -2,6 +2,7 @@ package ai_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -118,8 +119,7 @@ func TestGenerateObject(t *testing.T) {
 func TestGenerateObject_Unsupported(t *testing.T) {
 	lm := ai.LanguageModel{Model: testModel, Provider: &textProvider{}}
 	_, err := ai.GenerateObject[person](t.Context(), lm, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "object")
+	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 
 func TestCountTokens(t *testing.T) {
@@ -139,8 +139,7 @@ func TestCountTokens(t *testing.T) {
 func TestCountTokens_Unsupported(t *testing.T) {
 	lm := ai.LanguageModel{Model: testModel, Provider: &textProvider{}}
 	_, err := ai.CountTokens(t.Context(), lm, nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "token")
+	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 
 type imageProvider struct {
@@ -174,31 +173,4 @@ func TestImageModel_GenerateImage(t *testing.T) {
 	size, ok := ai.GetOption(p.opts, ai.ImageSize)
 	assert.True(t, ok)
 	assert.Equal(t, "1024x1024", size)
-}
-
-type speechProvider struct {
-	model ai.Model
-	text  string
-}
-
-func (p *speechProvider) GenerateSpeech(
-	_ context.Context,
-	model ai.Model,
-	text string,
-	_ ai.Options,
-) (*ai.SpeechResponse, error) {
-	p.model = model
-	p.text = text
-	return &ai.SpeechResponse{Audio: []byte("wav"), MediaType: "audio/wav"}, nil
-}
-
-func TestSpeechModel_GenerateSpeech(t *testing.T) {
-	p := &speechProvider{}
-	sm := ai.SpeechModel{Model: testModel, Provider: p}
-
-	res, err := sm.GenerateSpeech(t.Context(), "hello")
-	require.NoError(t, err)
-	assert.Equal(t, "audio/wav", res.MediaType)
-	assert.Equal(t, testModel, p.model)
-	assert.Equal(t, "hello", p.text)
 }

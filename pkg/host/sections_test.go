@@ -85,9 +85,9 @@ func TestAgentFilePromptIsTheFirstSection(t *testing.T) {
 	writeAgent(t, dir, "reviewer", reviewer)
 
 	_, err := f.h.Create(context.Background(), host.Config{
-		ID:    "s1",
-		Dirs:  []string{dir},
-		Agent: "reviewer",
+		ID:      "s1",
+		DefDirs: []string{dir},
+		Agent:   "reviewer",
 	})
 	require.NoError(t, err)
 

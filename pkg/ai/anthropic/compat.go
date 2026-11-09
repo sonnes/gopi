@@ -1,6 +1,10 @@
 package anthropic
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/sonnes/gopi/internal/family"
+)
 
 // features holds what a model accepts beyond the base Messages API. The
 // zero value is the base API, so a model that this package does not know
@@ -33,14 +37,15 @@ var claude5 = features{
 	noTemperature:  true,
 }
 
-// modelFeatures maps a model ID of the Anthropic API to its features.
-// The list comes from the Claude docs.
+// modelFeatures maps a family of the model IDs of the Anthropic API to
+// its features. The longest family of an ID wins, so a later model of a
+// family gets the features of the family. Claude Sonnet 5.5 has more
+// features than Claude Sonnet 5. The list comes from the Claude docs.
 var modelFeatures = map[string]features{
 	"claude-fable-5-1":  claude5,
-	"claude-opus-5-5":   claude5,
 	"claude-opus-5":     claude5,
-	"claude-sonnet-5-5": claude5,
 	"claude-sonnet-5":   {noTemperature: true},
+	"claude-sonnet-5-5": claude5,
 }
 
 // openRouterPrefix starts the ID of a Claude model on OpenRouter, such
@@ -51,15 +56,13 @@ const openRouterPrefix = "anthropic/"
 // the features of the same Claude model, less the tool changes:
 // OpenRouter rejects a request with a tool_addition block.
 func featuresOf(id string) features {
-	if f, ok := modelFeatures[id]; ok {
+	rest, onOpenRouter := strings.CutPrefix(id, openRouterPrefix)
+	if !onOpenRouter {
+		f, _ := family.Of(modelFeatures, id)
 		return f
 	}
 
-	rest, ok := strings.CutPrefix(id, openRouterPrefix)
-	if !ok {
-		return features{}
-	}
-	f := modelFeatures[strings.ReplaceAll(rest, ".", "-")]
+	f, _ := family.Of(modelFeatures, strings.ReplaceAll(rest, ".", "-"))
 	f.toolChanges = false
 	return f
 }

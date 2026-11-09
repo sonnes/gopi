@@ -72,6 +72,19 @@ func TestDurableDuplicateToolName(t *testing.T) {
 	assert.ErrorIs(t, err, session.ErrNotFound, "the check comes before the store")
 }
 
+func TestDurableHookWithNoPoint(t *testing.T) {
+	store := session.NewMemoryStore()
+
+	_, err := agent.Durable(context.Background(), model(&script{}), "s1",
+		agent.Store(store),
+		agent.Hooks(agent.BaseHook{}),
+	)
+	require.EqualError(t, err, "agent: hook 1 (agent.BaseHook) implements no point")
+
+	_, err = store.Load(context.Background(), "s1")
+	assert.ErrorIs(t, err, session.ErrNotFound, "the check comes before the store")
+}
+
 func TestMessageEndComesAfterTheStore(t *testing.T) {
 	p := &script{responses: []ai.Message{
 		toolCall("c1", "echo", `{"s":"x"}`),
@@ -251,7 +264,7 @@ func TestHookSetsAValue(t *testing.T) {
 	}}
 	a := agent.New(model(p),
 		agent.Toolset(echo),
-		agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+		agent.Hooks(agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 			n, _, err := denied.Get(s.Log())
 			if err != nil {
 				return c, err
@@ -260,7 +273,7 @@ func TestHookSetsAValue(t *testing.T) {
 				return c, err
 			}
 			return c, agent.Deny("no")
-		}),
+		})),
 	)
 
 	_, _, err := collect(t, a.Run(ctx, session.Text("hi")))
@@ -276,10 +289,10 @@ func TestAfterTurnStoresACustomEntry(t *testing.T) {
 	ctx := context.Background()
 	p := &script{responses: []ai.Message{text("one"), text("two")}}
 	a := agent.New(model(p),
-		agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
+		agent.Hooks(agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
 			e, err := session.Custom("compaction", map[string]int{"turn": s.Turn()})
 			return []session.Entry{e}, err
-		}),
+		})),
 	)
 
 	events, _, err := collect(t, a.Run(ctx, session.Text("hi")))

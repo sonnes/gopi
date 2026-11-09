@@ -11,6 +11,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -42,7 +43,7 @@ func TestSectionsChangeInTheNextTurn(t *testing.T) {
 	useTraces(t, []string{"sections.trace"})
 	p := &prompt{}
 	p.set(projectSection, emptyMemory)
-	a := newAgent(t, Sections(p.get))
+	a := newAgent(t, agent.Config{Sections: p.get})
 
 	events, _, err := collect(a.Run(context.Background(), session.Text("One.")))
 	require.NoError(t, err, "the thread gets the base as its developer instructions")
@@ -68,14 +69,26 @@ func TestSectionsResumeKeepsTheBase(t *testing.T) {
 	p := &prompt{}
 	p.set(projectSection, emptyMemory)
 
-	first, err := Durable(ctx, "s1", Store(store), Dir(workDir), Sections(p.get))
+	first, err := Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Tools:     allTools,
+		Store:     store,
+		Dir:       workDir,
+		Sections:  p.get,
+	})
 	require.NoError(t, err)
 	_, _, err = collect(first.Run(ctx, session.Text("Remember 7.")))
 	require.NoError(t, err)
 	require.NoError(t, first.Close())
 
 	p.set(projectSection, notedMemory)
-	second, err := Durable(ctx, "s1", Store(store), Dir(workDir), Sections(p.get))
+	second, err := Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Tools:     allTools,
+		Store:     store,
+		Dir:       workDir,
+		Sections:  p.get,
+	})
 	require.NoError(t, err)
 	t.Cleanup(func() { second.Close() })
 	_, _, err = collect(second.Run(ctx, session.Text("What number?")))
@@ -84,13 +97,12 @@ func TestSectionsResumeKeepsTheBase(t *testing.T) {
 
 func TestSystemIsOneSection(t *testing.T) {
 	useTraces(t, []string{"text.trace"})
-	a := newAgent(t,
-		Model("gpt-5-codex"),
-		System("Be brief."),
-		Sandbox(SandboxReadOnly),
-		Thinking(ai.ThinkingHigh),
-		Name("codex"),
-	)
+	a := newAgent(t, agent.Config{
+		Model:    ai.Model{ID: "gpt-5-codex"},
+		Sections: agent.SystemText("Be brief."),
+		Mode:     permission.Default,
+		Effort:   ai.ThinkingHigh,
+	})
 
 	_, err := a.Run(context.Background(), session.Text("Say hello.")).Wait()
 	require.NoError(t, err)

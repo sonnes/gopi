@@ -56,7 +56,7 @@ func listModels(ctx context.Context, c config) ([]ai.Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("claude: list models: %w", err)
 	}
-	proc, err := launch(cliCommand(c, args), nil, nil, nil)
+	proc, err := launch(cliCommand(c, args), nil, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("claude: list models: %w", err)
 	}

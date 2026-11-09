@@ -14,10 +14,11 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/session"
+	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -34,19 +35,9 @@ func (h toolLog) BeforeTool(_ context.Context, _ agent.State, c ai.ToolCall) (ai
 	return c, nil
 }
 
-// start starts the session id of h with c, and returns its agent.
-func start(t *testing.T, h *harness.Harness, c agent.Config) *agent.Agent {
-	t.Helper()
-	r, err := h.Start(context.Background(), c)
-	require.NoError(t, err)
-	a, ok := r.(*agent.Agent)
-	require.True(t, ok, "the harness starts an *agent.Agent")
-	return a
-}
-
 func TestStartResumesTheSession(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("one"), reply("two")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(base(p)...)
 	store := session.NewMemoryStore()
 	c := agent.Config{
 		SessionID: "s1",
@@ -64,13 +55,12 @@ func TestStartResumesTheSession(t *testing.T) {
 
 func TestStartAddsTheSystemAndTheSkills(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("done")}}
-	h := harness.New(with(base(t, p),
-		harness.System("You are a test agent."),
-		harness.Skillset(deploy),
-	)...)
+	h := harness.New(with(base(p), harness.System("You are a test agent."))...)
 
 	a := start(t, h, agent.Config{
 		SessionID: "s1",
+		Spec:      "fake/one",
+		Defs:      def.Set{Skills: []def.Skill{deploy}},
 		Sections: func(context.Context) ([]ai.Section, error) {
 			return []ai.Section{{Name: "review", Text: "Review the diff."}}, nil
 		},
@@ -88,11 +78,13 @@ func TestStartAddsTheHooksAndTheTools(t *testing.T) {
 		callTool("c1", "echo", `{"s":"x"}`),
 		reply("done"),
 	}}
-	h := harness.New(with(base(t, p), harness.Mode(permission.Bypass))...)
+	h := harness.New(base(p)...)
 	var names []string
 
 	a := start(t, h, agent.Config{
 		SessionID: "s1",
+		Spec:      "fake/one",
+		Mode:      permission.Bypass,
 		Hooks:     []agent.Hook{toolLog{names: &names}},
 		Tools:     []tool.Tool{echo},
 	})
@@ -122,10 +114,11 @@ func TestStartKeepsOnlyTheToolNames(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &script{responses: []ai.Message{reply("done")}}
-			h := harness.New(with(base(t, p), harness.Toolset(harness.Tools(echo, other, grepTool)))...)
+			h := harness.New(with(base(p), harness.Toolset(harness.Tools(echo, other, grepTool)))...)
 
 			a := start(t, h, agent.Config{
 				SessionID: "s1",
+				Spec:      "fake/one",
 				ToolNames: tt.names,
 			})
 			run(t, a, "hi")
@@ -140,10 +133,11 @@ func TestStartTakesAToolWithAnyName(t *testing.T) {
 		return in.S, nil
 	})
 	p := &script{responses: []ai.Message{reply("done")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(base(p)...)
 
 	_, err := h.Start(context.Background(), agent.Config{
 		SessionID: "s1",
+		Spec:      "fake/one",
 		Tools:     []tool.Tool{lookup},
 	})
 
@@ -157,39 +151,39 @@ func (askingHook) BeforeTool(_ context.Context, _ agent.State, c ai.ToolCall) (a
 	return c, agent.Ask("the hook asks")
 }
 
-// TestStartAddsTheRules checks that each rule of the config changes
-// what a call of echo does. Without the rule, the mode of the harness
-// gives the other outcome.
+// TestStartAddsTheRules checks that each rule and each mode of the
+// config changes what a call of echo does.
 func TestStartAddsTheRules(t *testing.T) {
 	tests := []struct {
 		name      string
-		mode      permission.Mode
 		config    agent.Config
 		wantAsked bool
 		wantRan   bool
 	}{
 		{
-			name:      "a hook of the config that asks asks the approve function",
-			mode:      permission.Bypass,
-			config:    agent.Config{Hooks: []agent.Hook{askingHook{}}},
+			name: "a hook of the config that asks asks the approve function",
+			config: agent.Config{
+				Mode:  permission.Bypass,
+				Hooks: []agent.Hook{askingHook{}},
+			},
 			wantAsked: true,
 			wantRan:   true,
 		},
 		{
-			name:   "Deny blocks a call that the mode runs",
-			mode:   permission.Bypass,
-			config: agent.Config{Deny: []string{"echo"}},
+			name: "Deny blocks a call that the mode runs",
+			config: agent.Config{
+				Mode: permission.Bypass,
+				Deny: []string{"echo"},
+			},
 		},
 		{
-			name:    "the mode of the config replaces the mode of the harness",
-			mode:    permission.Default,
-			config:  agent.Config{Mode: agent.ModeBypass},
+			name:    "the bypass mode runs the call",
+			config:  agent.Config{Mode: permission.Bypass},
 			wantRan: true,
 		},
 		{
-			name:      "the default mode of the config asks for a call that the mode of the harness runs",
-			mode:      permission.Bypass,
-			config:    agent.Config{Mode: agent.ModeDefault},
+			name:      "the default mode asks for the call",
+			config:    agent.Config{Mode: permission.Default},
 			wantAsked: true,
 			wantRan:   true,
 		},
@@ -200,10 +194,11 @@ func TestStartAddsTheRules(t *testing.T) {
 				callTool("c1", "echo", `{"s":"x"}`),
 				reply("done"),
 			}}
-			h := harness.New(with(base(t, p), harness.Mode(tt.mode))...)
+			h := harness.New(base(p)...)
 			var asked []string
 			c := tt.config
 			c.SessionID = "s1"
+			c.Spec = "fake/one"
 			c.Tools = []tool.Tool{echo}
 			c.Approve = func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
 				asked = append(asked, req.Call.Name)
@@ -226,17 +221,10 @@ func TestStartFails(t *testing.T) {
 		errText string
 	}{
 		{
-			name: "a hook with no point",
-			config: agent.Config{
-				SessionID: "s1",
-				Hooks:     []agent.Hook{agent.BaseHook{}},
-			},
-			errText: "harness: agent: hook 1 (agent.BaseHook) implements no point",
-		},
-		{
 			name: "an unknown skill",
 			config: agent.Config{
 				SessionID: "s1",
+				Spec:      "fake/one",
 				Skills:    []string{"missing"},
 			},
 			errText: `harness: preload the skill "missing": no skill has this name`,
@@ -245,30 +233,32 @@ func TestStartFails(t *testing.T) {
 			name: "an unknown mode",
 			config: agent.Config{
 				SessionID: "s1",
+				Spec:      "fake/one",
 				Mode:      "auto",
 			},
-			errText: `harness: agent: unknown mode "auto"`,
+			errText: `harness: permission: unknown mode "auto"`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := harness.New(base(t, &script{})...)
+			h := harness.New(base(&script{})...)
 			_, err := h.Start(context.Background(), tt.config)
 			require.EqualError(t, err, tt.errText)
 		})
 	}
 }
 
-func TestStartReadsTheDirs(t *testing.T) {
+func TestStartLoadsTheDefsOfTheConfig(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "skills/deploy/SKILL.md", skillFile("Deploy from the dir.", "body"))
 	writeFile(t, dir, "AGENTS.md", "Use tabs.")
 	p := &script{responses: []ai.Message{reply("done")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(with(base(p), skillTool)...)
 
 	a := start(t, h, agent.Config{
 		SessionID: "s1",
-		Dirs:      []string{dir},
+		Spec:      "fake/one",
+		Defs:      storefs.Dir(dir),
 	})
 	run(t, a, "hi")
 
@@ -276,33 +266,34 @@ func TestStartReadsTheDirs(t *testing.T) {
 	assert.Contains(t, section(a, "instructions"), "Use tabs.")
 }
 
-func TestStartReadsTheSkillsetBeforeTheDirs(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "skills/deploy/SKILL.md", skillFile("Deploy from the dir.", "body"))
+func TestStartLoadsTheDefsOfTheConfigAfterTheDefsOfTheHarness(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("done")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(with(base(p), skillTool, harness.Defs(def.Set{Skills: []def.Skill{
+		{Name: "deploy", Description: "Deploy from the harness.", Body: "b"},
+		{Name: "test", Description: "Test from the harness.", Body: "b"},
+	}}))...)
 
 	a := start(t, h, agent.Config{
 		SessionID: "s1",
-		Dirs:      []string{dir},
-		Skillset: []def.SkillsReader{
-			def.Skill{Name: "deploy", Description: "Deploy inline.", Body: "b"},
-			def.Skill{Name: "test", Description: "Test inline.", Body: "b"},
-		},
+		Spec:      "fake/one",
+		Defs: def.Set{Skills: []def.Skill{
+			{Name: "deploy", Description: "Deploy from the config.", Body: "b"},
+		}},
 	})
 	run(t, a, "hi")
 
-	assert.Contains(t, section(a, "skills"), "Deploy from the dir.", "a dir wins")
-	assert.NotContains(t, section(a, "skills"), "Deploy inline.")
-	assert.Contains(t, section(a, "skills"), "Test inline.")
+	assert.Contains(t, section(a, "skills"), "Deploy from the config.", "the config wins")
+	assert.NotContains(t, section(a, "skills"), "Deploy from the harness.")
+	assert.Contains(t, section(a, "skills"), "Test from the harness.")
 }
 
 func TestStartSetsTheEffort(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("done")}}
-	h := harness.New(base(t, p)...)
+	h := harness.New(base(p)...)
 
 	a := start(t, h, agent.Config{
 		SessionID: "s1",
+		Spec:      "fake/one",
 		Effort:    ai.ThinkingHigh,
 	})
 	run(t, a, "hi")
@@ -329,7 +320,7 @@ func TestDefaultCompactionSummarizes(t *testing.T) {
 		reply("the summary"),
 		reply("done"),
 	}}
-	a, err := harness.New(base(t, p)...).New(context.Background())
+	a, err := harness.New(base(p)...).New(context.Background(), config(t))
 	require.NoError(t, err)
 
 	run(t, a, "first")
@@ -353,10 +344,8 @@ func TestCompactionNilTurnsItOff(t *testing.T) {
 		bigReply(400_000),
 		reply("done"),
 	}}
-	a, err := harness.New(base(t, p)...).New(
-		context.Background(),
-		harness.AgentDefaults(agent.Compaction(nil)),
-	)
+	h := harness.New(with(base(p), harness.AgentDefaults(agent.Compaction(nil)))...)
+	a, err := h.New(context.Background(), config(t))
 	require.NoError(t, err)
 
 	run(t, a, "first")
@@ -382,9 +371,10 @@ func (c *countingCompactor) Compact(
 func TestStartUsesTheCompactionOfTheConfig(t *testing.T) {
 	p := &script{responses: []ai.Message{reply("done")}}
 	c := &countingCompactor{}
-	a := start(t, harness.New(base(t, p)...), agent.Config{
+	a := start(t, harness.New(base(p)...), agent.Config{
 		SessionID:  "s1",
 		Compaction: c,
+		Spec:       "fake/one",
 	})
 
 	run(t, a, strings.Repeat("abcd", 100))
@@ -399,9 +389,10 @@ func TestStartGivesTheAutoCompactSizeToTheDefaultStrategy(t *testing.T) {
 		reply("the summary"),
 		reply("done"),
 	}}
-	a := start(t, harness.New(base(t, p)...), agent.Config{
+	a := start(t, harness.New(base(p)...), agent.Config{
 		SessionID:   "s1",
 		AutoCompact: 100_000,
+		Spec:        "fake/one",
 	})
 
 	run(t, a, "first")
@@ -420,13 +411,13 @@ func TestStartAppliesTheLimits(t *testing.T) {
 	tests := []struct {
 		name    string
 		tool    string
-		limits  agent.Limits
+		limits  permission.Limits
 		wantRan bool
 	}{
 		{name: "no limit writes outside in bypass", tool: tool.WriteFile, wantRan: true},
-		{name: "a block on writes", tool: tool.WriteFile, limits: agent.Limits{BlockWritesOutside: true}},
-		{name: "a block on reads", tool: tool.ReadFile, limits: agent.Limits{BlockReadsOutside: true}},
-		{name: "a block on writes reads outside", tool: tool.ReadFile, limits: agent.Limits{BlockWritesOutside: true}, wantRan: true},
+		{name: "a block on writes", tool: tool.WriteFile, limits: permission.Limits{BlockWritesOutside: true}},
+		{name: "a block on reads", tool: tool.ReadFile, limits: permission.Limits{BlockReadsOutside: true}},
+		{name: "a block on writes reads outside", tool: tool.ReadFile, limits: permission.Limits{BlockWritesOutside: true}, wantRan: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -439,12 +430,13 @@ func TestStartAppliesTheLimits(t *testing.T) {
 			fileTool := tool.Func(tt.tool, func(context.Context, ai.ToolCall) (ai.ToolResult, error) {
 				return ai.ToolResult{}, nil
 			})
-			h := harness.New(base(t, p)...)
+			h := harness.New(base(p)...)
 
 			a := start(t, h, agent.Config{
 				SessionID: "s1",
+				Spec:      "fake/one",
 				Dir:       t.TempDir(),
-				Mode:      agent.ModeBypass,
+				Mode:      permission.Bypass,
 				Tools:     []tool.Tool{fileTool},
 				Limits:    tt.limits,
 			})
@@ -463,13 +455,14 @@ func TestStartFencesTheSandbox(t *testing.T) {
 		boxes = append(boxes, box)
 		return read.New(box)
 	}
-	h := harness.New(base(t, &script{})...)
+	h := harness.New(base(&script{})...)
 
 	start(t, h, agent.Config{
 		SessionID: "s1",
+		Spec:      "fake/one",
 		Dir:       dir,
 		Tools:     []tool.Tool{harness.Sandboxed(build)},
-		Limits:    agent.Limits{Fence: true},
+		Limits:    permission.Limits{Fence: true},
 	})
 
 	require.NotEmpty(t, boxes)

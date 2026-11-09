@@ -24,17 +24,19 @@ type Assembly struct {
 	Spec string
 	// Model is the model that Spec resolves to.
 	Model ai.Model
-	// System is the base text that [System] set.
+	// System is the base text that [System] set, with the body of each
+	// skill of the Skills of the config.
 	System string
-	// Instructions holds the instruction texts of the readers of
-	// [Instructions] and [Defs], in order.
+	// Instructions holds the instruction texts of the source of [Defs],
+	// then of the Defs of the config, in order.
 	Instructions []def.Instruction
 	// Tools describes the tools that the model can call, in the order of
-	// [Toolset]. A deferred tool is not in the list, because the model
-	// cannot call it until the search of the agent loads it.
+	// [Toolset], then the Tools of the config, then the MCP tools. A
+	// deferred tool is not in the list, because the model cannot call it
+	// until the search of the agent loads it.
 	Tools []ai.ToolInfo
-	// Skills holds the skills of the readers, merged by qualified name. [Assembly.SkillName] gives the name that the model
-	// sees.
+	// Skills holds the skills of the sources, merged by qualified name.
+	// [Assembly.SkillName] gives the name that the model sees.
 	Skills []def.Skill
 	// Agents holds the subagents, merged by name. A child assembly has
 	// none, so a subagent cannot start a subagent.
@@ -46,6 +48,8 @@ type Assembly struct {
 	h *Harness
 	// sessionID is the ID of the session, or "" for an unsaved agent.
 	sessionID string
+	// defs holds the merged definitions.
+	defs def.Set
 	// names holds the name that the model sees for each skill.
 	names []string
 	// tools are the tools that go to the agent, deferred or not.
@@ -65,11 +69,7 @@ func (a *Assembly) SkillName(i int) string {
 // skill returns the skill that has the name or the qualified name, and
 // reports whether it exists.
 func (a *Assembly) skill(name string) (def.Skill, bool) {
-	set := def.Set{
-		Skills: a.Skills,
-		Names:  a.names,
-	}
-	return set.Find(name)
+	return a.defs.Skill(name)
 }
 
 // withSkills returns text with the body of each named skill after it.
@@ -96,12 +96,23 @@ func skillHeading(name string) string {
 	return "## Skill: " + name + "\n\n"
 }
 
-// agentTool reports if the assembly gives the model the agent tool.
+// agentTool reports if the agent tool binds to the assembly.
 func (a *Assembly) agentTool() bool {
 	return len(a.Agents) > 0 && a.h.child == nil
 }
 
-// assemble reads the readers of h, and fills in an
+// hasTool reports if the assembly has a tool with the name, deferred or
+// not.
+func (a *Assembly) hasTool(name string) bool {
+	for _, t := range a.tools {
+		if t.Info().Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// assemble loads the definitions of h, reads its tools, and fills in an
 // Assembly for the spec of h. id is the ID of the session, or "".
 func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 	model, err := h.model()
@@ -112,36 +123,32 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 	if err != nil {
 		return nil, err
 	}
-	instructions, err := readInstructions(ctx, h.instructions)
+	set, err := def.Layers(h.defs, h.cfg.Defs).Load(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("harness: %w", err)
+	}
+	// A subagent gets no agents of its parent.
+	if h.child != nil {
+		set.Agents = nil
 	}
 
 	asm := &Assembly{
-		Spec:         h.spec,
+		Spec:         h.cfg.Spec,
 		Model:        model,
 		System:       h.system,
-		Instructions: instructions,
+		Instructions: set.Instructions,
+		Skills:       set.Skills,
+		Agents:       set.Agents,
 		Dir:          dir,
 		h:            h,
 		sessionID:    id,
+		defs:         set,
+		names:        set.SkillNames(),
 	}
-	// A subagent gets no agents of its parent.
-	agents := h.agents
-	if h.child != nil {
-		agents = nil
-	}
-	set, err := def.Resolve(ctx, h.skills, agents)
-	if err != nil {
-		return nil, err
-	}
-	asm.Skills = set.Skills
-	asm.names = set.Names
-	asm.Agents = set.Agents
 	if h.child == nil {
 		// A subagent preloads the skills of its file, in childSystem,
 		// and not the skills of its parent.
-		asm.System, err = asm.withSkills(asm.System, h.preload)
+		asm.System, err = asm.withSkills(asm.System, h.cfg.Skills)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +162,7 @@ func (h *Harness) assemble(ctx context.Context, id string) (*Assembly, error) {
 			asm.Tools = append(asm.Tools, info)
 		}
 	}
-	if err := h.policy.Validate(); err != nil {
+	if err := h.policy(dir).Validate(); err != nil {
 		return nil, fmt.Errorf("harness: %w", err)
 	}
 	return asm, nil
@@ -166,47 +173,35 @@ func (h *Harness) model() (ai.Model, error) {
 	if h.cat == nil {
 		return ai.Model{}, errors.New("harness: no catalog; give one with Catalog")
 	}
-	if h.spec == "" {
-		return ai.Model{}, errors.New("harness: no model; give a spec with Model")
+	if h.cfg.Spec == "" {
+		return ai.Model{}, errors.New("harness: no model; give a Spec in the config")
 	}
-	model, err := h.cat.Model(h.spec)
+	model, err := h.cat.Model(h.cfg.Spec)
 	if err != nil {
-		return ai.Model{}, fmt.Errorf("harness: model %q: %w", h.spec, err)
+		return ai.Model{}, fmt.Errorf("harness: model %q: %w", h.cfg.Spec, err)
 	}
 	return model, nil
 }
 
-// workDir returns the absolute path of [Dir], or the working directory.
+// workDir returns the absolute path of the Dir of the config, or the
+// working directory.
 func (h *Harness) workDir() (string, error) {
-	if h.dir == "" {
+	if h.cfg.Dir == "" {
 		return os.Getwd()
 	}
-	return filepath.Abs(h.dir)
-}
-
-// readInstructions reads each instructions reader in order. An error of
-// a reader fails the assembly.
-func readInstructions(ctx context.Context, readers []def.InstructionsReader) ([]def.Instruction, error) {
-	var out []def.Instruction
-	for i, r := range readers {
-		texts, err := r.ReadInstructions(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("harness: instructions reader %d (%T): %w", i, r, err)
-		}
-		out = append(out, texts...)
-	}
-	return out, nil
+	return filepath.Abs(h.cfg.Dir)
 }
 
 // readTools returns the tools of the assembly: the tools of each reader
-// of [Toolset] in order, each bound to the assembly. In a child
-// assembly, it keeps only the tools of the subagent. With [Only], it
-// keeps only the named tools.
+// of [Toolset] in order, the Tools of the config, and the MCP tools,
+// each bound to the assembly. In a child assembly, it keeps only the
+// tools of the subagent. With the ToolNames of the config, it keeps
+// only the named tools.
 //
 // It picks the tools by name before it binds them. A name of the list
-// then passes [Only] also when its tool binds to nothing, such as the
-// skill tool in a folder with no skill, and a tool that Only leaves out
-// makes no sandbox.
+// then passes ToolNames also when its tool binds to nothing, such as
+// the skill tool in a folder with no skill, and a tool that ToolNames
+// leaves out makes no sandbox.
 func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
 	var read []tool.Tool
 	for i, r := range a.h.tools {
@@ -216,6 +211,8 @@ func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
 		}
 		read = append(read, tools...)
 	}
+	read = append(read, a.h.cfg.Tools...)
+	read = append(read, a.h.mcpTools...)
 	read, err := a.pick(read)
 	if err != nil {
 		return nil, err
@@ -230,32 +227,34 @@ func (a *Assembly) readTools(ctx context.Context) ([]tool.Tool, error) {
 	return out, nil
 }
 
-// pick returns the tools of tools that [Only] keeps, without each tool
-// that a [Deny] rule with no content names, and in a child assembly
-// the tools of the subagent. A name of Only or of the file of the
-// subagent that names no tool fails with [tool.ErrUnknownTool], so a
-// typo does not remove a tool silently. A child narrows the names of
-// Only with no check: the start of its parent checked them, and the
-// file of the subagent removes some of them, such as the agent tool.
+// pick returns the tools of tools that the ToolNames of the config
+// keeps, without each tool that a Deny rule with no content names, and
+// in a child assembly the tools of the subagent. A name of ToolNames or
+// of the file of the subagent that names no tool fails with
+// [tool.ErrUnknownTool], so a typo does not remove a tool silently. A
+// child narrows the names of ToolNames with no check: the start of its
+// parent checked them, and the file of the subagent removes some of
+// them, such as the agent tool.
 func (a *Assembly) pick(tools []tool.Tool) ([]tool.Tool, error) {
+	only := a.h.cfg.ToolNames
 	if c := a.h.child; c != nil {
 		if _, err := tool.Select(tools, c.sub.Tools); err != nil {
 			return nil, fmt.Errorf("harness: subagent %q: %w", c.sub.Name, err)
 		}
 		tools = keepTools(tools, c.sub)
-		if a.h.only != nil {
-			tools = keepTools(tools, def.Agent{Tools: a.h.only})
+		if only != nil {
+			tools = keepTools(tools, def.Agent{Tools: only})
 		}
-		return withoutDenied(tools, a.h.policy.Deny), nil
+		return withoutDenied(tools, a.h.cfg.Deny), nil
 	}
-	if a.h.only != nil {
-		kept, err := tool.Select(tools, a.h.only)
+	if only != nil {
+		kept, err := tool.Select(tools, only)
 		if err != nil {
 			return nil, fmt.Errorf("harness: %w", err)
 		}
 		tools = kept
 	}
-	return withoutDenied(tools, a.h.policy.Deny), nil
+	return withoutDenied(tools, a.h.cfg.Deny), nil
 }
 
 // withoutDenied returns the tools without each tool that a deny rule
@@ -263,12 +262,7 @@ func (a *Assembly) pick(tools []tool.Tool) ([]tool.Tool, error) {
 // content, such as "bash(git push *)", keeps the tool, and the policy
 // denies the calls that the rule matches.
 func withoutDenied(tools []tool.Tool, rules []string) []tool.Tool {
-	var whole []string
-	for _, r := range rules {
-		if _, content := tool.SplitRule(r); content == "" {
-			whole = append(whole, r)
-		}
-	}
+	whole := tool.WholeTools(rules)
 	if len(whole) == 0 {
 		return tools
 	}
@@ -291,10 +285,11 @@ func uniqueNames(tools []tool.Tool) error {
 
 // prepare resolves the language model. It returns the agent options in
 // the order that the harness promises: the permission hook, the hook
-// that loads the skill of a slash call, the agent options of the
-// baseline and of the call, then the prompt and the tools. The agent builds the prompt before each model call, through
-// [agent.System]: the section of [Assembly.System], the sections of the
-// prompt builder, then the sections of [Sections].
+// that loads the skill of a slash call, the options of [AgentDefaults],
+// the options of the config, then the prompt and the tools. The agent
+// builds the prompt before each model call, through [agent.System]: the
+// section of [Assembly.System], the sections of the prompt builder,
+// then the sections of the config.
 func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 	lm, err := a.h.cat.LanguageModel(a.Spec)
 	if err != nil {
@@ -313,47 +308,37 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 		if a.System != "" {
 			built = append([]ai.Section{{Name: SystemSection, Text: a.System}}, built...)
 		}
-		if a.h.sections == nil {
+		sections := a.h.cfg.Sections
+		if sections == nil {
 			return built, nil
 		}
-		more, err := a.h.sections(ctx)
+		more, err := sections(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("harness: build the prompt: %w", err)
 		}
 		return append(built, more...), nil
 	}
 
-	policy := a.h.policy
-	policy.Dir = a.Dir
-	policy.Roots = append([]string{a.Dir}, a.h.addDirs...)
+	approve := a.h.cfg.Approve
 	opts := []agent.Option{
-		agent.Hooks(policy.Hook()),
-		agent.Approve(policy.Approve),
+		agent.Hooks(policyHook(a.h.policy(a.Dir), approve)),
+		agent.Approve(approve),
 		// The first option, so [AgentDefaults] can replace it.
 		agent.Compaction(compact.Summarize()),
 	}
 	if a.h.child != nil && a.h.child.sub.MaxTurns > 0 {
-		opts = append(opts, maxTurns(a.h.child.sub.MaxTurns))
+		opts = append(opts, agent.Hooks(agent.MaxTurns(a.h.child.sub.MaxTurns)))
 	}
 	// Only a user writes the input of a parent. A subagent gets the
 	// text of the model, and the model cannot load a skill this way.
 	if a.h.child == nil && len(a.Skills) > 0 {
-		opts = append(opts, a.slashSkills())
+		opts = append(opts, agent.Hooks(a.slashSkills()))
 	}
 	opts = append(opts, a.h.agentOpts...)
+	opts = append(opts, configOptions(a.h.cfg)...)
 	opts = append(opts, agent.System(system))
 	opts = append(opts, agent.Toolset(a.tools...))
 	return lm, opts, nil
-}
-
-// maxTurns returns a hook that fails a run after n turns.
-func maxTurns(n int) agent.Option {
-	return agent.BeforeCall(func(_ context.Context, s agent.State, r agent.Request) (agent.Request, error) {
-		if s.Turn() > n {
-			return r, fmt.Errorf("harness: the subagent used more than %d turns", n)
-		}
-		return r, nil
-	})
 }
 
 // seed appends the entries of the seeders to log if log has no

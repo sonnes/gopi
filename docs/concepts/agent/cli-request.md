@@ -29,12 +29,13 @@ flowchart LR
 - Codex cannot change the input of an action or send a reason to the model, so the Codex agent declines a changed input and drops the reason.
 - Neither agent keeps a rule for an `Always` decision, and neither CLI gets one. A CLI matches a rule in its own way, so the caller keeps the grant with the rules of gopi.
 - Neither CLI sends the type of a safety check. Each agent marks a safety check with the protected paths of gopi, so a rule or a grant cannot allow it.
-- A gopi hook that returns `agent.Ask` asks a person. The Claude Code agent answers the hook with "ask", so the CLI sends its permission prompt, which has no time limit. The Codex agent waits in its hook for the approve function.
+- A gopi hook that returns `agent.Ask` asks a person. Each agent asks its approve function inside the hook, as the loop does, so an ask gets the same answer on each driver. A CLI runs the call when a hook times out, so each agent gives the PreToolUse hook a time limit that is longer than a person takes to answer.
 - The Codex approve function runs in its own goroutine, so the reader goes on while a caller decides.
 - Claude Code calls the gopi hooks over the control protocol. The agent registers one callback for each hook event in `initialize`, so the CLI runs no command and needs no trust for a hook.
 - Codex has no hook callback over its protocol, so the agent adds a command hook to the thread through the config of `thread/start`, with the hook trust bypassed.
 - If `gopi hook` fails or times out, Codex runs the tool. So the agent finds the command before it starts the process, and a run with hooks fails if the command is missing. If the command cannot reach the agent, it fails closed: a deny, an error output, or the end of the turn.
 - A hook of a CLI agent gives text entries only, because a CLI takes only text context from a hook. A CLI has no hook at a model call, so its driver rejects `BeforeCall` and `AfterCall`.
+- Each agent maps a hook point to the hook events of its CLI in one map. The two agents share the wire of a hook event and the BeforeStop answer, because both CLIs send the same input and read the same answer.
 
 ## Map
 
@@ -44,6 +45,7 @@ flowchart LR
 | Change how Claude Code calls a hook        | `pkg/agent/claude/hooks.go`   |
 | Change the Codex handshake or a request    | `pkg/agent/codex/conn.go`     |
 | Change how Codex calls a hook              | `pkg/agent/codex/hooks.go`    |
+| Change the hook wire that both CLIs read   | `pkg/agent/internal/clihook/clihook.go` |
 | Change the relay of `gopi hook`            | `cmd/gopi/hook.go`            |
 
 ## Related Concepts
@@ -51,4 +53,4 @@ flowchart LR
 - [CLI Agent](cli-agent.md)
 - [Driver](driver.md)
 - [Loop](loop.md)
-- [Permission](../harness/permission.md)
+- [Permission](../permission/permission.md)

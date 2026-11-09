@@ -4,9 +4,8 @@
 // that run.
 //
 // A [Model] is metadata. A provider holds the credentials and implements
-// [TextProvider], [ObjectProvider], [ImageProvider], [SpeechProvider], or
-// [TokenCounter]. A binding such as [LanguageModel] pairs a model with a
-// provider.
+// [TextProvider], [ObjectProvider], [ImageProvider], or [TokenCounter].
+// A binding such as [LanguageModel] pairs a model with a provider.
 //
 // A caller must obey these rules:
 //

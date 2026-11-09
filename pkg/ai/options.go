@@ -76,9 +76,9 @@ func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 			return v.value.(T), true
 		}
 	case set:
-		for i := len(v) - 1; i >= 0; i-- {
-			if v[i].key == probe.key {
-				return v[i].value.(T), true
+		for _, v0 := range slices.Backward(v) {
+			if v0.key == probe.key {
+				return v0.value.(T), true
 			}
 		}
 	}
@@ -102,6 +102,19 @@ const (
 // uses [Model.MaxTokens], then its own default.
 var MaxTokens = NewOption[int]()
 
+// MaxTokensOf returns the output cap of a call to model: [MaxTokens], or
+// else [Model.MaxTokens]. The bool is false if neither is set, and the
+// provider then uses its own default.
+func MaxTokensOf(model Model, opts Options) (int, bool) {
+	if n, ok := GetOption(opts, MaxTokens); ok {
+		return n, true
+	}
+	if model.MaxTokens > 0 {
+		return model.MaxTokens, true
+	}
+	return 0, false
+}
+
 // thinkingLevels lists each thinking level, from off to the most.
 var thinkingLevels = []ThinkingLevel{
 	ThinkingOff,
@@ -110,6 +123,12 @@ var thinkingLevels = []ThinkingLevel{
 	ThinkingHigh,
 	ThinkingXHigh,
 	ThinkingMax,
+}
+
+// ThinkingLevels returns each thinking level, from off to the most. A
+// provider lists the levels of a model in this order.
+func ThinkingLevels() []ThinkingLevel {
+	return slices.Clone(thinkingLevels)
 }
 
 // ParseThinking returns the thinking level that s names. A name that is
@@ -122,10 +141,37 @@ func ParseThinking(s string) (ThinkingLevel, error) {
 	return level, nil
 }
 
+// effortNone is the effort of [ThinkingOff] in the APIs that name an
+// effort.
+const effortNone = "none"
+
+// Effort returns the reasoning effort of the level in the words of the
+// OpenAI APIs and OpenRouter: the name of the level, or "none" for
+// [ThinkingOff].
+func (l ThinkingLevel) Effort() string {
+	if l == ThinkingOff {
+		return effortNone
+	}
+	return string(l)
+}
+
 // Thinking sets the thinking level. If it is unset, a provider uses the
 // default of the model. A provider package names each model that gets
 // another default from the provider.
 var Thinking = NewOption[ThinkingLevel]()
+
+// ThinkingOf returns the [Thinking] option. The bool is false if it is
+// unset. A value that is not a level is an error.
+func ThinkingOf(opts Options) (ThinkingLevel, bool, error) {
+	level, ok := GetOption(opts, Thinking)
+	if !ok {
+		return "", false, nil
+	}
+	if _, err := ParseThinking(string(level)); err != nil {
+		return "", false, err
+	}
+	return level, true, nil
+}
 
 // SystemPrompt sets the system prompt of a call to blocks, in order. A
 // [Text] block is plain text. A [Section] block is a named part of the
@@ -136,6 +182,22 @@ var Thinking = NewOption[ThinkingLevel]()
 // messages are the only input that every call has. A [SystemMessage]
 // adds to the prompt from its place in the messages.
 var SystemPrompt = NewOption[[]Content]()
+
+// SystemPromptOf returns the text of each [Text] and [Section] block of
+// the [SystemPrompt] option, in order. It skips every other block.
+func SystemPromptOf(opts Options) []string {
+	blocks, _ := GetOption(opts, SystemPrompt)
+	var texts []string
+	for _, c := range blocks {
+		switch v := c.(type) {
+		case Text:
+			texts = append(texts, v.Text)
+		case Section:
+			texts = append(texts, v.Text)
+		}
+	}
+	return texts
+}
 
 // Tools sets the tools that the model can call at the start of the
 // messages. A system message changes them from its place, with
@@ -193,18 +255,42 @@ var (
 	ToolChoiceNone = ToolChoiceMode{Type: "none"}
 )
 
+// toolChoiceNamed is the type of a choice that names one tool.
+const toolChoiceNamed = "tool"
+
 // ToolChoiceTool makes the model call the tool with name.
 func ToolChoiceTool(name string) ToolChoiceMode {
 	return ToolChoiceMode{
-		Type: "tool",
+		Type: toolChoiceNamed,
 		Name: name,
 	}
+}
+
+// Named reports if c makes the model call the one tool that it names.
+func (c ToolChoiceMode) Named() bool {
+	return c.Type == toolChoiceNamed
 }
 
 // ToolChoice sets the tool choice of a call. If it is unset, the model
 // decides. Some models reject a forced tool, and a provider does not
 // check.
 var ToolChoice = NewOption[ToolChoiceMode]()
+
+// ToolChoiceOf returns the [ToolChoice] option. The bool is false if it
+// is unset. A type other than auto, any, none, and tool is an error, so
+// a provider maps only the known types.
+func ToolChoiceOf(opts Options) (ToolChoiceMode, bool, error) {
+	c, ok := GetOption(opts, ToolChoice)
+	if !ok {
+		return ToolChoiceMode{}, false, nil
+	}
+	switch c.Type {
+	case ToolChoiceAuto.Type, ToolChoiceAny.Type, ToolChoiceNone.Type, toolChoiceNamed:
+		return c, true, nil
+	default:
+		return ToolChoiceMode{}, false, fmt.Errorf("ai: unknown tool choice %q", c.Type)
+	}
+}
 
 // Retention is how long a provider keeps the cached prefix of a call.
 type Retention string
@@ -222,3 +308,12 @@ const (
 // CacheRetention sets how long a provider keeps the cached prefix. If it
 // is unset, a provider uses [CacheShort].
 var CacheRetention = NewOption[Retention]()
+
+// RetentionOf returns the [CacheRetention] option, or [CacheShort] if it
+// is unset.
+func RetentionOf(opts Options) Retention {
+	if r, ok := GetOption(opts, CacheRetention); ok {
+		return r
+	}
+	return CacheShort
+}

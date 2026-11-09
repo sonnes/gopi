@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/sonnes/gopi/pkg/agent"
 )
@@ -43,10 +44,31 @@ func Command(ctx context.Context, binary string, env []string, args ...string) (
 // as "2.1.308" in "2.1.308 (Claude Code)" or "0.163.0" in
 // "codex-cli 0.163.0". It returns "" if no word starts with a digit.
 func Version(out []byte) string {
-	for _, word := range strings.Fields(string(out)) {
+	for word := range strings.FieldsSeq(string(out)) {
 		if unicode.IsDigit(rune(word[0])) {
 			return word
 		}
 	}
 	return ""
+}
+
+// CheckErr returns the error of a check command of the CLI named cli,
+// with the end of its stderr.
+func CheckErr(cli string, err error, stderr []byte) error {
+	reason := strings.TrimSpace(string(stderr))
+	if reason == "" {
+		return fmt.Errorf("%s: %w", cli, err)
+	}
+	return fmt.Errorf("%s: %w: %s", cli, err, reason)
+}
+
+// PlanName returns the name of a plan for a person, such as
+// "Claude Max" for the brand "Claude" and the plan "max". It returns ""
+// for no plan.
+func PlanName(brand, plan string) string {
+	if plan == "" {
+		return ""
+	}
+	first, size := utf8.DecodeRuneInString(plan)
+	return brand + " " + string(unicode.ToUpper(first)) + plan[size:]
 }

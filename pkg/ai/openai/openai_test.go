@@ -3,17 +3,15 @@ package openai_test
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httprr"
 	"github.com/sonnes/gopi/internal/modelstest"
+	"github.com/sonnes/gopi/internal/providertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/tool"
@@ -32,91 +30,38 @@ var testModel = ai.Model{
 // luna is GPT-6 Luna with the limits and the prices of models.json.
 var luna = modelstest.Model("openai", "gpt-6-luna")
 
-// canonicalHost is the host in every fixture. The scrubber replaces the
-// host and the path prefix of a recording, so a replay does not depend
-// on the base URL that the recording used.
+// canonicalHost is the host in every fixture.
 const canonicalHost = "api.openai.com"
 
 type weatherInput struct {
 	City string `json:"city" jsonschema:"The city name"`
 }
 
-type person struct {
-	Name string `json:"name" jsonschema:"The name of the person"`
-	Age  int    `json:"age" jsonschema:"The age of the person"`
-	City string `json:"city" jsonschema:"The city where the person lives"`
-}
-
 var weatherTool = tool.New("get_weather", func(_ context.Context, in weatherInput) (string, error) {
 	return "Sunny, 22C in " + in.City, nil
 }, tool.Description("Get the current weather in a city"))
 
-// scrubRequest removes the secrets and the headers that change between
-// runs, so a replay matches a recording.
-func scrubRequest(req *http.Request) error {
-	req.URL.Host = canonicalHost
-	req.Host = canonicalHost
-	if i := strings.Index(req.URL.Path, "/v1/"); i > 0 {
-		req.URL.Path = req.URL.Path[i:]
-	}
-	req.Header.Del("Authorization")
-	req.Header.Del("Accept")
-	req.Header.Del("OpenAI-Organization")
-	req.Header.Del("OpenAI-Project")
-	for key := range req.Header {
-		if strings.HasPrefix(key, "X-Stainless-") {
-			req.Header.Del(key)
-		}
-	}
-	req.Header.Set("User-Agent", "Go-http-client/1.1")
-	return nil
+// recordFrom is the API that a test records from: the API of
+// OPENAI_BASE_URL, OpenAI by default. Without OPENAI_API_KEY, the test
+// records from OpenRouter.
+var recordFrom = providertest.Server{
+	KeyEnv:  "OPENAI_API_KEY",
+	BaseURL: os.Getenv("OPENAI_BASE_URL"),
+	Fallback: &providertest.Server{
+		KeyEnv:  "OPENROUTER_API_KEY",
+		BaseURL: "https://openrouter.ai/api/v1",
+	},
 }
 
 // newTestProvider returns a provider that replays the fixture of the
-// test. If -httprecord matches, it records against a real API and needs
-// OPENAI_API_KEY. OPENAI_BASE_URL selects the API to record from. A
-// test with no fixture is skipped.
-// openRouterURL is the base URL of the APIs of OpenRouter.
-const openRouterURL = "https://openrouter.ai/api/v1"
-
-// recordFrom returns the key and the base URL to record from. It uses
-// OPENAI_API_KEY and OPENAI_BASE_URL if the key is set. Else it uses
-// OPENROUTER_API_KEY and OpenRouter.
-func recordFrom() (apiKey, baseURL string) {
-	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
-		return key, os.Getenv("OPENAI_BASE_URL")
-	}
-	return os.Getenv("OPENROUTER_API_KEY"), openRouterURL
-}
-
+// test.
 func newTestProvider(t *testing.T) *openai.Provider {
 	t.Helper()
-
-	trace := filepath.Join("testdata", strings.ReplaceAll(t.Name(), "/", "_")+".httprr")
-
-	recording, err := httprr.Recording(trace)
-	require.NoError(t, err)
-
-	apiKey := "fake-api-key"
-	var baseURL string
-	if recording {
-		apiKey, baseURL = recordFrom()
-		if apiKey == "" {
-			t.Skip("neither OPENAI_API_KEY nor OPENROUTER_API_KEY is set")
-		}
-	} else if _, err := os.Stat(trace); os.IsNotExist(err) {
-		t.Skipf("fixture %s not found; run make record PKG=openai", trace)
-	}
-
-	rr, err := httprr.Open(trace, http.DefaultTransport)
-	require.NoError(t, err)
-	rr.ScrubReq(scrubRequest)
-	t.Cleanup(func() { _ = rr.Close() })
-
+	r := providertest.Open(t, recordFrom, canonicalHost)
 	return openai.New(
-		openai.APIKey(apiKey),
-		openai.BaseURL(baseURL),
-		openai.HTTPClient(rr.Client()),
+		openai.APIKey(r.APIKey),
+		openai.BaseURL(r.BaseURL),
+		openai.HTTPClient(r.Client),
 	)
 }
 
@@ -125,7 +70,7 @@ func newTestProvider(t *testing.T) *openai.Provider {
 func skipOnCompatibleAPI(t *testing.T) {
 	t.Helper()
 
-	_, baseURL := recordFrom()
+	baseURL := recordFrom.Resolve().BaseURL
 	if baseURL != "" && !strings.Contains(baseURL, canonicalHost) {
 		t.Skip("the endpoint exists only on api.openai.com")
 	}
@@ -327,24 +272,6 @@ func TestCacheReadUsage(t *testing.T) {
 
 	cached := first.Usage.CacheRead + first.Usage.CacheWrite + second.Usage.CacheRead
 	assert.NotZero(t, cached)
-}
-
-func TestGenerateObject(t *testing.T) {
-	p := newTestProvider(t)
-	lm := ai.LanguageModel{Model: testModel, Provider: p}
-
-	res, err := ai.GenerateObject[person](
-		t.Context(),
-		lm,
-		[]ai.Message{ai.UserMessage("Describe Alice, who is 30 and lives in Lisbon.")},
-		ai.Thinking(ai.ThinkingOff),
-	)
-	require.NoError(t, err)
-
-	assert.Equal(t, "Alice", res.Object.Name)
-	assert.Equal(t, 30, res.Object.Age)
-	assert.Equal(t, "Lisbon", res.Object.City)
-	assert.NotZero(t, res.Usage.Output)
 }
 
 func TestCountTokens(t *testing.T) {

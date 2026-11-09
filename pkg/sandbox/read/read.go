@@ -3,26 +3,20 @@
 package read
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/host"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
 const (
-	// maxLines is the largest number of lines that one read returns.
-	maxLines = 2000
-	// maxBytes is the largest number of bytes of text that one read
-	// returns.
-	maxBytes = 50 * 1024
 	// maxImageBytes is the size of the largest image that the tool
 	// returns. A provider rejects a larger image, and the image then
 	// stays in the history of the run.
@@ -31,13 +25,9 @@ const (
 	maxPDFBytes = 32 * 1024 * 1024
 	// maxFileBytes is the size of the largest file that the tool reads.
 	// The tool reads the whole file into memory, but one read returns
-	// at most maxBytes of it. For a larger file, such as a log, the
-	// model reads a part with bash.
+	// at most [output.MaxBytes] of it. For a larger file, such as a log,
+	// the model reads a part with bash.
 	maxFileBytes = 64 * 1024 * 1024
-	// sniffLength is the number of bytes at the start of a file that
-	// the tool reads to find its type. A text file has no NUL byte in
-	// them. git uses the same test.
-	sniffLength = 8000
 )
 
 // mediaLimits are the file types that the tool returns as an
@@ -66,7 +56,7 @@ const Name = tool.ReadFile
 var description string
 
 // New returns the read_file tool on box. For text, the tool returns at
-// most maxLines lines and maxBytes bytes, with a note that gives the
+// most [output.MaxLines] lines and [output.MaxBytes] bytes, with a note that gives the
 // offset of the next read. It finds an image or a PDF by its content,
 // not by its name, and returns it as an [ai.File]. The text has no line
 // numbers, so the model copies text into edit_file without a prefix to
@@ -89,12 +79,11 @@ func (t *reader) run(ctx context.Context, in readInput) (ai.ToolResult, error) {
 		return ai.ToolResult{}, err
 	}
 
-	head := data[:min(len(data), sniffLength)]
-	mediaType := http.DetectContentType(head)
+	mediaType := http.DetectContentType(data)
 	if limit, ok := mediaLimits[mediaType]; ok {
 		return media(data, mediaType, limit)
 	}
-	if bytes.IndexByte(head, 0) >= 0 {
+	if output.IsBinary(data) {
 		return ai.ToolResult{}, fmt.Errorf("%s is a binary file: %s reads text, images, and PDF files", in.Path, Name)
 	}
 
@@ -106,30 +95,24 @@ func (t *reader) run(ctx context.Context, in readInput) (ai.ToolResult, error) {
 }
 
 // checkSize returns an error for a file over maxFileBytes in a
-// sandbox with host paths. It reads the size before the file. The
-// interface of a remote sandbox has no stat, so a remote file has no
-// check.
+// sandbox that gives the size of a file, before the tool reads the
+// file.
 func (t *reader) checkSize(path string) error {
-	hp, ok := t.box.(host.Pather)
+	sizer, ok := t.box.(host.Sizer)
 	if !ok {
 		return nil
 	}
-	hostPath, err := hp.HostPath(path)
+	size, err := sizer.FileSize(path)
 	if err != nil {
 		return err
 	}
-	info, err := os.Stat(hostPath)
-	if err != nil {
-		// ReadFile returns the same error, with the path of the model.
-		return nil
-	}
-	if info.Size() > maxFileBytes {
+	if size > maxFileBytes {
 		return fmt.Errorf(
 			"%s is too large: %d bytes, and the limit is %d. Read a part of it with bash, for example sed -n '1,100p' %s",
 			path,
-			info.Size(),
+			size,
 			maxFileBytes,
-			shellQuote(path),
+			output.Quote(path),
 		)
 	}
 	return nil
@@ -150,8 +133,8 @@ func media(data []byte, mediaType string, limit int) (ai.ToolResult, error) {
 }
 
 // readText returns the lines of text from the offset of in. It stops at
-// the limit of in, at maxLines, or at maxBytes, and then adds a note
-// with the offset of the next read.
+// the limit of in, at [output.MaxLines], or at [output.MaxBytes], and
+// then adds a note with the offset of the next read.
 func readText(in readInput, text string) (string, error) {
 	if text == "" {
 		return "(empty file)", nil
@@ -174,14 +157,14 @@ func readText(in readInput, text string) (string, error) {
 		end = min(start+*in.Limit, total)
 	}
 
-	if len(lines[start]) > maxBytes {
+	if len(lines[start]) > output.MaxBytes {
 		return fmt.Sprintf(
 			"[Line %d is %d bytes, over the 50KB limit. Use bash: sed -n '%dp' %s | head -c %d. The next line is offset %d.]",
 			start+1,
 			len(lines[start]),
 			start+1,
-			shellQuote(in.Path),
-			maxBytes,
+			output.Quote(in.Path),
+			output.MaxBytes,
 			start+2,
 		), nil
 	}
@@ -202,19 +185,20 @@ func readText(in readInput, text string) (string, error) {
 	}
 }
 
-// fit returns the first lines that fit in maxLines and maxBytes, with
-// a newline between two lines. byBytes is true if maxBytes stopped it.
+// fit returns the first lines that fit in [output.MaxLines] and
+// [output.MaxBytes], with a newline between two lines. byBytes is true
+// if MaxBytes stopped it.
 func fit(lines []string) (shown []string, byBytes bool) {
 	size := 0
 	for i, line := range lines {
-		if i == maxLines {
+		if i == output.MaxLines {
 			return lines[:i], false
 		}
 		size += len(line)
 		if i > 0 {
 			size++
 		}
-		if size > maxBytes {
+		if size > output.MaxBytes {
 			return lines[:i], true
 		}
 	}
@@ -224,10 +208,4 @@ func fit(lines []string) (shown []string, byBytes bool) {
 // textResult returns text as a result.
 func textResult(text string) ai.ToolResult {
 	return ai.ToolResult{Content: []ai.Content{ai.Text{Text: text}}}
-}
-
-// shellQuote makes s one word for a POSIX shell, for a command that an
-// error suggests.
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

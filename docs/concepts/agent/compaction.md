@@ -43,7 +43,7 @@ flowchart TD
 - A strategy uses the prefix of the agent by default, so its call reads the prompt cache. The edit still breaks the prefix from the earliest edit, and the next call writes the cache from there.
 - A custom model reads serialized text and no cache, because a prefix belongs to one model.
 - A driver of a CLI ignores the strategy, because the CLI compacts its own session. The driver reads the compaction from the output of the CLI, and the log stores the entry with no edits, the trigger, and the sizes or the summary that the CLI gives.
-- `agent.ManualCompactor` starts a compaction on each driver: `/compact` for Claude Code, `thread/compact/start` for Codex, and the strategy for the harness. Codex takes no instructions, so its driver ignores them.
+- `Runner.Compact` starts a compaction on each driver: `/compact` for Claude Code, `thread/compact/start` for Codex, and the strategy for the harness. Codex takes no instructions, so its driver ignores them.
 - `Config.AutoCompact` gives each driver one size: `--autocompact` for Claude Code, `model_auto_compact_token_limit` for Codex, and the limit of `Summarize` for the harness. A strategy of `Config.Compaction` wins on the harness.
 - A compaction of a CLI can drop a change of the sections, so the next run sends each section again.
 - The user message rules of the `Summarize` prompt come from Claude Code.

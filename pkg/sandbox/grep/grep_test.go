@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/tooltest"
 )
 
@@ -249,4 +250,19 @@ func TestGrepSkipsABinaryFile(t *testing.T) {
 			assert.NotContains(t, got, "b.bin:1")
 		})
 	}
+}
+
+func TestGrepWalkSkipsAFileOverTheSizeLimit(t *testing.T) {
+	dir := t.TempDir()
+	text := "Hello\n" + strings.Repeat("x", output.SniffLength) + "\n"
+	tooltest.WriteFiles(t, dir, map[string]string{"a.txt": "Hello\n", "big.txt": text})
+	// The file is sparse, so the test writes little to the disk. Its end
+	// is NUL bytes, after the bytes that the binary check reads.
+	require.NoError(t, os.Truncate(filepath.Join(dir, "big.txt"), maxWalkFileBytes+1))
+
+	box := tooltest.SearchBoxes(t, dir)["walk"]
+	got, isErr := tooltest.Call(t, New(box), map[string]any{"pattern": "Hello"})
+
+	require.False(t, isErr, got)
+	assert.Equal(t, "a.txt:1:Hello", got)
 }

@@ -103,6 +103,7 @@ func Hidden(t *testing.T, dir string) sandbox.Sandbox {
 type hostBox interface {
 	sandbox.Sandbox
 	host.Pather
+	host.Sizer
 }
 
 // noRG is a local sandbox whose shell has no rg. The search tools fall

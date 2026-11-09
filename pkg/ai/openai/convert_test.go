@@ -15,7 +15,9 @@ import (
 func input(t *testing.T, messages []ai.Message) []any {
 	t.Helper()
 
-	data, err := json.Marshal(convertMessages(messages, convertConfig{systemMessages: true, addTools: true}))
+	converted, err := convertMessages(messages, convertConfig{systemMessages: true, addTools: true})
+	require.NoError(t, err)
+	data, err := json.Marshal(converted)
 	require.NoError(t, err)
 
 	var items []any

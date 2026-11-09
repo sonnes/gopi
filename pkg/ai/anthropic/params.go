@@ -47,7 +47,6 @@ type request struct {
 func buildRequest(model ai.Model, messages []ai.Message, opts ai.Options) (request, error) {
 	f := featuresOf(model.ID)
 	cache := cacheMarker(opts)
-	system, _ := ai.GetOption(opts, ai.SystemPrompt)
 	firstTools, _ := ai.GetOption(opts, ai.Tools)
 
 	// The API rejects a tool list where every tool is deferred, so
@@ -60,28 +59,48 @@ func buildRequest(model ai.Model, messages []ai.Message, opts ai.Options) (reque
 		effort:         f.effort,
 		cache:          cache,
 	}
+	converted, err := convertMessages(messages, cfg)
+	if err != nil {
+		return request{}, err
+	}
+	maxTokens, ok := ai.MaxTokensOf(model, opts)
+	if !ok {
+		maxTokens = defaultMaxTokens
+	}
 	req := request{
 		params: sdk.MessageNewParams{
 			Model:     sdk.Model(model.ID),
-			MaxTokens: maxTokens(model, opts),
-			Messages:  convertMessages(messages, cfg),
-			System:    systemPromptBlocks(system, cache),
+			MaxTokens: int64(maxTokens),
+			Messages:  converted,
+			System:    systemPromptBlocks(ai.SystemPromptOf(opts), cache),
 		},
 	}
 
+	tools := firstTools
+	if !nativeTools {
+		tools = transcript.CurrentTools(firstTools, messages)
+	}
+	if len(tools) > 0 {
+		req.params.Tools, err = convertTools(tools)
+		if err != nil {
+			return request{}, err
+		}
+		markLastTool(req.params.Tools, cache)
+	}
 	if nativeTools {
 		// The list never changes. A later tool goes in a tool_addition
 		// block, so the cached prefix stays.
-		req.params.Tools = append(convertTools(firstTools), placeholderTool())
-		markLastTool(req.params.Tools[:len(firstTools)], cache)
+		req.params.Tools = append(req.params.Tools, placeholderTool())
 		req.betas = append(req.betas, inlineToolsBeta)
-	} else if tools := transcript.CurrentTools(firstTools, messages); len(tools) > 0 {
-		req.params.Tools = convertTools(tools)
-		markLastTool(req.params.Tools, cache)
+	}
+
+	level, levelSet, err := ai.ThinkingOf(opts)
+	if err != nil {
+		return request{}, err
 	}
 
 	if f.effort {
-		effort, err := managedEffort(model, opts)
+		effort, err := managedEffort(model, level, levelSet)
 		if err != nil {
 			return req, err
 		}
@@ -93,26 +112,22 @@ func buildRequest(model ai.Model, messages []ai.Message, opts ai.Options) (reque
 		req.params.OutputConfig.Effort = defaultEffort
 		req.params.Messages = append(req.params.Messages, effortMessage(effort))
 		req.betas = append(req.betas, midConversationOutputConfigBeta, thinkingBindingControlsBeta)
-	} else {
-		thinking, effort, err := thinkingConfig(opts)
-		if err != nil {
-			return req, err
-		}
-		req.params.Thinking = thinking
-		req.params.OutputConfig.Effort = effort
+	} else if levelSet {
+		req.params.Thinking, req.params.OutputConfig.Effort = thinkingConfig(level)
 	}
 
-	sendTemperature := !f.noTemperature && !thinkingOn(opts)
+	thinkingOn := levelSet && level != ai.ThinkingOff
+	sendTemperature := !f.noTemperature && !thinkingOn
 	if t, ok := ai.GetOption(opts, ai.Temperature); ok && sendTemperature {
 		req.params.Temperature = param.NewOpt(t)
 	}
 
-	if c, ok := ai.GetOption(opts, ai.ToolChoice); ok {
-		choice, err := toolChoiceParam(c)
-		if err != nil {
-			return req, err
-		}
-		req.params.ToolChoice = choice
+	choice, ok, err := ai.ToolChoiceOf(opts)
+	if err != nil {
+		return request{}, err
+	}
+	if ok {
+		req.params.ToolChoice = toolChoiceParam(choice)
 	}
 
 	return req, nil
@@ -131,9 +146,9 @@ func buildObjectRequest(
 		return req, err
 	}
 
-	schemaMap, err := toMap(schema)
+	schemaMap, err := transcript.Schema(schema)
 	if err != nil {
-		return req, err
+		return req, fmt.Errorf("anthropic: %w", err)
 	}
 	req.params.OutputConfig.Format = sdk.JSONOutputFormatParam{Schema: schemaMap}
 
@@ -175,26 +190,11 @@ func buildCountTokensParams(
 	return params, req.betas, nil
 }
 
-// maxTokens is the option, else the cap of the model, else the default.
-func maxTokens(model ai.Model, opts ai.Options) int64 {
-	if n, ok := ai.GetOption(opts, ai.MaxTokens); ok {
-		return int64(n)
-	}
-	if model.MaxTokens > 0 {
-		return int64(model.MaxTokens)
-	}
-	return defaultMaxTokens
-}
-
 // cacheMarker returns the cache marker of the retention in opts, or nil
 // for [ai.CacheNone]. The short cache sends no TTL, because 5 minutes
 // is the default of the API.
 func cacheMarker(opts ai.Options) *sdk.CacheControlEphemeralParam {
-	retention, ok := ai.GetOption(opts, ai.CacheRetention)
-	if !ok {
-		retention = ai.CacheShort
-	}
-
+	retention := ai.RetentionOf(opts)
 	if retention == ai.CacheNone {
 		return nil
 	}
@@ -205,19 +205,12 @@ func cacheMarker(opts ai.Options) *sdk.CacheControlEphemeralParam {
 	return &marker
 }
 
-// systemPromptBlocks maps the blocks of the [ai.SystemPrompt] option
-// 1:1. Each [ai.Text] and [ai.Section] block is one text block, in
-// order. Every other block type is skipped. The last block carries the
-// cache marker.
-func systemPromptBlocks(system []ai.Content, cache *sdk.CacheControlEphemeralParam) []sdk.TextBlockParam {
+// systemPromptBlocks maps each text of the system prompt to one text
+// block, in order. The last block carries the cache marker.
+func systemPromptBlocks(system []string, cache *sdk.CacheControlEphemeralParam) []sdk.TextBlockParam {
 	var out []sdk.TextBlockParam
-	for _, c := range system {
-		switch v := c.(type) {
-		case ai.Text:
-			out = append(out, sdk.TextBlockParam{Text: v.Text})
-		case ai.Section:
-			out = append(out, sdk.TextBlockParam{Text: v.Text})
-		}
+	for _, text := range system {
+		out = append(out, sdk.TextBlockParam{Text: text})
 	}
 	if n := len(out); n > 0 && cache != nil {
 		out[n-1].CacheControl = *cache
@@ -249,34 +242,15 @@ func placeholderTool() sdk.ToolUnionParam {
 	}}
 }
 
-// thinkingOn reports if the call sets a thinking level other than off.
-func thinkingOn(opts ai.Options) bool {
-	level, ok := ai.GetOption(opts, ai.Thinking)
-	return ok && level != ai.ThinkingOff
-}
-
-// thinkingConfig maps the thinking option to the request. If the option
-// is unset, the request omits the parameter and the model uses its
-// default. Off sends the disabled config. Every other level sends
-// adaptive thinking with the level as the effort. The display is
-// explicit, because the API default omits the thinking text.
-func thinkingConfig(
-	opts ai.Options,
-) (sdk.ThinkingConfigParamUnion, sdk.OutputConfigEffort, error) {
-	level, ok := ai.GetOption(opts, ai.Thinking)
-	if !ok {
-		return sdk.ThinkingConfigParamUnion{}, "", nil
-	}
-
+// thinkingConfig maps a thinking level to the request. Off sends the
+// disabled config. Every other level sends adaptive thinking with the
+// level as the effort. The display is explicit, because the API default
+// omits the thinking text. If the call sets no level, the request omits
+// the parameter and the model uses its default.
+func thinkingConfig(level ai.ThinkingLevel) (sdk.ThinkingConfigParamUnion, sdk.OutputConfigEffort) {
 	if level == ai.ThinkingOff {
 		disabled := sdk.ThinkingConfigParamUnion{OfDisabled: &sdk.ThinkingConfigDisabledParam{}}
-		return disabled, "", nil
-	}
-
-	effort, ok := efforts[level]
-	if !ok {
-		err := fmt.Errorf("anthropic: unknown thinking level %q", level)
-		return sdk.ThinkingConfigParamUnion{}, "", err
+		return disabled, ""
 	}
 
 	adaptive := sdk.ThinkingConfigParamUnion{
@@ -284,26 +258,20 @@ func thinkingConfig(
 			Display: sdk.ThinkingConfigAdaptiveDisplaySummarized,
 		},
 	}
-	return adaptive, effort, nil
+	return adaptive, sdk.OutputConfigEffort(level)
 }
 
 // managedEffort returns the effort of a call to a model that manages
 // its effort. The thinking level sets it, and high is the default. The
 // model always thinks, so off is an error.
-func managedEffort(model ai.Model, opts ai.Options) (string, error) {
-	level, ok := ai.GetOption(opts, ai.Thinking)
-	if !ok {
+func managedEffort(model ai.Model, level ai.ThinkingLevel, set bool) (string, error) {
+	if !set {
 		return defaultEffort, nil
 	}
 	if level == ai.ThinkingOff {
 		return "", fmt.Errorf("anthropic: %s always thinks, so thinking cannot be off", model.ID)
 	}
-
-	effort, ok := efforts[level]
-	if !ok {
-		return "", fmt.Errorf("anthropic: unknown thinking level %q", level)
-	}
-	return string(effort), nil
+	return string(level), nil
 }
 
 // bindingThinking is adaptive thinking with the drop_block control. If
@@ -319,40 +287,33 @@ func bindingThinking() sdk.ThinkingConfigParamUnion {
 	return sdk.ThinkingConfigParamUnion{OfAdaptive: adaptive}
 }
 
-// efforts maps a thinking level to the effort of the API.
-var efforts = map[ai.ThinkingLevel]sdk.OutputConfigEffort{
-	ai.ThinkingLow:    sdk.OutputConfigEffortLow,
-	ai.ThinkingMedium: sdk.OutputConfigEffortMedium,
-	ai.ThinkingHigh:   sdk.OutputConfigEffortHigh,
-	ai.ThinkingXHigh:  sdk.OutputConfigEffortXhigh,
-	ai.ThinkingMax:    sdk.OutputConfigEffortMax,
-}
-
-// toolChoiceParam maps a tool choice to the API. An unknown type is an
-// error.
-func toolChoiceParam(c ai.ToolChoiceMode) (sdk.ToolChoiceUnionParam, error) {
+// toolChoiceParam maps a tool choice that [ai.ToolChoiceOf] returned to
+// the API.
+func toolChoiceParam(c ai.ToolChoiceMode) sdk.ToolChoiceUnionParam {
 	switch c.Type {
 	case ai.ToolChoiceAuto.Type:
-		return sdk.ToolChoiceUnionParam{OfAuto: &sdk.ToolChoiceAutoParam{}}, nil
+		return sdk.ToolChoiceUnionParam{OfAuto: &sdk.ToolChoiceAutoParam{}}
 	case ai.ToolChoiceAny.Type:
-		return sdk.ToolChoiceUnionParam{OfAny: &sdk.ToolChoiceAnyParam{}}, nil
+		return sdk.ToolChoiceUnionParam{OfAny: &sdk.ToolChoiceAnyParam{}}
 	case ai.ToolChoiceNone.Type:
-		return sdk.ToolChoiceUnionParam{OfNone: &sdk.ToolChoiceNoneParam{}}, nil
-	case "tool":
-		return sdk.ToolChoiceParamOfTool(c.Name), nil
+		return sdk.ToolChoiceUnionParam{OfNone: &sdk.ToolChoiceNoneParam{}}
 	default:
-		return sdk.ToolChoiceUnionParam{}, fmt.Errorf("anthropic: unknown tool choice %q", c.Type)
+		return sdk.ToolChoiceParamOfTool(c.Name)
 	}
 }
 
 // convertTools maps each tool to a function tool with eager input
 // streaming, so the input streams as the model writes it.
-func convertTools(tools []ai.ToolInfo) []sdk.ToolUnionParam {
+func convertTools(tools []ai.ToolInfo) ([]sdk.ToolUnionParam, error) {
 	out := make([]sdk.ToolUnionParam, 0, len(tools))
 	for _, t := range tools {
+		schema, err := convertSchema(t.InputSchema)
+		if err != nil {
+			return nil, fmt.Errorf("anthropic: tool %q: %w", t.Name, err)
+		}
 		tool := &sdk.ToolParam{
 			Name:                t.Name,
-			InputSchema:         convertSchema(t.InputSchema),
+			InputSchema:         schema,
 			EagerInputStreaming: param.NewOpt(true),
 		}
 		if t.Description != "" {
@@ -360,18 +321,18 @@ func convertTools(tools []ai.ToolInfo) []sdk.ToolUnionParam {
 		}
 		out = append(out, sdk.ToolUnionParam{OfTool: tool})
 	}
-	return out
+	return out, nil
 }
 
 // convertSchema maps a JSON schema to the input schema param. The param
 // has fields for properties and required. Every other keyword goes in
 // an extra field.
-func convertSchema(schema *jsonschema.Schema) sdk.ToolInputSchemaParam {
+func convertSchema(schema *jsonschema.Schema) (sdk.ToolInputSchemaParam, error) {
 	var out sdk.ToolInputSchemaParam
 
-	m, err := toMap(schema)
-	if err != nil || m == nil {
-		return out
+	m, err := transcript.Schema(schema)
+	if err != nil {
+		return out, err
 	}
 
 	for key, value := range m {
@@ -396,25 +357,7 @@ func convertSchema(schema *jsonschema.Schema) sdk.ToolInputSchemaParam {
 		}
 	}
 
-	return out
-}
-
-// toMap converts a schema to the map shape that the API takes.
-func toMap(schema *jsonschema.Schema) (map[string]any, error) {
-	if schema == nil {
-		return nil, nil
-	}
-
-	data, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("anthropic: encode schema: %w", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("anthropic: decode schema: %w", err)
-	}
-	return m, nil
+	return out, nil
 }
 
 // buildMessage builds the final message from the accumulated response.

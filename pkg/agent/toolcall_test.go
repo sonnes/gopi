@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -112,6 +113,8 @@ func TestRunSkipsToolCallsOfRefusal(t *testing.T) {
 }
 
 // counter is a tool that records the most calls that ran at one time.
+// Each call sleeps, so calls that run in parallel overlap. Run it in a
+// synctest bubble, where the sleep takes no real time.
 type counter struct {
 	running atomic.Int32
 	most    atomic.Int32
@@ -180,26 +183,28 @@ func TestRunToolsInParallel(t *testing.T) {
 }
 
 func TestRunToolsSequential(t *testing.T) {
-	var c counter
-	p := &script{responses: []ai.Message{
-		toolCalls("one", "two", "three"),
-		text("done"),
-	}}
-	a := agent.New(model(p), agent.Toolset(
-		c.tool("one"),
-		c.tool("two", tool.Sequential()),
-		c.tool("three"),
-	))
+	synctest.Test(t, func(t *testing.T) {
+		var c counter
+		p := &script{responses: []ai.Message{
+			toolCalls("one", "two", "three"),
+			text("done"),
+		}}
+		a := agent.New(model(p), agent.Toolset(
+			c.tool("one"),
+			c.tool("two", tool.Sequential()),
+			c.tool("three"),
+		))
 
-	events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
-	require.NoError(t, err)
-	emittest.CheckEvents(t, events)
-	msgs = afterBase(t, msgs)
+		events, msgs, err := collect(t, a.Run(context.Background(), session.Text("hi")))
+		require.NoError(t, err)
+		emittest.CheckEvents(t, events)
+		msgs = afterBase(t, msgs)
 
-	assert.Equal(t, int32(1), c.most.Load(), "a sequential tool runs every call of its message in order")
-	require.Len(t, msgs, 5)
-	assert.Equal(t, "one", msgs[1].Text())
-	assert.Equal(t, "three", msgs[3].Text())
+		assert.Equal(t, int32(1), c.most.Load(), "a sequential tool runs every call of its message in order")
+		require.Len(t, msgs, 5)
+		assert.Equal(t, "one", msgs[1].Text())
+		assert.Equal(t, "three", msgs[3].Text())
+	})
 }
 
 func TestRunToolsCanceledInParallel(t *testing.T) {

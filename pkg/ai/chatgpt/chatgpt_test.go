@@ -2,12 +2,15 @@ package chatgpt_test
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/sonnes/gopi/internal/httpget"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/chatgpt"
 	"github.com/sonnes/gopi/pkg/ai/oauth"
@@ -84,4 +87,20 @@ func TestProvider_ListModels(t *testing.T) {
 			ContextWindow: 400000,
 		},
 	}, models)
+}
+
+func TestProvider_ListModelsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"detail":"expired"}`))
+	}))
+	t.Cleanup(srv.Close)
+	p := chatgpt.New(staticSource("plan-token"), chatgpt.BaseURL(srv.URL))
+
+	_, err := p.ListModels(t.Context())
+
+	require.ErrorContains(t, err, "chatgpt: list models: 401 Unauthorized: ")
+	var status *httpget.StatusError
+	require.ErrorAs(t, err, &status)
+	assert.Equal(t, http.StatusUnauthorized, status.Code)
 }

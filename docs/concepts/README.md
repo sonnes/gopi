@@ -34,6 +34,12 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Tool List](tool/tool-list.md) | How a caller gives the full set of tools of each session, how a config picks a subset, and how each driver reads the list. |
 | [Tool Name](tool/name.md) | How each well-known tool has one gopi name on each driver, and where a Claude Code name becomes a gopi name. |
 
+## permission
+
+| Concept                                 | Description                                                                                                      |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| [Permission](permission/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied. |
+
 ## agent
 
 | Concept                             | Description                                                                                   |
@@ -56,16 +62,15 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 
 | Concept                          | Description                                                                                                  |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| [Definition](def/definition.md)  | How an agent, a skill, and an instruction text reach an agent from any store through one reader interface for each. |
+| [Definition](def/definition.md)  | How an agent, a skill, and an instruction text reach an agent from any store through one source interface. |
 
 ## harness
 
 | Concept                              | Description                                                                                                                     |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the definitions of its readers, and a catalog, on each call.     |
+| [Harness](harness/harness.md)        | How a harness assembles a coding agent from options, the config of a session, its definition sources, and a catalog, on each call.     |
 | [Skill](harness/skill.md)            | How a skill reaches the model on demand through the skill tool, how the system prompt lists the skills, and how two skills with one name both stay. |
 | [Agent Tool](harness/agent-tool.md)    | How the agent tool of the harness runs a subagent in a child session, what the parent model gets back, and how a child resumes.   |
-| [Permission](harness/permission.md)  | How a permission mode and the allow, ask, and deny rules decide if a tool call runs, asks a person, or is denied.                 |
 
 ## host
 
@@ -87,4 +92,4 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | Concept                        | Description                                                                                                      |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | [Sandbox](sandbox/sandbox.md)  | How the file and shell tools reach a directory on this host or a remote machine through one small interface.   |
-| [Fence](sandbox/fence.md)      | How a command runs inside an OS sandbox that limits its writes, its reads, its network, and its environment.   |
+| [Fence](sandbox/fence.md)      | How a command runs inside an OS sandbox that limits its writes, its reads, and its network.   |

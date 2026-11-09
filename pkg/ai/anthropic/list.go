@@ -83,16 +83,3 @@ func effortLevels(effort sdk.EffortCapability) []ai.ThinkingLevel {
 	}
 	return levels
 }
-
-var _ ai.KeyChecker = (*Provider)(nil)
-
-// CheckKey asks the Models API for one model, so a refused key fails
-// and no model runs. The API says nothing more about the key, so the
-// info is zero.
-func (p *Provider) CheckKey(ctx context.Context) (ai.KeyInfo, error) {
-	params := sdk.ModelListParams{Limit: sdk.Int(1)}
-	if _, err := p.client.Models.List(ctx, params); err != nil {
-		return ai.KeyInfo{}, fmt.Errorf("anthropic: check key: %w", err)
-	}
-	return ai.KeyInfo{}, nil
-}

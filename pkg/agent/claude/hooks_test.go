@@ -126,7 +126,7 @@ func TestHookBeforeTool(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
 			var seen []ai.ToolCall
-			a := claude.New(claude.Hooks(toolGuard{seen: &seen, fn: tt.fn}))
+			a := claude.New(agent.Config{Hooks: []agent.Hook{toolGuard{seen: &seen, fn: tt.fn}}})
 			defer closeAgent(t, a)
 
 			_, msgs, err := run(context.Background(), a, "Delete a.txt")
@@ -144,34 +144,53 @@ func TestHookBeforeTool(t *testing.T) {
 }
 
 func TestHookBeforeToolAsks(t *testing.T) {
-	claude.Replay(t, nil, "testdata/hook_pre_tool_ask.trace")
-	var (
-		seen []ai.ToolCall
-		asks []agent.ApprovalRequest
-	)
-	guard := toolGuard{
-		seen: &seen,
-		fn: func(c ai.ToolCall) (ai.ToolCall, error) {
-			return c, agent.Ask("the rule asks")
+	tests := []struct {
+		name     string
+		file     string
+		decision agent.Decision
+		result   string
+		isError  bool
+	}{
+		{
+			name:     "an allow runs the call with no prompt of the CLI",
+			file:     "testdata/hook_pre_tool_ask.trace",
+			decision: agent.Decision{Allow: true},
+		},
+		{
+			name:     "a deny blocks the call with the message",
+			file:     "testdata/hook_pre_tool.trace",
+			decision: agent.Decision{Message: "Do not delete files."},
+			result:   "Do not delete files.",
+			isError:  true,
 		},
 	}
-	a := claude.New(
-		claude.Hooks(guard),
-		claude.Approve(func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-			asks = append(asks, req)
-			return agent.Decision{Allow: true}, nil
-		}),
-	)
-	defer closeAgent(t, a)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			claude.Replay(t, nil, tt.file)
+			var asks []agent.ApprovalRequest
+			guard := agent.BeforeTool(func(_ context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
+				return c, agent.Ask("the rule asks")
+			})
+			a := claude.New(agent.Config{
+				Hooks: []agent.Hook{guard},
+				Approve: func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+					asks = append(asks, req)
+					return tt.decision, nil
+				},
+			})
+			defer closeAgent(t, a)
 
-	_, msgs, err := run(context.Background(), a, "Delete a.txt")
-	require.NoError(t, err, "the hook answers ask, and the prompt of the CLI reaches the approve function")
+			_, msgs, err := run(context.Background(), a, "Delete a.txt")
+			require.NoError(t, err, "the trace matches the answer of the hook")
 
-	require.Len(t, seen, 1)
-	require.Len(t, asks, 1)
-	assert.Equal(t, "the rule asks", asks[0].Reason)
-	require.Len(t, msgs, 3)
-	assert.False(t, msgs[1].IsError)
+			require.Len(t, asks, 1)
+			assert.Equal(t, "the rule asks", asks[0].Reason)
+			assert.Equal(t, "bash", asks[0].Call.Name)
+			require.Len(t, msgs, 3)
+			assert.Equal(t, tt.result, msgs[1].Text())
+			assert.Equal(t, tt.isError, msgs[1].IsError)
+		})
+	}
 }
 
 func TestHookAfterToolAndAfterTurn(t *testing.T) {
@@ -201,10 +220,10 @@ func TestHookAfterToolAndAfterTurn(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			claude.Replay(t, nil, tt.file)
 			var results []string
-			a := claude.New(claude.Hooks(resultEditor{
+			a := claude.New(agent.Config{Hooks: []agent.Hook{resultEditor{
 				results: &results,
 				edit:    tt.edit,
-			}))
+			}}})
 			defer closeAgent(t, a)
 
 			_, msgs, err := run(context.Background(), a, "List the files")
@@ -239,7 +258,7 @@ func (h failureNote) AfterTool(
 func TestHookAfterToolOnAFailedCall(t *testing.T) {
 	claude.Replay(t, nil, "testdata/hook_post_tool_failure.trace")
 	var results []ai.ToolResult
-	a := claude.New(claude.Hooks(failureNote{results: &results}))
+	a := claude.New(agent.Config{Hooks: []agent.Hook{failureNote{results: &results}}})
 	defer closeAgent(t, a)
 
 	_, msgs, err := run(context.Background(), a, "List the files")
@@ -259,10 +278,10 @@ func TestHookBeforeStop(t *testing.T) {
 	claude.Replay(t, nil, "testdata/hook_stop.trace")
 	calls := 0
 	var states []agent.State
-	a := claude.New(claude.Hooks(goodbye{
+	a := claude.New(agent.Config{Hooks: []agent.Hook{goodbye{
 		calls:  &calls,
 		states: &states,
-	}))
+	}}})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Say hello")
@@ -296,7 +315,7 @@ func TestHookBeforeStop(t *testing.T) {
 
 func TestHookErrorFailsTheRun(t *testing.T) {
 	claude.Replay(t, nil, "testdata/hook_error.trace")
-	a := claude.New(claude.Hooks(failingStop{}))
+	a := claude.New(agent.Config{Hooks: []agent.Hook{failingStop{}}})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Say hello")
@@ -305,7 +324,7 @@ func TestHookErrorFailsTheRun(t *testing.T) {
 
 func TestHookAtAModelCallFails(t *testing.T) {
 	claude.Replay(t, nil)
-	a := claude.New(claude.Hooks(callHook{}))
+	a := claude.New(agent.Config{Hooks: []agent.Hook{callHook{}}})
 	defer closeAgent(t, a)
 
 	_, _, err := run(context.Background(), a, "Say hello")

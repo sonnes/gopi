@@ -9,12 +9,12 @@ import (
 )
 
 // codexTools are the gopi names of the tools of the CLI that a hook at
-// PreToolUse sees, so that the driver can remove them. The CLI also
+// PreToolUse sees, so that the agent can remove them. The CLI also
 // has web_search and agent, but its hooks do not see them, so a Deny
 // rule cannot remove them, and the agent keeps them.
 var codexTools = []string{
-	toolBash,       // commandExecution
-	toolApplyPatch, // fileChange
+	tool.Bash,       // commandExecution
+	tool.ApplyPatch, // fileChange
 }
 
 // Tools returns a [tool.Named] tool for each tool of the CLI: bash,
@@ -22,9 +22,9 @@ var codexTools = []string{
 // session each tool of the CLI.
 func Tools() []tool.Tool {
 	return []tool.Tool{
-		tool.Named(toolBash),
-		tool.Named(toolApplyPatch),
-		tool.Named(toolWebSearch),
+		tool.Named(tool.Bash),
+		tool.Named(tool.ApplyPatch),
+		tool.Named(tool.WebSearch),
 		tool.Named(tool.Agent),
 	}
 }
@@ -32,7 +32,7 @@ func Tools() []tool.Tool {
 // leftOutTools returns the tools of the CLI that c does not give the
 // agent: each tool of [codexTools] that is not in the Tools of c, or
 // that ToolNames does not keep. The CLI has no flag that removes a
-// tool, so the driver denies each of them in a hook. A well-known tool
+// tool, so the agent denies each of them in a hook. A well-known tool
 // that the CLI does not have, such as read_file, is skipped, and so is
 // a tool of the caller, because the CLI cannot run its code. A tool of
 // the caller that ToolNames keeps fails with [tool.ErrUnknownTool]. A

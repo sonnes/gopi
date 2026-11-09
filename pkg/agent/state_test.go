@@ -158,7 +158,7 @@ func TestStateSnapshotBetweenRuns(t *testing.T) {
 			defer cancel()
 			opts := []agent.Option{agent.Toolset(echo)}
 			if tt.hook != nil {
-				opts = append(opts, agent.BeforeTool(tt.hook(cancel)))
+				opts = append(opts, agent.Hooks(agent.BeforeTool(tt.hook(cancel))))
 			}
 			a := agent.New(model(&script{responses: tt.responses}), opts...)
 
@@ -242,4 +242,56 @@ func TestStateSplitsUsageByModel(t *testing.T) {
 
 	st.Apply(agent.EventAgentStart{})
 	assert.Nil(t, st.UsageByModel(), "a new run starts from zero")
+}
+
+func TestNewState(t *testing.T) {
+	ctx := t.Context()
+	log := session.New()
+	var ids []string
+	for _, text := range []string{"one", "two", "three"} {
+		stored, err := log.Append(ctx, session.Text(text))
+		require.NoError(t, err)
+		ids = append(ids, stored[0].ID)
+	}
+	summary := ai.UserMessage("summary")
+	compaction, err := session.Custom(session.KindCompaction, session.Compaction{
+		Edits: []session.Edit{{
+			First:    ids[0],
+			Last:     ids[1],
+			Messages: []ai.Message{summary},
+		}},
+	})
+	require.NoError(t, err)
+	_, err = log.Append(ctx, compaction)
+	require.NoError(t, err)
+
+	st := agent.NewState(log)
+
+	assert.Equal(t, log.Messages(), st.Messages())
+	assert.Equal(t, []ai.Message{summary, ai.UserMessage("three")}, st.View(), "the view applies the edits")
+	data, err := json.Marshal(st)
+	require.NoError(t, err)
+	var snap struct {
+		IDs         []string `json:"ids"`
+		CompactedAt int      `json:"compacted_at"`
+	}
+	require.NoError(t, json.Unmarshal(data, &snap))
+	assert.Equal(t, ids, snap.IDs)
+	assert.Equal(t, 3, snap.CompactedAt)
+	assert.False(t, st.Running())
+}
+
+// A hook of a CLI agent reads the session through the log of its state,
+// as a hook of the loop does.
+func TestNewStateHasTheLog(t *testing.T) {
+	log := session.New()
+	got := agent.NewState(log).Log()
+	require.NotNil(t, got)
+
+	note := session.Value[string]{Namespace: "test.note"}
+	require.NoError(t, note.Set(t.Context(), got, "kept"))
+	v, ok, err := note.Get(log)
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, "kept", v)
 }

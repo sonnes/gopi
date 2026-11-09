@@ -20,7 +20,7 @@ func ExampleBeforeTool() {
 		}
 		return c, nil
 	})
-	a := agent.New(lm, readOnly)
+	a := agent.New(lm, agent.Hooks(readOnly))
 	_ = a
 }
 
@@ -35,7 +35,7 @@ func ExampleBeforeCall() {
 		}
 		return r, nil
 	})
-	a := agent.New(lm, planFirst)
+	a := agent.New(lm, agent.Hooks(planFirst))
 	_ = a
 }
 
@@ -50,7 +50,7 @@ func ExampleBeforeCall_maxTurns() {
 		}
 		return r, nil
 	})
-	a := agent.New(lm, maxTurns)
+	a := agent.New(lm, agent.Hooks(maxTurns))
 	_ = a
 }
 
@@ -66,7 +66,7 @@ func ExampleBeforeStop() {
 		}
 		return []session.Entry{session.Text("The tests fail. Fix them.")}, nil
 	})
-	a := agent.New(lm, untilGreen)
+	a := agent.New(lm, agent.Hooks(untilGreen))
 	_ = a
 }
 

@@ -25,7 +25,7 @@ OpenRouter serves a copy of the OpenAI Responses API at `https://openrouter.ai/a
 
 The provider never reads `OPENAI_API_KEY` or `OPENAI_BASE_URL`, so your OpenAI key never goes to OpenRouter. `env.Detectors` registers the provider when `OPENROUTER_API_KEY` is set.
 
-OpenRouter has no token count API and no image API. `ai.CountTokens` returns an error, and an `ai.ImageModel` with this provider does not compile.
+OpenRouter has no token count API and no image API. `ai.CountTokens` returns an error that wraps `errors.ErrUnsupported`, and an `ai.ImageModel` with this provider does not compile.
 
 ## Models
 
@@ -43,9 +43,9 @@ The package has no models. Name a model by its OpenRouter ID, such as `ai.Model{
 
 ## System Messages
 
-The OpenAI provider knows the features of `gpt-6-sol`, `gpt-6-luna`, `gpt-6-astra`, and `gpt-5.6`. On OpenRouter, the same models have the prefix `openai/`, such as `openai/gpt-6-luna`, and they get the same features. These are the system messages in place, the tool changes in place, and the cache mark on the system prompt. The [OpenAI](openai.mdx#system-messages) page says how they work.
+The OpenAI provider knows the features of the GPT-6 and GPT-5.6 models, such as `gpt-6-luna` and `gpt-6.1-sol`. On OpenRouter, the same models have the prefix `openai/`, such as `openai/gpt-6-luna`, and they get the same features. These are the system messages in place, the tool changes in place, and the cache mark on the system prompt. The [OpenAI](openai.mdx#system-messages) page says how they work.
 
-Every other model gets each system message as a `<system-reminder>` in a user message, and its request has no cache mark. An Anthropic model on OpenRouter is one of these, and so is `openai/gpt-6.1-sol`.
+Every other model gets each system message as a `<system-reminder>` in a user message, and its request has no cache mark. An Anthropic model on OpenRouter is one of these.
 
 ## Errors
 

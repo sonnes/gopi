@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,66 +14,38 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/clidefs"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliproc"
 	"github.com/sonnes/gopi/pkg/agent/internal/resume"
 	"github.com/sonnes/gopi/pkg/agent/internal/sections"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
+	"github.com/sonnes/gopi/pkg/tool"
 )
 
 // defaultBinary is the name of the CLI, looked up on PATH.
 const defaultBinary = "claude"
 
+// cliName starts each error of the agent.
+const cliName = "claude"
+
 // conversation is the session ID of the CLI, so that a [Durable] agent
 // resumes the same CLI session.
 var conversation = resume.New("claude")
-
-// ErrNoConversation is the error of a run whose CLI cannot find the
-// stored session, such as after the session file was deleted. The agent
-// clears the stored session ID, so the next run starts a new session of
-// the CLI. The log keeps its messages, and the CLI no longer reads them.
-var ErrNoConversation = errors.New("claude: the CLI has no conversation to resume")
-
-// ErrAuth is the error of a run whose CLI is not logged in. Run `claude
-// /login`, or set an API key in the environment of the CLI.
-var ErrAuth = errors.New("claude: the CLI is not logged in")
-
-// Permission is a permission mode of the CLI. It decides which tool
-// calls the CLI runs without a prompt. The agent denies every prompt,
-// so a mode that prompts less lets the CLI do more.
-type Permission string
-
-const (
-	// PermissionDefault prompts for each tool call that the settings do
-	// not allow.
-	PermissionDefault Permission = "default"
-	// PermissionAcceptEdits allows file edits without a prompt.
-	PermissionAcceptEdits Permission = "acceptEdits"
-	// PermissionAuto lets a classifier of the CLI allow or deny each
-	// prompt.
-	PermissionAuto Permission = "auto"
-	// PermissionDontAsk denies each tool call that the settings do not
-	// allow, without a prompt.
-	PermissionDontAsk Permission = "dontAsk"
-	// PermissionBypass allows every tool call without a prompt.
-	PermissionBypass Permission = "bypassPermissions"
-)
 
 // Agent runs the Claude Code CLI as a gopi agent. The CLI runs its own
 // loop and its own tools. The agent sends the input of each run to the
 // CLI, turns the output into [agent.Event] values, and writes every
 // message to its [session.Log].
 type Agent struct {
-	log *session.Log
-	// store keeps the log and the child sessions of the subagents. It
-	// is nil for an agent of [New], whose children are unsaved too.
-	store session.Storer
-	name  string
-	cfg   config
-	state *emit.State
+	core *cliagent.Core
+	cfg  config
+	// err is the error of the config. Each run of an agent of [New]
+	// fails with it.
+	err error
 
 	// mu guards proc and idle. proc is the running CLI, or nil before
 	// the first run and after a failure that stopped it. idle is the
@@ -94,100 +67,29 @@ type Agent struct {
 	kept []*line
 }
 
-// config collects the options before [New] or [Durable] builds the agent.
+// config is the session config of an agent, its options, and what the
+// agent derives from them.
 type config struct {
-	store       session.Storer
-	name        string
-	binary      string
-	dir         string
-	addDirs     []string
-	model       string
-	sections    agent.SystemFunc
-	thinking    ai.ThinkingLevel
-	autoCompact int
-	env         []string
-	permission  Permission
-	disallowed  []string
-	limits      agent.Limits
-	only        []string
-	approve     agent.ApproveFunc
-	hooks       []agent.Hook
-	mcp         []agent.MCPServer
-	idle        func(agent.Event)
-	wake        func()
-	// defs is set by [Driver].
-	defs *clidefs.Defs
+	agent.Config
+	binary string
+	env    []string
+	// tools are the gopi names of the tools that --tools gives the CLI.
+	// If tools is nil, the CLI keeps its default tools, as for a list
+	// of the models.
+	tools []string
+	// hooks are the Hooks of the config, then the hook of ToolNames.
+	hooks []agent.Hook
 }
 
-// Option configures an [Agent]. [New] and [Durable] take the same options.
+// Option sets how an agent starts the CLI. [New], [Durable], and
+// [Driver] take the same options. The [agent.Config] holds the
+// settings of one session.
 type Option func(*config)
-
-// Store sets the store of a [Durable] agent. Without it, Durable keeps
-// the session in a [session.MemoryStore]. [New] ignores it.
-func Store(s session.Storer) Option {
-	return func(c *config) { c.store = s }
-}
-
-// Name sets the Author of every entry that the agent writes.
-func Name(s string) Option {
-	return func(c *config) { c.name = s }
-}
 
 // Binary sets the path of the CLI. Without it, the agent runs "claude"
 // from PATH.
 func Binary(path string) Option {
 	return func(c *config) { c.binary = path }
-}
-
-// Dir sets the working directory of the CLI. Without it, the CLI runs
-// in the working directory of this process.
-func Dir(path string) Option {
-	return func(c *config) { c.dir = path }
-}
-
-// AddDirs gives the CLI one --add-dir for each directory, so its tools
-// can read and write there, as they do in [Dir].
-func AddDirs(dirs ...string) Option {
-	return func(c *config) { c.addDirs = append(c.addDirs, dirs...) }
-}
-
-// Model sets the model of the CLI, as an alias such as "sonnet" or a
-// full model name.
-func Model(s string) Option {
-	return func(c *config) { c.model = s }
-}
-
-// System appends s to the system prompt of the CLI, as one section
-// named [agent.SystemSection]. It is [Sections] with
-// [agent.SystemText].
-func System(s string) Option {
-	return Sections(agent.SystemText(s))
-}
-
-// Sections sets the function that returns the sections that the agent
-// appends to the system prompt of the CLI. The CLI keeps its own
-// prompt, because its tools depend on it. The agent calls fn before
-// each run. The first sections of a session go in the system prompt,
-// and the log keeps them as its base, so each start of the CLI gets
-// the same prompt. A later change goes as a reminder before the input
-// of the next run, so the cache of the conversation stays. If fn
-// returns an error, the run fails. Without Sections, the agent adds no
-// prompt.
-func Sections(fn agent.SystemFunc) Option {
-	return func(c *config) { c.sections = fn }
-}
-
-// AutoCompact sets the size of the context, in tokens, that starts a
-// compaction. The CLI takes 100k to 1M. Without it, the CLI uses its
-// default.
-func AutoCompact(tokens int) Option {
-	return func(c *config) { c.autoCompact = tokens }
-}
-
-// Thinking sets the effort level of the CLI. [ai.ThinkingOff] turns
-// thinking off. Without it, the CLI uses its default.
-func Thinking(level ai.ThinkingLevel) Option {
-	return func(c *config) { c.thinking = level }
 }
 
 // Env adds KEY=VALUE pairs to the environment of the CLI. The CLI gets
@@ -196,108 +98,41 @@ func Env(kv ...string) Option {
 	return func(c *config) { c.env = append(c.env, kv...) }
 }
 
-// DisallowedTools removes the named tools from the CLI. A name is a
-// gopi name or a Claude Code name, and it can hold a rule, such as
-// "bash(rm:*)". The agent gives the CLI the Claude Code names.
-func DisallowedTools(names ...string) Option {
-	return func(c *config) { c.disallowed = append(c.disallowed, names...) }
+// New returns an agent of the config c over an unsaved session. The
+// history lives in process memory and ends with the process. New
+// ignores the Store of c. New does no I/O, so it does not check the
+// names of Skills. The CLI starts on the first run. If c is not valid,
+// each run fails with the error that [Durable] returns.
+func New(c agent.Config, opts ...Option) *Agent {
+	core := cliagent.New(cliName, &c)
+	cfg, err := newConfig(c, opts)
+	return newAgent(core, cfg, err)
 }
 
-// Limits gives the CLI the hard limits l in the settings of --settings:
-// permissions.blockReadsOutsideWorkingDirectories,
-// permissions.blockWritesOutsideWorkingDirectories, and
-// sandbox.enabled. The CLI adds them to its own settings. Without
-// Limits, the settings of the CLI decide.
-func Limits(l agent.Limits) Option {
-	return func(c *config) { c.limits = l }
-}
-
-// OnlyTools gives the CLI only the named built-in tools, with the
-// --tools flag. A name is a gopi name or a Claude Code name. The flag
-// does not list an MCP
-// tool, so OnlyTools skips each MCP name. OnlyTools with no names gives
-// the CLI no built-in tool. Without it, the CLI has its default tools.
-func OnlyTools(names ...string) Option {
-	return func(c *config) { c.only = append([]string{}, names...) }
-}
-
-// Approve sets the function that answers each permission prompt of the
-// CLI. The call of the request has the tool_use_id, the tool name, and
-// the input of the prompt. The request has the reason of the CLI. It
-// has Safety for an edit of a protected path. Without Approve, the
-// agent denies every prompt. If fn returns an error, the agent sends the
-// error to the CLI, which denies the call.
+// Durable returns an agent of the config c over the session
+// c.SessionID. If the session is unknown, Durable creates it. If it
+// exists, Durable resumes it, and the CLI resumes its own session.
+// Without a Store in c, Durable keeps the session in a
+// [session.MemoryStore].
 //
-// The agent keeps no rule for an Always decision, and the CLI keeps
-// none. The caller keeps the rule of Always, as the host does.
-func Approve(fn agent.ApproveFunc) Option {
-	return func(c *config) { c.approve = fn }
-}
-
-// MCP gives the CLI the MCP servers servers, with --mcp-config. The CLI
-// connects to them and names each tool "mcp__<server>__<tool>". The
-// servers of the settings of the CLI stay, so a server of servers
-// replaces a server of the settings with the same name.
-func MCP(servers ...agent.MCPServer) Option {
-	return func(c *config) { c.mcp = append(c.mcp, servers...) }
-}
-
-// Idle sets the function that gets the events between runs: the events
-// of a subagent in the background, wrapped as in a run. Without it, the
-// agent drops them, and the log of each child still gets its messages.
-func Idle(fn func(agent.Event)) Option {
-	return func(c *config) { c.idle = fn }
-}
-
-// Wake sets the function that the agent calls when the CLI starts a turn
-// between runs. [Agent.Continue] runs that turn.
-func Wake(fn func()) Option {
-	return func(c *config) { c.wake = fn }
-}
-
-// defsOf sets the definitions of the session.
-func defsOf(d *clidefs.Defs) Option {
-	return func(c *config) { c.defs = d }
-}
-
-// PermissionMode sets the permission mode of the CLI. Without it, the
-// settings of the CLI decide.
-func PermissionMode(mode Permission) Option {
-	return func(c *config) { c.permission = mode }
-}
-
-// New returns an agent over an unsaved session. The history lives in
-// process memory and ends with the process. New does no I/O. The CLI
-// starts on the first run.
-func New(opts ...Option) *Agent {
-	a := newAgent(opts)
-	a.log = session.New()
-	a.state = emit.NewState(a.log)
-	return a
-}
-
-// Durable returns an agent over the session id. If id is unknown,
-// Durable creates it. If id exists, Durable resumes it, and the CLI
-// resumes its own session. The [Store] option sets where the session
-// lives.
-func Durable(ctx context.Context, id string, opts ...Option) (*Agent, error) {
-	a := newAgent(opts)
-	store := a.cfg.store
-	if store == nil {
-		store = session.NewMemoryStore()
-	}
-	log, err := session.Open(ctx, store, id)
+// Durable fails before it opens the session if c is not valid: a hook
+// at a point that the CLI does not call, a mode that
+// [permission.ParseMode] does not know, a name of ToolNames that names
+// a tool of the caller, or a name of Skills that no skill has.
+func Durable(ctx context.Context, c agent.Config, opts ...Option) (*Agent, error) {
+	cfg, err := newConfig(c, opts)
 	if err != nil {
 		return nil, err
 	}
-	a.log = log
-	a.store = store
-	a.state = emit.NewState(log)
-	return a, nil
+	core, err := cliagent.Open(ctx, cliName, c)
+	if err != nil {
+		return nil, err
+	}
+	return newAgent(core, cfg, nil), nil
 }
 
-// newConfig applies opts over the defaults.
-func newConfig(opts []Option) config {
+// newOptions applies opts over the defaults.
+func newOptions(opts []Option) config {
 	c := config{binary: defaultBinary}
 	for _, opt := range opts {
 		opt(&c)
@@ -305,12 +140,39 @@ func newConfig(opts []Option) config {
 	return c
 }
 
-// newAgent applies opts and returns an agent with no log.
-func newAgent(opts []Option) *Agent {
-	c := newConfig(opts)
+// newConfig returns the config of an agent of c with opts. It does no
+// I/O.
+func newConfig(c agent.Config, opts []Option) (config, error) {
+	cfg := newOptions(opts)
+	cfg.Config = c
+	tools, err := cliTools(c.Tools, c.ToolNames)
+	if err != nil {
+		return config{}, fmt.Errorf("claude: %w", err)
+	}
+	if _, err := permission.ParseMode(string(c.Mode)); err != nil {
+		return config{}, fmt.Errorf("claude: %w", err)
+	}
+	hooks := slices.Clip(c.Hooks)
+	if c.ToolNames != nil {
+		// --tools hides only the built-in tools, so the hook blocks a
+		// call of an MCP tool that ToolNames does not name.
+		hooks = append(hooks, agent.OnlyTools(c.ToolNames))
+	}
+	if err := checkHooks(hooks); err != nil {
+		return config{}, err
+	}
+	cfg.tools = tools
+	cfg.hooks = hooks
+	return cfg, nil
+}
+
+// newAgent returns an agent of core with cfg. Each run fails with err,
+// the error of the config.
+func newAgent(core *cliagent.Core, cfg config, err error) *Agent {
 	a := &Agent{
-		name:       c.name,
-		cfg:        c,
+		core:       core,
+		cfg:        cfg,
+		err:        err,
 		steerReady: make(chan struct{}, 1),
 	}
 	a.subs = newSubagents(a)
@@ -318,15 +180,15 @@ func newAgent(opts []Option) *Agent {
 }
 
 // Log returns the log that the agent writes to.
-func (a *Agent) Log() *session.Log { return a.log }
+func (a *Agent) Log() *session.Log { return a.core.Log() }
 
 // State returns a copy of the state of the agent, as
 // [agent.Agent.State] does. Each event of a run changes the state
 // before the stream gets it. [agent.State.Log] is the log of the
-// agent, also in the state that a hook of [Hooks] gets. The agent has
+// agent, also in the state that a hook of the config gets. The agent has
 // no queues, so [agent.State.Steer] and [agent.State.FollowUp] do
 // nothing.
-func (a *Agent) State() agent.State { return a.state.Get() }
+func (a *Agent) State() agent.State { return a.core.State() }
 
 // Run sends entries to the CLI as one user message and streams the run
 // until the CLI reports its result. The text of the entries is the
@@ -347,7 +209,7 @@ func (a *Agent) State() agent.State { return a.state.Get() }
 // The stream then fails with the error of ctx.
 func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream {
 	return stream.New(func(push func(agent.Event)) ([]ai.Message, error) {
-		if len(emit.Input(entries)) == 0 {
+		if len(cliagent.Input(entries)) == 0 {
 			return nil, errors.New("claude: a run needs an entry with text or a file")
 		}
 		return a.runWith(ctx, push, entries)
@@ -369,10 +231,7 @@ func (a *Agent) Close() error {
 	if proc != nil {
 		stopErr = proc.stop()
 	}
-	if a.cfg.defs == nil {
-		return stopErr
-	}
-	return errors.Join(stopErr, a.cfg.defs.Remove())
+	return a.core.Close(stopErr)
 }
 
 // ensure returns the running CLI. It starts the CLI and initializes it
@@ -385,14 +244,14 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 		return proc, nil
 	}
 
+	if a.err != nil {
+		return nil, a.err
+	}
 	cmd, fresh, skills, err := a.command(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if err := agent.CheckHooks(a.cfg.hooks, hookPoints...); err != nil {
-		return nil, fmt.Errorf("claude: %w", err)
-	}
-	proc, err = launch(cmd, a.cfg.approve, a.cfg.hooks, a.State)
+	proc, err = launch(cmd, a.cfg.Approve, a.cfg.hooks, a.State, a.core.Stops())
 	if err != nil {
 		return nil, err
 	}
@@ -404,13 +263,13 @@ func (a *Agent) ensure(ctx context.Context) (*process, error) {
 	if _, err := proc.initialize(ctx); err != nil {
 		proc.terminate()
 		switch {
-		case errors.Is(err, ErrNoConversation):
-			err = errors.Join(err, conversation.Clear(ctx, a.log))
+		case errors.Is(err, agent.ErrNoConversation):
+			err = errors.Join(err, conversation.Clear(ctx, a.core.Log()))
 		case fresh != "" && takenSession(err, fresh):
 			// An earlier CLI made the conversation and exited before the
 			// agent stored its ID. The agent stores the ID now, so the
 			// next start resumes the conversation.
-			if err := conversation.Save(ctx, a.log, fresh); err != nil {
+			if err := conversation.Save(ctx, a.core.Log(), fresh); err != nil {
 				return nil, err
 			}
 			return a.ensure(ctx)
@@ -452,8 +311,8 @@ type sandboxSettings struct {
 
 // settings returns the settings of the CLI, as JSON, that hold the
 // limits. ok is false if there is nothing to give.
-func settings(l agent.Limits) (string, bool, error) {
-	if l == (agent.Limits{}) {
+func settings(l permission.Limits) (string, bool, error) {
+	if l == (permission.Limits{}) {
 		return "", false, nil
 	}
 	var s cliSettings
@@ -508,29 +367,29 @@ func mcpConfig(servers []agent.MCPServer) (string, error) {
 // it. Otherwise a saved agent gives the CLI the session ID of
 // [cliSessionID], and fresh is that ID.
 func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, skills def.Set, err error) {
-	args, err := cliArgs(a.cfg, sections.Text(a.log.Messages()))
+	args, err := cliArgs(a.cfg, sections.Text(a.core.Log().Messages()))
 	if err != nil {
 		return nil, "", def.Set{}, err
 	}
-	skills, folder, err := writeDefs(ctx, a.cfg.defs)
+	skills, folder, err := writeDefs(ctx, a.cfg.Defs, a.core.Defs())
 	if err != nil {
 		return nil, "", def.Set{}, fmt.Errorf("claude: %w", err)
 	}
 	if folder != "" {
 		args = append(args, "--add-dir", folder)
 	}
-	for _, dir := range a.cfg.addDirs {
+	for _, dir := range a.cfg.AddDirs {
 		args = append(args, "--add-dir", dir)
 	}
-	id, err := conversation.Get(a.log)
+	id, err := conversation.Get(a.core.Log())
 	if err != nil {
 		return nil, "", def.Set{}, err
 	}
 	switch {
 	case id != "":
 		args = append(args, "--resume="+id)
-	case a.sessionID() != "":
-		fresh = cliSessionID(a.sessionID())
+	case a.core.SessionID() != "":
+		fresh = cliSessionID(a.core.SessionID())
 		args = append(args, "--session-id="+fresh)
 	}
 	return cliCommand(a.cfg, args), fresh, skills, nil
@@ -539,11 +398,11 @@ func (a *Agent) command(ctx context.Context) (cmd *exec.Cmd, fresh string, skill
 // usageBase returns the modelUsage that a CLI that resumes the stored
 // conversation starts from.
 func (a *Agent) usageBase() (map[string]wireModelUsage, error) {
-	id, err := conversation.Get(a.log)
+	id, err := conversation.Get(a.core.Log())
 	if err != nil {
 		return nil, err
 	}
-	return loadBase(a.log, id)
+	return loadBase(a.core.Log(), id)
 }
 
 // cliSpace is the UUID namespace of the session IDs that the agent
@@ -570,14 +429,22 @@ func takenSession(err error, fresh string) bool {
 // cliCommand returns the command that starts the CLI of c with args.
 func cliCommand(c config, args []string) *exec.Cmd {
 	cmd := exec.Command(c.binary, args...)
-	cmd.Dir = c.dir
-	cmd.Env = environ(c.env)
+	cmd.Dir = c.Dir
+	cmd.Env = cliproc.Environ(dropped, c.env)
 	return cmd
 }
 
+// cliModes maps each permission mode to the name of the mode in the
+// CLI.
+var cliModes = map[permission.Mode]string{
+	permission.Default:     "default",
+	permission.AcceptEdits: "acceptEdits",
+	permission.Bypass:      "bypassPermissions",
+}
+
 // cliArgs returns the arguments of the CLI of c, with system as the
-// appended system prompt, without a session to resume. The input never goes on
-// the command line. It goes to stdin.
+// appended system prompt, without a session to resume. The input never
+// goes on the command line. It goes to stdin.
 func cliArgs(c config, system string) ([]string, error) {
 	args := []string{
 		"--print",
@@ -588,41 +455,41 @@ func cliArgs(c config, system string) ([]string, error) {
 		"--replay-user-messages",
 		"--permission-prompt-tool", "stdio",
 	}
-	if c.model != "" {
-		args = append(args, "--model", c.model)
+	if c.Model.ID != "" {
+		args = append(args, "--model", c.Model.ID)
 	}
-	if c.autoCompact > 0 {
-		args = append(args, "--autocompact", strconv.Itoa(c.autoCompact))
+	if c.AutoCompact > 0 {
+		args = append(args, "--autocompact", strconv.Itoa(c.AutoCompact))
 	}
 	if system != "" {
 		args = append(args, "--append-system-prompt", system)
 	}
-	switch c.thinking {
+	switch c.Effort {
 	case "":
 	case ai.ThinkingOff:
 		args = append(args, "--thinking", "disabled")
 	default:
-		args = append(args, "--effort", string(c.thinking))
+		args = append(args, "--effort", string(c.Effort))
 	}
-	if c.permission != "" {
-		args = append(args, "--permission-mode", string(c.permission))
+	if c.Mode != "" {
+		args = append(args, "--permission-mode", cliModes[c.Mode])
 	}
-	if len(c.disallowed) > 0 {
-		rules := claudeRules(c.disallowed)
+	if removed := tool.WholeTools(c.Deny); len(removed) > 0 {
+		rules := claudeRules(removed)
 		args = append(args, "--disallowedTools", strings.Join(rules, ","))
 	}
-	s, ok, err := settings(c.limits)
+	s, ok, err := settings(c.Limits)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
 		args = append(args, "--settings", s)
 	}
-	if c.only != nil {
-		args = append(args, "--tools", strings.Join(builtinTools(c.only), ","))
+	if c.tools != nil {
+		args = append(args, "--tools", strings.Join(builtinTools(c.tools), ","))
 	}
-	if len(c.mcp) > 0 {
-		servers, err := mcpConfig(c.mcp)
+	if len(c.MCP) > 0 {
+		servers, err := mcpConfig(c.MCP)
 		if err != nil {
 			return nil, err
 		}

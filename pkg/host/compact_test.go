@@ -2,7 +2,6 @@ package host_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,13 +50,6 @@ func TestCompactFailures(t *testing.T) {
 		f.model.waitCalls(t, 1)
 		assert.ErrorIs(t, f.h.Compact(ctx, "s1", ""), host.ErrBusy)
 		close(gate)
-	})
-
-	t.Run("an agent that cannot compact", func(t *testing.T) {
-		f := newFixture(t)
-		f.driver.plain = true
-		f.create(t, host.Config{ID: "s1"})
-		assert.ErrorIs(t, f.h.Compact(ctx, "s1", ""), errors.ErrUnsupported)
 	})
 }
 

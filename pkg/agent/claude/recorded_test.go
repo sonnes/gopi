@@ -22,6 +22,7 @@ import (
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -109,11 +110,12 @@ func TestRecorded(t *testing.T) {
 		scrubDir(home, "/home/me"),
 	}, "testdata/TestRecorded.trace")
 
-	a := claude.New(
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionDontAsk),
-	)
+	a := claude.New(agent.Config{
+		Dir:   dir,
+		Tools: claude.Tools(),
+		Model: ai.Model{ID: "haiku"},
+		Mode:  permission.Default,
+	})
 	defer closeAgent(t, a)
 
 	events, msgs, err := run(context.Background(), a, "Reply with the word hi and nothing else.")
@@ -155,12 +157,13 @@ func TestRecordedHooks(t *testing.T) {
 		},
 	}
 	stops := 0
-	a := claude.New(
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionDontAsk),
-		claude.Hooks(guard, goodbye{calls: &stops}),
-	)
+	a := claude.New(agent.Config{
+		Dir:   dir,
+		Tools: claude.Tools(),
+		Model: ai.Model{ID: "haiku"},
+		Mode:  permission.Default,
+		Hooks: []agent.Hook{guard, goodbye{calls: &stops}},
+	})
 	defer closeAgent(t, a)
 
 	prompt := "Run the shell command `rm a.txt` with the Bash tool. Then reply with the word done."
@@ -253,12 +256,13 @@ func TestRecordedToolEdits(t *testing.T) {
 		},
 	}
 	var results []ai.ToolResult
-	a := claude.New(
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionBypass),
-		claude.Hooks(guard, outputEditor{results: &results}),
-	)
+	a := claude.New(agent.Config{
+		Dir:   dir,
+		Tools: claude.Tools(),
+		Model: ai.Model{ID: "haiku"},
+		Mode:  permission.Bypass,
+		Hooks: []agent.Hook{guard, outputEditor{results: &results}},
+	})
 	defer closeAgent(t, a)
 
 	prompt := "Make two separate Bash tool calls, one after the other. " +
@@ -301,12 +305,14 @@ func TestRecordedSubagent(t *testing.T) {
 	}, "testdata/TestRecordedSubagent.trace")
 
 	store := session.NewMemoryStore()
-	a, err := claude.Durable(ctx, "s1",
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionBypass),
-		claude.Store(store),
-	)
+	a, err := claude.Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Dir:       dir,
+		Tools:     claude.Tools(),
+		Model:     ai.Model{ID: "haiku"},
+		Mode:      permission.Bypass,
+		Store:     store,
+	})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -400,14 +406,16 @@ func TestRecordedBackgroundSubagent(t *testing.T) {
 	idle := &idleSink{}
 	woke := newWakeSink()
 	store := session.NewMemoryStore()
-	a, err := claude.Durable(ctx, "s1",
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionBypass),
-		claude.Store(store),
-		claude.Idle(idle.add),
-		claude.Wake(woke.signal),
-	)
+	a, err := claude.Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Dir:       dir,
+		Tools:     claude.Tools(),
+		Model:     ai.Model{ID: "haiku"},
+		Mode:      permission.Bypass,
+		Store:     store,
+		Idle:      idle.add,
+		Wake:      woke.signal,
+	})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -513,14 +521,16 @@ func TestBackgroundSubagentWithAFailedLogEndsBetweenRuns(t *testing.T) {
 	idle := &idleSink{}
 	woke := newWakeSink()
 	store := &laterFailStore{MemoryStore: session.NewMemoryStore()}
-	a, err := claude.Durable(ctx, "s1",
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionBypass),
-		claude.Store(store),
-		claude.Idle(idle.add),
-		claude.Wake(woke.signal),
-	)
+	a, err := claude.Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Dir:       dir,
+		Tools:     claude.Tools(),
+		Model:     ai.Model{ID: "haiku"},
+		Mode:      permission.Bypass,
+		Store:     store,
+		Idle:      idle.add,
+		Wake:      woke.signal,
+	})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 
@@ -569,14 +579,16 @@ func TestRecordedSteerSubagent(t *testing.T) {
 	idle := &idleSink{}
 	woke := newWakeSink()
 	store := session.NewMemoryStore()
-	a, err := claude.Durable(ctx, "s1",
-		claude.Dir(dir),
-		claude.Model("haiku"),
-		claude.PermissionMode(claude.PermissionBypass),
-		claude.Store(store),
-		claude.Idle(idle.add),
-		claude.Wake(woke.signal),
-	)
+	a, err := claude.Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Dir:       dir,
+		Tools:     claude.Tools(),
+		Model:     ai.Model{ID: "haiku"},
+		Mode:      permission.Bypass,
+		Store:     store,
+		Idle:      idle.add,
+		Wake:      woke.signal,
+	})
 	require.NoError(t, err)
 	defer closeAgent(t, a)
 

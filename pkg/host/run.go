@@ -76,8 +76,7 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 // the agent. A Codex agent ignores them.
 //
 // If a run is active, Compact returns [ErrBusy]. If the session has no
-// message, Compact returns [ErrInvalid]. If the agent cannot compact,
-// Compact returns an error that wraps [errors.ErrUnsupported].
+// message, Compact returns [ErrInvalid].
 func (h *Host) Compact(ctx context.Context, id, instructions string) error {
 	s, err := h.session(id)
 	if err != nil {
@@ -96,14 +95,11 @@ func (h *Host) Compact(ctx context.Context, id, instructions string) error {
 	if s.run != nil {
 		return fmt.Errorf("host: session %s: %w", s.id, ErrBusy)
 	}
-	if _, ok := s.runner.(agent.ManualCompactor); !ok {
-		return fmt.Errorf("host: session %s: the agent cannot compact: %w", s.id, errors.ErrUnsupported)
-	}
 	if len(s.runner.Log().Messages()) == 0 {
 		return fmt.Errorf("host: session %s: nothing to compact: %w", s.id, ErrInvalid)
 	}
 	s.beginRunLocked(func(ctx context.Context, runner agent.Runner) *agent.Stream {
-		return runner.(agent.ManualCompactor).Compact(ctx, instructions)
+		return runner.Compact(ctx, instructions)
 	})
 	return nil
 }

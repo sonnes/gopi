@@ -30,7 +30,15 @@ Add a hook when a run needs a rule that the loop does not have, such as a token 
 
 ## Add a Hook
 
-Each point is its own interface, such as `agent.BeforeToolHook`. A hook embeds `agent.BaseHook` and implements the points that it needs. A misspelled method compiles and never runs. Each point gets a copy of `agent.State`.
+Each point is its own interface, such as `agent.BeforeToolHook`. The constructor of a point, such as `agent.BeforeTool`, returns an `agent.Hook` from a function. Add hooks with `agent.Hooks`, or in the `Hooks` of an [`agent.Config`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Config).
+
+```go
+a := agent.New(lm, agent.Hooks(readOnly))
+```
+
+The hooks run in the order that you add them. Each one gets the value that the one before it returned, and a copy of `agent.State`.
+
+A struct hook embeds `agent.BaseHook` and implements the points that it needs. A hook with no point fails `agent.New`, but a misspelled second method never runs.
 
 ```go
 type Budget struct {
@@ -47,8 +55,6 @@ func (b Budget) BeforeTool(ctx context.Context, s agent.State, c ai.ToolCall) (a
 
 a := agent.New(lm, agent.Hooks(Budget{Max: 50_000}))
 ```
-
-For one point, use its option, such as `agent.BeforeTool`. The hooks run in the order that you add them, and each one gets the value that the one before it returned.
 
 A hook reads the [session](../session/index.mdx#in-a-hook) from `State.Log()`.
 
@@ -79,6 +85,8 @@ readOnly := agent.BeforeTool(func(ctx context.Context, s agent.State, c ai.ToolC
 	return c, nil
 })
 ```
+
+To ask a person, return `agent.Ask`. The approve function of the agent decides the call before it runs.
 
 When the calls of a message run at the same time, all their `BeforeTool` hooks run first, one call at a time, in call order.
 
@@ -126,7 +134,7 @@ The hooks after the failed hook do not run.
 
 ## Hooks on a CLI Agent
 
-The same hooks run on Claude Code and Codex. The CLI calls each point at one of its own hook events:
+The same hooks run on Claude Code and Codex. Give them in the `Hooks` field of the config. The CLI calls each point at one of its own hook events:
 
 | Point        | Claude Code                         | Codex         |
 | ------------ | ----------------------------------- | ------------- |
@@ -137,7 +145,7 @@ The same hooks run on Claude Code and Codex. The CLI calls each point at one of 
 | `AfterTurn`  | `PostToolBatch`                     | none          |
 | `BeforeStop` | `Stop`                              | `Stop`        |
 
-A hook at a point that the CLI does not have fails the run. Codex runs each hook as the command `gopi hook`, from the `PATH` or from `codex.HookCommand`. If that command fails, Codex runs the tool. [`claude.Hooks`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#Hooks) and [`codex.Hooks`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#Hooks) give the other rules.
+A hook at a point that the CLI does not have fails the start of the driver, `Durable`, and each run of an agent of `New`. Codex runs each hook as the command `gopi hook`, from the `PATH` or from `codex.HookCommand`. If that command fails, Codex runs the tool. The Hooks section of the package docs of [claude](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude#hdr-Hooks) and [codex](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex#hdr-Hooks) gives the other rules.
 
 ## Related
 

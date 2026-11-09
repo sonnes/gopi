@@ -72,7 +72,7 @@ The [site](https://sonnes.github.io/gopi/docs/) has a page for each layer. Sever
 
 ## Build Your Own Harness
 
-A harness turns a repository into an agent. Each part of the agent is one option: change one and keep the rest. The harness assembles the agent again at each start, so an edit to a skill reaches the next agent.
+A harness turns a repository into an agent. Each part of the agent is one option of the harness or one field of the session config: change one and keep the rest. The harness assembles the agent again at each start, so an edit to a skill reaches the next agent.
 
 This harness reads the folders of Claude Code: `CLAUDE.md`, `skills/`, and `agents/`, in your home and in the repository. A later folder wins.
 
@@ -85,33 +85,30 @@ md := storefs.InstructionFiles("CLAUDE.md", "AGENTS.md")
 
 h := harness.New(
 	harness.Catalog(cat),
-	harness.Model("anthropic/claude-opus-5-5"),
-	harness.Store(store),
-
-	harness.Defs(
+	harness.Defs(def.Layers(
 		storefs.Dir(filepath.Join(home, ".claude"), md),
 		storefs.Dir(filepath.Join(repo, ".claude"), md),
 		storefs.Dir(repo, md),
-	),
-
-	harness.MCP(github),
+	)),
 	harness.Toolset(harness.Tools(deploy)),
-
-	harness.Mode(permission.AcceptEdits),
 	harness.Allow("bash(go test *)"),
-	harness.Deny("bash(git push *)"),
-	harness.Approve(ask),
-
-	harness.AgentDefaults(
-		agent.Thinking(ai.ThinkingHigh),
-		agent.BeforeTool(guard),
-	),
 )
 
-a, err := h.Durable(ctx, "fix-login", harness.Dir(repo))
+a, err := h.Start(ctx, agent.Config{
+	SessionID: "fix-login",
+	Store:     store,
+	Spec:      "anthropic/claude-opus-5-5",
+	Dir:       repo,
+	Effort:    ai.ThinkingHigh,
+	Mode:      permission.AcceptEdits,
+	Deny:      []string{"bash(git push *)"},
+	Approve:   ask,
+	Hooks:     []agent.Hook{agent.BeforeTool(guard)},
+	MCP:       []agent.MCPServer{github},
+})
 ```
 
-To use another model, change the model spec, such as to `openai/gpt-6-sol`. The other options stay the same. The sessions go to any store: JSONL files, or your own store over SQLite or Postgres.
+To use another model, change the model spec, such as to `openai/gpt-6-sol`. The rest stays the same. The sessions go to any store: JSONL files, or your own store over SQLite or Postgres.
 
 ## Pick Your Layer
 
@@ -123,7 +120,7 @@ The SDK is a stack. Each layer calls only the layers under it, so you can use an
 | Harness | `pkg/harness` | An agent from a repository: AGENTS.md, skills, subagents, MCP servers, and a permission mode and rules for each tool call | The code gives the tools and the prompt, and no files. Use `agent.New`. |
 | Agent | `pkg/agent` | Your own loop in your process, on any provider, with hooks around each model call and tool call | One model call needs no tools. Use `StreamText`. |
 | Session | `pkg/session`, `pkg/store/fs` | A record of the work that outlives the process, app state next to the messages, and a store of your own | An agent has `agent.Store`. The agent writes the log. |
-| Tool | `pkg/tool`, `pkg/mcp` | A Go function that the model can call, code around each call, and tools that load on demand | The tools come from an MCP server. Give the server to `harness.MCP`. |
+| Tool | `pkg/tool`, `pkg/mcp` | A Go function that the model can call, code around each call, and tools that load on demand | The tools come from an MCP server. Give the server in the `MCP` field of `agent.Config`. |
 | Model call | `pkg/ai` | One model call, such as a reply, a summary, or a label, or a typed value with `GenerateObject` | The model calls tools in a loop. Use `pkg/agent`. |
 | Catalog | `pkg/catalog` | Model specs, such as `anthropic/claude-opus-5-5`, resolved to a provider or a driver | The code builds an `ai.LanguageModel` itself. |
 
@@ -159,9 +156,9 @@ if err != nil {
 	log.Fatal(err)
 }
 notes, err := h.Create(ctx, host.Config{
-	Model: "codex/gpt-6-astra",
-	Dir:   "repos/site",
-	Dirs:  []string{"repos/site/.agents"},
+	Model:   "codex/gpt-6-astra",
+	Dir:     "repos/site",
+	DefDirs: []string{"repos/site/.agents"},
 })
 if err != nil {
 	log.Fatal(err)
@@ -183,22 +180,24 @@ A hook runs at one point of the loop. A denied call does not run, and the model 
 ```go
 a := agent.New(model,
 	agent.Toolset(tools...),
-	agent.BeforeTool(func(
-		ctx context.Context, s agent.State, c ai.ToolCall,
-	) (ai.ToolCall, error) {
-		if c.Name == "close_issue" {
-			return c, agent.Deny("ask a maintainer to close issues")
-		}
-		return c, nil
-	}),
-	agent.BeforeStop(func(
-		ctx context.Context, s agent.State,
-	) ([]session.Entry, error) {
-		if posted(s.Messages()) {
-			return nil, nil
-		}
-		return []session.Entry{session.Text("Post the summary.")}, nil
-	}),
+	agent.Hooks(
+		agent.BeforeTool(func(
+			ctx context.Context, s agent.State, c ai.ToolCall,
+		) (ai.ToolCall, error) {
+			if c.Name == "close_issue" {
+				return c, agent.Deny("ask a maintainer to close issues")
+			}
+			return c, nil
+		}),
+		agent.BeforeStop(func(
+			ctx context.Context, s agent.State,
+		) ([]session.Entry, error) {
+			if posted(s.Messages()) {
+				return nil, nil
+			}
+			return []session.Entry{session.Text("Post the summary.")}, nil
+		}),
+	),
 )
 ```
 
@@ -250,20 +249,20 @@ An agent is a value in your Go program. It runs where your code runs, with the t
 |---|---|---|
 | A coding agent | a terminal | `harness.New` |
 | Issue triage | a nightly job | `agent.Durable` |
-| A code reviewer | a CI step | `harness.Mode(permission.Plan)` |
+| A code reviewer | a CI step | `Deny: []string{"Edit"}` |
 | A support agent | an HTTP handler | `h.Stream` |
 | Claude Code or Codex | a page of your app | the `claude-code/` and `codex/` specs |
 
 ## Try the CLI
 
-`cmd/gopi` is a test drive of the SDK. It builds a coding agent with the harness, in a sandbox in the current folder.
+`cmd/gopi` is a test drive of the SDK. It runs a coding agent in a session of the host, with the harness as the driver, in a sandbox in the current folder.
 
 ```sh
 make build
 .bin/gopi --model anthropic/claude-opus-5-5 "Summarize README.md"
 ```
 
-With no prompt, gopi reads stdin, and each line is one run of the same conversation. `--session-id` keeps the conversation in a session. `gopi login chatgpt` signs in with a ChatGPT account, so the `chatgpt` provider runs on the ChatGPT plan with no API key. `gopi models` lists the specs that `--model` takes.
+With no prompt, gopi reads stdin, and each line is one run of the same conversation. `--session-id` keeps the conversation, its config, and its grants in a session. `gopi login chatgpt` signs in with a ChatGPT account, so the `chatgpt` provider runs on the ChatGPT plan with no API key. `gopi models` lists the specs that `--model` takes.
 
 ## Concepts
 

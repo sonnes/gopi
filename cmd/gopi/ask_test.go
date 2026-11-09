@@ -6,6 +6,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -162,51 +163,53 @@ func (w *signalWriter) Write(p []byte) (int, error) {
 }
 
 func TestTerminal_Ask_OnATerminal(t *testing.T) {
-	question := []askquestion.Question{{
-		Header:   "Color",
-		Question: "Which color?",
-		Options:  []askquestion.Option{{Label: "Red"}, {Label: "Blue"}},
-	}}
-	pr, pw := io.Pipe()
-	t.Cleanup(func() { _ = pw.Close() })
-	in := readInput(pr, true)
-	shown := &shownCalls{}
-	w := &signalWriter{asked: make(chan struct{})}
-	r := terminal{
-		w:     w,
-		in:    in,
-		shown: shown,
-	}
+	synctest.Test(t, func(t *testing.T) {
+		question := []askquestion.Question{{
+			Header:   "Color",
+			Question: "Which color?",
+			Options:  []askquestion.Option{{Label: "Red"}, {Label: "Blue"}},
+		}}
+		pr, pw := io.Pipe()
+		t.Cleanup(func() { _ = pw.Close() })
+		in := readInput(pr, true)
+		shown := &shownCalls{}
+		w := &signalWriter{asked: make(chan struct{})}
+		r := terminal{
+			w:     w,
+			in:    in,
+			shown: shown,
+		}
 
-	// A line typed during the run, before the question.
-	_, err := io.WriteString(pw, "next prompt\n")
-	require.NoError(t, err)
+		_, err := io.WriteString(pw, "next prompt\n")
+		require.NoError(t, err)
+		// The user typed the line during the run, before the question.
+		time.Sleep(time.Second)
 
-	type result struct {
-		answers []askquestion.Answer
-		err     error
-	}
-	done := make(chan result, 1)
-	go func() {
-		answers, err := r.Ask(t.Context(), "call_1", question)
-		done <- result{answers, err}
-	}()
+		type result struct {
+			answers []askquestion.Answer
+			err     error
+		}
+		done := make(chan result, 1)
+		go func() {
+			answers, err := r.Ask(t.Context(), "call_1", question)
+			done <- result{answers, err}
+		}()
 
-	// The question waits until the tree prints its call.
-	time.Sleep(50 * time.Millisecond)
-	assert.Empty(t, w.String())
-	shown.mark("call_1")
-	<-w.asked
+		synctest.Wait()
+		assert.Empty(t, w.String(), "the question waits until the tree prints its call")
+		shown.mark("call_1")
+		<-w.asked
 
-	_, err = io.WriteString(pw, "2\n")
-	require.NoError(t, err)
-	got := <-done
+		_, err = io.WriteString(pw, "2\n")
+		require.NoError(t, err)
+		got := <-done
 
-	require.NoError(t, got.err)
-	assert.Equal(t, []askquestion.Answer{{Header: "Color", Answer: "Blue"}}, got.answers)
-	line, ok := in.next()
-	require.True(t, ok)
-	assert.Equal(t, "next prompt", line)
+		require.NoError(t, got.err)
+		assert.Equal(t, []askquestion.Answer{{Header: "Color", Answer: "Blue"}}, got.answers)
+		line, ok := in.next()
+		require.True(t, ok)
+		assert.Equal(t, "next prompt", line, "a line from before the question stays for the prompt loop")
+	})
 }
 
 func TestTerminal_Approve(t *testing.T) {

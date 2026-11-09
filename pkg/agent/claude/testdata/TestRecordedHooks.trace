@@ -1,5 +1,5 @@
 stdiorr trace v1
-> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":{"PreToolUse":[{"hookCallbackIds":["PreToolUse"]}],"Stop":[{"hookCallbackIds":["Stop"]}]}}}
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":{"PreToolUse":[{"hookCallbackIds":["PreToolUse"],"timeout":86400}],"Stop":[{"hookCallbackIds":["Stop"]}]}}}
 < {"session_id":"9a356c94-e3cc-40ea-a3c0-b1f91f34a30b","subtype":"hook_started","type":"system"}
 < {"session_id":"9a356c94-e3cc-40ea-a3c0-b1f91f34a30b","subtype":"hook_response","type":"system"}
 < {"response":{"request_id":"req_1","response":{},"subtype":"success"},"type":"control_response"}

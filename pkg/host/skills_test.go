@@ -32,19 +32,19 @@ func descriptions(skills []def.Skill) [][2]string {
 	return out
 }
 
-func TestSkillsReplaceASkillsetSkillWithAFolderSkill(t *testing.T) {
-	f := newFixture(t, host.Skillset(
-		def.Skill{Name: "deploy", Description: "Code.", Body: "b"},
-		def.Skill{Name: "lw-tasks", Description: "Tasks.", Body: "b"},
-	))
+func TestSkillsReplaceASkillOfTheHostWithAFolderSkill(t *testing.T) {
+	f := newFixture(t, host.Defs(def.Set{Skills: []def.Skill{
+		{Name: "deploy", Description: "Code.", Body: "b"},
+		{Name: "lw-tasks", Description: "Tasks.", Body: "b"},
+	}}))
 	low := t.TempDir()
 	high := t.TempDir()
 	writeSkill(t, low, "deploy", "Low.")
 	writeSkill(t, low, "review", "Review.")
 	writeSkill(t, high, "deploy", "High.")
 	f.create(t, host.Config{
-		ID:   "s1",
-		Dirs: []string{low, high},
+		ID:      "s1",
+		DefDirs: []string{low, high},
 	})
 
 	skills, err := f.h.Skills(context.Background(), "s1")
@@ -54,12 +54,12 @@ func TestSkillsReplaceASkillsetSkillWithAFolderSkill(t *testing.T) {
 		{"deploy", "High."},
 		{"lw-tasks", "Tasks."},
 		{"review", "Review."},
-	}, descriptions(skills), "a later folder wins at the place of the Skillset skill")
+	}, descriptions(skills), "a later folder wins at the place of the skill of the host")
 }
 
-func TestConfigSkillsWithNoDirsGivesTheSkillset(t *testing.T) {
+func TestConfigSkillsWithNoDefDirsGivesTheSkillsOfTheHost(t *testing.T) {
 	inline := def.Skill{Name: "deploy", Description: "D.", Body: "b"}
-	f := newFixture(t, host.Skillset(inline))
+	f := newFixture(t, host.Defs(def.Set{Skills: []def.Skill{inline}}))
 
 	skills, err := f.h.ConfigSkills(context.Background(), host.Config{})
 	require.NoError(t, err)

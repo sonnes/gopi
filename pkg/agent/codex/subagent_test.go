@@ -13,8 +13,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 )
 
@@ -56,13 +58,14 @@ func TestRecordedSubagent(t *testing.T) {
 		machineScrub,
 	)
 	store := session.NewMemoryStore()
-	a, err := Durable(ctx, "s1",
-		Dir(dir),
-		Sandbox(SandboxReadOnly),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-		Store(store),
-	)
+	a, err := Durable(ctx, agent.Config{
+		SessionID: "s1",
+		Tools:     allTools,
+		Dir:       dir,
+		Mode:      permission.Default,
+		Effort:    ai.ThinkingLow,
+		Store:     store,
+	})
 	require.NoError(t, err)
 	t.Cleanup(func() { a.Close() })
 
@@ -106,12 +109,12 @@ func TestRecordedSubagent(t *testing.T) {
 
 func TestSubagentThatEndsLateGetsAReportTurn(t *testing.T) {
 	useTraces(t, []string{"subagent_report.trace"})
-	a := New(
-		Dir(workDir),
-		Sandbox(SandboxReadOnly),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-	)
+	a := New(agent.Config{
+		Tools:  allTools,
+		Dir:    workDir,
+		Mode:   permission.Default,
+		Effort: ai.ThinkingLow,
+	})
 	t.Cleanup(func() { a.Close() })
 
 	prompt := "Spawn exactly one subagent with spawn_agent. Its task: read the file word.txt " +
@@ -169,12 +172,12 @@ func TestCollabToolName(t *testing.T) {
 
 func TestCancelInterruptsTheChild(t *testing.T) {
 	useTraces(t, []string{"subagent_cancel.trace"})
-	a := New(
-		Dir(workDir),
-		Sandbox(SandboxReadOnly),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-	)
+	a := New(agent.Config{
+		Tools:  allTools,
+		Dir:    workDir,
+		Mode:   permission.Default,
+		Effort: ai.ThinkingLow,
+	})
 	t.Cleanup(func() { a.Close() })
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -218,12 +221,12 @@ const subagentPrompt = "Spawn exactly one subagent with spawn_agent. Its task: r
 func newSubagentAgent(t *testing.T, trace string) *Agent {
 	t.Helper()
 	useTraces(t, []string{trace})
-	a := New(
-		Dir(workDir),
-		Sandbox(SandboxReadOnly),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-	)
+	a := New(agent.Config{
+		Tools:  allTools,
+		Dir:    workDir,
+		Mode:   permission.Default,
+		Effort: ai.ThinkingLow,
+	})
 	t.Cleanup(func() { a.Close() })
 	return a
 }
@@ -271,7 +274,7 @@ func TestCancelBeforeTheChildTurnStartsInterruptsIt(t *testing.T) {
 	_, err := s.Wait()
 	require.ErrorIs(t, err, context.Canceled)
 	emittest.CheckEvents(t, events)
-	assert.Less(t, time.Since(start), interruptTimeout, "the child that starts after the cancel stops at once")
+	assert.Less(t, time.Since(start), cliagent.InterruptTimeout, "the child that starts after the cancel stops at once")
 }
 
 func TestReportTurnTakesNotificationsBeforeItsResponse(t *testing.T) {

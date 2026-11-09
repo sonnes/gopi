@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 // ErrContextExceeded reports that a provider refused a request because
@@ -64,8 +65,9 @@ type TokenCount struct {
 	Total int
 }
 
-// CountTokens counts the input tokens of messages and opts with lm. If the provider of
-// lm does not implement [TokenCounter], CountTokens returns an error.
+// CountTokens counts the input tokens of messages and opts with lm. If
+// the provider of lm does not implement [TokenCounter], the error wraps
+// [errors.ErrUnsupported].
 func CountTokens(
 	ctx context.Context,
 	lm LanguageModel,
@@ -74,7 +76,7 @@ func CountTokens(
 ) (*TokenCount, error) {
 	counter, ok := lm.Provider.(TokenCounter)
 	if !ok {
-		return nil, errors.New("ai: provider does not support token counting")
+		return nil, fmt.Errorf("ai: provider does not count tokens: %w", errors.ErrUnsupported)
 	}
 	return counter.CountTokens(ctx, lm.Model, messages, JoinOptions(opts...))
 }

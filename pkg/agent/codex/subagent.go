@@ -13,7 +13,7 @@ import (
 	"unicode"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
+	"github.com/sonnes/gopi/pkg/agent/internal/cliagent"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -103,38 +103,23 @@ func (s *subagents) open(ctx context.Context, t *turn, it item) error {
 	if it.Model != nil {
 		model = *it.Model
 	}
-	id := agent.ChildID(t.sessionID, name, threadID)
-	ref := agent.ParentRef{
-		SessionID:  t.sessionID,
-		ToolCallID: it.ID,
-	}
-	log, err := emit.OpenChild(ctx, s.a.store, id, ref)
+	opened, err := s.a.core.OpenChild(ctx, t.sessionID, name, threadID, it.ID, t.emitter.Subagent)
 	if err != nil {
 		return err
 	}
-
-	owner := t.emitter
-	callID := it.ID
-	push := func(ev agent.Event) {
-		owner.Subagent(agent.EventSubagent{
-			ToolCallID: callID,
-			SessionID:  id,
-			Event:      ev,
-		})
-	}
 	c := &child{
-		callID:    callID,
+		callID:    it.ID,
 		name:      name,
 		model:     model,
-		sessionID: id,
+		sessionID: opened.SessionID,
 		owner:     t,
 		turn: &turn{
 			conn:      t.conn,
-			emitter:   emit.New(log, s.a.cfg.name, emit.NewState(log), push),
+			emitter:   opened.Emitter,
 			threadID:  threadID,
 			model:     model,
 			subs:      s,
-			sessionID: id,
+			sessionID: opened.SessionID,
 		},
 	}
 	s.byThread[threadID] = c
@@ -242,31 +227,34 @@ func (s *subagents) end(ctx context.Context, c *child, p params) error {
 	if runErr != nil && status == agent.SubagentCompleted {
 		status = agent.SubagentFailed
 	}
-	s.finish(ctx, c, status, runErr)
+	err := s.finish(ctx, c, status, runErr)
 	if c.owner == s.root && s.root.completed {
 		s.late = append(s.late, c)
 	}
-	return nil
+	return err
 }
 
 // finish ends the run of c, and sends its end on the stream of its
-// owner. The text of the end is the last text of c, or the error of a
-// child that failed.
-func (s *subagents) finish(ctx context.Context, c *child, status string, err error) {
+// owner. The text of the end comes from [cliagent.EndText]. It returns
+// the error of a write of the log of c. The end still goes out, because
+// the stream of the owner must close the child.
+func (s *subagents) finish(ctx context.Context, c *child, status string, err error) error {
 	byModel := map[string]ai.Usage{c.turn.model: c.turn.usage}
-	msgs, _ := c.turn.emitter.FinishByModel(ctx, byModel, err)
+	msgs, finishErr := c.turn.emitter.FinishByModel(ctx, byModel, err)
 	c.running = false
 	c.status = status
-	c.text = agent.LastText(msgs)
-	if status == agent.SubagentFailed && err != nil {
-		c.text = err.Error()
-	}
+	c.text = cliagent.EndText(msgs, status, err)
 	c.owner.emitter.Subagent(agent.EventSubagentEnd{
 		ToolCallID: c.callID,
 		SessionID:  c.sessionID,
 		Status:     c.status,
 		Text:       c.text,
 	})
+	// Finish returns err as it is when each write works.
+	if finishErr == err {
+		return nil
+	}
+	return finishErr
 }
 
 // children returns each child, by its thread ID, so that the children
@@ -306,25 +294,30 @@ func (s *subagents) interrupt() error {
 
 // endAll ends each child that runs as interrupted, at the end of a run
 // that did not wait for them. A nested child ends before its owner, so
-// that the stream of the owner closes after it.
-func (s *subagents) endAll(ctx context.Context) {
+// that the stream of the owner closes after it. It returns the errors of
+// the logs of the children.
+func (s *subagents) endAll(ctx context.Context) error {
+	var errs []error
 	for _, c := range s.children() {
 		if c.owner == s.root {
-			s.endTree(ctx, c)
+			errs = append(errs, s.endTree(ctx, c))
 		}
 	}
+	return errors.Join(errs...)
 }
 
 // endTree ends each child of c that runs, then c if it runs.
-func (s *subagents) endTree(ctx context.Context, c *child) {
+func (s *subagents) endTree(ctx context.Context, c *child) error {
+	var errs []error
 	for _, d := range s.children() {
 		if d.owner == c.turn {
-			s.endTree(ctx, d)
+			errs = append(errs, s.endTree(ctx, d))
 		}
 	}
 	if c.running {
-		s.finish(ctx, c, agent.SubagentInterrupted, errRunEnded)
+		errs = append(errs, s.finish(ctx, c, agent.SubagentInterrupted, errRunEnded))
 	}
+	return errors.Join(errs...)
 }
 
 // errRunEnded is the error of a child that the end of the run stops.

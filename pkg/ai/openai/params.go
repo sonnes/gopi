@@ -1,7 +1,6 @@
 package openai
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/google/jsonschema-go/jsonschema"
@@ -23,30 +22,34 @@ const objectFormatName = "output"
 func buildParams(model ai.Model, messages []ai.Message, opts ai.Options) (responses.ResponseNewParams, error) {
 	f := featuresOf(model.ID)
 	tools := requestTools(messages, opts, f)
+	input, err := buildInput(messages, opts, f, tools.addTools)
+	if err != nil {
+		return responses.ResponseNewParams{}, err
+	}
 	params := responses.ResponseNewParams{
 		Model:   shared.ResponsesModel(model.ID),
 		Store:   param.NewOpt(false),
 		Include: []responses.ResponseIncludable{responses.ResponseIncludableReasoningEncryptedContent},
 		Input: responses.ResponseNewParamsInputUnion{
-			OfInputItemList: buildInput(messages, opts, f, tools.addTools),
+			OfInputItemList: input,
 		},
 	}
 
-	if n, ok := maxTokens(model, opts); ok {
-		params.MaxOutputTokens = param.NewOpt(n)
+	if n, ok := ai.MaxTokensOf(model, opts); ok {
+		params.MaxOutputTokens = param.NewOpt(int64(n))
 	}
 
-	reasoning, err := reasoningConfig(opts)
+	params.Reasoning, err = reasoningConfig(opts)
 	if err != nil {
 		return params, err
 	}
-	params.Reasoning = reasoning
 
-	if len(tools.list) > 0 {
-		params.Tools = convertTools(tools.list)
+	params.Tools, err = convertTools(tools.list)
+	if err != nil {
+		return params, err
 	}
 
-	retention := cacheRetention(opts)
+	retention := ai.RetentionOf(opts)
 	if key, ok := ai.GetOption(opts, PromptCacheKey); ok && key != "" && retention != ai.CacheNone {
 		params.PromptCacheKey = param.NewOpt(key)
 	}
@@ -58,54 +61,32 @@ func buildParams(model ai.Model, messages []ai.Message, opts ai.Options) (respon
 		params.Temperature = param.NewOpt(t)
 	}
 
-	choice, ok, err := requestToolChoice(opts, tools)
+	c, set, err := ai.ToolChoiceOf(opts)
 	if err != nil {
 		return params, err
 	}
-	if ok {
-		params.ToolChoice = choice
+	choice, send, limit := transcript.LimitChoice(c, set, tools.allowed)
+	switch {
+	case limit:
+		params.ToolChoice = allowedTools(choice, tools.allowed)
+	case send:
+		params.ToolChoice = toolChoiceParam(choice)
 	}
 
 	return params, nil
 }
 
-// requestToolChoice returns the tool choice of a request, and false if
-// the request sends none. If the tool plan limits the tools, the choice
-// limits the model to them with allowed_tools. The tool list then stays
-// the same, so the cache holds. A choice that names one tool, or none,
-// is narrower than the limit, so it goes as it is.
-func requestToolChoice(opts ai.Options, plan toolPlan) (responses.ResponseNewParamsToolChoiceUnion, bool, error) {
-	c, set := ai.GetOption(opts, ai.ToolChoice)
-	if plan.allowed == nil {
-		if !set {
-			return responses.ResponseNewParamsToolChoiceUnion{}, false, nil
-		}
-		choice, err := toolChoiceParam(c)
-		return choice, true, err
-	}
-
-	narrower := set && (c.Type == ai.ToolChoiceNone.Type || c.Type == "tool")
-	if narrower {
-		choice, err := toolChoiceParam(c)
-		return choice, true, err
-	}
-	if len(plan.allowed) == 0 {
-		choice, err := toolChoiceParam(ai.ToolChoiceNone)
-		return choice, true, err
-	}
-
+// allowedTools limits the model to the allowed tools with an
+// allowed_tools choice. The tool list then stays the same, so the cache
+// holds. Any is "required" in this API.
+func allowedTools(c ai.ToolChoiceMode, allowed []string) responses.ResponseNewParamsToolChoiceUnion {
 	mode := responses.ToolChoiceAllowedModeAuto
-	if set {
-		if _, err := toolChoiceParam(c); err != nil {
-			return responses.ResponseNewParamsToolChoiceUnion{}, false, err
-		}
-		if c.Type == ai.ToolChoiceAny.Type {
-			mode = responses.ToolChoiceAllowedModeRequired
-		}
+	if c.Type == ai.ToolChoiceAny.Type {
+		mode = responses.ToolChoiceAllowedModeRequired
 	}
 
-	tools := make([]map[string]any, 0, len(plan.allowed))
-	for _, name := range plan.allowed {
+	tools := make([]map[string]any, 0, len(allowed))
+	for _, name := range allowed {
 		tools = append(tools, map[string]any{
 			"type": "function",
 			"name": name,
@@ -116,37 +97,27 @@ func requestToolChoice(opts ai.Options, plan toolPlan) (responses.ResponseNewPar
 			Mode:  mode,
 			Tools: tools,
 		},
-	}, true, nil
-}
-
-// cacheRetention is the [ai.CacheRetention] option, or [ai.CacheShort].
-func cacheRetention(opts ai.Options) ai.Retention {
-	if r, ok := ai.GetOption(opts, ai.CacheRetention); ok {
-		return r
 	}
-	return ai.CacheShort
 }
 
-// toolChoiceParam maps a tool choice to the API. Any is "required" in
-// this API. An unknown type is an error.
-func toolChoiceParam(c ai.ToolChoiceMode) (responses.ResponseNewParamsToolChoiceUnion, error) {
+// toolChoiceParam maps a tool choice that [ai.ToolChoiceOf] returned to
+// the API. Any is "required" in this API.
+func toolChoiceParam(c ai.ToolChoiceMode) responses.ResponseNewParamsToolChoiceUnion {
 	mode := func(m responses.ToolChoiceOptions) responses.ResponseNewParamsToolChoiceUnion {
 		return responses.ResponseNewParamsToolChoiceUnion{OfToolChoiceMode: param.NewOpt(m)}
 	}
 
 	switch c.Type {
 	case ai.ToolChoiceAuto.Type:
-		return mode(responses.ToolChoiceOptionsAuto), nil
+		return mode(responses.ToolChoiceOptionsAuto)
 	case ai.ToolChoiceAny.Type:
-		return mode(responses.ToolChoiceOptionsRequired), nil
+		return mode(responses.ToolChoiceOptionsRequired)
 	case ai.ToolChoiceNone.Type:
-		return mode(responses.ToolChoiceOptionsNone), nil
-	case "tool":
+		return mode(responses.ToolChoiceOptionsNone)
+	default:
 		return responses.ResponseNewParamsToolChoiceUnion{
 			OfFunctionTool: &responses.ToolChoiceFunctionParam{Name: c.Name},
-		}, nil
-	default:
-		return responses.ResponseNewParamsToolChoiceUnion{}, fmt.Errorf("openai: unknown tool choice %q", c.Type)
+		}
 	}
 }
 
@@ -163,9 +134,9 @@ func buildObjectParams(
 		return params, err
 	}
 
-	schemaMap, err := toMap(schema)
+	schemaMap, err := transcript.Schema(schema)
 	if err != nil {
-		return params, err
+		return params, fmt.Errorf("openai: %w", err)
 	}
 	params.Text.Format = responses.ResponseFormatTextConfigUnionParam{
 		OfJSONSchema: &responses.ResponseFormatTextJSONSchemaConfigParam{
@@ -188,21 +159,25 @@ func buildCountTokensParams(
 ) (responses.InputTokenCountParams, error) {
 	f := featuresOf(model.ID)
 	tools := requestTools(messages, opts, f)
+	input, err := buildInput(messages, opts, f, tools.addTools)
+	if err != nil {
+		return responses.InputTokenCountParams{}, err
+	}
 	params := responses.InputTokenCountParams{
 		Model: param.NewOpt(model.ID),
 		Input: responses.InputTokenCountParamsInputUnion{
-			OfResponseInputItemArray: buildInput(messages, opts, f, tools.addTools),
+			OfResponseInputItemArray: input,
 		},
 	}
 
-	reasoning, err := reasoningConfig(opts)
+	params.Reasoning, err = reasoningConfig(opts)
 	if err != nil {
 		return params, err
 	}
-	params.Reasoning = reasoning
 
-	if len(tools.list) > 0 {
-		params.Tools = convertTools(tools.list)
+	params.Tools, err = convertTools(tools.list)
+	if err != nil {
+		return params, err
 	}
 
 	return params, nil
@@ -215,11 +190,10 @@ func buildInput(
 	opts ai.Options,
 	f features,
 	addTools bool,
-) responses.ResponseInputParam {
+) (responses.ResponseInputParam, error) {
 	var input responses.ResponseInputParam
-	system, _ := ai.GetOption(opts, ai.SystemPrompt)
-	breakpoint := f.cacheBreakpoint && cacheRetention(opts) != ai.CacheNone
-	if item, ok := systemItem(system, breakpoint); ok {
+	breakpoint := f.cacheBreakpoint && ai.RetentionOf(opts) != ai.CacheNone
+	if item, ok := systemItem(ai.SystemPromptOf(opts), breakpoint); ok {
 		input = append(input, item)
 	}
 
@@ -227,7 +201,11 @@ func buildInput(
 		systemMessages: f.systemMessages,
 		addTools:       addTools,
 	}
-	return append(input, convertMessages(messages, cfg)...)
+	converted, err := convertMessages(messages, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return append(input, converted...), nil
 }
 
 // toolPlan is where the tools of a request go.
@@ -251,70 +229,30 @@ type toolPlan struct {
 // guide gives allowed_tools for this, because the tool list stays the
 // same. The API also has no item that replaces a tool. So after a
 // replacement, or for a model without the item, the request sends the
-// current tools from [transcript.CurrentTools], and the input adds no
-// tools.
+// current tools, and the input adds no tools.
 func requestTools(messages []ai.Message, opts ai.Options, f features) toolPlan {
 	tools, _ := ai.GetOption(opts, ai.Tools)
-	current := transcript.CurrentTools(tools, messages)
-	if !f.additionalTools {
-		return toolPlan{list: current}
+	changes := transcript.ChangesOf(tools, messages)
+	if !f.additionalTools || changes.Replaced {
+		return toolPlan{list: changes.Current}
 	}
-
-	declared := make(map[string]bool, len(tools))
-	for _, t := range tools {
-		declared[t.Name] = true
-	}
-	removed := false
-	replaced := false
-	for _, m := range messages {
-		if m.Role != ai.RoleSystem {
-			continue
-		}
-		for _, c := range m.Content {
-			switch v := c.(type) {
-			case ai.ToolRemoved:
-				removed = true
-			case ai.ToolAdded:
-				if declared[v.Tool.Name] {
-					replaced = true
-				}
-				declared[v.Tool.Name] = true
-			}
-		}
-	}
-
-	if replaced {
-		return toolPlan{list: current}
-	}
-	plan := toolPlan{
+	return toolPlan{
 		list:     tools,
 		addTools: true,
+		allowed:  changes.Allowed(),
 	}
-	if removed {
-		plan.allowed = make([]string, 0, len(current))
-		for _, t := range current {
-			plan.allowed = append(plan.allowed, t.Name)
-		}
-	}
-	return plan
 }
 
-// systemItem returns the [ai.SystemPrompt] option as a developer
-// message. Each [ai.Text] and [ai.Section] block is one text part, in
-// order. If breakpoint is true, the last part carries a cache breakpoint.
-// The implicit breakpoint of the API stays on, so the API also caches
-// the history. The prompt is not sent as instructions, because a
-// breakpoint needs a content part. The bool is false if the prompt has
-// no text.
-func systemItem(system []ai.Content, breakpoint bool) (responses.ResponseInputItemUnionParam, bool) {
+// systemItem returns the system prompt as a developer message. Each
+// text is one text part, in order. If breakpoint is true, the last part
+// carries a cache breakpoint. The implicit breakpoint of the API stays
+// on, so the API also caches the history. The prompt is not sent as
+// instructions, because a breakpoint needs a content part. The bool is
+// false if the prompt has no text.
+func systemItem(system []string, breakpoint bool) (responses.ResponseInputItemUnionParam, bool) {
 	var parts responses.ResponseInputMessageContentListParam
-	for _, c := range system {
-		switch v := c.(type) {
-		case ai.Text:
-			parts = append(parts, inputText(v.Text))
-		case ai.Section:
-			parts = append(parts, inputText(v.Text))
-		}
+	for _, text := range system {
+		parts = append(parts, inputText(text))
 	}
 	if len(parts) == 0 {
 		return responses.ResponseInputItemUnionParam{}, false
@@ -327,62 +265,44 @@ func systemItem(system []ai.Content, breakpoint bool) (responses.ResponseInputIt
 	return responses.ResponseInputItemParamOfMessage(parts, responses.EasyInputMessageRoleDeveloper), true
 }
 
-// maxTokens is the option, else the cap of the model. If neither is set,
-// the request omits the cap and the API uses the cap of the model.
-func maxTokens(model ai.Model, opts ai.Options) (int64, bool) {
-	if n, ok := ai.GetOption(opts, ai.MaxTokens); ok {
-		return int64(n), true
-	}
-	if model.MaxTokens > 0 {
-		return int64(model.MaxTokens), true
-	}
-	return 0, false
-}
-
 // reasoningConfig maps the thinking option to the request. If the
 // option is unset, the request asks only for a summary, and the model
 // uses its default effort. Off sends the effort none. Every other level
 // sends its effort and asks for a summary, because the API sends no
 // reasoning text without one.
 func reasoningConfig(opts ai.Options) (shared.ReasoningParam, error) {
-	level, ok := ai.GetOption(opts, ai.Thinking)
-	if !ok {
+	level, ok, err := ai.ThinkingOf(opts)
+	switch {
+	case err != nil:
+		return shared.ReasoningParam{}, err
+	case !ok:
 		return shared.ReasoningParam{Summary: shared.ReasoningSummaryAuto}, nil
-	}
-
-	if level == ai.ThinkingOff {
+	case level == ai.ThinkingOff:
 		return shared.ReasoningParam{Effort: shared.ReasoningEffortNone}, nil
+	default:
+		return shared.ReasoningParam{
+			Effort:  shared.ReasoningEffort(level.Effort()),
+			Summary: shared.ReasoningSummaryAuto,
+		}, nil
 	}
-
-	effort, ok := efforts[level]
-	if !ok {
-		return shared.ReasoningParam{}, fmt.Errorf("openai: unknown thinking level %q", level)
-	}
-
-	return shared.ReasoningParam{
-		Effort:  effort,
-		Summary: shared.ReasoningSummaryAuto,
-	}, nil
 }
 
-// efforts maps a thinking level to the effort of the API.
-var efforts = map[ai.ThinkingLevel]shared.ReasoningEffort{
-	ai.ThinkingLow:    shared.ReasoningEffortLow,
-	ai.ThinkingMedium: shared.ReasoningEffortMedium,
-	ai.ThinkingHigh:   shared.ReasoningEffortHigh,
-	ai.ThinkingXHigh:  shared.ReasoningEffortXhigh,
-	ai.ThinkingMax:    shared.ReasoningEffortMax,
-}
+// emptyParameters is the parameters of a tool with no schema. The API
+// needs an object schema for a function tool.
+var emptyParameters = map[string]any{"type": "object", "properties": map[string]any{}}
 
 // convertTools maps each tool to a function tool. Strict mode is off,
 // because it needs every property to be required, and a tool input can
 // have optional fields.
-func convertTools(tools []ai.ToolInfo) []responses.ToolUnionParam {
-	out := make([]responses.ToolUnionParam, 0, len(tools))
+func convertTools(tools []ai.ToolInfo) ([]responses.ToolUnionParam, error) {
+	var out []responses.ToolUnionParam
 	for _, t := range tools {
-		parameters, err := toMap(t.InputSchema)
-		if err != nil || parameters == nil {
-			parameters = map[string]any{"type": "object", "properties": map[string]any{}}
+		parameters, err := transcript.Schema(t.InputSchema)
+		if err != nil {
+			return nil, fmt.Errorf("openai: tool %q: %w", t.Name, err)
+		}
+		if parameters == nil {
+			parameters = emptyParameters
 		}
 
 		tool := &responses.FunctionToolParam{
@@ -395,23 +315,5 @@ func convertTools(tools []ai.ToolInfo) []responses.ToolUnionParam {
 		}
 		out = append(out, responses.ToolUnionParam{OfFunction: tool})
 	}
-	return out
-}
-
-// toMap converts a schema to the map shape that the API takes.
-func toMap(schema *jsonschema.Schema) (map[string]any, error) {
-	if schema == nil {
-		return nil, nil
-	}
-
-	data, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("openai: encode schema: %w", err)
-	}
-
-	var m map[string]any
-	if err := json.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("openai: decode schema: %w", err)
-	}
-	return m, nil
+	return out, nil
 }

@@ -30,7 +30,7 @@ func TestDefsGiveAgentsSkillsAndInstructions(t *testing.T) {
 	writeFile(t, dir, "agents/reviewer.md", "---\nname: reviewer\ndescription: Review a diff.\n---\nRead it.\n")
 	writeFile(t, dir, "AGENTS.md", "Use tabs.")
 
-	asm := assemblyOf(t, with(base(t, &script{}), harness.Defs(storefs.Dir(dir))))
+	asm := assemblyOf(t, with(base(&script{}), harness.Defs(storefs.Dir(dir))), config(t))
 
 	assert.Equal(t, []string{"deploy"}, listed(asm))
 	require.Len(t, asm.Agents, 1)
@@ -44,7 +44,10 @@ func TestWithoutDefsTheHarnessReadsNoFile(t *testing.T) {
 	writeFile(t, dir, ".claude/skills/b/SKILL.md", skillFile("B.", "b"))
 	writeFile(t, dir, "AGENTS.md", "Use tabs.")
 
-	asm := assemblyOf(t, with(base(t, &script{}), harness.Dir(dir)))
+	c := config(t)
+	c.Dir = dir
+
+	asm := assemblyOf(t, base(&script{}), c)
 
 	assert.Empty(t, asm.Skills)
 	assert.Empty(t, asm.Instructions)
@@ -56,9 +59,11 @@ func TestALaterDirWinsForASkillName(t *testing.T) {
 	writeFile(t, first, "skills/deploy/SKILL.md", skillFile("First deploy.", "first"))
 	writeFile(t, later, "skills/deploy/SKILL.md", skillFile("Later deploy.", "later"))
 
-	asm := assemblyOf(t, with(base(t, &script{}),
-		harness.Defs(storefs.Dir(first), storefs.Dir(later)),
-	))
+	asm := assemblyOf(
+		t,
+		with(base(&script{}), harness.Defs(def.Layers(storefs.Dir(first), storefs.Dir(later)))),
+		config(t),
+	)
 
 	assert.Equal(t, []string{"deploy"}, listed(asm))
 	assert.Equal(t, "Later deploy.", asm.Skills[0].Description)
@@ -68,10 +73,10 @@ func TestASkillInCodeAfterTheDefsWins(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "skills/deploy/SKILL.md", skillFile("File deploy.", "file"))
 
-	asm := assemblyOf(t, with(base(t, &script{}),
-		harness.Defs(storefs.Dir(dir)),
-		harness.Skillset(deploy),
-	))
+	c := config(t)
+	c.Defs = def.Set{Skills: []def.Skill{deploy}}
+
+	asm := assemblyOf(t, with(base(&script{}), harness.Defs(storefs.Dir(dir))), c)
 
 	assert.Equal(t, []string{"deploy"}, listed(asm))
 	assert.Equal(t, "Deploy the service.", asm.Skills[0].Description)
@@ -88,9 +93,10 @@ func TestTheSkillToolTakesTheQualifiedName(t *testing.T) {
 		callTool("c1", "skill", `{"name":"ops:deploy"}`),
 		reply("done"),
 	}}
-	opts := with(base(t, p), harness.Skillset(ops, deploy))
+	c := config(t)
+	c.Defs = def.Set{Skills: []def.Skill{ops, deploy}}
 
-	a, err := harness.New(opts...).New(context.Background())
+	a, err := harness.New(with(base(p), skillTool)...).New(context.Background(), c)
 	require.NoError(t, err)
 	run(t, a, "deploy it")
 
@@ -100,24 +106,30 @@ func TestTheSkillToolTakesTheQualifiedName(t *testing.T) {
 func TestASkillThatTheModelCannotCallIsNotListed(t *testing.T) {
 	hidden := def.Skill{Name: "release", Description: "Cut a release.", Body: "x", NoModelCall: true}
 
-	asm := assemblyOf(t, with(base(t, &script{}), harness.Skillset(deploy, hidden)))
+	c := config(t)
+	c.Defs = def.Set{Skills: []def.Skill{deploy, hidden}}
+
+	asm := assemblyOf(t, with(base(&script{}), skillTool), c)
 
 	require.Len(t, asm.Tools, 1)
 	assert.Equal(t, []any{"deploy"}, asm.Tools[0].InputSchema.Properties["name"].Enum)
 }
 
-func TestInstructionsGoInTheOrderOfTheReaders(t *testing.T) {
+func TestInstructionsGoInTheOrderOfTheSources(t *testing.T) {
 	first := t.TempDir()
 	later := t.TempDir()
 	writeFile(t, first, "AGENTS.md", "first rule")
 	writeFile(t, later, "AGENTS.md", "later rule")
 	p := &script{responses: []ai.Message{reply("ok")}}
-	opts := with(base(t, p),
-		harness.Defs(storefs.Dir(first), storefs.Dir(later)),
-		harness.Instructions(def.Instruction{Path: "code", Text: "code rule"}),
+	opts := with(base(p),
+		harness.Defs(def.Layers(
+			storefs.Dir(first),
+			storefs.Dir(later),
+			def.Set{Instructions: []def.Instruction{{Path: "code", Text: "code rule"}}},
+		)),
 	)
 
-	a, err := harness.New(opts...).New(context.Background())
+	a, err := harness.New(opts...).New(context.Background(), config(t))
 	require.NoError(t, err)
 	run(t, a, "hi")
 
@@ -135,14 +147,13 @@ func TestAnInstructionEditReachesTheNextCall(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "AGENTS.md", "old rule")
 	p := &script{responses: []ai.Message{reply("a"), reply("b")}}
-	h := harness.New(with(base(t, p), harness.Defs(storefs.Dir(dir)))...)
+	h := harness.New(with(base(p), harness.Defs(storefs.Dir(dir)))...)
 
-	a, err := h.Durable(context.Background(), "s1")
-	require.NoError(t, err)
-	run(t, a, "first")
+	c := config(t)
+
+	run(t, start(t, h, c), "first")
 	writeFile(t, dir, "AGENTS.md", "new rule")
-	a, err = h.Durable(context.Background(), "s1")
-	require.NoError(t, err)
+	a := start(t, h, c)
 	run(t, a, "second")
 
 	assert.Contains(t, section(a, "instructions"), "new rule")

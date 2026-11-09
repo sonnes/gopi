@@ -36,8 +36,8 @@ type ObjectResult[T any] struct {
 }
 
 // GenerateObject generates a T from lm. It derives the schema from T. If
-// the provider of lm does not implement [ObjectProvider], GenerateObject
-// returns an error.
+// the provider of lm does not implement [ObjectProvider], the error
+// wraps [errors.ErrUnsupported].
 func GenerateObject[T any](
 	ctx context.Context,
 	lm LanguageModel,
@@ -46,7 +46,7 @@ func GenerateObject[T any](
 ) (*ObjectResult[T], error) {
 	provider, ok := lm.Provider.(ObjectProvider)
 	if !ok {
-		return nil, errors.New("ai: provider does not support object generation")
+		return nil, fmt.Errorf("ai: provider does not generate objects: %w", errors.ErrUnsupported)
 	}
 
 	schema, err := jsonschema.For[T](nil)

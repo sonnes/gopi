@@ -325,6 +325,7 @@ func TestBuildParams_CacheRetention(t *testing.T) {
 
 func TestFeaturesOf(t *testing.T) {
 	assert.Equal(t, openAIModel, featuresOf("gpt-6-luna"))
+	assert.Equal(t, openAIModel, featuresOf("gpt-6.1-sol"))
 	assert.Equal(t, openAIModel, featuresOf("openai/gpt-6-luna"))
 	assert.Equal(t, features{}, featuresOf("deepseek/deepseek-v4-flash"))
 }
@@ -500,4 +501,14 @@ func TestBuildObjectParams(t *testing.T) {
 	assert.Equal(t, true, jsonSchema["strict"])
 	assert.NotEmpty(t, jsonSchema["name"])
 	assert.Contains(t, jsonSchema["schema"].(map[string]any)["properties"], "city")
+}
+
+func TestBuildParams_BadToolSchema(t *testing.T) {
+	bad := ai.ToolInfo{
+		Name:        "bad",
+		InputSchema: &jsonschema.Schema{Type: "object", Types: []string{"object"}},
+	}
+
+	_, err := buildParams(config{}, testModel, nil, ai.Tools([]ai.ToolInfo{bad}))
+	require.ErrorContains(t, err, `tool "bad"`)
 }

@@ -24,17 +24,17 @@ const (
 	ownerExec = 0o100
 )
 
-// WriteSkills writes each skill to dir, in the format that [Skills]
-// reads: dir/<name>/SKILL.md and the support files of the skill. The
-// name of a skill is the name at its index in names, which is the name
-// that the model sees. It skips a name that leaves dir, because a name
-// comes from a file of a folder that a person can clone. A support file
-// that is a symbolic link and does not open stays out.
+// WriteSkills writes each skill to dir, in the format of the skills
+// folder of [FS]: dir/<name>/SKILL.md and the support files of the
+// skill. The name of a skill is the name at its index in names, which is
+// the name that the model sees, as [def.Set.SkillNames] gives it. A name
+// that [CheckName] rejects fails the write. A support file that is a
+// symbolic link and does not open stays out.
 func WriteSkills(dir string, skills []def.Skill, names []string) error {
 	for i, s := range skills {
 		name := names[i]
-		if !OneElement(name) {
-			continue
+		if err := CheckName(name); err != nil {
+			return err
 		}
 		folder := filepath.Join(dir, name)
 		if err := os.MkdirAll(folder, writeDirPerm); err != nil {
@@ -57,16 +57,16 @@ func WriteSkills(dir string, skills []def.Skill, names []string) error {
 	return nil
 }
 
-// WriteAgents writes each agent to dir, in the format that [Agents]
-// reads: dir/<name>.md. It skips a name that leaves dir, because a name
-// comes from a file of a folder that a person can clone.
+// WriteAgents writes each agent to dir, in the format of the agents
+// folder of [FS]: dir/<name>.md. A name that [CheckName] rejects fails
+// the write.
 func WriteAgents(dir string, agents []def.Agent) error {
 	if err := os.MkdirAll(dir, writeDirPerm); err != nil {
 		return fmt.Errorf("fs: write the agents: %w", err)
 	}
 	for _, a := range agents {
-		if !OneElement(a.Name) {
-			continue
+		if err := CheckName(a.Name); err != nil {
+			return err
 		}
 		data, err := agentData(a)
 		if err != nil {
@@ -80,14 +80,19 @@ func WriteAgents(dir string, agents []def.Agent) error {
 	return nil
 }
 
-// OneElement reports whether name is one element of a path, so a file
-// with this name stays in its folder. A name can come from a file of a
-// folder that a person can clone.
-func OneElement(name string) bool {
-	if name == "" || name == "." || name == ".." {
-		return false
+// CheckName returns an error if name is not one element of a path. A
+// file with the name then stays in its folder. A writer of definitions
+// fails on such a name, because a name comes from a file of a folder
+// that a person can clone.
+func CheckName(name string) error {
+	isOne := name != "" &&
+		name != "." &&
+		name != ".." &&
+		!strings.ContainsAny(name, `/\`)
+	if !isOne {
+		return fmt.Errorf("fs: the name %q is not a file name", name)
 	}
-	return !strings.ContainsAny(name, `/\`)
+	return nil
 }
 
 // skillData returns the text of the SKILL.md file of s. The name key is
@@ -118,7 +123,7 @@ func skillData(name string, s def.Skill) ([]byte, error) {
 }
 
 // agentData returns the text of the file of a. A nil Tools list has no
-// key, and an empty list has an empty key, as [Agents] reads them.
+// key, and an empty list has an empty key, as [FS] reads them.
 func agentData(a def.Agent) ([]byte, error) {
 	keys := maps.Clone(a.Extra)
 	if keys == nil {

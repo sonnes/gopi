@@ -31,7 +31,7 @@ func compactions(t *testing.T, a *Agent) []session.Compaction {
 func TestCompactOnTheCLI(t *testing.T) {
 	ctx := context.Background()
 	useTraces(t, []string{"compact.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, msgs, err := collect(a.Run(ctx, session.Text("Hi.")))
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestCompactOnTheCLI(t *testing.T) {
 
 func TestCompactThatFails(t *testing.T) {
 	useTraces(t, []string{"compact_failed.trace"})
-	a := newAgent(t)
+	a := newAgent(t, agent.Config{})
 
 	events, _, err := collect(a.Compact(context.Background(), ""))
 	require.ErrorContains(t, err, "the compaction failed")
@@ -81,7 +81,7 @@ func TestCompactThatFails(t *testing.T) {
 }
 
 func TestAutoCompactGoesInTheThreadConfig(t *testing.T) {
-	a := newAgent(t, AutoCompact(300000))
+	a := newAgent(t, agent.Config{AutoCompact: 300000})
 
 	p := a.threadParams("", nil, "", nil)
 

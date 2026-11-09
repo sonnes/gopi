@@ -3,15 +3,11 @@
 package grep
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	_ "embed"
 	"errors"
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -21,6 +17,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/host"
+	"github.com/sonnes/gopi/pkg/sandbox/internal/output"
 	"github.com/sonnes/gopi/pkg/sandbox/internal/search"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -47,13 +44,6 @@ type grepInput struct {
 	Limit      *int   `json:"limit,omitempty" jsonschema:"max lines, default 100"`
 }
 
-func (in grepInput) limit() int {
-	if in.Limit != nil && *in.Limit > 0 {
-		return *in.Limit
-	}
-	return grepDefaultLimit
-}
-
 // Name is the name of the tool.
 const Name = tool.Grep
 
@@ -74,7 +64,7 @@ func grep(ctx context.Context, box sandbox.Sandbox, in grepInput) (string, error
 	if in.Pattern == "" {
 		return "", errors.New("pattern is required")
 	}
-	base, err := search.Base(box, in.Path)
+	root, err := search.NewRoot(box, in.Path)
 	if err != nil {
 		return "", err
 	}
@@ -97,22 +87,18 @@ func grep(ctx context.Context, box sandbox.Sandbox, in grepInput) (string, error
 	}
 	args = append(args, "--regexp", in.Pattern)
 
-	res, err := search.RunRG(ctx, box, base, args)
+	res, err := root.RunRG(ctx, args)
 	if err != nil {
 		return "", err
 	}
 	if res.ExitCode == search.ExitNotFound {
-		hp, ok := box.(host.Pather)
-		if !ok {
-			return "", search.ErrNoRG
-		}
-		return walkGrep(ctx, hp, base, in)
+		return walkGrep(ctx, box, root, in)
 	}
 
 	if in.Glob != "" {
-		res.Stdout = []byte(search.FilterGlob(string(res.Stdout), base, in.Glob, true))
+		res.Stdout = []byte(root.FilterGlob(string(res.Stdout), in.Glob, true))
 	}
-	out, ok := search.Output(res, in.limit())
+	out, ok := search.Output(res, search.Limit(in.Limit, grepDefaultLimit))
 	if !ok {
 		return "", search.Error(res)
 	}
@@ -123,10 +109,11 @@ func grep(ctx context.Context, box sandbox.Sandbox, in grepInput) (string, error
 }
 
 // walkGrep is the grep tool without rg. It walks the directory on this
-// host and matches each line with a Go regular expression. Go and rg
-// have the same regular expression syntax. The output has the form of
-// the rg output.
-func walkGrep(ctx context.Context, hp host.Pather, base string, in grepInput) (string, error) {
+// host, reads each file through box, and matches each line with a Go
+// regular expression. Go and rg have the same regular expression
+// syntax. The output has the form of the rg output. If box is a
+// [host.Sizer], the walk skips a file over [maxWalkFileBytes].
+func walkGrep(ctx context.Context, box sandbox.Sandbox, root search.Root, in grepInput) (string, error) {
 	re, err := grepRegexp(in)
 	if err != nil {
 		return "", err
@@ -134,43 +121,28 @@ func walkGrep(ctx context.Context, hp host.Pather, base string, in grepInput) (s
 	if in.Glob != "" && !doublestar.ValidatePattern(in.Glob) {
 		return "", fmt.Errorf("invalid glob: %s", in.Glob)
 	}
-
-	root, err := hp.HostPath(base)
-	if err != nil {
-		return "", err
-	}
-	info, err := os.Stat(root)
+	files, err := root.Walk()
 	if err != nil {
 		return "", err
 	}
 
-	type file struct{ host, display string }
-	var files []file
-	if info.IsDir() {
-		rels, err := search.WalkFiles(hp, root)
-		if err != nil {
-			return "", err
-		}
-		for _, rel := range rels {
-			if in.Glob != "" && !search.MatchGlob(in.Glob, rel) {
-				continue
-			}
-			files = append(files, file{
-				host:    filepath.Join(root, filepath.FromSlash(rel)),
-				display: path.Join(base, rel),
-			})
-		}
-	} else {
-		files = []file{{host: root, display: base}}
-	}
-
-	limit := in.limit()
+	limit := search.Limit(in.Limit, grepDefaultLimit)
 	var out []string
 	for _, f := range files {
 		if len(out) > limit || ctx.Err() != nil {
 			break
 		}
-		out = grepFile(f.host, f.display, re, out, limit)
+		if in.Glob != "" && !search.MatchGlob(in.Glob, f.Rel) {
+			continue
+		}
+		if tooLarge(box, f.Path) {
+			continue
+		}
+		data, err := box.ReadFile(ctx, f.Path)
+		if err != nil {
+			continue
+		}
+		out = grepFile(data, f.Path, re, out, limit)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -182,61 +154,48 @@ func walkGrep(ctx context.Context, hp host.Pather, base string, in grepInput) (s
 	return search.CapLines(strings.Join(out, "\n"), limit), nil
 }
 
-// grepFile adds each line of the host file that matches re to out, as
-// display:line:text. It reads one line at a time, and it keeps at most
-// maxLineBytes of a line, so a large file does not fill the memory. It
-// skips a binary file, as rg does. It stops after limit+1 lines in out,
-// so that [search.CapLines] adds its note.
-func grepFile(hostPath, display string, re *regexp.Regexp, out []string, limit int) []string {
-	file, err := os.Open(hostPath)
-	if err != nil {
-		return out
+// tooLarge reports whether the file at path is over maxWalkFileBytes.
+// It asks the size through box, so the rules of box apply. A file whose
+// size box cannot give is not too large, and its read decides.
+func tooLarge(box sandbox.Sandbox, path string) bool {
+	sizer, ok := box.(host.Sizer)
+	if !ok {
+		return false
 	}
-	defer file.Close()
+	size, err := sizer.FileSize(path)
+	return err == nil && size > maxWalkFileBytes
+}
 
-	r := bufio.NewReader(file)
-	head, _ := r.Peek(binarySniff)
-	if bytes.IndexByte(head, 0) >= 0 {
+// grepFile adds each line of data that matches re to out, as
+// display:line:text. It matches at most maxLineBytes of a line. It skips
+// a binary file, as rg does. It stops after limit+1 lines in out, so
+// that [search.CapLines] adds its note.
+func grepFile(data []byte, display string, re *regexp.Regexp, out []string, limit int) []string {
+	if output.IsBinary(data) {
 		return out
 	}
-	for n := 1; len(out) <= limit; n++ {
-		line, err := readLine(r)
-		if line == "" && err != nil {
+	n := 0
+	for line := range bytes.Lines(data) {
+		if len(out) > limit {
 			break
 		}
-		if re.MatchString(line) {
-			out = append(out, display+":"+strconv.Itoa(n)+":"+cutLine(line))
-		}
-		if err != nil {
-			break
+		n++
+		line = bytes.TrimSuffix(line, []byte("\n"))
+		line = line[:min(len(line), maxLineBytes)]
+		if re.Match(line) {
+			out = append(out, display+":"+strconv.Itoa(n)+":"+cutLine(string(line)))
 		}
 	}
 	return out
 }
 
-// binarySniff is how many bytes grepFile reads to find a NUL, the sign
-// of a binary file.
-const binarySniff = 8000
-
-// maxLineBytes is the most bytes of one line that grepFile matches. The
-// rest of a longer line is read and dropped.
+// maxLineBytes is the most bytes of one line that grepFile matches.
 const maxLineBytes = 64 * 1024
 
-// readLine returns the next line of r without its newline. It keeps at
-// most maxLineBytes of the line.
-func readLine(r *bufio.Reader) (string, error) {
-	var b []byte
-	for {
-		chunk, err := r.ReadSlice('\n')
-		if len(b) < maxLineBytes {
-			b = append(b, chunk[:min(len(chunk), maxLineBytes-len(b))]...)
-		}
-		if errors.Is(err, bufio.ErrBufferFull) {
-			continue
-		}
-		return strings.TrimSuffix(string(b), "\n"), err
-	}
-}
+// maxWalkFileBytes is the size of the largest file that the walk
+// searches. The walk reads the whole file into memory, so it skips a
+// larger file, such as a log. rg has no limit.
+const maxWalkFileBytes = 64 * 1024 * 1024
 
 // cutLine cuts a line that is longer than grepMaxColumns, as rg does. It
 // does not cut a UTF-8 character in two.

@@ -20,6 +20,7 @@ import (
 
 	"github.com/sonnes/gopi/internal/stdiorr"
 	"github.com/sonnes/gopi/pkg/agent"
+	"github.com/sonnes/gopi/pkg/agent/internal/clihook"
 	"github.com/sonnes/gopi/pkg/agent/internal/emittest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
@@ -90,10 +91,14 @@ func (turnHook) AfterTurn(context.Context, agent.State) ([]session.Entry, error)
 // noState is the state of an agent with no runs.
 func noState() agent.State { return agent.State{} }
 
+// newStops returns the keeper of the error of a hook that stops the
+// turn, as the core of an agent gives it.
+func newStops() *clihook.StopErr { return &clihook.StopErr{Agent: "codex"} }
+
 func TestHookShim(t *testing.T) {
 	var names []string
 	stops := 0
-	srv, err := startHookServer([]agent.Hook{policyHook{names: &names, stops: &stops}}, noState, nil)
+	srv, err := startHookServer([]agent.Hook{policyHook{names: &names, stops: &stops}}, noState, nil, newStops())
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -221,7 +226,7 @@ func TestHookShimWithoutHost(t *testing.T) {
 }
 
 func TestHookErrorStopsTheTurn(t *testing.T) {
-	srv, err := startHookServer([]agent.Hook{failingStop{}}, noState, nil)
+	srv, err := startHookServer([]agent.Hook{failingStop{}}, noState, nil, newStops())
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -229,8 +234,8 @@ func TestHookErrorStopsTheTurn(t *testing.T) {
 	input := `{"hook_event_name":"Stop"}`
 	require.NoError(t, HookShim(context.Background(), srv.socket, strings.NewReader(input), &out))
 	assert.JSONEq(t, `{"continue":false,"stopReason":"the check failed"}`, out.String())
-	assert.EqualError(t, srv.takeErr(), "codex: the hook at Stop: the check failed")
-	assert.NoError(t, srv.takeErr(), "takeErr clears the error")
+	assert.EqualError(t, srv.stops.Take(), "codex: the hook at Stop: the check failed")
+	assert.NoError(t, srv.stops.Take(), "Take clears the error")
 }
 
 // fakeGopi returns the path of an executable file that stands in for
@@ -253,8 +258,9 @@ func TestThreadStartAddsTheHooks(t *testing.T) {
 	useTraces(t, []string{"hook_thread.trace"}, gopiScrub, socketScrub)
 	var names []string
 	stops := 0
-	a := newAgent(t,
-		Hooks(policyHook{names: &names, stops: &stops}),
+	a := newAgent(
+		t,
+		agent.Config{Hooks: []agent.Hook{policyHook{names: &names, stops: &stops}}},
 		HookCommand(gopi),
 	)
 
@@ -271,8 +277,9 @@ func TestRelativeHookCommandBecomesAbsolute(t *testing.T) {
 	require.NoError(t, err)
 	useTraces(t, []string{"hook_thread.trace"}, gopiScrub, socketScrub)
 	stops := 0
-	a := newAgent(t,
-		Hooks(policyHook{names: new([]string), stops: &stops}),
+	a := newAgent(
+		t,
+		agent.Config{Hooks: []agent.Hook{policyHook{names: new([]string), stops: &stops}}},
 		HookCommand(relative),
 	)
 
@@ -282,7 +289,7 @@ func TestRelativeHookCommandBecomesAbsolute(t *testing.T) {
 
 func TestHookAtAMissingPointFails(t *testing.T) {
 	useTraces(t, nil)
-	a := newAgent(t, Hooks(turnHook{}))
+	a := newAgent(t, agent.Config{Hooks: []agent.Hook{turnHook{}}})
 
 	_, _, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
 	assert.ErrorIs(t, err, errors.ErrUnsupported)
@@ -347,10 +354,11 @@ func TestRecordedHooks(t *testing.T) {
 	var names []string
 	stops := 0
 	a := New(
-		Dir(dir),
-		Policy(ApprovalNever),
-		Thinking(ai.ThinkingLow),
-		Hooks(policyHook{names: &names, stops: &stops}),
+		agent.Config{
+			Dir:    dir,
+			Effort: ai.ThinkingLow,
+			Hooks:  []agent.Hook{policyHook{names: &names, stops: &stops}},
+		},
 		HookCommand(gopi),
 	)
 	t.Cleanup(func() { a.Close() })
@@ -402,14 +410,14 @@ func TestHookServerFailure(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv, err := startHookServer([]agent.Hook{badInput{}}, noState, nil)
+			srv, err := startHookServer([]agent.Hook{badInput{}}, noState, nil, newStops())
 			require.NoError(t, err)
 			defer srv.close()
 
 			var out bytes.Buffer
 			require.NoError(t, HookShim(context.Background(), srv.socket, strings.NewReader(tt.input), &out))
 			assert.Contains(t, out.String(), tt.want)
-			assert.Equal(t, tt.failRun, srv.takeErr() != nil)
+			assert.Equal(t, tt.failRun, srv.stops.Take() != nil)
 		})
 	}
 }
@@ -451,8 +459,9 @@ func TestCloseWhileAHookWaits(t *testing.T) {
 	gopi, gopiScrub := fakeGopi(t)
 	useTraces(t, []string{"hook_wait.trace"}, gopiScrub, socketScrub)
 	entered := make(chan struct{})
-	a := newAgent(t,
-		Hooks(waitHook{entered: entered}),
+	a := newAgent(
+		t,
+		agent.Config{Hooks: []agent.Hook{waitHook{entered: entered}}},
 		HookCommand(gopi),
 	)
 
@@ -496,8 +505,7 @@ func TestMissingHookCommandFails(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("PATH", t.TempDir())
 			useTraces(t, nil)
-			opts := append([]Option{Hooks(policyHook{})}, tt.opts...)
-			a := newAgent(t, opts...)
+			a := newAgent(t, agent.Config{Hooks: []agent.Hook{policyHook{}}}, tt.opts...)
 
 			_, _, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
 			require.Error(t, err, "Codex runs the tool when the hook command is missing")
@@ -568,7 +576,7 @@ func TestHookNewInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			srv, err := startHookServer([]agent.Hook{inputHook{input: tt.hook}}, noState, nil)
+			srv, err := startHookServer([]agent.Hook{inputHook{input: tt.hook}}, noState, nil, newStops())
 			require.NoError(t, err)
 			defer srv.close()
 
@@ -589,7 +597,7 @@ func TestHookServerEndsAStuckConnection(t *testing.T) {
 	saved := hookReadTimeout
 	hookReadTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { hookReadTimeout = saved })
-	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil)
+	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil, newStops())
 	require.NoError(t, err)
 	defer srv.close()
 
@@ -610,7 +618,7 @@ func TestHookServerWithALongTempDir(t *testing.T) {
 	require.NoError(t, os.MkdirAll(long, 0o700))
 	t.Setenv("TMPDIR", long)
 
-	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil)
+	srv, err := startHookServer([]agent.Hook{policyHook{}}, noState, nil, newStops())
 	require.NoError(t, err, "a socket path over the limit of the OS fails to listen")
 	defer srv.close()
 
@@ -644,7 +652,7 @@ func TestHookServerAsks(t *testing.T) {
 				seen = append(seen, req)
 				return tt.decision, nil
 			}
-			srv, err := startHookServer([]agent.Hook{askHook{}}, noState, approve)
+			srv, err := startHookServer([]agent.Hook{askHook{}}, noState, approve, newStops())
 			require.NoError(t, err)
 			defer srv.close()
 

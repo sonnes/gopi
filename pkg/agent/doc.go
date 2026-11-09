@@ -70,7 +70,8 @@
 //     the order of registration. Each point is its own interface,
 //     such as [BeforeToolHook]. A hook must embed [BaseHook].
 //     [BeforeCall], [AfterCall], [BeforeTool], [AfterTool],
-//     [AfterTurn], and [BeforeStop] add a hook at one point. An
+//     [AfterTurn], and [BeforeStop] return a hook at one point, and
+//     [Hooks] adds it. A hook that implements no point fails [New]. An
 //     AfterTool method must be safe for concurrent use. A hook reads
 //     the session and sets values through [State.Log]. It adds entries
 //     from AfterTurn and BeforeStop, or queues them with [State.Steer]

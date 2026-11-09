@@ -2,6 +2,7 @@ package compact
 
 import (
 	"context"
+	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
@@ -131,11 +132,11 @@ func cutIndex(view []session.Entry, keepRecent int) int {
 		return len(view)
 	}
 	tokens := 0
-	for i := len(view) - 1; i >= 0; i-- {
-		m := view[i].Message
+	for i, v := range slices.Backward(view) {
+		m := v.Message
 		tokens += ai.EstimateTokens(m)
 		starts := m.Role == ai.RoleUser || m.Role == ai.RoleAssistant
-		if !starts || view[i].Ephemeral || tokens < keepRecent {
+		if !starts || v.Ephemeral || tokens < keepRecent {
 			continue
 		}
 		if i > 0 && m.Role == ai.RoleAssistant && view[i-1].Message.Role == ai.RoleUser && !view[i-1].Ephemeral {

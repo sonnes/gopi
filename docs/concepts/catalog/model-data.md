@@ -32,21 +32,24 @@ flowchart TD
 - A program accepts a field that it does not know, so a newer file still loads in an older program. The generator rejects it, so a typo in the file fails `make models`.
 - The generator is the module `cmd/modelsync`, because it imports `pkg/catalog/env` and the providers, and the root module imports neither.
 - The generator merges a model list with the rule of `FetchModels`, so a model list gives the same values to the file and to a [catalog](catalog.md). Only the generator fills values from models.dev.
+- The generator takes its IDs from the detectors of `pkg/catalog/env`, so a new provider needs a detector and no change to the generator. With no `IDS`, it updates only the IDs that the file has, because a detector such as `openaichat` serves any server and has no models in the file.
 - A value in the file always wins over models.dev, because models.dev can be late or wrong. The report names each price that differs, so a person checks it.
 - A model that a model list leaves out stays, unless `PRUNE=1` is set, because a provider can drop a model from its list before it stops serving it.
 - The OpenRouter entry holds only the models with tools, because each call of a gopi agent sends tools.
 
 ## Map
 
-| Task                                  | File                                 |
-| ------------------------------------- | ------------------------------------ |
-| Change a model, a price, or a default | `models.json`                        |
-| Update the file from the model lists  | `make models`, `make models IDS=...` |
-| Change how the generator merges       | `cmd/modelsync/sync.go`              |
-| Change how models.dev maps to a model | `cmd/modelsync/dev.go`               |
-| Change the format of the file         | `internal/modelsfile/modelsfile.go`  |
-| Change how a program reads the file   | `pkg/catalog/modelfile.go`           |
-| Change the checks of the file         | `pkg/catalog/modelfile_test.go`      |
+| Task                                   | File                                 |
+| -------------------------------------- | ------------------------------------ |
+| Change a model, a price, or a default  | `models.json`                        |
+| Update the file from the model lists   | `make models`, `make models IDS=...` |
+| Change how one field of a model merges | `pkg/catalog/fetch.go`               |
+| Change how the generator merges        | `cmd/modelsync/sync.go`              |
+| Link an ID to models.dev               | `cmd/modelsync/main.go`              |
+| Change how models.dev maps to a model  | `cmd/modelsync/dev.go`               |
+| Change the format of the file          | `internal/modelsfile/modelsfile.go`  |
+| Change how a program reads the file    | `pkg/catalog/modelfile.go`           |
+| Change the checks of the file          | `pkg/catalog/modelfile_test.go`      |
 
 ## Related Concepts
 

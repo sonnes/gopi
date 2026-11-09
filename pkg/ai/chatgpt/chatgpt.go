@@ -27,13 +27,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
 
 	"github.com/google/jsonschema-go/jsonschema"
 
+	"github.com/sonnes/gopi/internal/httpget"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/oauth"
 	"github.com/sonnes/gopi/pkg/ai/openai"
@@ -41,9 +41,6 @@ import (
 
 // DefaultBaseURL is the base URL of the Responses route of the plan.
 const DefaultBaseURL = "https://api.openai.com/v1"
-
-// maxErrorBody is the most bytes of an error body that an error holds.
-const maxErrorBody = 1024
 
 // listedVisibility is the visibility of a model that the model picker
 // of ChatGPT shows. A model with another visibility is not for a user.
@@ -152,18 +149,6 @@ type listResponse struct {
 	} `json:"models"`
 }
 
-// efforts maps a reasoning effort of the model list to an
-// [ai.ThinkingLevel]. An effort with no level, such as "minimal", is
-// not in the list of the model.
-var efforts = map[string]ai.ThinkingLevel{
-	"none":   ai.ThinkingOff,
-	"low":    ai.ThinkingLow,
-	"medium": ai.ThinkingMedium,
-	"high":   ai.ThinkingHigh,
-	"xhigh":  ai.ThinkingXHigh,
-	"max":    ai.ThinkingMax,
-}
-
 // modalities maps an input modality of the model list to an
 // [ai.Modality].
 var modalities = map[string]ai.Modality{
@@ -174,9 +159,10 @@ var modalities = map[string]ai.Modality{
 // ListModels lists the models that the account can use on the route.
 // It skips a model that the model picker hides, and a model that the
 // API does not serve. A reasoning effort or an input modality with no
-// gopi value, such as "ultra", is not in the model.
+// gopi value, such as "ultra", is not in the model. The thinking levels
+// of a model are in the order of [ai.ThinkingLevels].
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
-	body, err := p.get(ctx, "/models")
+	body, err := httpget.Get(ctx, p.client, p.baseURL+"/models", "")
 	if err != nil {
 		return nil, fmt.Errorf("chatgpt: list models: %w", err)
 	}
@@ -191,10 +177,13 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 		if !listed {
 			continue
 		}
-		var levels []ai.ThinkingLevel
+		var efforts []string
 		for _, l := range m.ReasoningLevels {
-			level, ok := efforts[l.Effort]
-			if ok && !slices.Contains(levels, level) {
+			efforts = append(efforts, l.Effort)
+		}
+		var levels []ai.ThinkingLevel
+		for _, level := range ai.ThinkingLevels() {
+			if slices.Contains(efforts, level.Effort()) {
 				levels = append(levels, level)
 			}
 		}
@@ -214,34 +203,4 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 		})
 	}
 	return models, nil
-}
-
-// get sends a GET request for path and returns the body of a 200
-// response.
-func (p *Provider) get(ctx context.Context, path string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	res, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: %s", res.Status, truncate(body))
-	}
-	return body, nil
-}
-
-// truncate returns at most [maxErrorBody] bytes of body as a string.
-func truncate(body []byte) string {
-	if len(body) > maxErrorBody {
-		body = body[:maxErrorBody]
-	}
-	return string(body)
 }

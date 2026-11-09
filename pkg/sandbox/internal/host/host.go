@@ -11,3 +11,14 @@ type Pather interface {
 	// an error for a path that the sandbox does not let the tools read.
 	HostPath(path string) (string, error)
 }
+
+// Sizer is a sandbox that gives the size of a file without a read of
+// the file. The local sandbox is one. The read tool uses it to refuse a
+// large file before the file fills the memory, and the walk of the grep
+// tool uses it to skip a large file. The interface of a
+// remote sandbox has no stat, so a remote file has no size check.
+type Sizer interface {
+	// FileSize returns the size of a file in bytes. It obeys the same
+	// rules as ReadFile, and returns the same errors.
+	FileSize(path string) (int64, error)
+}

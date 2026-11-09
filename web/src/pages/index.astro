@@ -38,7 +38,7 @@ const bands = [
 const covers = [
   ["coding agent", "a terminal", "harness.New"],
   ["issue triage", "a nightly job", "agent.Durable"],
-  ["code reviewer", "a CI step", 'harness.Deny("Edit")'],
+  ["code reviewer", "a CI step", 'Deny: []string{"Edit"}'],
   ["support agent", "an HTTP handler", "h.Stream"],
   ["Claude Code or Codex", "a page of your app", "claude-code/, codex/"],
 ];
@@ -162,11 +162,11 @@ const guide: Record<string, Guide> = {
     skip: "The code gives the tools and the prompt, and no files. Use agent.New.",
     apis: [
       ["harness.New", "a harness from options"],
-      ["h.Durable", "an agent bound to a stored session"],
+      ["h.Start", "an agent bound to a stored session"],
+      ["agent.Config", "the model, the folder, and the mode of one session"],
       ["harness.Defs", "folders of AGENTS.md, skills/, and agents/"],
-      ["harness.MCP", "MCP servers, connected at each start"],
-      ["harness.Mode", "the permission mode of each call"],
-      ["harness.Deny", "a rule for the calls that never run"],
+      ["harness.Toolset", "the tools of each agent"],
+      ["harness.Allow", "a rule for the calls that run with no question"],
     ],
   },
   agent: {
@@ -209,7 +209,7 @@ const guide: Record<string, Guide> = {
       "Code around each call, such as a log, a retry, or a denial.",
       "Many tools that load only when the model searches for them.",
     ],
-    skip: "The tools come from an MCP server. Give the server to harness.MCP.",
+    skip: "The tools come from an MCP server. Give the server in the MCP field of agent.Config.",
     apis: [
       ["tool.New", "a tool from a Go function"],
       ["tool.Description", "the text that the model reads"],

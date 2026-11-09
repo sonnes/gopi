@@ -186,10 +186,11 @@ func (a *Agent) Close() error {
 }
 
 // New returns an agent over an unsaved log. The log lives in process
-// memory and ends with the process. New does no I/O, so it
-// returns no error and takes no context. If two tools have the same
-// name, New panics, because that is a bug in the caller. A deferred
-// tool counts, because a change can add it to a later call.
+// memory and ends with the process. New does no I/O, so it returns no
+// error and takes no context. If two tools have the same name, or if a
+// hook implements no point, New panics, because that is a bug in the
+// caller. A deferred tool counts, because a change can add it to a
+// later call.
 func New(lm ai.LanguageModel, opts ...Option) *Agent {
 	a, err := newAgent(lm, opts)
 	if err != nil {
@@ -205,8 +206,8 @@ func New(lm ai.LanguageModel, opts ...Option) *Agent {
 // entry, with the tools that the model can call there. To load the
 // tools that a search loaded, Durable runs each search of the log
 // again. Durable is the one constructor that does store I/O. If two
-// tools have the same name, Durable returns an error before it touches
-// the store.
+// tools have the same name, or if a hook implements no point, Durable
+// returns an error before it touches the store.
 func Durable(
 	ctx context.Context,
 	lm ai.LanguageModel,
@@ -233,7 +234,7 @@ func Durable(
 }
 
 // newAgent applies opts and returns an agent with no log. It fails if
-// two tools have the same name.
+// a hook implements no point, or if two tools have the same name.
 func newAgent(lm ai.LanguageModel, opts []Option) (*Agent, error) {
 	a := &Agent{
 		lm:     lm,
@@ -242,6 +243,9 @@ func newAgent(lm ai.LanguageModel, opts []Option) (*Agent, error) {
 	a.state.queues = a.queues
 	for _, opt := range opts {
 		opt(a)
+	}
+	if err := CheckHooks(a.cfg.hooks, AllPoints...); err != nil {
+		return nil, err
 	}
 	a.cfg.tools = slices.Clip(a.cfg.tools)
 
@@ -270,16 +274,8 @@ func newAgent(lm ai.LanguageModel, opts []Option) (*Agent, error) {
 // the state.
 func (a *Agent) setLog(l *session.Log) {
 	a.log = l
-	a.state.log = l.Writer()
-	h := l.History()
-	a.state.messages = make([]ai.Message, 0, len(h.Entries))
-	a.state.ids = make([]string, 0, len(h.Entries))
-	for _, e := range h.Entries {
-		a.state.messages = append(a.state.messages, e.Message)
-		a.state.ids = append(a.state.ids, e.ID)
-	}
-	a.state.edits = h.Edits
-	a.state.compactedAt = h.CompactedAt
+	a.state = NewState(l)
+	a.state.queues = a.queues
 }
 
 // Log returns the log of the agent: its entries, and the values of the
@@ -344,23 +340,20 @@ func (em *emitter) emit(e Event) {
 	em.apply(e)
 }
 
-// commit appends entries to the log, then applies events to the state
-// and pushes them. If the append fails, the state and the stream do not
-// change, and commit returns the error. The append ignores the
-// cancellation of ctx, so a run that stops keeps what it finished.
-func (em *emitter) commit(ctx context.Context, entries []session.Entry, events ...Event) error {
+// commit appends en to the log, then applies events to the state and
+// pushes them. A message_end gets the ID of the entry. If the append
+// fails, the state and the stream do not change, and commit returns the
+// error. The append ignores the cancellation of ctx, so a run that
+// stops keeps what it finished.
+func (em *emitter) commit(ctx context.Context, en session.Entry, events ...Event) error {
 	em.order.Lock()
 	defer em.order.Unlock()
-	var stored []session.Entry
-	if len(entries) > 0 {
-		var err error
-		stored, err = em.agent.log.Append(context.WithoutCancel(ctx), entries...)
-		if err != nil {
-			return err
-		}
+	stored, err := em.agent.log.Append(context.WithoutCancel(ctx), en)
+	if err != nil {
+		return err
 	}
 	for _, e := range events {
-		if end, ok := e.(EventMessageEnd); ok && len(stored) == 1 {
+		if end, ok := e.(EventMessageEnd); ok {
 			end.EntryID = stored[0].ID
 			e = end
 		}

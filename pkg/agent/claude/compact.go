@@ -3,11 +3,9 @@ package claude
 import (
 	"cmp"
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/agent/internal/emit"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/stream"
@@ -25,16 +23,14 @@ const (
 	compactSuccess   = "success"
 )
 
-var _ agent.ManualCompactor = (*Agent)(nil)
-
-// Compact implements [agent.ManualCompactor]. It sends /compact with the
+// Compact implements [agent.Runner]. It sends /compact with the
 // instructions to the CLI. The log keeps the compaction, and not the
 // command.
 func (a *Agent) Compact(ctx context.Context, instructions string) *agent.Stream {
 	return stream.New(func(push func(agent.Event)) ([]ai.Message, error) {
-		em := emit.New(a.log, a.name, a.state, push)
-		if err := em.Start(); err != nil {
-			return nil, fmt.Errorf("claude: %w", err)
+		em, err := a.core.Start(push)
+		if err != nil {
+			return nil, err
 		}
 		text := strings.TrimSpace(compactCommand + " " + instructions)
 		return a.drive(ctx, em, []session.Entry{session.Text(text)}, nil, true)

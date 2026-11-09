@@ -48,8 +48,8 @@ type Detection struct {
 }
 
 // Detect runs ds in order and registers each provider that a detector
-// builds. It registers the provider for images and for speech too, if
-// the provider implements [ai.ImageProvider] or [ai.SpeechProvider].
+// builds. It registers the provider for images too, if the provider
+// implements [ai.ImageProvider].
 //
 // Order is precedence. If two detectors have the same Provider, the
 // first one that finds its credential wins, and Detect skips the rest.
@@ -99,13 +99,9 @@ func (c *Catalog) DetectDrivers(ds ...DriverDetector) []Detection {
 	return found
 }
 
-// register registers p for each capability that it implements.
 func (c *Catalog) register(id string, p ai.TextProvider, models []ai.Model) {
 	c.RegisterTextProvider(id, p, models...)
 	if ip, ok := p.(ai.ImageProvider); ok {
 		c.RegisterImageProvider(id, ip)
-	}
-	if sp, ok := p.(ai.SpeechProvider); ok {
-		c.RegisterSpeechProvider(id, sp)
 	}
 }

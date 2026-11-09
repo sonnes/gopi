@@ -2,8 +2,6 @@ package claude_test
 
 import (
 	"context"
-	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,18 +13,16 @@ import (
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
+	"github.com/sonnes/gopi/pkg/agent/internal/drivertest"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	storefs "github.com/sonnes/gopi/pkg/store/fs"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// The agent is a runner that a host stops with Close.
-var (
-	_ agent.Runner = (*claude.Agent)(nil)
-	_ io.Closer    = (*claude.Agent)(nil)
-)
+var _ agent.Runner = (*claude.Agent)(nil)
 
 // stopHook is a hook at BeforeStop.
 type stopHook struct{ agent.BaseHook }
@@ -37,10 +33,7 @@ func (stopHook) BeforeStop(context.Context, agent.State) ([]session.Entry, error
 
 func TestDriverStart(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
-	d := claude.Driver(
-		claude.Binary("/opt/claude"),
-		claude.PermissionMode(claude.PermissionBypass),
-	)
+	d := claude.Driver(claude.Binary("/opt/claude"))
 
 	r, err := d.Start(context.Background(), agent.Config{
 		SessionID: "s1",
@@ -48,11 +41,6 @@ func TestDriverStart(t *testing.T) {
 		Spec:      "claude-code/haiku",
 		Model:     ai.Model{ID: "haiku"},
 		Dir:       "/work",
-		Sections:  agent.SystemText("Be brief."),
-		Mode:      agent.ModeAcceptEdits,
-		Deny:      []string{"web_fetch", "bash(rm:*)"},
-		Effort:    ai.ThinkingHigh,
-		MCP:       []agent.MCPServer{{Name: "local", Command: "lw-mcp"}},
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -65,26 +53,12 @@ func TestDriverStart(t *testing.T) {
 	cmds := starts.Cmds()
 	require.Len(t, cmds, 1)
 	cmd := cmds[0]
-	assert.Equal(t, "/opt/claude", cmd.Args[0], "the options of the driver come first")
+	assert.Equal(t, "/opt/claude", cmd.Args[0], "the driver gives its options")
 	assert.Equal(t, "/work", cmd.Dir)
-	args := strings.Join(cmd.Args, " ")
-	for _, want := range []string{
-		"--model haiku",
-		"--append-system-prompt Be brief.",
-		"--disallowedTools WebFetch --",
-		"--permission-mode acceptEdits",
-		"--effort high",
-		`--mcp-config {"mcpServers":{"local":{"command":"lw-mcp"}}}`,
-	} {
-		assert.Contains(t, args, want)
-	}
-	assert.NotContains(t, args, "bypassPermissions", "the mode of the config replaces the mode of the driver")
-	assert.NotContains(t, args, "Bash(rm:*)", "the CLI gets no rule with content")
-	assert.NotContains(t, args, "--settings", "the CLI gets no permission rules in its settings")
-	assert.NotContains(t, args, "--agents", "a config with no dirs gives no agents")
+	assert.Contains(t, strings.Join(cmd.Args, " "), "--model haiku", "the driver gives the config")
 }
 
-func TestDriverDirs(t *testing.T) {
+func TestDriverDefs(t *testing.T) {
 	low := t.TempDir()
 	writeAgent(t, low, "penny.md", `---
 name: penny
@@ -129,7 +103,7 @@ Answer.
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
 		Spec:      "claude-code/claude-opus-5-5",
-		Dirs:      []string{low, high},
+		Defs:      def.Layers(storefs.Dir(low), storefs.Dir(high)),
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -143,11 +117,10 @@ Answer.
 	assert.NotContains(t, args, "--agents", "the folder holds the agents")
 	assert.NotContains(t, args, "--agent", "the host gives the prompt of the agent of the session")
 
-	folder := os.DirFS(filepath.Join(root, "s1"))
-	got, err := storefs.Agents(folder, ".claude/agents").ReadAgents(context.Background())
+	written, err := storefs.Dir(filepath.Join(root, "s1", ".claude")).Load(context.Background())
 	require.NoError(t, err)
-	byName := make(map[string]def.Agent, len(got))
-	for _, agent := range got {
+	byName := make(map[string]def.Agent, len(written.Agents))
+	for _, agent := range written.Agents {
 		byName[agent.Name] = agent
 	}
 	require.Len(t, byName, 4)
@@ -202,7 +175,7 @@ func TestDriverWritesNoEffortForOff(t *testing.T) {
 	r, err := claude.Driver().Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
-		Dirs:      []string{dir},
+		Defs:      storefs.Dir(dir),
 	})
 	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
@@ -217,20 +190,32 @@ func TestDriverWritesNoEffortForOff(t *testing.T) {
 	assert.NotContains(t, string(data), "effort")
 }
 
-func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
+func TestDriverConformance(t *testing.T) {
+	drivertest.Run(t, drivertest.Suite{
+		Driver:          claude.Driver(),
+		UnsupportedHook: callHook{},
+		SkillDir:        filepath.Join(".claude", "skills"),
+		WriteDefs: func(t *testing.T, r agent.Runner) {
+			claude.Replay(t, nil, "testdata/text.trace")
+			_, err := r.Run(context.Background(), session.Text("Say hello")).Wait()
+			require.NoError(t, err)
+		},
+	})
+}
+
+func TestDriverGivesTheDefsToTheCLI(t *testing.T) {
 	starts := claude.Replay(t, nil, "testdata/text.trace")
 	root := defsRoot(t)
-	d := claude.Driver()
 
-	r, err := d.Start(context.Background(), agent.Config{
+	r, err := claude.Driver().Start(context.Background(), agent.Config{
 		SessionID: "s1",
 		Store:     session.NewMemoryStore(),
-		Dirs:      []string{defsDir(t)},
-		Skills:    []string{"deploy"},
+		Defs:      storefs.Dir(defsDir(t)),
 	})
-	require.NoError(t, err, "the driver takes a skill of the dirs")
+	require.NoError(t, err)
 	a, ok := r.(*claude.Agent)
 	require.True(t, ok)
+	defer closeAgent(t, a)
 
 	_, _, err = run(context.Background(), a, "Say hello")
 	require.NoError(t, err)
@@ -239,53 +224,9 @@ func TestDriverGivesTheDirsToTheCLI(t *testing.T) {
 	cmds := starts.Cmds()
 	require.Len(t, cmds, 1)
 	assert.Contains(t, strings.Join(cmds[0].Args, " "), "--add-dir "+folder)
-	assert.FileExists(t, filepath.Join(folder, ".claude", "skills", "deploy", "SKILL.md"))
 	agentFile, err := os.ReadFile(filepath.Join(folder, ".claude", "agents", "reviewer.md"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(agentFile), "gpt-6", "the model of another CLI stays out")
-
-	require.NoError(t, a.Close())
-	assert.NoDirExists(t, folder, "the folder lives for the process of the CLI")
-}
-
-func TestDriverWritesAnInlineSkillWithNoDirs(t *testing.T) {
-	starts := claude.Replay(t, nil, "testdata/text.trace")
-	root := defsRoot(t)
-
-	r, err := claude.Driver().Start(context.Background(), agent.Config{
-		SessionID: "s1",
-		Store:     session.NewMemoryStore(),
-		Skillset:  []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
-	})
-	require.NoError(t, err)
-	a, ok := r.(*claude.Agent)
-	require.True(t, ok)
-	defer closeAgent(t, a)
-
-	_, _, err = run(context.Background(), a, "Say hello")
-	require.NoError(t, err)
-
-	folder := filepath.Join(root, "s1")
-	assert.Contains(t, strings.Join(starts.Cmds()[0].Args, " "), "--add-dir "+folder)
-	assert.FileExists(t, filepath.Join(folder, ".claude", "skills", "deploy", "SKILL.md"))
-}
-
-func TestDriverWithNoDirsGivesNoFolder(t *testing.T) {
-	starts := claude.Replay(t, nil, "testdata/text.trace")
-
-	r, err := claude.Driver().Start(context.Background(), agent.Config{
-		SessionID: "s1",
-		Store:     session.NewMemoryStore(),
-	})
-	require.NoError(t, err)
-	a, ok := r.(*claude.Agent)
-	require.True(t, ok)
-	defer closeAgent(t, a)
-
-	_, _, err = run(context.Background(), a, "Say hello")
-	require.NoError(t, err)
-
-	assert.NotContains(t, starts.Cmds()[0].Args, "--add-dir")
 }
 
 func TestDriverGivesEachAddDirToTheCLI(t *testing.T) {
@@ -318,14 +259,14 @@ func TestDriverGivesTheLimitsToTheCLI(t *testing.T) {
 		{
 			name: "each limit",
 			config: agent.Config{
-				Limits: agent.Limits{BlockReadsOutside: true, BlockWritesOutside: true, Fence: true},
+				Limits: permission.Limits{BlockReadsOutside: true, BlockWritesOutside: true, Fence: true},
 			},
 			want: `{"permissions":{"blockReadsOutsideWorkingDirectories":true,"blockWritesOutsideWorkingDirectories":true},"sandbox":{"enabled":true}}`,
 		},
 		{
 			name: "one limit",
 			config: agent.Config{
-				Limits: agent.Limits{BlockWritesOutside: true},
+				Limits: permission.Limits{BlockWritesOutside: true},
 			},
 			want: `{"permissions":{"blockWritesOutsideWorkingDirectories":true}}`,
 		},
@@ -348,83 +289,6 @@ func TestDriverGivesTheLimitsToTheCLI(t *testing.T) {
 			i := slices.Index(args, "--settings")
 			require.GreaterOrEqual(t, i, 0, "the CLI gets --settings")
 			assert.JSONEq(t, tt.want, args[i+1])
-		})
-	}
-}
-
-func TestDriverRejects(t *testing.T) {
-	tests := []struct {
-		name string
-		// opts are the options of the driver.
-		opts        []claude.Option
-		config      agent.Config
-		unsupported bool
-		errText     string
-	}{
-		{
-			name: "a skill that no dir has",
-			config: agent.Config{
-				SessionID: "s1",
-				Skills:    []string{"deploy"},
-			},
-			errText: `claude: clidefs: the skill "deploy": no skill has this name`,
-		},
-		{
-			name: "a tool of the caller that ToolNames names",
-			config: agent.Config{
-				SessionID: "s1",
-				Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Func("echo", nil)},
-				ToolNames: []string{"bash", "echo"},
-			},
-			errText: `claude: tool: unknown tool: "echo" is not a tool of claude-code`,
-		},
-		{
-			name: "a name outside the tools",
-			config: agent.Config{
-				SessionID: "s1",
-				Tools:     []tool.Tool{tool.Named(tool.Bash)},
-				ToolNames: []string{"Read"},
-			},
-			errText: `claude: tool: unknown tool: "Read" is not in the tool list`,
-		},
-		{
-			name: "a hook at a model call",
-			config: agent.Config{
-				SessionID: "s1",
-				Hooks:     []agent.Hook{stopHook{}, callHook{}},
-			},
-			unsupported: true,
-			errText:     "claude: agent: hook 2 (claude_test.callHook) uses BeforeCall: unsupported operation",
-		},
-		{
-			name:        "a hook of the driver at a model call",
-			opts:        []claude.Option{claude.Hooks(callHook{})},
-			config:      agent.Config{SessionID: "s1"},
-			unsupported: true,
-			errText:     "claude: agent: hook 1 (claude_test.callHook) uses BeforeCall: unsupported operation",
-		},
-		{
-			name: "a hook with no point",
-			config: agent.Config{
-				SessionID: "s1",
-				Hooks:     []agent.Hook{agent.BaseHook{}},
-			},
-			errText: "claude: agent: hook 1 (agent.BaseHook) implements no point",
-		},
-		{
-			name: "an unknown mode",
-			config: agent.Config{
-				SessionID: "s1",
-				Mode:      "auto",
-			},
-			errText: `claude: agent: unknown mode "auto"`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := claude.Driver(tt.opts...).Start(context.Background(), tt.config)
-			require.EqualError(t, err, tt.errText)
-			assert.Equal(t, tt.unsupported, errors.Is(err, errors.ErrUnsupported))
 		})
 	}
 }
@@ -508,39 +372,6 @@ func TestDriverTools(t *testing.T) {
 	}
 }
 
-func TestDriverOnlyToolsLimitsTheList(t *testing.T) {
-	starts := claude.Replay(t, nil, "testdata/text.trace")
-	d := claude.Driver(claude.OnlyTools("Read", "Grep"))
-
-	r, err := d.Start(context.Background(), agent.Config{
-		SessionID: "s1",
-		Store:     session.NewMemoryStore(),
-		Tools:     []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ReadFile)},
-	})
-	require.NoError(t, err)
-	a, ok := r.(*claude.Agent)
-	require.True(t, ok)
-	defer closeAgent(t, a)
-	_, _, err = run(context.Background(), a, "Say hello")
-	require.NoError(t, err)
-
-	args := strings.Join(starts.Cmds()[0].Args, " ") + " "
-	assert.Contains(t, args, "--tools Read,ToolSearch ", "the option of the driver limits the list of the config")
-}
-
-func TestToolsIsEachToolOfClaudeCode(t *testing.T) {
-	var names []string
-	for _, tl := range claude.Tools() {
-		assert.True(t, tool.IsNamed(tl))
-		names = append(names, tl.Info().Name)
-	}
-
-	for _, want := range []string{tool.Bash, tool.ReadFile, tool.AskUserQuestion, tool.ExitPlanMode, tool.NotebookEdit} {
-		assert.Contains(t, names, want)
-	}
-	assert.NotContains(t, names, tool.ApplyPatch, "Claude Code has no apply_patch")
-}
-
 func TestDriverMovesTheTextOfASkillCallLast(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -558,7 +389,7 @@ func TestDriverMovesTheTextOfASkillCallLast(t *testing.T) {
 			r, err := claude.Driver().Start(context.Background(), agent.Config{
 				SessionID: "s1",
 				Store:     session.NewMemoryStore(),
-				Skillset:  []def.SkillsReader{def.Skill{Name: "deploy", Description: "D.", Body: "Do it."}},
+				Defs:      def.Set{Skills: []def.Skill{{Name: "deploy", Description: "D.", Body: "Do it."}}},
 			})
 			require.NoError(t, err)
 			a, ok := r.(*claude.Agent)

@@ -1,7 +1,7 @@
 stdiorr trace v1
 # The model calls an MCP tool that the ToolNames of the config do not name.
 # The hook of ToolNames denies the call. Written by hand from hook_pre_tool.trace.
-> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":{"PreToolUse":[{"hookCallbackIds":["PreToolUse"]}]}}}
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize","hooks":{"PreToolUse":[{"hookCallbackIds":["PreToolUse"],"timeout":86400}]}}}
 < {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{"commands":[],"models":[]}}}
 > {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Send it"}]},"parent_tool_use_id":null,"session_id":""}
 < {"type":"system","subtype":"init","cwd":"/work","session_id":"sess-1","model":"claude-haiku-4-5","tools":["Bash","mcp__lw__threads_send"]}

@@ -1,6 +1,6 @@
 // Package anthropic is the provider for the Anthropic Messages API. It
 // implements [ai.TextProvider], [ai.ObjectProvider], [ai.TokenCounter],
-// [ai.ModelLister], and [ai.KeyChecker].
+// and [ai.ModelLister].
 //
 // A caller must obey these rules:
 //
@@ -28,13 +28,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	sdk "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 	"github.com/google/jsonschema-go/jsonschema"
 
-	"github.com/sonnes/gopi/internal/retry"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -221,7 +221,7 @@ func (p *Provider) StreamText(
 			}
 		}
 
-		stream, err := p.openStream(ctx, req.params, retry.PolicyOf(opts), reqOpts)
+		stream, err := p.openStream(ctx, req.params, opts, reqOpts)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func (p *Provider) GenerateObject(
 	stream, err := p.openStream(
 		ctx,
 		req.params,
-		retry.PolicyOf(opts),
+		opts,
 		requestOptions(req.betas, opts),
 	)
 	if err != nil {
@@ -296,19 +296,22 @@ func (p *Provider) GenerateObject(
 		return nil, err
 	}
 
-	var raw string
+	var raw strings.Builder
 	for _, block := range resp.Content {
 		if block.Type == "text" {
-			raw += block.Text
+			raw.WriteString(block.Text)
 		}
 	}
-	if raw == "" {
+	if raw.String() == "" {
 		return nil, fmt.Errorf("anthropic: no object in response, stop reason %q", resp.StopReason)
 	}
 
+	usage := mapUsage(resp.Usage)
+	usage.Cost = model.Pricing.Cost(usage)
+
 	return &ai.ObjectResponse{
-		Raw:   raw,
-		Usage: mapUsage(resp.Usage),
+		Raw:   raw.String(),
+		Usage: usage,
 	}, nil
 }
 
@@ -325,9 +328,13 @@ func (p *Provider) CountTokens(
 		return nil, err
 	}
 
-	resp, err := p.client.Messages.CountTokens(ctx, params, requestOptions(betas, opts)...)
+	reqOpts := requestOptions(betas, opts)
+	send := func() (*sdk.MessageTokensCount, error) {
+		return p.client.Messages.CountTokens(ctx, params, reqOpts...)
+	}
+	resp, err := call(ctx, opts, send)
 	if err != nil {
-		return nil, fmt.Errorf("anthropic: %w", err)
+		return nil, err
 	}
 
 	return &ai.TokenCount{Total: int(resp.InputTokens)}, nil

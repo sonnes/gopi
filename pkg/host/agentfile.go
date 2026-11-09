@@ -5,17 +5,12 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
-	storefs "github.com/sonnes/gopi/pkg/store/fs"
+	"github.com/sonnes/gopi/pkg/permission"
 )
-
-// inheritModel is the model of an agent file that uses the model of
-// the config.
-const inheritModel = "inherit"
 
 // checkEffort returns an error if the effort of config is not a thinking
 // level, so that a typo in an agent file fails the start and not the
@@ -31,34 +26,41 @@ func checkEffort(config Config) error {
 // checkMode returns an error if the mode of config is not a mode of
 // gopi. Without it, an unknown mode fails only the next start.
 func checkMode(config Config) error {
-	return agent.CheckMode(config.Mode, agent.AllModes...)
+	_, err := permission.ParseMode(string(config.Mode))
+	return err
 }
 
 // AgentSection is the name of the section with the prompt of the agent
 // file of a session.
 const AgentSection = "agent"
 
-// findAgent returns the agent file of config in its dirs.
-func findAgent(ctx context.Context, config Config) (def.Agent, error) {
-	readers := make([]def.AgentsReader, len(config.Dirs))
-	for i, d := range config.Dirs {
-		readers[i] = storefs.Dir(d)
+// findAgent returns the agent file of config in the definitions of
+// config. A name that no agent has wraps [ErrInvalid].
+func (h *Host) findAgent(ctx context.Context, config Config) (def.Agent, error) {
+	set, err := h.configDefs(config).Load(ctx)
+	if err != nil {
+		return def.Agent{}, err
 	}
-	return def.FindAgent(ctx, config.Agent, readers...)
+	a, ok := set.Agent(config.Agent)
+	if !ok {
+		return def.Agent{}, fmt.Errorf("no agent file is named %q: %w", config.Agent, ErrInvalid)
+	}
+	return a, nil
 }
 
 // sectionsOf returns the function that gives the sections of the
 // session id with config: the prompt of the agent file, then the
-// sections of fn. It returns nil if config has no agent file and fn
-// is nil, so the agent adds no prompt.
-func sectionsOf(config Config, id string, fn SectionsFunc) agent.SystemFunc {
+// sections of [Sections]. It returns nil if config has no agent file
+// and the host has no sections, so the agent adds no prompt.
+func (h *Host) sectionsOf(config Config, id string) agent.SystemFunc {
+	fn := h.sections
 	if config.Agent == "" && fn == nil {
 		return nil
 	}
 	return func(ctx context.Context) ([]ai.Section, error) {
 		var out []ai.Section
 		if config.Agent != "" {
-			a, err := findAgent(ctx, config)
+			a, err := h.findAgent(ctx, config)
 			if err != nil {
 				return nil, fmt.Errorf("host: session %s: %w", id, err)
 			}
@@ -77,25 +79,24 @@ func sectionsOf(config Config, id string, fn SectionsFunc) agent.SystemFunc {
 	}
 }
 
-// withAgent fills config from the file of config.Agent in the dirs. A field
-// that the config sets wins over the file. A config with no agent stays as
-// it is.
-func withAgent(ctx context.Context, config Config) (Config, error) {
+// withAgent fills config from the file of config.Agent. A field that the
+// config sets wins over the file. A config with no agent stays as it is.
+func (h *Host) withAgent(ctx context.Context, config Config) (Config, error) {
 	if config.Agent == "" {
 		return config, nil
 	}
 
-	a, err := findAgent(ctx, config)
+	a, err := h.findAgent(ctx, config)
 	if err != nil {
 		return config, err
 	}
 
 	model := a.Model
-	if strings.EqualFold(model, inheritModel) {
+	if a.InheritsModel() {
 		model = ""
 	}
 	config.Model = cmp.Or(config.Model, model)
-	config.Mode = cmp.Or(config.Mode, agent.Mode(a.Mode))
+	config.Mode = cmp.Or(config.Mode, permission.Mode(a.Mode))
 	config.Effort = cmp.Or(config.Effort, a.Effort)
 	if config.ToolNames == nil {
 		config.ToolNames = a.Tools

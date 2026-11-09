@@ -1,24 +1,19 @@
 package fireworks
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/sonnes/gopi/internal/httpget"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
 // pageSize is the most models that one page of the list holds. The API
 // caps a page at this size.
 const pageSize = 200
-
-// maxErrorBody is the most bytes of an error body that an error holds.
-const maxErrorBody = 1024
 
 // readyState is the state of a model that the API serves.
 const readyState = "READY"
@@ -85,26 +80,12 @@ func (p *Provider) listPage(ctx context.Context, token string) (listResponse, er
 	path := "/v1/accounts/" + url.PathEscape(p.cfg.account) + "/models"
 	endpoint := p.cfg.baseURL + path + "?" + query.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	body, err := httpget.Get(ctx, p.cfg.httpClient, endpoint, p.cfg.apiKey)
 	if err != nil {
 		return listResponse{}, err
-	}
-	if p.cfg.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+p.cfg.apiKey)
-	}
-	client := cmp.Or(p.cfg.httpClient, http.DefaultClient)
-	resp, err := client.Do(req)
-	if err != nil {
-		return listResponse{}, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBody))
-		return listResponse{}, fmt.Errorf("%s: %s", resp.Status, body)
 	}
 	var page listResponse
-	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+	if err := json.Unmarshal(body, &page); err != nil {
 		return listResponse{}, err
 	}
 	return page, nil
@@ -127,14 +108,4 @@ func (m listedModel) model() ai.Model {
 		ContextWindow: m.ContextLength,
 		Input:         input,
 	}
-}
-
-// CheckKey asks for the first page of the models of the account, so a
-// refused key fails and no model runs. Fireworks says nothing more
-// about the key, so the info is zero.
-func (p *Provider) CheckKey(ctx context.Context) (ai.KeyInfo, error) {
-	if _, err := p.listPage(ctx, ""); err != nil {
-		return ai.KeyInfo{}, fmt.Errorf("fireworks: check key: %w", err)
-	}
-	return ai.KeyInfo{}, nil
 }

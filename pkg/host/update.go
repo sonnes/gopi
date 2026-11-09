@@ -17,10 +17,11 @@ import (
 // resumes the log. A change that leaves the config the same keeps the
 // agent.
 //
-// Update returns [ErrInvalid] if change sets another ID, Dir, Dirs, or
-// Agent, or a model of another kind of agent, because the new agent
-// then cannot resume the conversation. It also returns [ErrInvalid] for
-// an effort that is not a thinking level. Such a change changes nothing.
+// Update returns [ErrInvalid] if change sets another ID, Dir, AddDirs,
+// DefDirs, or Agent, or a model of another kind of agent, because the
+// new agent then cannot resume the conversation. It also returns
+// [ErrInvalid] for a config that [Host.Create] refuses. Such a change
+// changes nothing.
 // If the host does not know the session, Update returns [ErrNotFound].
 func (h *Host) Update(ctx context.Context, id string, change func(*Config)) (Session, error) {
 	s, err := h.session(id)
@@ -48,14 +49,14 @@ func (s *hosted) update(ctx context.Context, change func(*Config)) (Session, err
 	}
 	// Two reads give two copies, so change cannot alter the old config
 	// through a shared slice.
-	old, ok, err := configValue.Get(w)
-	if err == nil && !ok {
-		err = fmt.Errorf("no config: %w", ErrInvalid)
-	}
+	old, err := s.storedConfig(configValue.Get(w))
 	if err != nil {
-		return Session{}, fmt.Errorf("host: session %s: %w", s.id, err)
+		return Session{}, err
 	}
-	config, _, _ := configValue.Get(w)
+	config, err := s.storedConfig(configValue.Get(w))
+	if err != nil {
+		return Session{}, err
+	}
 	change(&config)
 
 	// A change that changes nothing keeps the agent, so a caller can set
@@ -75,9 +76,7 @@ func (s *hosted) update(ctx context.Context, change func(*Config)) (Session, err
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sess.Model = config.Model
-	s.sess.Effort = config.Effort
-	s.sess.Mode = config.Mode
+	s.sess.setConfig(config)
 	s.stale = s.runner != nil
 	s.updateLocked()
 	return s.sess.clone(), nil
@@ -90,30 +89,21 @@ func (h *Host) checkChange(old, config Config) error {
 		old.Dir == config.Dir &&
 		slices.Equal(old.AddDirs, config.AddDirs) &&
 		old.Agent == config.Agent &&
-		slices.Equal(old.Dirs, config.Dirs)
+		slices.Equal(old.DefDirs, config.DefDirs)
 	if !fixed {
 		return fmt.Errorf("the ID, the folders, and the agent file cannot change: %w", ErrInvalid)
 	}
-	if err := checkEffort(config); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalid, err)
-	}
-	if err := checkMode(config); err != nil {
-		return fmt.Errorf("%w: %w", ErrInvalid, err)
-	}
-	if err := h.checkTools(config, false); err != nil {
+	driver, err := h.check(config, false)
+	if err != nil {
 		return err
 	}
-
 	oldDriver, _, err := h.cat.Driver(old.Model)
 	if err != nil {
 		return err
 	}
-	driver, _, err := h.cat.Driver(config.Model)
-	if err != nil {
-		return err
-	}
 	// Each kind of agent keeps its own conversation, so the type of the
-	// driver names the conversation that the agent resumes.
+	// driver names the conversation that the agent resumes. A driver
+	// value of a CLI holds a slice, so == on two of them panics.
 	if reflect.TypeOf(driver) != reflect.TypeOf(oldDriver) {
 		return fmt.Errorf("the model %s runs another kind of agent: %w", config.Model, ErrInvalid)
 	}

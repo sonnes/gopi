@@ -8,6 +8,7 @@ import (
 
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/def"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
 )
@@ -47,7 +48,7 @@ type Config struct {
 	AddDirs []string
 	// Limits are hard limits on the paths of the agent. The zero Limits
 	// sets no limit, so the mode and the rules decide each call.
-	Limits Limits
+	Limits permission.Limits
 	// Sections returns the sections that the agent adds to its own
 	// prompt, in order. A native agent calls it before each model call,
 	// and an agent CLI calls it before each run. A change of the
@@ -55,31 +56,30 @@ type Config struct {
 	// start of the conversation stays the same for the cache. If it is
 	// nil, the agent adds no prompt.
 	Sections SystemFunc
-	// Skillset holds readers of skills that are not in a folder, such as
-	// skills that ship in a program. They are lower than Dirs, so a skill
-	// of a folder replaces a skill of Skillset with the same name. Each
-	// driver gets the same skills.
-	Skillset []def.SkillsReader
+	// Defs gives the instructions, the skills, and the agents of the
+	// agent. Each driver gets the same skills and agents. Only the
+	// harness reads the instructions. If Defs is nil, the agent has no
+	// definitions.
+	Defs def.Source
 	// Skills names the skills that the agent loads at the start. A name
-	// that Skillset and Dirs do not have fails the start. The harness adds the
-	// body of each skill to the prompt. A driver of a CLI adds no text,
+	// that Defs does not have fails the start. The harness adds the body
+	// of each skill to the prompt. A driver of a CLI adds no text,
 	// because the CLI lists each skill and loads its body.
 	Skills []string
-	// Dirs are folders with agents/, skills/, and AGENTS.md, lowest
-	// first. A later folder wins for a name. Each driver gets the same
-	// skills and agents. Only the harness reads AGENTS.md.
-	Dirs []string
 	// Effort is the thinking level of each model call. If it is empty,
 	// the driver keeps the default of the model.
 	Effort ai.ThinkingLevel
 	// Mode is the permission mode of the agent. If it is empty, the
-	// driver keeps its own mode.
-	Mode Mode
+	// driver keeps its own mode. A mode that [permission.ParseMode] does
+	// not know fails the start.
+	Mode permission.Mode
 	// ToolNames limits the agent to the named tools of Tools. A name can
 	// be a gopi name or a Claude Code name, such as "Glob", and can have
 	// content, such as "bash(git diff *)". [tool.Select] reads it. If it
 	// is nil, the agent keeps each tool of Tools. A name of no tool of
-	// Tools fails the start with [tool.ErrUnknownTool].
+	// Tools fails the start with [tool.ErrUnknownTool]. Each driver keeps
+	// the tool search, [tool.ToolSearch], because it loads the deferred
+	// tools that ToolNames keeps.
 	ToolNames []string
 	// Deny are the Deny rules of the agent, in the format "Tool" or
 	// "Tool(content)". A rule can use a gopi name or a Claude Code name.
@@ -179,22 +179,33 @@ const (
 // installed, such as a CLI that is not at its path.
 var ErrNotInstalled = errors.New("agent: the CLI is not installed")
 
+// ErrNotLoggedIn is the error of a run whose CLI is not logged in. A
+// caller asks the user to log in to the CLI, or to give the CLI an API
+// key in its environment.
+var ErrNotLoggedIn = errors.New("agent: the CLI is not logged in")
+
+// ErrNoConversation is the error of a run whose CLI cannot find the
+// stored conversation, such as after its file was deleted. The agent
+// clears the stored ID, so the next run starts a new conversation of
+// the CLI. The log keeps its messages, and the CLI no longer reads
+// them.
+var ErrNoConversation = errors.New("agent: the CLI has no conversation to resume")
+
 // Runner is the part of an agent that a host uses. [Agent], the Claude
 // Code agent, and the Codex agent implement it. A runner shows an extra
-// feature with another interface, such as [Steerer] or [io.Closer].
+// feature with another interface, such as [Steerer] or [Waker].
 type Runner interface {
 	Run(ctx context.Context, entries ...session.Entry) *Stream
 	Log() *session.Log
 	State() State
-}
-
-// ManualCompactor is a [Runner] that compacts when a caller asks. [Agent],
-// the Claude Code agent, and the Codex agent implement it. The stream has
-// agent_start, the events of the compaction, and agent_end. If a run is
-// active, the stream fails with no event. The Codex agent ignores the
-// instructions, because its CLI does not take them.
-type ManualCompactor interface {
+	// Compact compacts the history now. The stream has agent_start, the
+	// events of the compaction, and agent_end. If a run is active, the
+	// stream fails with no event. The Codex agent ignores the
+	// instructions, because its CLI does not take them.
 	Compact(ctx context.Context, instructions string) *Stream
+	// Close frees what the agent holds, such as the process of a CLI
+	// or the MCP sessions of the harness. The log stays.
+	Close() error
 }
 
 // Steerer is a [Runner] that reads entries during a run, before its
@@ -293,67 +304,4 @@ func CheckHooks(hooks []Hook, supported ...Point) error {
 		}
 	}
 	return nil
-}
-
-// Mode is a permission mode. It decides the tool calls that no rule
-// matches: a call runs, asks the approve function, or is blocked. The
-// names are the names of the permission modes of Claude Code, because
-// the harness uses the same names.
-type Mode string
-
-// The permission modes, from the strictest.
-const (
-	// ModeDefault runs the read tools. Each other call asks.
-	ModeDefault Mode = "default"
-	// ModeAcceptEdits runs the read tools and the edit tools. Each
-	// other call asks.
-	ModeAcceptEdits Mode = "acceptEdits"
-	// ModeBypass runs each call.
-	ModeBypass Mode = "bypassPermissions"
-)
-
-// AllModes lists each [Mode], from the strictest.
-var AllModes = []Mode{
-	ModeDefault,
-	ModeAcceptEdits,
-	ModeBypass,
-}
-
-// CheckMode returns an error if a driver cannot honor the mode m. An
-// empty m keeps the mode of the driver, so it gives no error. A mode
-// that is not in supported gives an error that wraps
-// [errors.ErrUnsupported]. A driver fails on such a mode, because an
-// agent with another mode runs calls that its caller did not allow. A
-// mode that is not in [AllModes] gives another error.
-func CheckMode(m Mode, supported ...Mode) error {
-	if m == "" || slices.Contains(supported, m) {
-		return nil
-	}
-	if !slices.Contains(AllModes, m) {
-		return fmt.Errorf("agent: unknown mode %q", m)
-	}
-	return fmt.Errorf("agent: the mode %s: %w", m, errors.ErrUnsupported)
-}
-
-// Limits are hard limits on the paths of an agent. A limit holds in each
-// mode, also in [ModeBypass]. The roots are Dir and AddDirs of the
-// [Config]. Each driver maps a limit to its own control, and a driver
-// whose agent has no such control fails at the start.
-type Limits struct {
-	// BlockReadsOutside refuses a read of a file tool outside the roots.
-	// The harness denies the call, and a read-only bash command outside
-	// the roots asks. Claude Code gets the setting
-	// permissions.blockReadsOutsideWorkingDirectories. Codex has no such
-	// control, so its driver fails at the start.
-	BlockReadsOutside bool
-	// BlockWritesOutside refuses an edit of a file tool outside the
-	// roots. The harness denies the call. Claude Code gets the setting
-	// permissions.blockWritesOutsideWorkingDirectories. Codex in
-	// [ModeBypass] gets the workspace-write sandbox.
-	BlockWritesOutside bool
-	// Fence runs the commands of the agent in an OS sandbox. The harness
-	// uses the fence of its default sandbox, which runs only on macOS.
-	// Claude Code gets the setting sandbox.enabled. Codex in
-	// [ModeBypass] gets the workspace-write sandbox.
-	Fence bool
 }

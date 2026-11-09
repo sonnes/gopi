@@ -48,8 +48,8 @@ const (
 	// MCPPrefix starts the name of each MCP tool, as in
 	// "mcp__<server>__<tool>".
 	MCPPrefix = "mcp__"
-	// mcpSeparator divides the server and the tool in an MCP name.
-	mcpSeparator = "__"
+	// MCPSeparator divides the server and the tool in an MCP name.
+	MCPSeparator = "__"
 	// contentStart starts the content of a rule, as in "bash(ls *)".
 	contentStart = "("
 )
@@ -217,7 +217,7 @@ func Registry() []Known {
 
 // MCPName returns the gopi name of the tool of an MCP server.
 func MCPName(server, tool string) string {
-	return MCPPrefix + server + mcpSeparator + tool
+	return MCPPrefix + server + MCPSeparator + tool
 }
 
 // Canonical returns the gopi name of a tool name. A Claude Code name of
@@ -283,4 +283,17 @@ func SplitRule(rule string) (name, content string) {
 		return rule, ""
 	}
 	return rule[:i], rule[i:]
+}
+
+// WholeTools returns the rules of rules with no content, in order. Each
+// one names a whole tool, such as "web_fetch". A driver removes the
+// tool of such a Deny rule, so the model does not see it.
+func WholeTools(rules []string) []string {
+	var out []string
+	for _, r := range rules {
+		if _, content := SplitRule(r); content == "" {
+			out = append(out, r)
+		}
+	}
+	return out
 }

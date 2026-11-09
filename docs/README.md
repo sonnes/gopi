@@ -54,11 +54,12 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | model list    | The models that a provider API or an agent CLI returns when gopi lists them. A fetch merges it into a catalog | model listing, model catalog |
 | spec          | The name of a model in a catalog: `<provider>/<model-id>`, or a bare model ID | model string, model name |
 | detector      | What reads one source and gives a catalog a provider or a driver | probe, loader            |
-| harness       | What assembles a coding agent from options, the definitions of its readers, and a catalog, on each call | builder, factory, runtime |
+| harness       | What assembles a coding agent from options, the config of a session, its definition sources, and a catalog, on each call | builder, factory, runtime |
 | assembly      | What one call of a harness resolved: the model, the instruction files, the skills, the subagents, and the tools | build, config |
 | prompt builder | The function of a harness that builds the sections of the system prompt from an assembly, before each model call | prompt template, prompt function |
 | seed          | The first entries of a new session, which the seeders of a harness build once, such as the working directory and the date | preamble, initial context |
 | definition    | An agent, a skill, or an instruction text that a person writes, and that a store reads for the harness | spec, manifest, config |
+| definition source | What gives a set of definitions: a folder of a store, an `fs.FS`, definitions in code, or layers of other sources | reader, loader, provider |
 | extra key     | A frontmatter key that no field of a definition takes. The definition keeps it with its value | meta, unknown field |
 | agent file    | A Markdown file that defines one agent: its frontmatter, and its prompt as the body | agent spec, agent config |
 | instruction file | A file of rules for the agent, such as AGENTS.md or CLAUDE.md | memory file, rules file  |
@@ -72,7 +73,7 @@ Add a term when you name a new abstraction. Keep one name for one thing.
 | child session | The session of one subagent run, with its parent in a session value | sidechain, sub-session |
 | permission mode | What decides a tool call that no rule matches: default, acceptEdits, or bypassPermissions | approval policy, level |
 | permission rule | A tool name, with an optional pattern, that allows, asks for, or denies the calls it matches | policy entry, filter |
-| permission policy | The permission mode and the permission rules of a harness, as one value that becomes one BeforeTool hook | policy, approval config |
+| permission policy | The permission mode, the permission rules, and the hard limits of an agent, as one value that decides each tool call. The harness turns it into one BeforeTool hook | policy, approval config |
 | exact rule    | The narrowest permission rule that allows one tool call: its command, its path, its host, or its tool name | precise rule, call rule |
 | grant         | The exact rule of an Always decision, which a host keeps in a session value | kept rule, session permission |
 | safety check  | A tool call that a rule or a grant cannot allow, such as an edit of a protected path. A person decides each one | protected call, forced ask |

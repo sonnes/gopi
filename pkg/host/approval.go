@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/agent"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 )
 
 // call is a tool call that waits for [Host.Confirm].
@@ -32,26 +32,19 @@ type call struct {
 // own. If the rules hook and the agent ask about one call, the second
 // question gets the answer of the first.
 func (s *hosted) approve(ctx context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
-	if s.personAllowed(req.Call) {
-		return agent.Decision{Allow: true}, nil
-	}
-	rules, dir, err := s.ruleSet(ctx)
+	byRules, dir, err := s.decide(ctx, req.Call, req.Safety)
 	if err != nil {
 		return agent.Decision{}, err
 	}
-	match, rule, err := rules.Check(req.Call, dir)
-	if err != nil {
-		return agent.Decision{}, fmt.Errorf("host: session %s: %w", s.id, err)
-	}
-	switch {
-	case match == permission.DenyMatch:
-		return agent.Decision{Message: denyText(rule, req.Call.Name)}, nil
-	case match == permission.AllowMatch && !req.Safety:
+	switch byRules.Match {
+	case permission.DenyMatch:
+		return agent.Decision{Message: byRules.Reason}, nil
+	case permission.AllowMatch:
 		return agent.Decision{Allow: true}, nil
 	}
 
 	req.Rule = ""
-	canKeep := match != permission.AskMatch && !req.Safety
+	canKeep := byRules.Match == permission.NoMatch && !req.Safety
 	if canKeep {
 		req.Rule, _ = permission.Exact(req.Call, dir)
 	}

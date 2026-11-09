@@ -3,6 +3,7 @@ package sandbox
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -68,20 +69,21 @@ func TestLocalPaths(t *testing.T) {
 		opts    []Option
 		path    string
 		want    string
-		wantErr string
+		wantErr error
 	}{
 		{name: "the default allows a parent path", path: "../outside/secret.txt", want: "outside"},
 		{name: "the default allows a symlink that points outside", path: "escape/secret.txt", want: "outside"},
 		{name: "a policy allows a path that it does not hide", opts: []Option{fenced}, path: "f.txt", want: "inside"},
-		{name: "a policy rejects a hidden path", opts: []Option{fenced}, path: "../outside/secret.txt", wantErr: "hidden"},
-		{name: "a policy rejects a symlink to a hidden path", opts: []Option{fenced}, path: "escape/secret.txt", wantErr: "hidden"},
+		{name: "a policy rejects a hidden path", opts: []Option{fenced}, path: "../outside/secret.txt", wantErr: ErrHidden},
+		{name: "a policy rejects a symlink to a hidden path", opts: []Option{fenced}, path: "escape/secret.txt", wantErr: ErrHidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := newLocal(t, root, tt.opts...).ReadFile(t.Context(), tt.path)
 
-			if tt.wantErr != "" {
-				require.ErrorContains(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, err, fs.ErrPermission)
 				return
 			}
 			require.NoError(t, err)
@@ -110,7 +112,8 @@ func TestLocalPolicyLimitsWrites(t *testing.T) {
 			err := box.WriteFile(t.Context(), tt.path, []byte("x"))
 
 			if tt.wantErr {
-				require.ErrorContains(t, err, "not writable")
+				require.ErrorIs(t, err, ErrNotWritable)
+				require.ErrorIs(t, err, fs.ErrPermission)
 				assert.NoFileExists(t, filepath.Join(root, tt.path))
 				return
 			}

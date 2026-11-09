@@ -21,6 +21,7 @@ func TestCases(t *testing.T) {
 		Model:         haiku,
 		SystemModel:   sonnet55,
 		ReminderModel: sonnet5,
+		ObjectModel:   testModel,
 	})
 }
 

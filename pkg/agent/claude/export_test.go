@@ -114,7 +114,7 @@ func Start(ctx context.Context, a *Agent) error {
 
 // SessionID returns the stored session ID of the CLI of a, or "".
 func SessionID(a *Agent) (string, error) {
-	return conversation.Get(a.log)
+	return conversation.Get(a.Log())
 }
 
 // SetUUIDs makes the agents of the test give the steers these IDs, in

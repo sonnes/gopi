@@ -95,7 +95,7 @@ func TestQueueOrder(t *testing.T) {
 			name:      "a steer continues a turn with no tool calls",
 			responses: []ai.Message{text("one"), text("two")},
 			setup: func(a **agent.Agent) []agent.Option {
-				return []agent.Option{steerOnTurn(a, 1, "more")}
+				return []agent.Option{agent.Hooks(steerOnTurn(a, 1, "more"))}
 			},
 			history: []string{"hi", "one", "more", "two"},
 		},
@@ -113,7 +113,7 @@ func TestQueueOrder(t *testing.T) {
 			name:      "the steer queue comes before the follow-up queue",
 			responses: []ai.Message{text("one"), text("two"), text("three")},
 			setup: func(a **agent.Agent) []agent.Option {
-				return []agent.Option{steerOnTurn(a, 1, "steer")}
+				return []agent.Option{agent.Hooks(steerOnTurn(a, 1, "steer"))}
 			},
 			before:  func(a *agent.Agent) { a.FollowUp(session.Text("follow")) },
 			history: []string{"hi", "one", "steer", "two", "follow", "three"},
@@ -122,7 +122,7 @@ func TestQueueOrder(t *testing.T) {
 			name:      "the follow-up queue comes before BeforeStop",
 			responses: []ai.Message{text("one"), text("two"), text("three")},
 			setup: func(**agent.Agent) []agent.Option {
-				return []agent.Option{agent.BeforeStop(once("hook"))}
+				return []agent.Option{agent.Hooks(agent.BeforeStop(once("hook")))}
 			},
 			before: func(a *agent.Agent) {
 				a.FollowUp(session.Text("follow"), session.Text("up"))
@@ -154,7 +154,7 @@ func TestQueueOrder(t *testing.T) {
 
 // steerOnTurn returns a BeforeCall hook that steers the agent with s on
 // the given turn. The first turn is 1.
-func steerOnTurn(a **agent.Agent, turn int, s string) agent.Option {
+func steerOnTurn(a **agent.Agent, turn int, s string) agent.Hook {
 	return agent.BeforeCall(func(_ context.Context, st agent.State, r agent.Request) (agent.Request, error) {
 		if st.Turn() == turn {
 			(*a).Steer(session.Text(s))
@@ -172,14 +172,14 @@ func TestQueueKeptAfterFailure(t *testing.T) {
 	var a *agent.Agent
 	failed := false
 	a = agent.New(model(p),
-		agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
+		agent.Hooks(agent.AfterTurn(func(context.Context, agent.State) ([]session.Entry, error) {
 			if failed {
 				return nil, nil
 			}
 			failed = true
 			a.Steer(session.Text("steer"))
 			return nil, errors.New("stop")
-		}),
+		})),
 	)
 	a.FollowUp(session.Text("follow"))
 
@@ -236,10 +236,10 @@ func TestHookSteersThroughTheState(t *testing.T) {
 	}}
 	a := agent.New(model(p),
 		agent.Toolset(echo),
-		agent.AfterTool(func(_ context.Context, s agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
+		agent.Hooks(agent.AfterTool(func(_ context.Context, s agent.State, _ ai.ToolCall, r ai.ToolResult) (ai.ToolResult, error) {
 			s.Steer(session.Text("check the output"))
 			return r, nil
-		}),
+		})),
 	)
 
 	events, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))
@@ -256,13 +256,13 @@ func TestHookFollowsUpThroughTheState(t *testing.T) {
 	p := &script{responses: []ai.Message{text("one"), text("two")}}
 	done := false
 	a := agent.New(model(p),
-		agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
+		agent.Hooks(agent.AfterTurn(func(_ context.Context, s agent.State) ([]session.Entry, error) {
 			if !done {
 				done = true
 				s.FollowUp(session.Text("go on"))
 			}
 			return nil, nil
-		}),
+		})),
 	)
 
 	_, _, err := collect(t, a.Run(context.Background(), session.Text("hi")))

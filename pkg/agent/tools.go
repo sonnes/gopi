@@ -30,7 +30,7 @@ func (a *Agent) addTools(names []string) {
 // The search is pure, so a second run loads the same tools. Only a
 // search with a result that is not an error loaded tools.
 func (a *Agent) reload(ctx context.Context, msgs []ai.Message) error {
-	search := a.known(searchToolName)
+	search := a.known(tool.ToolSearch)
 	if search == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (a *Agent) reload(ctx context.Context, msgs []ai.Message) error {
 	}
 	for _, m := range msgs {
 		for _, tc := range m.ToolCalls() {
-			loaded := tc.Name == searchToolName && ok[tc.ID]
+			loaded := tc.Name == tool.ToolSearch && ok[tc.ID]
 			if !loaded {
 				continue
 			}

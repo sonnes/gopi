@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/def"
 	"github.com/sonnes/gopi/pkg/harness"
-	"github.com/sonnes/gopi/pkg/harness/permission"
+	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/sandbox/bash"
 	"github.com/sonnes/gopi/pkg/sandbox/read"
@@ -28,8 +29,9 @@ func (done) StreamText(context.Context, ai.Model, []ai.Message, ai.Options) *ai.
 	})
 }
 
-// A harness assembles a coding agent from options. Durable reads the
-// definitions of the folder on each call, and the session keeps its model.
+// A harness assembles a coding agent from its options and the config of
+// a session. Start reads the definitions of the folder on each call, and
+// the session keeps its model.
 func Example() {
 	ctx := context.Background()
 	cat := catalog.New()
@@ -43,9 +45,14 @@ func Example() {
 
 	h := harness.New(
 		harness.Catalog(cat),
-		harness.Model("fake/one"),
-		harness.Dir(dir),
-		harness.Defs(storefs.Dir(dir)),
+		harness.Defs(def.Layers(
+			storefs.Dir(dir),
+			def.Set{Agents: []def.Agent{{
+				Name:        "reviewer",
+				Description: "Review a diff.",
+				Prompt:      "You review code.",
+			}}},
+		)),
 		harness.Toolset(harness.Tools(
 			harness.Sandboxed(bash.New),
 			harness.Sandboxed(read.New),
@@ -53,24 +60,24 @@ func Example() {
 			harness.AgentTool(),
 		)),
 		harness.Sandbox(box),
-		harness.Skillset(def.Skill{
+	)
+
+	r, err := h.Start(ctx, agent.Config{
+		SessionID: "fix-login",
+		Spec:      "fake/one",
+		Dir:       dir,
+		Defs: def.Set{Skills: []def.Skill{{
 			Name:        "deploy",
 			Description: "Deploy the service.",
 			Body:        "Run make deploy.",
-		}),
-		harness.Agents(def.Agent{
-			Name:        "reviewer",
-			Description: "Review a diff.",
-			Prompt:      "You review code.",
-		}),
-		harness.Mode(permission.AcceptEdits),
-		harness.Deny("bash(git push *)"),
-	)
-
-	a, err := h.Durable(ctx, "fix-login")
+		}}},
+		Mode: permission.AcceptEdits,
+		Deny: []string{"bash(git push *)"},
+	})
 	if err != nil {
 		panic(err)
 	}
+	a := r.(*agent.Agent)
 	msgs, err := a.Run(ctx, session.Text("Fix the login test.")).Wait()
 	if err != nil {
 		panic(err)

@@ -83,39 +83,3 @@ func TestAPIKey(t *testing.T) {
 		})
 	}
 }
-
-func TestCheckKey(t *testing.T) {
-	var path, auth string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path = r.URL.Path
-		auth = r.Header.Get("Authorization")
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(modelsList))
-	}))
-	t.Cleanup(server.Close)
-	p := openai.New(openai.APIKey("test-key"), openai.BaseURL(server.URL+"/v1"))
-
-	got, err := p.CheckKey(context.Background())
-
-	require.NoError(t, err)
-	assert.Equal(t, ai.KeyInfo{}, got)
-	assert.Equal(t, "/v1/models", path)
-	assert.Equal(t, "Bearer test-key", auth)
-}
-
-func TestCheckKey_Error(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"error":{"message":"Incorrect API key provided","type":"invalid_request_error","code":"invalid_api_key"}}`))
-	}))
-	t.Cleanup(server.Close)
-	p := openai.New(openai.APIKey("bad"), openai.BaseURL(server.URL+"/v1"))
-
-	_, err := p.CheckKey(context.Background())
-
-	var apiErr *openai.Error
-	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, http.StatusUnauthorized, apiErr.StatusCode)
-	assert.ErrorContains(t, err, "openai: check key: ")
-}

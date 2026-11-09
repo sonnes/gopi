@@ -6,15 +6,22 @@
 package tail
 
 import (
-	"bytes"
 	"io"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
 
-// ansi matches the terminal color codes of a log line.
-var ansi = regexp.MustCompile("\x1b\\[[0-9;]*m")
+// ansi matches an ANSI escape sequence of a terminal: a CSI sequence,
+// such as a color code, an OSC sequence, such as a link, or a
+// two-byte escape.
+var ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[@-_]`)
+
+// Plain returns s with no ANSI escape sequence and no space at its ends.
+func Plain(s string) string {
+	return strings.TrimSpace(ansi.ReplaceAllString(s, ""))
+}
 
 // Tail reads a stream to its end and keeps its last bytes.
 type Tail struct {
@@ -52,7 +59,7 @@ func (t *Tail) Write(p []byte) (int, error) {
 }
 
 // Text waits up to grace for the stream to end, then returns the kept
-// text without color codes and without the space at each end. A CLI
+// text as [Plain] returns it. A CLI
 // closes stderr when it exits, a short time after it closes stdout, so
 // a caller that saw stdout end gives it a grace period.
 func (t *Tail) Text(grace time.Duration) string {
@@ -62,6 +69,5 @@ func (t *Tail) Text(grace time.Duration) string {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	text := ansi.ReplaceAll(t.buf, nil)
-	return string(bytes.TrimSpace(text))
+	return Plain(string(t.buf))
 }
