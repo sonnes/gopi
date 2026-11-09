@@ -79,6 +79,12 @@ type Host struct {
 	// the end of a run finds its children with no scan of the sessions.
 	running map[string]map[string]*hosted
 	closed  bool
+
+	// calls has each [Host.Call] that runs. Close cancels callsCtx, so
+	// each call stops, and then waits for calls.
+	calls     sync.WaitGroup
+	callsCtx  context.Context
+	stopCalls context.CancelCauseFunc
 }
 
 // Option configures a [Host].
@@ -175,6 +181,7 @@ func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, err
 	for _, opt := range opts {
 		opt(h)
 	}
+	h.callsCtx, h.stopCalls = context.WithCancelCause(context.Background())
 	if !h.toolList {
 		return nil, fmt.Errorf("host: no tool list; give one with host.Tools: %w", ErrInvalid)
 	}
@@ -475,6 +482,9 @@ func (h *Host) Close() error {
 	if closed {
 		return nil
 	}
+
+	h.stopCalls(ErrClosed)
+	h.calls.Wait()
 
 	var errs []error
 	for _, s := range h.all() {

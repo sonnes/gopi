@@ -46,6 +46,8 @@ flowchart LR
 - Each event of `Events` has the whole session, so a reader needs no history.
 - Each `Events` and `Stream` call gives a copy of the state and each event after it, under one lock, so a reader gets no gap and no repeat. A stalled reader loses its stream, so it cannot hold the events in memory.
 - Two hosts on one store must not run the same session, because their entries interleave in one log.
+- `Call` runs one prompt on a driver and returns the last assistant message. It keeps no session: the agent writes to `session.Discard`, and `List` and `Events` never show it. A one-shot task, such as a title, then leaves no record and needs no cleanup. The cost: a call has no approvals, so the host denies each tool call that asks.
+- `Close` cancels each running call and waits for it, so no driver outlives the host.
 
 ## Map
 
@@ -60,6 +62,7 @@ flowchart LR
 | Change how a call waits for Confirm                 | `pkg/host/approval.go`  |
 | Change how the rules and the grants decide a call   | `pkg/host/rules.go`     |
 | Change how a reader gets the state and the events   | `pkg/host/hub.go`       |
+| Change a one-shot call                              | `pkg/host/call.go`      |
 
 ## Related Concepts
 

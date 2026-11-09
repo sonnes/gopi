@@ -33,6 +33,7 @@ flowchart LR
 - A custom entry has the line type `message`, as a message entry does, so a reader of entries needs one line type.
 - List reads each session file to its end and changes no file, so a second process can list the sessions while a writer runs. The cost is that a list reads every entry of every session.
 - A value line is a write, not the state. Load replays the value lines in order, so the file never rewrites a line. The cost is that a value that changes often makes the file grow.
+- `Discard` is a store that keeps nothing. Each write succeeds, and Load finds no session, so Open starts a new log. The log keeps its entries in memory for the life of the agent.
 
 ## Map
 
@@ -40,6 +41,7 @@ flowchart LR
 | -------------------------------------------- | ---------------------------- |
 | Implement a store                            | `pkg/session/store.go`       |
 | See a store in memory                        | `pkg/session/memstore.go`    |
+| Keep no record                               | `pkg/session/discard.go`     |
 | Change the file format                       | `pkg/store/fs/sessions.go`   |
 | Change where the CLI keeps the session files | `cmd/gopi/main.go`           |
 
