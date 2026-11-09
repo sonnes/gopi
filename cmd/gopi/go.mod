@@ -4,12 +4,12 @@ go 1.27
 
 require (
 	github.com/modelcontextprotocol/go-sdk v1.5.0
-	github.com/sonnes/gopi v0.0.2
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.2
-	github.com/sonnes/gopi/pkg/ai/chatgpt v0.0.2
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.2
-	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.2
-	github.com/sonnes/gopi/pkg/catalog/env v0.0.2
+	github.com/sonnes/gopi v0.0.3
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.3
+	github.com/sonnes/gopi/pkg/ai/chatgpt v0.0.3
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.3
+	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.3
+	github.com/sonnes/gopi/pkg/catalog/env v0.0.3
 	github.com/stretchr/testify v1.12.1
 	github.com/urfave/cli/v3 v3.14.0
 )
@@ -27,8 +27,8 @@ require (
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
-	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.2 // indirect
-	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.2 // indirect
+	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.3 // indirect
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.3 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
