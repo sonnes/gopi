@@ -42,7 +42,7 @@ Use it for a product that runs many sessions, a page where a person approves too
 
 ## Harness
 
-`pkg/harness` turns a repository into an agent. The options of a harness hold the parts that each session shares: the catalog, the instruction files, the skills, the subagents, the tools, and the Allow rules. The config of a session holds its own parts, such as the model, the MCP servers, and the permission mode.
+`pkg/harness` assembles a coding agent from options. The options of a harness hold the parts that each session shares: the catalog, the instruction files, the skills, the subagents, the tools, and the Allow rules. The config of a session holds its own parts, such as the model, the MCP servers, and the permission mode.
 
 Use it for a coding agent, or for an agent that a team changes through files. Skip it when the code gives the tools and the prompt and reads no files, and use `agent.New`.
 

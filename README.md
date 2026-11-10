@@ -3,9 +3,9 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/sonnes/gopi.svg)](https://pkg.go.dev/github.com/sonnes/gopi)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-![gopi: durable agents in Go](web/public/og.png)
+![gopi: durable agents SDK in Go](web/public/og.png)
 
-gopi is a Go SDK for durable agents. Run your own agent loop, Claude Code, or Codex as a session in your Go program. Each session is a log in your store, so an agent continues where it stopped: after a deploy, a restart, or between the steps of a long workflow.
+gopi is a durable agents SDK in Go. Build agentic workflows from Go packages, not a framework. Each session is a log in your store, so an agent continues after a deploy, a restart, or a pause between steps. Pick the model for each agent, and ship the program as one binary.
 
 gopi started as a Go port of [Mario Zechner](https://github.com/badlogic)'s [pi](https://github.com/badlogic/pi-mono). The vocabulary of messages, content blocks, streaming events, tool calls, and the agent loop comes from pi. The rewrite shapes the rest around Go: typed tools from Go types, one stream for each run with `Events` and `Wait`, a session log that stores each message before its event, and one driver interface for the harness, Claude Code, and Codex.
 
@@ -72,7 +72,7 @@ The [site](https://sonnes.github.io/gopi/docs/) has a page for each layer. Sever
 
 ## Build Your Own Harness
 
-A harness turns a repository into an agent. Each part of the agent is one option of the harness or one field of the session config: change one and keep the rest. The harness assembles the agent again at each start, so an edit to a skill reaches the next agent.
+A harness assembles a coding agent from options. Each part of the agent is one option of the harness or one field of the session config: change one and keep the rest. The harness assembles the agent again at each start, so an edit to a skill reaches the next agent.
 
 This harness reads the folders of Claude Code: `CLAUDE.md`, `skills/`, and `agents/`, in your home and in the repository. A later folder wins.
 

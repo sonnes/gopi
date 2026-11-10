@@ -7,6 +7,7 @@ import { snippet } from "../snippet.mjs";
 import durableSrc from "../../../examples/landing/durable.go?raw";
 import hostSrc from "../../../examples/landing/host.go?raw";
 import customizeSrc from "../../../examples/landing/customize.go?raw";
+import workflowSrc from "../../../examples/landing/workflow.go?raw";
 import demo from "../data/demo.json";
 
 const base = import.meta.env.BASE_URL;
@@ -38,9 +39,9 @@ const bands = [
 const covers = [
   ["coding agent", "a terminal", "harness.New"],
   ["issue triage", "a nightly job", "agent.Durable"],
-  ["code reviewer", "a CI step", 'Deny: []string{"Edit"}'],
+  ["code reviewer", "a CI step", 'Deny: []string{"edit_file"}'],
   ["support agent", "an HTTP handler", "h.Stream"],
-  ["Claude Code or Codex", "a page of your app", "claude-code/, codex/"],
+  ["issue to fix", "a queue worker", "one agent.Durable per step"],
 ];
 
 // A long call in the covers table wraps after its open parenthesis, not
@@ -49,7 +50,7 @@ const breakAfterParen = (s: string) => s.replaceAll("(", "(<wbr>");
 
 // The sessions of one host, each over its own workspace, for fig. 1.
 const sessions = [
-  { id: "fix-login", dir: "repos/app", agent: "claude-code", status: "running" },
+  { id: "fix-login", dir: "repos/app", agent: "harness", status: "running" },
   { id: "notes", dir: "repos/site", agent: "codex", status: "requires_action" },
   { id: "nightly", dir: "repos/api", agent: "harness", status: "idle", reason: "restarted" },
 ];
@@ -70,16 +71,31 @@ const stops = [
   ["restarted", "the process stopped, and Open recovered the session"],
 ];
 
-// The two parts of a model spec, for the figure of the providers band.
-const specParts = [
-  { text: "claude-code", hue: "harness", name: "driver", note: "claude-code and codex start their CLI. A provider, such as anthropic, runs on the harness." },
-  { text: "/", hue: null },
-  { text: "claude-opus-5-5", hue: "ai", name: "model", note: "from models.json, or from the models that the CLI lists" },
+// The model specs that fig. 3, the harness snippet, and the host snippet
+// cycle through. Each one is a provider and a model of models.json. The
+// first one is the spec of examples/landing, so the page without
+// JavaScript shows the code as it builds.
+const specCycle = [
+  ["openrouter", "z-ai/glm-5.3"],
+  ["openrouter", "moonshotai/kimi-k3"],
+  ["openrouter", "mistralai/mistral-large-4-0"],
+  ["openrouter", "google/gemini-3.1-pro-preview"],
+  ["anthropic", "claude-opus-5-5"],
+  ["openai", "gpt-6-sol"],
 ];
-const specs = [
-  ["anthropic/claude-opus-5-5", "the loop in your process"],
-  ["claude-code/claude-opus-5-5", "the Claude Code CLI"],
-  ["codex/gpt-6-astra", "the Codex CLI"],
+// The script finds the spec of a snippet by its text. If a snippet and
+// the first spec disagree, the snippet would stop cycling with no sign,
+// so the build fails instead.
+for (const [name, src] of [["harness", customizeSrc], ["host", hostSrc]]) {
+  const spec = `"${specCycle[0].join("/")}"`;
+  if (!snippet(src, name).includes(spec)) {
+    throw new Error(`examples/landing: the ${name} snippet does not have the spec ${spec} of specCycle[0]`);
+  }
+}
+const specParts = [
+  { text: specCycle[0][0], hue: "harness", name: "provider", cycle: "provider" },
+  { text: "/", hue: null, cycle: "slash" },
+  { text: specCycle[0][1], hue: "ai", name: "model", cycle: "model" },
 ];
 
 // The events of the resumed run, with the deltas of one message as one
@@ -153,7 +169,7 @@ const guide: Record<string, Guide> = {
     ],
   },
   harness: {
-    nouns: ["Harness", "Option", "Builtins", "Mode"],
+    nouns: ["Harness", "Option", "Assembly", "Binder"],
     use: [
       "A coding agent over a repository.",
       "An agent that a team changes through files: AGENTS.md, skills, and subagents.",
@@ -260,25 +276,32 @@ const waysOut = [
 ---
 
 <Landing
-  title="gopi: durable agents in Go"
-  description="Each session is a log in your store, so an agent continues where it stopped: after a deploy, a restart, or between the steps of a long workflow."
+  title="gopi: durable agents SDK in Go"
+  description="A durable agents SDK in Go for agentic workflows. Each session is a log in your store, so an agent continues after a deploy, a restart, or a pause between steps."
 >
   {/* ============ HERO ============ */}
   <header class="row hero agent-hero">
     <div class="row-inner">
       <div class="cell cell--words">
-        <p class="label">Go SDK · durable agents</p>
-        <h1>Durable agents in Go.</h1>
+        <p class="label">Go SDK · agentic workflows</p>
+        <h1>Durable agents SDK in Go.</h1>
         <p class="lede">
-          Run your own loop, Claude Code, or Codex as a session in your Go program.
-          Each session is a log in your store, so an agent continues where it stopped:
-          after a deploy, a restart, or between the steps of a long workflow.
+          Build agentic workflows from Go packages, not a framework. Each session is a
+          log in your store, so an agent continues after a deploy, a restart, or a pause
+          between steps. Pick the model for each agent, and ship the program as one
+          binary.
         </p>
 
         <p class="hero-actions">
-          <a class="btn btn--primary" href={docs}>Get started</a>
+          <a class="btn btn--primary" href={docs}>Read the docs</a>
           <a class="more" href={`${docs}session/`}>Read about sessions</a>
         </p>
+
+        <ul class="proof">
+          <li><b>6</b><span>layers, use any one</span></li>
+          <li><b>6</b><span>providers, or your own</span></li>
+          <li><b>1</b><span>binary</span></li>
+        </ul>
       </div>
 
       <div class="cell cell--work">
@@ -287,6 +310,29 @@ const waysOut = [
     </div>
   </header>
 
+  {/* ============ workflow ============ */}
+  <section class="row" id="workflow">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/agent · your program</p>
+        <h2>Use Agents Any Way You Want</h2>
+        <p>
+          Call an agent from a handler, a job, or a loop. Chain agents into steps, where
+          the answer of one step is the input of the next. gopi does not decide the shape
+          of your program.
+        </p>
+        <p>
+          Each session keeps its log in your store. A step that a deploy stopped can
+          continue from its last message, and the steps before it keep their answers.
+        </p>
+        <a class="more" href={`${docs}agent/`}>Read about agents</a>
+      </div>
+      <div class="cell cell--work">
+        <CodeFrame path="workflow.go" caption="two agents as two steps" code={snippet(workflowSrc, "workflow")} />
+      </div>
+    </div>
+  </section>
+
   {/* ============ harness ============ */}
   <section class="row" id="harness">
     <div class="row-inner">
@@ -294,8 +340,8 @@ const waysOut = [
         <p class="label">pkg/harness · options</p>
         <h2>Build Your Own Harness</h2>
         <p>
-          A harness turns a repository into an agent. Each part of the agent is one option:
-          change one and keep the rest. The sessions go to any store: JSONL files, or your
+          A harness assembles a coding agent from options: its instructions, skills,
+          subagents, tools, and permission rules. Change one option and keep the rest. The sessions go to any store: JSONL files, or your
           own store over SQLite or Postgres.
         </p>
         <p>
@@ -305,7 +351,7 @@ const waysOut = [
         <a class="more" href={`${docs}harness/`}>Read about the harness</a>
       </div>
       <div class="cell cell--work">
-        <CodeFrame path="claude.go" caption="a harness like Claude Code" code={snippet(customizeSrc, "harness")} />
+        <CodeFrame path="agent.go" caption="a coding agent from its files" code={snippet(customizeSrc, "harness")} />
       </div>
     </div>
   </section>
@@ -322,13 +368,13 @@ const waysOut = [
         </p>
         <p>
           Each session pairs an agent with a workspace: the folder that it works in, and
-          the folders of its AGENTS.md, skills, and subagents. The model spec picks the
-          agent: the harness, Claude Code, or Codex.
+          the folders of its AGENTS.md, skills, and subagents. Each session has its own
+          model spec, so one host runs each session on the model that fits it.
         </p>
         <a class="more" href={`${docs}host/`}>Read about the host</a>
       </div>
       <div class="cell cell--work">
-        <CodeFrame path="host.go" caption="two sessions over two workspaces" code={snippet(hostSrc, "host")} />
+        <CodeFrame path="host.go" caption="two of its sessions" code={snippet(hostSrc, "host")} />
         <figure class="cycle">
           <table class="cycle-sessions">
             <thead><tr><th>session</th><th>workspace</th><th>agent</th><th>status</th></tr></thead>
@@ -393,7 +439,7 @@ const waysOut = [
           Each step of a run is a typed event on one stream, so a page can show the run as
           it happens.
         </p>
-        <p>The harness, Claude Code, and Codex send the same events.</p>
+        <p>The events are the same for each provider and each driver.</p>
         <a class="more" href={`${docs}agent/events/`}>Read about events</a>
       </div>
       <div class="cell cell--work">
@@ -493,60 +539,69 @@ const waysOut = [
   </section>
 
   {/* ============ providers and drivers ============ */}
-  <section class="row row--wide" id="providers">
-    <div class="wide-inner">
-      <div class="wide-head">
-        <div>
-          <p class="label">pkg/ai · pkg/agent</p>
-          <h2>Providers and Drivers</h2>
-        </div>
-        <div class="wide-note">
-          <p>
-            A provider serves a model call. A driver starts an agent. A model spec names
-            one of them and a model. A spec with no driver runs on the harness.
-          </p>
-          <a class="more" href={`${docs}providers/write-a-provider/`}>Write a provider</a>
-        </div>
+  <section class="row" id="providers">
+    <div class="row-inner">
+      <div class="cell cell--words">
+        <p class="label">pkg/ai · pkg/agent</p>
+        <h2>Providers and Drivers</h2>
+        <p>
+          A model spec names a provider and a model. Change the spec, and the same agent
+          runs on another model. The code around it stays the same.
+        </p>
+        <p>
+          A provider serves the model calls of the loop in your process. Six ship with
+          gopi, and openaichat reaches any server with a Chat Completions API. A provider
+          of your own fits the same interface.
+        </p>
+        <p>
+          A driver runs an agent. The harness is the driver for each provider. Claude Code
+          and Codex are CLI drivers behind the same interface. They start the claude or
+          codex command where the agent runs.
+        </p>
+        <a class="more" href={`${docs}providers/write-a-provider/`}>Write a provider</a>
       </div>
+      <div class="cell cell--work">
+        <figure class="spec-fig">
+          <div class="win">
+            <div class="win-tab">model spec  ·  one string</div>
+            <div class="spec-body">
+              <div class="spec" aria-hidden="true" data-spec-cycle={JSON.stringify(specCycle)}>
+                {
+                  specParts.map((p) => (
+                    <span class="spec-text" style={p.hue ? `--hue: var(--l-${p.hue})` : undefined} data-spec-part={p.cycle}>{p.text}</span>
+                  ))
+                }
+              </div>
+              <ul class="spec-legend">
+                {specParts.filter((p) => p.name).map((p) => <li style={`--hue: var(--l-${p.hue})`}>{p.name}</li>)}
+              </ul>
+              <p class="sr-only">Model specs: {specCycle.map((c) => c.join("/")).join(", ")}.</p>
+              <p class="spec-also" aria-hidden="true" data-spec-also>also {specCycle.slice(1).map((c) => c.join("/")).join(" · ")}</p>
+            </div>
+          </div>
 
-      <figure class="spec-fig">
-        <div class="spec" aria-hidden="true">
-          {
-            specParts.map((p) => (
-              <span class="spec-part" style={p.hue ? `--hue: var(--l-${p.hue})` : undefined}>
-                <span class="spec-text">{p.text}</span>
-                {p.name && <span class="spec-note"><b>{p.name}</b>{p.note}</span>}
-              </span>
-            ))
-          }
-        </div>
-        <ul class="spec-routes">
-          {specs.map(([spec, where]) => <li><code>{spec}</code><span>{where}</span></li>)}
-        </ul>
-        <figcaption class="label"><span>fig. 3</span><span>the model spec</span></figcaption>
-      </figure>
-
-      <figure class="artifact">
-        <figcaption class="label">spec prefixes</figcaption>
-        <table class="ledger ledger--providers">
-          <colgroup><col /><col /><col /><col /></colgroup>
-          <thead>
-            <tr><th>prefix</th><th>kind</th><th>auth</th><th>package</th></tr>
-          </thead>
-          <tbody>
+          <table class="ledger ledger--providers">
+            <thead>
+              <tr><th>prefix</th><th>auth</th><th>package</th></tr>
+            </thead>
             {
-              providers.map(([id, kind, auth, pkg]) => (
-                <tr>
-                  <td class="mono">{id}</td>
-                  <td class="dim">{kind}</td>
-                  <td class="dim">{auth}</td>
-                  <td class="mono"><a href={`${godoc}/${pkg}`}>{pkg}</a></td>
-                </tr>
+              [["provider", "providers"], ["driver", "CLI drivers"]].map(([kind, head]) => (
+                <tbody>
+                  <tr class="ledger-group"><th colspan="3">{head}</th></tr>
+                  {providers.filter((r) => r[1] === kind).map(([id, , auth, pkg]) => (
+                    <tr data-prefix={id} class={id === specCycle[0][0] ? "is-current" : undefined}>
+                      <td class="mono">{id}</td>
+                      <td class="dim">{auth}</td>
+                      <td class="mono"><a href={`${godoc}/${pkg}`}>{pkg}</a></td>
+                    </tr>
+                  ))}
+                </tbody>
               ))
             }
-          </tbody>
-        </table>
-      </figure>
+          </table>
+          <figcaption class="label"><span>fig. 3</span><span>the model spec and its prefixes</span></figcaption>
+        </figure>
+      </div>
     </div>
   </section>
 
@@ -564,8 +619,9 @@ const waysOut = [
         <p class="label">agent gopi · cover identities</p>
         <h2>Agent Gopi Can Be Any Agent in Your Code</h2>
         <p class="agent-lede">
-          An agent is a value in your Go program. It runs where your code runs, with the
-          tools and the rules that you give it.
+          An agent is a value in your Go program, and <code>go build</code> makes it one
+          binary. It runs where your code runs, with the tools and the rules that you
+          give it.
         </p>
         <table class="ledger ledger--covers">
           <thead><tr><th>cover</th><th>runs in</th><th>built with</th></tr></thead>
@@ -581,8 +637,7 @@ const waysOut = [
   {/* ============ THE WAY OUT ============ */}
   <section class="outro">
     <div class="outro-inner">
-      <p class="label">the documentation</p>
-      <a class="outro-link" href={docs}>Read the documentation</a>
+      <h2 class="outro-head"><a class="outro-link" href={docs}>Read the documentation</a></h2>
       <p class="outro-lede">Start with the overview, or open the page for your job.</p>
       <ul class="ways-out">
         {
@@ -595,21 +650,108 @@ const waysOut = [
   </section>
 
   <script is:inline>
+    // Each model spec on the page, in the code and in fig. 3, types the
+    // next spec of the cycle every 5 seconds: it deletes the old spec back
+    // to the prefix that the new spec shares with it, then types the rest.
+    // One loop waits for each change to end, and it skips a change while
+    // the tab is hidden. Without JavaScript, or with reduced motion, each
+    // spec shows the first spec, the one in examples/landing, and fig. 3
+    // lists the others under it.
+    (() => {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const fig = document.querySelector("[data-spec-cycle]");
+      if (!fig) return;
+      const cycle = JSON.parse(fig.dataset.specCycle).map(([p, m]) => [p, m, `${p}/${m}`]);
+      const quoted = `"${cycle[0][2]}"`;
+      fig.closest(".spec-body")?.querySelector("[data-spec-also]")?.remove();
+
+      // A target shows the whole spec. A string in a code frame shows it
+      // in one element, between quotes. A screen reader reads a static
+      // copy of the string, and not the typed text. Fig. 3 splits the
+      // spec over the provider, the slash, and the model, each in its own
+      // hue, and its copy for a screen reader is in the page.
+      const part = (name) => fig.querySelector(`[data-spec-part="${name}"]`);
+      const codeTarget = (el) => {
+        const copy = Object.assign(document.createElement("span"), { className: "sr-only", textContent: el.textContent });
+        el.after(copy);
+        el.setAttribute("aria-hidden", "true");
+        return { el };
+      };
+      const targets = [
+        { parts: [part("provider"), part("slash"), part("model")] },
+        ...[...document.querySelectorAll(".win code span")].filter((s) => s.textContent === quoted).map(codeTarget),
+      ];
+      for (const t of targets) t.caret = Object.assign(document.createElement("span"), { className: "caret" });
+
+      const DELETE_MS = 22;
+      const TYPE_MS = 45;
+      const CYCLE_MS = 5000;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      // The caret goes after the typed text: inside the quotes of a Go
+      // string, or after the last part of fig. 3 that has text. cut is the
+      // length of the provider of the spec that is on screen.
+      const show = (t, text, typing, cut) => {
+        const caret = typing ? [t.caret] : [];
+        if (t.el) {
+          t.el.replaceChildren('"' + text, ...caret, '"');
+          return;
+        }
+        const texts = [text.slice(0, cut), text.length > cut ? "/" : "", text.slice(cut + 1)];
+        const last = texts.findLastIndex((s) => s);
+        t.parts.forEach((el, n) => el.replaceChildren(texts[n], ...(n === last ? caret : [])));
+      };
+
+      // The row of the provider in the table of fig. 3 changes when the
+      // new provider starts to appear.
+      const markRow = (provider) => {
+        for (const r of document.querySelectorAll("tr[data-prefix]")) {
+          r.classList.toggle("is-current", r.dataset.prefix === provider);
+        }
+      };
+
+      async function retype(t, [fromProvider, , from], [toProvider, , to]) {
+        let keep = 0;
+        while (keep < from.length && from[keep] === to[keep]) keep++;
+        for (let n = from.length; n >= keep; n--) {
+          show(t, from.slice(0, n), true, fromProvider.length);
+          await sleep(DELETE_MS);
+        }
+        if (t.parts) markRow(toProvider);
+        for (let n = keep + 1; n <= to.length; n++) {
+          show(t, to.slice(0, n), true, toProvider.length);
+          await sleep(TYPE_MS);
+        }
+        show(t, to, false, toProvider.length);
+      }
+
+      (async () => {
+        let i = 0;
+        for (;;) {
+          await sleep(CYCLE_MS);
+          if (document.hidden) continue;
+          const from = cycle[i];
+          i = (i + 1) % cycle.length;
+          await Promise.all(targets.map((t) => retype(t, from, cycle[i])));
+        }
+      })();
+    })();
+
     // The events light up in order, once, when the figure comes into
     // view. Without JavaScript, the page shows every event.
-    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const EVENT_MS = 140;
-    document.querySelectorAll("[data-events]").forEach((fig) => {
-      if (still) return;
-      const rows = [...fig.querySelectorAll("[data-event]")];
-      const seen = new IntersectionObserver(([entry]) => {
-        if (!entry.isIntersecting) return;
-        seen.disconnect();
-        rows.forEach((r) => r.classList.add("is-dim"));
-        rows.forEach((r, i) => setTimeout(() => r.classList.remove("is-dim"), (i + 1) * EVENT_MS));
+    (() => {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const EVENT_MS = 140;
+      document.querySelectorAll("[data-events]").forEach((fig) => {
+        const rows = [...fig.querySelectorAll("[data-event]")];
+        const seen = new IntersectionObserver(([entry]) => {
+          if (!entry.isIntersecting) return;
+          seen.disconnect();
+          rows.forEach((r) => r.classList.add("is-dim"));
+          rows.forEach((r, i) => setTimeout(() => r.classList.remove("is-dim"), (i + 1) * EVENT_MS));
+        });
+        seen.observe(fig);
       });
-      seen.observe(fig);
-    });
+    })();
   </script>
 </Landing>

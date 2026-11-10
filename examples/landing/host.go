@@ -27,7 +27,7 @@ func Manage(
 
 	// Each session works in its own folder, with its own kind of agent.
 	fix, err := h.Create(ctx, host.Config{
-		Model: "claude-code/claude-opus-5-5",
+		Model: "openrouter/z-ai/glm-5.3",
 		Dir:   "repos/app",
 	})
 	if err != nil {

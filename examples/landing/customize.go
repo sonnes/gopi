@@ -61,10 +61,11 @@ func posted(msgs []ai.Message) bool {
 	return false
 }
 
-// ClaudeCode is the preview of the harness band: a harness with the
-// parts of Claude Code, and the config of one session. Each option is
-// one part, so a caller can change one part and keep the others.
-func ClaudeCode(
+// CodingAgent is the preview of the harness band: a coding agent from
+// the AGENTS.md files and the definitions of its folders, and the
+// config of one session. Each option is one part, so a caller can
+// change one part and keep the others.
+func CodingAgent(
 	ctx context.Context,
 	cat *catalog.Catalog,
 	home string,
@@ -79,14 +80,13 @@ func ClaudeCode(
 	if err != nil {
 		return nil, err
 	}
-	md := storefs.InstructionFiles("CLAUDE.md", "AGENTS.md")
 
 	h := harness.New(
 		harness.Catalog(cat),
 		harness.Defs(def.Layers(
-			storefs.Dir(filepath.Join(home, ".claude"), md),
-			storefs.Dir(filepath.Join(repo, ".claude"), md),
-			storefs.Dir(repo, md),
+			storefs.Dir(filepath.Join(home, ".agents")),
+			storefs.Dir(filepath.Join(repo, ".agents")),
+			storefs.Dir(repo),
 		)),
 		harness.Toolset(harness.Tools(deploy)),
 		harness.Allow("bash(go test *)"),
@@ -95,7 +95,7 @@ func ClaudeCode(
 	a, err := h.Start(ctx, agent.Config{
 		SessionID: "fix-login",
 		Store:     store,
-		Spec:      "anthropic/claude-opus-5-5",
+		Spec:      "openrouter/z-ai/glm-5.3",
 		Dir:       repo,
 		Effort:    ai.ThinkingHigh,
 		Mode:      permission.AcceptEdits,
