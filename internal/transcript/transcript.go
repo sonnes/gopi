@@ -314,3 +314,21 @@ func Parameters(schema *jsonschema.Schema) (map[string]any, error) {
 	}
 	return Schema(schema)
 }
+
+// imageMediaPrefix starts the media type of an image.
+const imageMediaPrefix = "image/"
+
+// NotImage returns the media type of the first file of messages that is
+// not an image. The decisions APIs of OpenAI and OpenRouter read no
+// other file.
+func NotImage(messages []ai.Message) (string, bool) {
+	for _, msg := range messages {
+		for _, c := range msg.Content {
+			f, ok := c.(ai.File)
+			if ok && !strings.HasPrefix(f.MediaType, imageMediaPrefix) {
+				return f.MediaType, true
+			}
+		}
+	}
+	return "", false
+}

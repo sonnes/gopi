@@ -29,6 +29,10 @@ type Fake struct {
 	// Count answers a call of CountTokens with 7 input tokens. Nil skips
 	// the token cases.
 	Count http.HandlerFunc
+	// Decide answers a call of Decide with the answer 0.9 to the
+	// yes-or-no question "is_bug", and its usage. Nil skips the decision
+	// cases.
+	Decide http.HandlerFunc
 }
 
 // RunFake runs every case on a fake API as a subtest of t.
@@ -36,6 +40,7 @@ func RunFake(t *testing.T, f Fake) {
 	t.Run("StreamText", f.streamText)
 	t.Run("GenerateObject", f.generateObject)
 	t.Run("CountTokens", f.countTokens)
+	t.Run("Decide", f.decide)
 }
 
 // fakeAPI answers each request with the next handler, and repeats the
@@ -206,6 +211,66 @@ func (f Fake) countTokens(t *testing.T) {
 	t.Run("marks a refused size", func(t *testing.T) {
 		_, _, err := count(t, nil, failure(http.StatusRequestEntityTooLarge))
 		assert.ErrorIs(t, err, ai.ErrContextExceeded)
+	})
+}
+
+func (f Fake) decide(t *testing.T) {
+	if f.Decide == nil {
+		t.Skip("the provider does not decide")
+	}
+	priced := fakeModel
+	priced.Pricing = ai.Pricing{Input: 1}
+	ticket := []ai.Message{ai.UserMessage("Pay shows a blank page.")}
+	isBug := ai.YesNo("is_bug", "Is it a defect?")
+	decide := func(
+		t *testing.T,
+		input []ai.Message,
+		opts ai.Options,
+		handlers ...http.HandlerFunc,
+	) (*ai.DecisionResponse, *fakeAPI, error) {
+		p, api := f.serve(t, handlers...)
+		decider, ok := p.(ai.DecisionProvider)
+		require.True(t, ok, "the provider decides")
+		dm := ai.DecisionModel{Model: priced, Provider: decider}
+		resp, err := dm.Decide(t.Context(), input, isBug, opts)
+		return resp, api, err
+	}
+
+	t.Run("answers and reports the cost", func(t *testing.T) {
+		resp, _, err := decide(t, ticket, nil, f.Decide)
+		require.NoError(t, err)
+		p, err := resp.YesNo("is_bug")
+		require.NoError(t, err)
+		assert.InDelta(t, 0.9, p, 1e-9)
+		assert.Positive(t, resp.Usage.Input)
+		assert.Positive(t, resp.Usage.Cost.Total())
+	})
+
+	t.Run("retries", func(t *testing.T) {
+		_, api, err := decide(t, ticket, ai.MaxRetries(1), failure(http.StatusServiceUnavailable, shortWait, "1"), f.Decide)
+		require.NoError(t, err)
+		assert.Equal(t, int32(2), api.calls.Load())
+	})
+
+	t.Run("no retry of a client error", func(t *testing.T) {
+		_, api, err := decide(t, ticket, ai.MaxRetries(3), failure(http.StatusBadRequest), f.Decide)
+		require.Error(t, err)
+		assert.Equal(t, int32(1), api.calls.Load())
+	})
+
+	t.Run("marks a refused size", func(t *testing.T) {
+		_, _, err := decide(t, ticket, nil, failure(http.StatusRequestEntityTooLarge))
+		assert.ErrorIs(t, err, ai.ErrContextExceeded)
+	})
+
+	t.Run("rejects a file that the API does not read", func(t *testing.T) {
+		notes := []ai.Message{{
+			Role:    ai.RoleUser,
+			Content: []ai.Content{ai.File{MediaType: "text/plain", Data: []byte("notes")}},
+		}}
+		_, api, err := decide(t, notes, nil, f.Decide)
+		require.ErrorIs(t, err, errors.ErrUnsupported)
+		assert.Zero(t, api.calls.Load(), "the provider sends nothing")
 	})
 }
 
