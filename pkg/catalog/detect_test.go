@@ -41,13 +41,15 @@ func TestCatalog_Detect(t *testing.T) {
 		missing("one", "ONE_KEY"),
 		found("two", "TWO_KEY", textProvider{}, beta),
 		found("paint", "PAINT_KEY", imageProvider{}, pixel),
+		found("judge", "JUDGE_KEY", decisionProvider{}, jev),
 	)
 
 	assert.Equal(t, []catalog.Detection{
 		{Provider: "two", Source: "TWO_KEY"},
 		{Provider: "paint", Source: "PAINT_KEY"},
+		{Provider: "judge", Source: "JUDGE_KEY"},
 	}, got)
-	assert.Equal(t, []string{"paint/pixel", "two/beta"}, c.Specs())
+	assert.Equal(t, []string{"judge/jev", "paint/pixel", "two/beta"}, c.Specs())
 }
 
 func TestCatalog_Detect_FirstSourceWins(t *testing.T) {
@@ -72,6 +74,16 @@ func TestCatalog_Detect_RegistersCapabilities(t *testing.T) {
 	_, imageErr := c.ImageModel("paint/pixel")
 	require.NoError(t, textErr)
 	require.NoError(t, imageErr)
+}
+
+func TestCatalog_Detect_RegistersDecisions(t *testing.T) {
+	c := catalog.New()
+
+	c.Detect(found("judge", "JUDGE_KEY", decisionProvider{}, jev))
+
+	dm, err := c.DecisionModel("judge/jev")
+	require.NoError(t, err)
+	assert.Equal(t, decisionProvider{}, dm.Provider)
 }
 
 // driverDetector returns a driver detector that finds d if ok is true.

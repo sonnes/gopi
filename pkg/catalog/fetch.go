@@ -90,24 +90,22 @@ func withUnlisted(results []FetchResult, ids, listed []string) []FetchResult {
 func (c *Catalog) providerIDs() []string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	ids := make(map[string]bool)
-	for id := range c.textProviders {
-		ids[id] = true
-	}
-	for id := range c.imageProviders {
-		ids[id] = true
-	}
-	return slices.Sorted(maps.Keys(ids))
+	return c.providerIDsLocked()
 }
 
-// lister returns the first provider of id that lists models: text, then
-// image.
+// providerIDsLocked returns the ID of each provider, sorted.
+func (c *Catalog) providerIDsLocked() []string {
+	return slices.Sorted(maps.Keys(c.providers))
+}
+
+// lister returns the first provider of id that lists models: text,
+// then image, then decision.
 func (c *Catalog) lister(id string) ai.ModelLister {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	e := c.providersOf(id)
 	for _, p := range []any{
-		c.textProviders[id],
-		c.imageProviders[id],
+		e.text,
+		e.image,
+		e.decision,
 	} {
 		if l, ok := p.(ai.ModelLister); ok {
 			return l
@@ -211,6 +209,7 @@ func FillModel(m, d ai.Model) ai.Model {
 	m.MaxTokens = cmp.Or(m.MaxTokens, d.MaxTokens)
 	m.ContextWindow = cmp.Or(m.ContextWindow, d.ContextWindow)
 	m.Input = slices.Clone(firstSet(m.Input, d.Input))
+	m.Output = slices.Clone(firstSet(m.Output, d.Output))
 	m.Reasoning = m.Reasoning || d.Reasoning
 	m.ThinkingLevels = slices.Clone(firstSet(m.ThinkingLevels, d.ThinkingLevels))
 	if !hasPrices(m.Pricing) {

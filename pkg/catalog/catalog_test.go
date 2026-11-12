@@ -42,20 +42,39 @@ func (imageProvider) GenerateImage(
 	return &ai.ImageResponse{}, nil
 }
 
+// decisionProvider implements [ai.TextProvider] and
+// [ai.DecisionProvider].
+type decisionProvider struct {
+	textProvider
+}
+
+func (decisionProvider) Decide(
+	_ context.Context,
+	_ ai.Model,
+	_ []ai.Message,
+	_ []ai.Question,
+	_ ai.Options,
+) (*ai.DecisionResponse, error) {
+	return &ai.DecisionResponse{}, nil
+}
+
 var (
 	alpha  = ai.Model{ID: "alpha", Name: "Alpha", MaxTokens: 100}
 	beta   = ai.Model{ID: "beta", Name: "Beta", MaxTokens: 200}
 	shared = ai.Model{ID: "shared", Name: "Shared"}
 	pixel  = ai.Model{ID: "pixel", Name: "Pixel"}
+	jev    = ai.Model{ID: "jev", Name: "Jev"}
 )
 
-// newCatalog returns a catalog with two text providers and one image
-// provider. "shared" is served by both text providers.
+// newCatalog returns a catalog with two text providers, one image
+// provider, and one decision provider. "shared" is served by both text
+// providers.
 func newCatalog() *catalog.Catalog {
 	c := catalog.New()
 	c.RegisterTextProvider("one", textProvider{}, alpha, shared)
 	c.RegisterTextProvider("two", textProvider{}, beta, shared)
 	c.RegisterImageProvider("paint", imageProvider{}, pixel)
+	c.RegisterDecisionProvider("judge", decisionProvider{}, jev)
 	return c
 }
 
@@ -145,14 +164,61 @@ func TestCatalog_ImageModel(t *testing.T) {
 	assert.Equal(t, imageProvider{}, im.Provider)
 }
 
+func TestCatalog_DecisionModel(t *testing.T) {
+	c := newCatalog()
+
+	dm, err := c.DecisionModel("jev")
+
+	require.NoError(t, err)
+	assert.Equal(t, jev, dm.Model)
+	assert.Equal(t, decisionProvider{}, dm.Provider)
+}
+
 func TestCatalog_MissingCapability(t *testing.T) {
 	c := newCatalog()
 
 	_, textErr := c.LanguageModel("paint/pixel")
 	_, imageErr := c.ImageModel("one/alpha")
+	_, decisionErr := c.DecisionModel("one/alpha")
 
 	assert.ErrorIs(t, textErr, errors.ErrUnsupported)
 	assert.ErrorIs(t, imageErr, errors.ErrUnsupported)
+	assert.ErrorIs(t, decisionErr, errors.ErrUnsupported)
+}
+
+func TestCatalog_ModelOutput(t *testing.T) {
+	c := catalog.New()
+	decides := ai.Model{ID: "decides", Output: []ai.Output{ai.OutputDecisions}}
+	writes := ai.Model{ID: "writes", Output: []ai.Output{ai.OutputText}}
+	unknown := ai.Model{ID: "unknown"}
+	c.RegisterTextProvider("judge", decisionProvider{}, decides, writes, unknown)
+	c.RegisterDecisionProvider("judge", decisionProvider{}, decides, writes, unknown)
+
+	_, textErr := c.LanguageModel("judge/decides")
+	_, decisionErr := c.DecisionModel("judge/writes")
+	_, unknownTextErr := c.LanguageModel("judge/unknown")
+	_, unknownDecisionErr := c.DecisionModel("judge/unknown")
+
+	require.ErrorIs(t, textErr, errors.ErrUnsupported)
+	assert.ErrorContains(t, textErr, `"judge/decides"`)
+	require.ErrorIs(t, decisionErr, errors.ErrUnsupported)
+	assert.ErrorContains(t, decisionErr, `"judge/writes"`)
+	assert.NoError(t, unknownTextErr, "a model with no output list binds to each capability")
+	assert.NoError(t, unknownDecisionErr)
+}
+
+func TestCatalog_ImageModelOutput(t *testing.T) {
+	c := catalog.New()
+	writes := ai.Model{ID: "writes", Output: []ai.Output{ai.OutputText}}
+	unknown := ai.Model{ID: "unknown"}
+	c.RegisterImageProvider("paint", imageProvider{}, writes, unknown)
+
+	_, writesErr := c.ImageModel("paint/writes")
+	_, unknownErr := c.ImageModel("paint/unknown")
+
+	require.ErrorIs(t, writesErr, errors.ErrUnsupported)
+	assert.ErrorContains(t, writesErr, `"paint/writes"`)
+	assert.NoError(t, unknownErr, "a model with no output list binds to image generation")
 }
 
 func TestCatalog_RegisterModel(t *testing.T) {
@@ -172,6 +238,7 @@ func TestCatalog_Specs(t *testing.T) {
 	got := c.Specs()
 
 	assert.Equal(t, []string{
+		"judge/jev",
 		"one/alpha",
 		"one/shared",
 		"paint/pixel",
@@ -324,9 +391,9 @@ func TestCatalog_UnknownModelError(t *testing.T) {
 			spec: "onee/alpha",
 			want: catalog.UnknownModelError{
 				Spec:      "onee/alpha",
-				Providers: []string{"one", "paint", "two"},
+				Providers: []string{"judge", "one", "paint", "two"},
 			},
-			wantMsg: `catalog: unknown model "onee/alpha": no provider "onee": use one of one, paint, two`,
+			wantMsg: `catalog: unknown model "onee/alpha": no provider "onee": use one of judge, one, paint, two`,
 		},
 	}
 	for _, tt := range tests {
@@ -411,6 +478,7 @@ func fullModel() ai.Model {
 		MaxTokens:      100,
 		ContextWindow:  1000,
 		Input:          []ai.Modality{ai.ModalityText},
+		Output:         []ai.Output{ai.OutputText},
 		Reasoning:      true,
 		ThinkingLevels: []ai.ThinkingLevel{ai.ThinkingHigh},
 		Pricing: ai.Pricing{
@@ -438,6 +506,7 @@ func TestFillModel_Copies(t *testing.T) {
 
 	got := catalog.FillModel(full, ai.Model{})
 	got.Input[0] = ai.ModalityPDF
+	got.Output[0] = ai.OutputImage
 	got.ThinkingLevels[0] = ai.ThinkingLow
 	got.Pricing.Tiers[0].Input = 9
 

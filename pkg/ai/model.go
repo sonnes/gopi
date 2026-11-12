@@ -18,6 +18,10 @@ type Model struct {
 	ContextWindow int `json:"context_window,omitempty"`
 	// Input lists the kinds of content that the model reads.
 	Input []Modality `json:"input,omitempty"`
+	// Output lists what the model gives. If it is empty, the output is
+	// unknown, and the catalog binds the model to each capability of
+	// its provider.
+	Output []Output `json:"output,omitempty"`
 	// Reasoning reports that the model reasons before it answers.
 	Reasoning bool `json:"reasoning,omitempty"`
 	// ThinkingLevels lists the [Thinking] levels that the model takes.
@@ -36,6 +40,19 @@ const (
 	ModalityText  Modality = "text"
 	ModalityImage Modality = "image"
 	ModalityPDF   Modality = "pdf"
+)
+
+// Output is a kind of result that a model gives.
+type Output string
+
+const (
+	// OutputText is text, for a [LanguageModel].
+	OutputText Output = "text"
+	// OutputImage is an image, for an [ImageModel].
+	OutputImage Output = "image"
+	// OutputDecisions is the answers of a decision, for a
+	// [DecisionModel].
+	OutputDecisions Output = "decisions"
 )
 
 // tokensPerPriceUnit is the number of tokens that a price is for.

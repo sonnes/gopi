@@ -108,16 +108,15 @@ func (e *AmbiguousModelError) Error() string {
 func (e *AmbiguousModelError) Unwrap() error { return ErrAmbiguousModel }
 
 // Catalog is a registry of providers, drivers, and their models. Each
-// capability has its own map of providers, and the providers share one
-// model index. The drivers of agents have their own model index, because
-// a driver cannot serve a call to a model. Create a Catalog with [New].
-// A Catalog is safe for concurrent use.
+// provider ID has one entry with a provider for each capability, and the
+// providers share one model index. The drivers of agents have their own
+// model index, because a driver cannot serve a call to a model. Create a
+// Catalog with [New]. A Catalog is safe for concurrent use.
 type Catalog struct {
-	mu             sync.RWMutex
-	textProviders  map[string]ai.TextProvider
-	imageProviders map[string]ai.ImageProvider
-	drivers        map[string]agent.Driver
-	defaultDriver  agent.Driver
+	mu            sync.RWMutex
+	providers     map[string]*providers
+	drivers       map[string]agent.Driver
+	defaultDriver agent.Driver
 
 	// models holds each model of a provider by its full spec.
 	models map[string]ai.Model
@@ -125,15 +124,44 @@ type Catalog struct {
 	driverModels map[string]ai.Model
 }
 
+// providers holds the providers registered under one ID.
+type providers struct {
+	text     ai.TextProvider
+	image    ai.ImageProvider
+	decision ai.DecisionProvider
+}
+
 // New returns an empty catalog.
 func New() *Catalog {
 	return &Catalog{
-		textProviders:  make(map[string]ai.TextProvider),
-		imageProviders: make(map[string]ai.ImageProvider),
-		drivers:        make(map[string]agent.Driver),
-		models:         make(map[string]ai.Model),
-		driverModels:   make(map[string]ai.Model),
+		providers:    make(map[string]*providers),
+		drivers:      make(map[string]agent.Driver),
+		models:       make(map[string]ai.Model),
+		driverModels: make(map[string]ai.Model),
 	}
+}
+
+// entryLocked returns the providers of id, and adds an empty entry if
+// id has none.
+func (c *Catalog) entryLocked(id string) *providers {
+	e, ok := c.providers[id]
+	if !ok {
+		e = &providers{}
+		c.providers[id] = e
+	}
+	return e
+}
+
+// providersOf returns a copy of the providers of id. It is empty if id
+// has none.
+func (c *Catalog) providersOf(id string) providers {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	e, ok := c.providers[id]
+	if !ok {
+		return providers{}
+	}
+	return *e
 }
 
 // RegisterTextProvider registers p for text generation under id, and
@@ -145,7 +173,7 @@ func (c *Catalog) RegisterTextProvider(
 ) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.textProviders[id] = p
+	c.entryLocked(id).text = p
 	addModels(c.models, id, models)
 }
 
@@ -158,7 +186,20 @@ func (c *Catalog) RegisterImageProvider(
 ) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.imageProviders[id] = p
+	c.entryLocked(id).image = p
+	addModels(c.models, id, models)
+}
+
+// RegisterDecisionProvider registers p for decisions under id, and
+// adds models to the model index.
+func (c *Catalog) RegisterDecisionProvider(
+	id string,
+	p ai.DecisionProvider,
+	models ...ai.Model,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entryLocked(id).decision = p
 	addModels(c.models, id, models)
 }
 
@@ -225,37 +266,59 @@ func (c *Catalog) Model(spec string) (ai.Model, error) {
 }
 
 // LanguageModel resolves spec to a model bound to its text provider. If
-// the provider of spec has no text generation, the error wraps
-// [errors.ErrUnsupported].
+// the provider of spec has no text generation, or the [ai.Model.Output]
+// of the model has no text, the error wraps [errors.ErrUnsupported].
 func (c *Catalog) LanguageModel(spec string) (ai.LanguageModel, error) {
 	m, id, err := c.resolve(spec)
 	if err != nil {
 		return ai.LanguageModel{}, err
 	}
-	c.mu.RLock()
-	p, ok := c.textProviders[id]
-	c.mu.RUnlock()
-	if !ok {
-		return ai.LanguageModel{}, unsupported(id, "text")
+	p := c.providersOf(id).text
+	if p == nil {
+		return ai.LanguageModel{}, unsupported(id, "text generation")
+	}
+	if err := checkOutput(id, m, ai.OutputText); err != nil {
+		return ai.LanguageModel{}, err
 	}
 	return ai.LanguageModel{Model: m, Provider: p}, nil
 }
 
 // ImageModel resolves spec to a model bound to its image provider. If
-// the provider of spec has no image generation, the error wraps
+// the provider of spec has no image generation, or the
+// [ai.Model.Output] of the model has no image, the error wraps
 // [errors.ErrUnsupported].
 func (c *Catalog) ImageModel(spec string) (ai.ImageModel, error) {
 	m, id, err := c.resolve(spec)
 	if err != nil {
 		return ai.ImageModel{}, err
 	}
-	c.mu.RLock()
-	p, ok := c.imageProviders[id]
-	c.mu.RUnlock()
-	if !ok {
-		return ai.ImageModel{}, unsupported(id, "image")
+	p := c.providersOf(id).image
+	if p == nil {
+		return ai.ImageModel{}, unsupported(id, "image generation")
+	}
+	if err := checkOutput(id, m, ai.OutputImage); err != nil {
+		return ai.ImageModel{}, err
 	}
 	return ai.ImageModel{Model: m, Provider: p}, nil
+}
+
+// DecisionModel resolves spec to a model bound to its decision
+// provider. If the provider of spec has no decisions, or the
+// [ai.Model.Output] of the model has no decisions, the error wraps
+// [errors.ErrUnsupported].
+func (c *Catalog) DecisionModel(spec string) (ai.DecisionModel, error) {
+	m, id, err := c.resolve(spec)
+	if err != nil {
+		return ai.DecisionModel{}, err
+	}
+	p := c.providersOf(id).decision
+	if p == nil {
+		return ai.DecisionModel{}, unsupported(id, "decisions")
+	}
+	if err := checkOutput(id, m, ai.OutputDecisions); err != nil {
+		return ai.DecisionModel{}, err
+	}
+	return ai.DecisionModel{Model: m, Provider: p}, nil
 }
 
 // Driver resolves spec to the driver that starts its agent, and to its
@@ -294,7 +357,8 @@ func (c *Catalog) Driver(spec string) (agent.Driver, ai.Model, error) {
 		m, err := c.driverModelLocked(id, m.ID)
 		return d, m, err
 	}
-	if _, ok := c.textProviders[id]; !ok {
+	e, ok := c.providers[id]
+	if !ok || e.text == nil {
 		return nil, ai.Model{}, fmt.Errorf(
 			"catalog: provider %q has %w and no text generation",
 			id,
@@ -323,11 +387,26 @@ func (c *Catalog) driverModelLocked(id, modelID string) (ai.Model, error) {
 	return m, nil
 }
 
+// checkOutput returns an error that wraps [errors.ErrUnsupported] if the
+// output of m is known and does not have want. A model with no output
+// list passes, because most model lists do not say what a model gives.
+func checkOutput(id string, m ai.Model, want ai.Output) error {
+	if len(m.Output) == 0 || slices.Contains(m.Output, want) {
+		return nil
+	}
+	return fmt.Errorf(
+		"catalog: model %q gives no %s: %w",
+		id+"/"+m.ID,
+		want,
+		errors.ErrUnsupported,
+	)
+}
+
 func unsupported(id, capability string) error {
 	return fmt.Errorf(
-		"catalog: %s generation of provider %q: %w",
-		capability,
+		"catalog: provider %q has no %s: %w",
 		id,
+		capability,
 		errors.ErrUnsupported,
 	)
 }
@@ -365,24 +444,20 @@ func (c *Catalog) withProvidersLocked(err error) error {
 	if !unknownProvider {
 		return err
 	}
-	ids := make(map[string]bool)
+	ids := c.providerIDsLocked()
 	for id := range c.drivers {
-		ids[id] = true
+		if !c.hasModelProviderLocked(id) {
+			ids = append(ids, id)
+		}
 	}
-	for id := range c.textProviders {
-		ids[id] = true
-	}
-	for id := range c.imageProviders {
-		ids[id] = true
-	}
-	unknown.Providers = slices.Sorted(maps.Keys(ids))
+	slices.Sort(ids)
+	unknown.Providers = ids
 	return unknown
 }
 
 func (c *Catalog) hasModelProviderLocked(id string) bool {
-	_, text := c.textProviders[id]
-	_, image := c.imageProviders[id]
-	return text || image
+	_, ok := c.providers[id]
+	return ok
 }
 
 // resolveIn returns the model of spec in index and the ID of its

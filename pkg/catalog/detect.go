@@ -49,7 +49,8 @@ type Detection struct {
 
 // Detect runs ds in order and registers each provider that a detector
 // builds. It registers the provider for images too, if the provider
-// implements [ai.ImageProvider].
+// implements [ai.ImageProvider], and for decisions, if it implements
+// [ai.DecisionProvider].
 //
 // Order is precedence. If two detectors have the same Provider, the
 // first one that finds its credential wins, and Detect skips the rest.
@@ -103,5 +104,8 @@ func (c *Catalog) register(id string, p ai.TextProvider, models []ai.Model) {
 	c.RegisterTextProvider(id, p, models...)
 	if ip, ok := p.(ai.ImageProvider); ok {
 		c.RegisterImageProvider(id, ip)
+	}
+	if dp, ok := p.(ai.DecisionProvider); ok {
+		c.RegisterDecisionProvider(id, dp)
 	}
 }
