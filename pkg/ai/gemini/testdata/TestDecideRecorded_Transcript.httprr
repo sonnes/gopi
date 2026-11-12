@@ -1,0 +1,22 @@
+httprr trace v1
+797 755
+POST https://generativelanguage.googleapis.com/v1beta/decisions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 595
+Content-Type: application/json
+
+{"model":"gemini-decision-1","input":[{"text":"Delete the temp files in /tmp/build.\n","type":"text"},{"text":"I will delete them.\n","type":"text"},{"text":"[tool call bash] {\"command\":\"rm -rf /tmp/build/*.tmp\"}\n","type":"text"},{"text":"[tool result bash] Removed 12 files.\n","type":"text"},{"text":"I removed 12 temp files from /tmp/build.\n","type":"text"}],"questions":{"done":{"type":"noul","instructions":"Did the assistant report that it removed the files?"},"tool":{"type":"choice","instructions":"Which tool did the agent call?","criteria":{"bash":"","browser":"","editor":""}}}}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 11:52:22 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=530
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+{"answers":{"tool":{"confidence":0.9996828389559992,"choice":"bash","probabilities":{"editor":0.0002618365354010651,"bash":0.9996828389559992,"browser":5.5324508599806883e-05},"type":"choice"},"done":{"confidence":0.983304602657318,"noul":0.983304602657318,"type":"noul"}},"usage":{"total_tokens":199,"total_input_tokens":199,"input_tokens_by_modality":[{"modality":"text","tokens":199}],"total_output_tokens":0}}

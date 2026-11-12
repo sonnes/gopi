@@ -81,8 +81,10 @@ func TestRequest_Conversation(t *testing.T) {
 func TestRequest_Files(t *testing.T) {
 	png := ai.File{MediaType: "image/png", Data: []byte("png")}
 	pdf := ai.File{MediaType: "application/pdf", Data: []byte("pdf")}
+	wav := ai.File{MediaType: "audio/wav", Data: []byte("wav")}
+	mp4 := ai.File{MediaType: "video/mp4", Data: []byte("mp4")}
 	messages := []ai.Message{
-		{Role: ai.RoleUser, Content: []ai.Content{ai.Text{Text: "Read these."}, png, pdf}},
+		{Role: ai.RoleUser, Content: []ai.Content{ai.Text{Text: "Read these."}, png, pdf, wav, mp4}},
 		ai.AssistantMessage(ai.ToolCall{ID: "call-1", Name: "screenshot", Input: json.RawMessage(`{}`)}),
 		{Role: ai.RoleToolResult, ToolCallID: "call-1", IsError: true, Content: []ai.Content{ai.Text{Text: "failed"}, png}},
 	}
@@ -97,7 +99,9 @@ func TestRequest_Files(t *testing.T) {
 	assert.JSONEq(t, `{"type": "user_input", "content": [
 		{"type": "text", "text": "Read these."},
 		{"type": "image", "mime_type": "image/png", "data": "cG5n"},
-		{"type": "document", "mime_type": "application/pdf", "data": "cGRm"}
+		{"type": "document", "mime_type": "application/pdf", "data": "cGRm"},
+		{"type": "audio", "mime_type": "audio/wav", "data": "d2F2"},
+		{"type": "video", "mime_type": "video/mp4", "data": "bXA0"}
 	]}`, string(got.Input[0]))
 	assert.JSONEq(t, `{"type": "function_result", "call_id": "call-1", "name": "screenshot", "is_error": true, "result": [
 		{"type": "text", "text": "failed"},

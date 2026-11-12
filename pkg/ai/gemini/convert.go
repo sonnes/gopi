@@ -97,11 +97,57 @@ func textContent(text string) interactions.TextContent {
 	return interactions.TextContent{Text: text}
 }
 
+// fileKind is the content type that the API reads a file as.
+type fileKind int
+
+const (
+	fileUnknown fileKind = iota
+	fileImage
+	fileAudio
+	fileVideo
+	fileDocument
+)
+
+// pdfMediaType is the media type of a PDF document.
+const pdfMediaType = "application/pdf"
+
+// kindOf returns the content type that the API reads a file of
+// mediaType as, or fileUnknown if the API does not read it.
+func kindOf(mediaType string) fileKind {
+	switch {
+	case strings.HasPrefix(mediaType, "image/"):
+		return fileImage
+	case strings.HasPrefix(mediaType, "audio/"):
+		return fileAudio
+	case strings.HasPrefix(mediaType, "video/"):
+		return fileVideo
+	case mediaType == pdfMediaType:
+		return fileDocument
+	default:
+		return fileUnknown
+	}
+}
+
+// fileContent maps an image, an audio file, or a video to its own
+// content type, and each other file to a document.
 func fileContent(f ai.File) interactions.Content {
 	data := base64.StdEncoding.EncodeToString(f.Data)
-	if strings.HasPrefix(f.MediaType, "image/") {
+	switch kindOf(f.MediaType) {
+	case fileImage:
 		mime := interactions.ImageContentMimeType(f.MediaType)
 		return interactions.NewContent(interactions.ImageContent{
+			Data:     &data,
+			MimeType: &mime,
+		})
+	case fileAudio:
+		mime := interactions.AudioContentMimeType(f.MediaType)
+		return interactions.NewContent(interactions.AudioContent{
+			Data:     &data,
+			MimeType: &mime,
+		})
+	case fileVideo:
+		mime := interactions.VideoContentMimeType(f.MediaType)
+		return interactions.NewContent(interactions.VideoContent{
 			Data:     &data,
 			MimeType: &mime,
 		})
@@ -219,6 +265,10 @@ func subcontent(c interactions.Content) interactions.FunctionResultSubcontent {
 		return interactions.NewFunctionResultSubcontent(*c.ImageContent)
 	case c.DocumentContent != nil:
 		return interactions.NewFunctionResultSubcontent(*c.DocumentContent)
+	case c.AudioContent != nil:
+		return interactions.NewFunctionResultSubcontent(*c.AudioContent)
+	case c.VideoContent != nil:
+		return interactions.NewFunctionResultSubcontent(*c.VideoContent)
 	default:
 		return interactions.NewFunctionResultSubcontent(*c.TextContent)
 	}

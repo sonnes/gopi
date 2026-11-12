@@ -9,6 +9,8 @@ import (
 
 	"google.golang.org/genai"
 	"google.golang.org/genai/interactions/models/apierrors"
+
+	"github.com/sonnes/gopi/internal/httpapi"
 )
 
 // Error is a failed answer of the API. Each method of the provider
@@ -91,6 +93,26 @@ func apiError(err error) error {
 		}
 	default:
 		return err
+	}
+}
+
+// statusError returns an [*Error] for a failed answer, and each other
+// error unchanged. If the body has no message, the message is the text
+// of the status.
+func statusError(err error) error {
+	var status *httpapi.StatusError
+	if !errors.As(err, &status) {
+		return err
+	}
+	message := strings.TrimSpace(bodyMessage(status.Body))
+	if message == "" {
+		message = http.StatusText(status.Code)
+	}
+	return &Error{
+		StatusCode: status.Code,
+		Message:    message,
+		Header:     status.Header,
+		err:        err,
 	}
 }
 

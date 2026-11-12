@@ -1109,6 +1109,22 @@
         "note": "Google raises the prices to 4, 20, and 0.20 on 2026-12-01."
       },
       {
+        "id": "gemini-decision-1",
+        "name": "Gemini Decision 1",
+        "context_window": 262144,
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "output": [
+          "decisions"
+        ],
+        "pricing": {
+          "input": 0.1
+        }
+      },
+      {
         "id": "gemini-nano-banana-2.1",
         "name": "Nano Banana 2.1",
         "input": [

@@ -1,0 +1,22 @@
+httprr trace v1
+923 1018
+POST https://generativelanguage.googleapis.com/v1beta/decisions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 721
+Content-Type: application/json
+
+{"model":"gemini-decision-1","input":[{"text":"My checkout page shows a blank screen after I click Pay. I tried two browsers, and no customer can pay.\n","type":"text"}],"questions":{"is_bug":{"type":"noul","instructions":"Does the user report a software defect?","criteria":{"true_description":"The user describes broken behavior.","false_description":"The user asks a question."}},"team":{"type":"choice","instructions":"Which team owns this ticket?","criteria":{"account":"Login, password, or profile.","payments":"Checkout, billing, or payments."}},"urgency":{"type":"score","instructions":"How urgent is this ticket?","criteria":["later: It can wait.","this week: Fix it this week.","now: It blocks revenue now."]}}}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 11:52:10 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=542
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+{"answers":{"is_bug":{"confidence":0.9738938862581732,"noul":0.9738938862581732,"type":"noul"},"team":{"confidence":0.9967308894158913,"choice":"payments","probabilities":{"account":0.003269110584108796,"payments":0.9967308894158913},"type":"choice"},"urgency":{"confidence":0.9856805429085711,"score":1.9845380837277693,"probabilities":{"1":0.013176997910627057,"0":0.0011424591808018396,"2":0.9856805429085711},"legend":{"2":"now: It blocks revenue now.","0":"later: It can wait.","1":"this week: Fix it this week."},"type":"score"}},"usage":{"total_tokens":274,"total_input_tokens":274,"input_tokens_by_modality":[{"modality":"text","tokens":274}],"total_output_tokens":0}}

@@ -107,6 +107,7 @@ func TestRunFake(t *testing.T) {
 		},
 		Text:   completed,
 		Object: answer(objectBody),
+		Decide: answer(decisionBody),
 	})
 }
 
