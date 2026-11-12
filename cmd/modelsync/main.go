@@ -140,6 +140,12 @@ func rules() map[string]source {
 			Dev:     "fireworks-ai",
 			DevAdds: true,
 		},
+		// The list of Gemini holds embedding and image models too, so
+		// models.dev admits only the models with tools.
+		"gemini": {
+			Dev:       "google",
+			DevAdmits: true,
+		},
 	}
 }
 

@@ -19,6 +19,7 @@
 package env
 
 import (
+	"cmp"
 	"os"
 	"os/exec"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
 	"github.com/sonnes/gopi/pkg/ai/fireworks"
+	"github.com/sonnes/gopi/pkg/ai/gemini"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
@@ -44,6 +46,8 @@ import (
 //     the models of today.
 //   - fireworks, from FIREWORKS_API_KEY, with [fireworks.New] and the
 //     models that come from models.dev.
+//   - gemini, from GOOGLE_API_KEY, or else GEMINI_API_KEY. The Google
+//     SDKs read the two variables in this order.
 //   - openaichat, from OPENAI_API_KEY. It registers no models, because
 //     it serves any server at OPENAI_BASE_URL. Call
 //     [catalog.Catalog.FetchModels] to list the models of the server.
@@ -96,6 +100,18 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 					return nil, false
 				}
 				return fireworks.New(fireworks.APIKey(key)), true
+			},
+		},
+		{
+			Provider: "gemini",
+			Source:   "GOOGLE_API_KEY or GEMINI_API_KEY",
+			Models:   file.Of("gemini"),
+			Detect: func() (ai.TextProvider, bool) {
+				key := cmp.Or(os.Getenv("GOOGLE_API_KEY"), os.Getenv("GEMINI_API_KEY"))
+				if key == "" {
+					return nil, false
+				}
+				return gemini.New(gemini.APIKey(key)), true
 			},
 		},
 		{

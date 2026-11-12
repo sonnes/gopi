@@ -237,7 +237,7 @@ func TestAllSources(t *testing.T) {
 	for _, s := range got {
 		ids = append(ids, s.ID)
 	}
-	assert.Equal(t, []string{"anthropic", "openai", "openrouter", "fireworks", "claude-code", "codex"}, ids)
+	assert.Equal(t, []string{"anthropic", "openai", "openrouter", "fireworks", "gemini", "claude-code", "codex"}, ids)
 	for _, s := range got {
 		assert.Equal(t, s.ID == "claude-code" || s.ID == "codex", s.Driver, s.ID)
 		assert.True(t, s.List != nil || s.Skip != "", "%s has a list or a reason to skip it", s.ID)

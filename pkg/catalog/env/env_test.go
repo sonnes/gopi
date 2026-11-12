@@ -2,8 +2,12 @@ package env_test
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +28,13 @@ var variables = []string{
 	"OPENAI_API_KEY",
 	"OPENROUTER_API_KEY",
 	"FIREWORKS_API_KEY",
+	"GEMINI_API_KEY",
+	"GOOGLE_API_KEY",
 }
+
+// geminiSource is the source of the gemini detector. The Google SDKs
+// read both variables.
+const geminiSource = "GOOGLE_API_KEY or GEMINI_API_KEY"
 
 func TestDetectors(t *testing.T) {
 	tests := []struct {
@@ -65,6 +75,20 @@ func TestDetectors(t *testing.T) {
 			},
 		},
 		{
+			name: "gemini",
+			set:  []string{"GEMINI_API_KEY"},
+			want: []catalog.Detection{
+				{Provider: "gemini", Source: geminiSource},
+			},
+		},
+		{
+			name: "gemini from the Google key",
+			set:  []string{"GOOGLE_API_KEY"},
+			want: []catalog.Detection{
+				{Provider: "gemini", Source: geminiSource},
+			},
+		},
+		{
 			name: "all, in chain order",
 			set:  variables,
 			want: []catalog.Detection{
@@ -72,6 +96,7 @@ func TestDetectors(t *testing.T) {
 				{Provider: "openai", Source: "OPENAI_API_KEY"},
 				{Provider: "openrouter", Source: "OPENROUTER_API_KEY"},
 				{Provider: "fireworks", Source: "FIREWORKS_API_KEY"},
+				{Provider: "gemini", Source: geminiSource},
 				{Provider: "openaichat", Source: "OPENAI_API_KEY"},
 			},
 		},
@@ -102,8 +127,12 @@ func TestDetectors_Capabilities(t *testing.T) {
 
 	_, sonnet := c.LanguageModel("claude-sonnet-5")
 	_, image := c.ImageModel("gpt-image-2")
+	_, gemini := c.LanguageModel("gemini/gemini-3.8-flash")
+	_, nanoBanana := c.ImageModel("gemini/gemini-nano-banana-2.1")
 	require.NoError(t, sonnet)
 	require.NoError(t, image)
+	require.NoError(t, gemini)
+	require.NoError(t, nanoBanana)
 
 	// The hosts register the models of models.json. openaichat serves
 	// any server, so it registers none, and a caller lists them with
@@ -131,7 +160,7 @@ func TestDetectors_ListedProviders(t *testing.T) {
 	c := catalog.New()
 	c.Detect(env.Detectors(repoFile)...)
 
-	for _, id := range []string{"openrouter", "fireworks"} {
+	for _, id := range []string{"openrouter", "fireworks", "gemini"} {
 		c.RegisterModel(id, ai.Model{ID: "m"})
 		lm, err := c.LanguageModel(id + "/m")
 		require.NoError(t, err, id)
@@ -141,6 +170,40 @@ func TestDetectors_ListedProviders(t *testing.T) {
 	assert.IsType(t, &openrouter.Provider{}, lm.Provider)
 	lm, _ = c.LanguageModel("fireworks/m")
 	assert.IsType(t, &fireworks.Provider{}, lm.Provider)
+}
+
+// TestDetectors_GoogleKeyWins checks that the gemini detector sends
+// GOOGLE_API_KEY when both variables are set, as the Google SDKs do.
+func TestDetectors_GoogleKeyWins(t *testing.T) {
+	var gotKey atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKey.Store(r.Header.Get("x-goog-api-key"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"models": []}`)
+	}))
+	t.Cleanup(srv.Close)
+
+	for _, v := range variables {
+		t.Setenv(v, "")
+	}
+	t.Setenv("GOOGLE_API_KEY", "google-key")
+	t.Setenv("GEMINI_API_KEY", "gemini-key")
+	// The SDK reads the base URL from this variable when the provider
+	// sets none.
+	t.Setenv("GOOGLE_GEMINI_BASE_URL", srv.URL)
+
+	c := catalog.New()
+	c.Detect(env.Detectors(repoFile)...)
+	c.RegisterModel("gemini", ai.Model{ID: "m"})
+	lm, err := c.LanguageModel("gemini/m")
+	require.NoError(t, err)
+	checker, ok := lm.Provider.(ai.KeyChecker)
+	require.True(t, ok)
+
+	_, err = checker.CheckKey(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, "google-key", gotKey.Load())
 }
 
 // fakePath sets PATH to a folder that holds an executable file for

@@ -1013,6 +1013,115 @@
       }
     ]
   },
+  "gemini": {
+    "default": "gemini-4-carbon",
+    "models": [
+      {
+        "id": "gemini-3.5-flash-lite",
+        "name": "Gemini 3.5 Flash-Lite",
+        "max_tokens": 65536,
+        "context_window": 1048576,
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "reasoning": true,
+        "thinking_levels": [
+          "off",
+          "low",
+          "medium",
+          "high"
+        ],
+        "pricing": {
+          "input": 0.3,
+          "output": 2.5,
+          "cache_read": 0.03
+        }
+      },
+      {
+        "id": "gemini-3.8-flash",
+        "name": "Gemini 3.8 Flash",
+        "max_tokens": 65536,
+        "context_window": 1048576,
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "reasoning": true,
+        "thinking_levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "pricing": {
+          "input": 0.75,
+          "output": 3.75,
+          "cache_read": 0.075
+        },
+        "note": "Google raises the prices to 1.50, 7.50, and 0.15 on 2027-01-01."
+      },
+      {
+        "id": "gemini-4-argon",
+        "name": "Gemini 4 Argon",
+        "max_tokens": 65536,
+        "context_window": 1048576,
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "reasoning": true,
+        "thinking_levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "pricing": {
+          "input": 2,
+          "output": 10,
+          "cache_read": 0.1
+        },
+        "note": "Google raises the prices to 4, 20, and 0.20 on 2026-12-01."
+      },
+      {
+        "id": "gemini-4-carbon",
+        "name": "Gemini 4 Carbon",
+        "max_tokens": 65536,
+        "context_window": 1048576,
+        "input": [
+          "text",
+          "image",
+          "pdf"
+        ],
+        "reasoning": true,
+        "thinking_levels": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "pricing": {
+          "input": 2,
+          "output": 10,
+          "cache_read": 0.1
+        },
+        "note": "Google raises the prices to 4, 20, and 0.20 on 2026-12-01."
+      },
+      {
+        "id": "gemini-nano-banana-2.1",
+        "name": "Nano Banana 2.1",
+        "input": [
+          "text",
+          "image"
+        ],
+        "pricing": {
+          "output": 30
+        },
+        "note": "An image model. The output price is for image tokens."
+      }
+    ]
+  },
   "openai": {
     "default": "gpt-6-sol",
     "models": [

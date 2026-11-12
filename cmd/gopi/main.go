@@ -28,9 +28,10 @@
 // "always" keeps the rule of the call as a grant of the session.
 //
 // gopi finds the providers from ANTHROPIC_API_KEY, OPENAI_API_KEY,
-// OPENROUTER_API_KEY, and FIREWORKS_API_KEY, with the detectors of
-// package catalog/env. Before those, it finds the chatgpt provider if
-// $GOPI_HOME/auth.json, or ~/.gopi/auth.json, has a signed-in account.
+// OPENROUTER_API_KEY, FIREWORKS_API_KEY, and GOOGLE_API_KEY or
+// GEMINI_API_KEY, with the detectors of package catalog/env. Before
+// those, it finds the chatgpt provider if $GOPI_HOME/auth.json, or
+// ~/.gopi/auth.json, has a signed-in account.
 //
 // "gopi login chatgpt" signs in with a ChatGPT account in the browser,
 // and saves the account to that file. Then the chatgpt provider runs on
