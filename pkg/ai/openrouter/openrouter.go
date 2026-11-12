@@ -1,18 +1,21 @@
 // Package openrouter is the provider for OpenRouter. It calls the
 // Responses API of OpenRouter through the provider of package openai,
-// lists the models of OpenRouter with their limits and prices, and
-// checks a key with its credit. It implements [ai.TextProvider],
-// [ai.ObjectProvider], [ai.ModelLister], and [ai.KeyChecker].
+// answers closed questions with its Decisions API, lists the models of
+// OpenRouter with their limits and prices, and checks a key with its
+// credit. It implements [ai.TextProvider], [ai.ObjectProvider],
+// [ai.DecisionProvider], [ai.ModelLister], and [ai.KeyChecker].
 //
 // A caller must obey these rules:
 //
 //   - The package has no models. A caller lists them with
 //     [Provider.ListModels], or with the FetchModels method of a
 //     catalog.
-//   - The call options of package openai apply, such as
-//     openai.PromptCacheKey and openai.OnPayload.
-//   - An API error wraps openai.Error. A caller reads the status code
-//     with errors.As.
+//   - The call options of package openai apply to a text call and an
+//     object call, such as openai.PromptCacheKey and openai.OnPayload.
+//     A decision call reads none of them.
+//   - An API error of a text or object call wraps openai.Error. An API
+//     error of a decision call has the status code in its text. A
+//     caller reads the status code of a text call with errors.As.
 //
 // The reasons are in docs/concepts/ai/host-provider.md.
 package openrouter

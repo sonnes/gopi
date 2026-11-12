@@ -1,0 +1,25 @@
+httprr trace v1
+873 1833
+POST https://openrouter.ai/api/alpha/decisions HTTP/1.1
+Host: openrouter.ai
+User-Agent: Go-http-client/1.1
+Content-Length: 708
+Content-Type: application/json
+
+{"model":"openai/gpt-6-luna-decisions","state":[{"role":"user","content":"My checkout page shows a blank screen after I click Pay. I tried two browsers, and no customer can pay."}],"questions":{"is_bug":{"type":"noul","instructions":"Does the user report a software defect?","criteria":{"false":"The user asks a question.","true":"The user describes broken behavior."}},"team":{"type":"choice","instructions":"Which team owns this ticket?","criteria":{"account":"Login, password, or profile.","payments":"Checkout, billing, or payments."}},"urgency":{"type":"score","instructions":"How urgent is this ticket?","criteria":["later: It can wait.","this week: Fix it this week.","now: It blocks revenue now."]}}}HTTP/2.0 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: WWW-Authenticate,PAYMENT-REQUIRED,Payment-Receipt,PAYMENT-RESPONSE,Location,X-Generation-Id,x-openrouter-error-origin,x-openrouter-error-tool,X-Provider-Name,request-id,cf-ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Ray: a594c3f1ab253c16-BOM
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 10:13:41 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Server-Timing: cfEdge;dur=9,cfOrigin;dur=0,cfWorker;dur=526
+Set-Cookie: __cf_bm=nEjkr7dpPSN7jQZvRVS8kojsxSJXykHWrU3sdYRFTQM-1794478420.7488735-1.0.1.1-6hnFno5Kd5e_4sWk_9tNuNuW_UGNhWRnYjXffr1bcp87c09Kp9gESJ226fzaLILvD9UMD6upPTA2VdMqPpNQ8FS4elYTRh4K6pAFxhQ18f9PdfkA5uf7jjzJK3mCLP5o; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 12 Nov 2026 10:43:41 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-dec-1794478420-t1pWLG1E8nUjl8NbR77u
+X-Provider-Name: OpenAI
+
+{"model":"openai/gpt-6-luna-decisions-20261006","answers":{"is_bug":{"type":"noul","noul":1},"team":{"type":"choice","choice":"payments","probabilities":{"account":0,"payments":1},"confidence":1},"urgency":{"type":"score","score":2,"legend":{"0":"later: It can wait.","1":"this week: Fix it this week.","2":"now: It blocks revenue now."},"probabilities":{"0":0,"1":0,"2":1},"confidence":1}},"usage":{"input_tokens":442,"output_tokens":0,"cost":0.0000442,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000442,"upstream_inference_prompt_cost":0.0000442,"upstream_inference_completions_cost":0}},"id":"gen-dec-1794478420-t1pWLG1E8nUjl8NbR77u","provider":"OpenAI"}

@@ -1,0 +1,25 @@
+httprr trace v1
+818 1644
+POST https://openrouter.ai/api/alpha/decisions HTTP/1.1
+Host: openrouter.ai
+User-Agent: Go-http-client/1.1
+Content-Length: 653
+Content-Type: application/json
+
+{"model":"typesafe/jev-1.14","state":[{"role":"user","content":"Delete the temp files in /tmp/build."},{"role":"assistant","content":"I will delete them."},{"role":"assistant","tool_calls":[{"id":"c1","name":"bash","arguments":{"command":"rm -rf /tmp/build/*.tmp"}}]},{"role":"tool","content":"Removed 12 files.","tool_call_id":"c1"},{"role":"assistant","content":"I removed 12 temp files from /tmp/build."}],"questions":{"done":{"type":"noul","instructions":"Did the assistant report that it removed the files?"},"tool":{"type":"choice","instructions":"Which tool did the agent call?","criteria":{"bash":"bash","browser":"browser","editor":"editor"}}}}HTTP/2.0 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: WWW-Authenticate,PAYMENT-REQUIRED,Payment-Receipt,PAYMENT-RESPONSE,Location,X-Generation-Id,x-openrouter-error-origin,x-openrouter-error-tool,X-Provider-Name,request-id,cf-ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Ray: a594c3f59faa3c16-BOM
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 10:13:41 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Server-Timing: cfEdge;dur=6,cfOrigin;dur=0,cfWorker;dur=458
+Set-Cookie: __cf_bm=u2LyV4Afov9L8AylGX.zXDH9KDnVnECKVTvFUfRozSs-1794478421.3751068-1.0.1.1-xhg.HDRRqg6n57zXhZPuH5gkGa19u5oA8ImGznySlevGvho4YkVpTrYasblJIOeWKEnMN0MCp3EbjzUbK8Ac2pYaY0iryQh3.1NO2hAOG35XwXIAelCg7pBXgwfW71rg; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 12 Nov 2026 10:43:41 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-dec-1794478421-9YR9hAMmFpOJiofUFGlO
+X-Provider-Name: TypeSafe
+
+{"model":"typesafe/jev-1.14-20261014","answers":{"done":{"type":"noul","noul":0.99},"tool":{"type":"choice","choice":"bash","probabilities":{"bash":1,"browser":0,"editor":0},"confidence":1}},"usage":{"input_tokens":503,"output_tokens":54,"cost":0.000021126,"is_byok":false,"cost_details":{"upstream_inference_cost":0.000021126,"upstream_inference_prompt_cost":0.000021126,"upstream_inference_completions_cost":0}},"id":"gen-dec-1794478421-9YR9hAMmFpOJiofUFGlO","provider":"TypeSafe"}

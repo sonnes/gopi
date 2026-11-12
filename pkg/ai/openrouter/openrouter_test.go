@@ -2,6 +2,7 @@ package openrouter_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -53,11 +54,18 @@ func TestListModels(t *testing.T) {
 	got, err := p.ListModels(context.Background())
 
 	require.NoError(t, err)
-	assert.Equal(t, []request{{
-		path:  "/api/v1/models",
-		query: "supported_parameters=tools",
-		auth:  "Bearer test-key",
-	}}, *seen, "the list asks for the models with tools, because each agent call sends tools")
+	assert.Equal(t, []request{
+		{
+			path:  "/api/v1/models",
+			query: "supported_parameters=tools",
+			auth:  "Bearer test-key",
+		},
+		{
+			path:  "/api/v1/models",
+			query: "output_modalities=decisions",
+			auth:  "Bearer test-key",
+		},
+	}, *seen, "the list asks for the models with tools and for the decision models")
 	all := []ai.ThinkingLevel{
 		ai.ThinkingOff,
 		ai.ThinkingLow,
@@ -74,6 +82,7 @@ func TestListModels(t *testing.T) {
 			MaxTokens:      128_000,
 			ContextWindow:  1_050_000,
 			Input:          documents,
+			Output:         []ai.Output{ai.OutputText},
 			Reasoning:      true,
 			ThinkingLevels: all,
 			Pricing: ai.Pricing{
@@ -96,6 +105,7 @@ func TestListModels(t *testing.T) {
 			MaxTokens:      128_000,
 			ContextWindow:  1_000_000,
 			Input:          documents,
+			Output:         []ai.Output{ai.OutputText},
 			Reasoning:      true,
 			ThinkingLevels: all,
 			Pricing: ai.Pricing{
@@ -120,6 +130,7 @@ func TestListModels(t *testing.T) {
 			MaxTokens:     943_718,
 			ContextWindow: 1_048_576,
 			Input:         documents,
+			Output:        []ai.Output{ai.OutputText},
 			Reasoning:     true,
 			ThinkingLevels: []ai.ThinkingLevel{
 				ai.ThinkingLow,
@@ -139,12 +150,14 @@ func TestListModels(t *testing.T) {
 			Name:          "Free Models Router",
 			ContextWindow: 200_000,
 			Input:         []ai.Modality{ai.ModalityText, ai.ModalityImage},
+			Output:        []ai.Output{ai.OutputText},
 		},
 		{
 			ID:            "typesafe/jev-router",
 			Name:          "TypeSafe: Jev Router",
 			ContextWindow: 1_000_000,
 			Input:         documents,
+			Output:        []ai.Output{ai.OutputText},
 		},
 	}, got)
 }
@@ -247,6 +260,66 @@ func TestListModels_GoogleCacheWrite(t *testing.T) {
 			CacheWrite: 0.641667,
 		}},
 	}, got[0].Pricing)
+}
+
+// TestListModels_DecisionModels checks that the list adds the decision
+// models, which the list of the models with tools does not hold, and
+// lists a model of both lists once.
+func TestListModels_DecisionModels(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("output_modalities") == "decisions" {
+			fmt.Fprint(w, `{"data":[
+				{"id":"typesafe/jev-1.14","name":"TypeSafe: Jev 1.14","context_length":262144,
+					"architecture":{"input_modalities":["text","image"],"output_modalities":["decisions"]},
+					"pricing":{"prompt":"0.000000042","completion":"0"}},
+				{"id":"both/model","name":"Both","architecture":{"output_modalities":["decisions"]}}
+			]}`)
+			return
+		}
+		fmt.Fprint(w, `{"data":[
+			{"id":"both/model","name":"Both","architecture":{"output_modalities":["text"]}},
+			{"id":"a/tools","name":"Tools","architecture":{"output_modalities":["text","image"]}}
+		]}`)
+	}))
+	t.Cleanup(server.Close)
+	p := openrouter.New(openrouter.APIKey("k"), openrouter.BaseURL(server.URL))
+
+	got, err := p.ListModels(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, []ai.Model{
+		{ID: "both/model", Name: "Both", Output: []ai.Output{ai.OutputText}},
+		{ID: "a/tools", Name: "Tools", Output: []ai.Output{ai.OutputText, ai.OutputImage}},
+		{
+			ID:            "typesafe/jev-1.14",
+			Name:          "TypeSafe: Jev 1.14",
+			ContextWindow: 262144,
+			Input:         []ai.Modality{ai.ModalityText, ai.ModalityImage},
+			Output:        []ai.Output{ai.OutputDecisions},
+			Pricing:       ai.Pricing{Input: 0.042},
+		},
+	}, got)
+}
+
+// TestListModels_DecisionListFails checks that the text models stay if
+// the list of the decision models fails.
+func TestListModels_DecisionListFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("output_modalities") == "decisions" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"data":[{"id":"a/tools","name":"Tools"}]}`)
+	}))
+	t.Cleanup(server.Close)
+	p := openrouter.New(openrouter.APIKey("k"), openrouter.BaseURL(server.URL))
+
+	got, err := p.ListModels(context.Background())
+
+	require.NoError(t, err)
+	assert.Equal(t, []ai.Model{{ID: "a/tools", Name: "Tools"}}, got)
 }
 
 // TestListModels_BaseURLSlash checks that a base URL with a trailing

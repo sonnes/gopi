@@ -34,7 +34,8 @@ type listedModel struct {
 	Name          string `json:"name"`
 	ContextLength *int   `json:"context_length"`
 	Architecture  struct {
-		InputModalities []string `json:"input_modalities"`
+		InputModalities  []string `json:"input_modalities"`
+		OutputModalities []string `json:"output_modalities"`
 	} `json:"architecture"`
 	Pricing     listedPricing `json:"pricing"`
 	TopProvider struct {
@@ -76,6 +77,13 @@ var modalities = map[string]ai.Modality{
 	"file":  ai.ModalityPDF,
 }
 
+// outputOrder is the order of the outputs of a listed model.
+var outputOrder = []ai.Output{
+	ai.OutputText,
+	ai.OutputImage,
+	ai.OutputDecisions,
+}
+
 // modalityOrder is the order of the input modalities of a listed model.
 var modalityOrder = []ai.Modality{
 	ai.ModalityText,
@@ -97,14 +105,49 @@ const storageOnlyPrefix = "google/"
 // cannot serve an agent.
 const toolModels = "supported_parameters=tools"
 
-// ListModels lists the text models with tools of GET /models, with
-// their limits, their input modalities, their thinking levels, and their
-// prices. It skips the models of the Batch API. A price that OpenRouter
-// gives as negative, such as the price of a router, is unknown and
-// stays zero. The output cap is at most the context window, and a tier
-// that starts after the context window is not in the list.
+// decisionModels is the query of GET /models that keeps the decision
+// models. A decision model takes no tools, and the default list of
+// GET /models does not hold it.
+const decisionModels = "output_modalities=decisions"
+
+// ListModels lists the text models with tools of GET /models, and then
+// the decision models, with their limits, their input modalities, their
+// outputs, their thinking levels, and their prices. A model of both
+// lists is in the result once. It skips the models of the Batch API.
+//
+// The list of the decision models is best effort. If it fails, the
+// result holds the text models only, because a failed list of decision
+// models must not stop a text session.
+//
+// A price that OpenRouter gives as negative, such as the price of a
+// router, is unknown and stays zero. The output cap is at most the
+// context window, and a tier that starts after the context window is
+// not in the list.
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
-	url := p.cfg.baseURL + "/models?" + toolModels
+	listed, err := p.listModels(ctx, toolModels)
+	if err != nil {
+		return nil, err
+	}
+	deciders, err := p.listModels(ctx, decisionModels)
+	if err == nil {
+		listed = append(listed, deciders...)
+	}
+
+	var models []ai.Model
+	seen := make(map[string]bool)
+	for _, m := range listed {
+		if seen[m.ID] || strings.HasSuffix(m.ID, batchSuffix) {
+			continue
+		}
+		seen[m.ID] = true
+		models = append(models, m.model())
+	}
+	return models, nil
+}
+
+// listModels returns the models of GET /models with query.
+func (p *Provider) listModels(ctx context.Context, query string) ([]listedModel, error) {
+	url := p.cfg.baseURL + "/models?" + query
 	body, err := httpapi.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("openrouter: list models: %w", err)
@@ -113,15 +156,7 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 	if err := json.Unmarshal(body, &list); err != nil {
 		return nil, fmt.Errorf("openrouter: list models: %w", err)
 	}
-
-	models := make([]ai.Model, 0, len(list.Data))
-	for _, m := range list.Data {
-		if strings.HasSuffix(m.ID, batchSuffix) {
-			continue
-		}
-		models = append(models, m.model())
-	}
-	return models, nil
+	return list.Data, nil
 }
 
 // model returns m as an [ai.Model].
@@ -146,6 +181,7 @@ func (m listedModel) model() ai.Model {
 		MaxTokens:     maxTokens,
 		ContextWindow: window,
 		Input:         input(m.Architecture.InputModalities),
+		Output:        outputsOf(m.Architecture.OutputModalities),
 		Reasoning:     m.Reasoning != nil,
 		Pricing:       pricing,
 	}
@@ -178,6 +214,19 @@ func input(names []string) []ai.Modality {
 		})
 		if known {
 			out = append(out, mod)
+		}
+	}
+	return out
+}
+
+// outputsOf returns the outputs that gopi knows, in [outputOrder]. The
+// value of an [ai.Output] is the name of its output modality on
+// OpenRouter.
+func outputsOf(names []string) []ai.Output {
+	var out []ai.Output
+	for _, o := range outputOrder {
+		if slices.Contains(names, string(o)) {
+			out = append(out, o)
 		}
 	}
 	return out

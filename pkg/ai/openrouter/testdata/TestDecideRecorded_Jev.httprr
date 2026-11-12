@@ -1,0 +1,25 @@
+httprr trace v1
+863 1834
+POST https://openrouter.ai/api/alpha/decisions HTTP/1.1
+Host: openrouter.ai
+User-Agent: Go-http-client/1.1
+Content-Length: 698
+Content-Type: application/json
+
+{"model":"typesafe/jev-1.14","state":[{"role":"user","content":"My checkout page shows a blank screen after I click Pay. I tried two browsers, and no customer can pay."}],"questions":{"is_bug":{"type":"noul","instructions":"Does the user report a software defect?","criteria":{"false":"The user asks a question.","true":"The user describes broken behavior."}},"team":{"type":"choice","instructions":"Which team owns this ticket?","criteria":{"account":"Login, password, or profile.","payments":"Checkout, billing, or payments."}},"urgency":{"type":"score","instructions":"How urgent is this ticket?","criteria":["later: It can wait.","this week: Fix it this week.","now: It blocks revenue now."]}}}HTTP/2.0 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: WWW-Authenticate,PAYMENT-REQUIRED,Payment-Receipt,PAYMENT-RESPONSE,Location,X-Generation-Id,x-openrouter-error-origin,x-openrouter-error-tool,X-Provider-Name,request-id,cf-ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Ray: a594c3ed1fa23c16-BOM
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 10:13:40 GMT
+Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
+Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Server: cloudflare
+Server-Timing: cfEdge;dur=8,cfOrigin;dur=0,cfWorker;dur=697
+Set-Cookie: __cf_bm=QtL402At23uUPdI_rDqVRbz7BIvkuMJrEH2.JKV49Ok-1794478420.0186622-1.0.1.1-arzblmtGEJDBKEfQVjr9iEYGxUbrM5kziffHNLfagdXKcfIZOeUZh8n2MR_fC2sdx2GdLTt4oTe385g.ognhFwJHLOGwScevlg6AEYWcek8waJwA6O5a818aLZJbk9uo; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=openrouter.ai; Expires=Thu, 12 Nov 2026 10:43:40 GMT
+X-Content-Type-Options: nosniff
+X-Generation-Id: gen-dec-1794478420-aB0EaraCMdrMzND0SiEb
+X-Provider-Name: TypeSafe
+
+{"model":"typesafe/jev-1.14-20261014","answers":{"is_bug":{"type":"noul","noul":0.97},"team":{"type":"choice","choice":"payments","probabilities":{"account":0,"payments":1},"confidence":1},"urgency":{"type":"score","score":2,"legend":{"0":"later: It can wait.","1":"this week: Fix it this week.","2":"now: It blocks revenue now."},"probabilities":{"0":0,"1":0,"2":1},"confidence":1}},"usage":{"input_tokens":455,"output_tokens":63,"cost":0.00001911,"is_byok":false,"cost_details":{"upstream_inference_cost":0.00001911,"upstream_inference_prompt_cost":0.00001911,"upstream_inference_completions_cost":0}},"id":"gen-dec-1794478420-aB0EaraCMdrMzND0SiEb","provider":"TypeSafe"}
