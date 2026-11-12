@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/chatgpt"
 	"github.com/sonnes/gopi/pkg/ai/oauth"
@@ -100,7 +100,7 @@ func TestProvider_ListModelsError(t *testing.T) {
 	_, err := p.ListModels(t.Context())
 
 	require.ErrorContains(t, err, "chatgpt: list models: 401 Unauthorized: ")
-	var status *httpget.StatusError
+	var status *httpapi.StatusError
 	require.ErrorAs(t, err, &status)
 	assert.Equal(t, http.StatusUnauthorized, status.Code)
 }

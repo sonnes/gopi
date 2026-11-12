@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/fireworks"
 )
@@ -132,7 +132,7 @@ func TestListModels_Error(t *testing.T) {
 	_, err := p.ListModels(context.Background())
 
 	require.ErrorContains(t, err, "fireworks: list models: 400 Bad Request: ")
-	var status *httpget.StatusError
+	var status *httpapi.StatusError
 	require.ErrorAs(t, err, &status)
 	assert.Equal(t, http.StatusBadRequest, status.Code)
 }
@@ -229,7 +229,7 @@ func TestCheckKey_Error(t *testing.T) {
 	_, err := p.CheckKey(context.Background())
 
 	require.ErrorContains(t, err, "fireworks: check key: 400 Bad Request: ")
-	var status *httpget.StatusError
+	var status *httpapi.StatusError
 	require.ErrorAs(t, err, &status)
 	assert.Equal(t, http.StatusBadRequest, status.Code)
 }

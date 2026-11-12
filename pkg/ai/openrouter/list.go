@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -105,7 +105,7 @@ const toolModels = "supported_parameters=tools"
 // that starts after the context window is not in the list.
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 	url := p.cfg.baseURL + "/models?" + toolModels
-	body, err := httpget.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
+	body, err := httpapi.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("openrouter: list models: %w", err)
 	}

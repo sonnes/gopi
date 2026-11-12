@@ -33,7 +33,7 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/oauth"
 	"github.com/sonnes/gopi/pkg/ai/openai"
@@ -162,7 +162,7 @@ var modalities = map[string]ai.Modality{
 // gopi value, such as "ultra", is not in the model. The thinking levels
 // of a model are in the order of [ai.ThinkingLevels].
 func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
-	body, err := httpget.Get(ctx, p.client, p.baseURL+"/models", "")
+	body, err := httpapi.Get(ctx, p.client, p.baseURL+"/models", "")
 	if err != nil {
 		return nil, fmt.Errorf("chatgpt: list models: %w", err)
 	}

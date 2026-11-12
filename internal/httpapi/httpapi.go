@@ -1,10 +1,12 @@
-// Package httpget sends the GET requests of a provider that its SDK
-// does not send, such as the model list of OpenRouter, Fireworks, or the
-// ChatGPT plan. A response with a status other than 200 is a
-// [StatusError], so a caller reads the status with errors.As.
-package httpget
+// Package httpapi sends the plain HTTP requests of a provider that its
+// SDK does not send, such as the model list of OpenRouter, Fireworks, or
+// the ChatGPT plan, and the decisions of OpenRouter and Gemini. A
+// response with a status other than 200 is a [StatusError], so a caller
+// reads the status with errors.As.
+package httpapi
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"fmt"
@@ -22,6 +24,8 @@ type StatusError struct {
 	Code int
 	// Status is the status line, such as "401 Unauthorized".
 	Status string
+	// Header holds the headers of the response, such as Retry-After.
+	Header http.Header
 	// Body is the start of the body of the response, up to 1024 bytes.
 	Body string
 }
@@ -39,6 +43,34 @@ func Get(ctx context.Context, client *http.Client, url, key string) ([]byte, err
 	if err != nil {
 		return nil, err
 	}
+	return do(client, req, key)
+}
+
+// Post sends body as JSON to url with client, and returns the body of a
+// response with status 200. The request also sends header. The key and
+// the client work as in [Get].
+func Post(
+	ctx context.Context,
+	client *http.Client,
+	url string,
+	key string,
+	body []byte,
+	header http.Header,
+) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	for name, values := range header {
+		for _, v := range values {
+			req.Header.Add(name, v)
+		}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return do(client, req, key)
+}
+
+func do(client *http.Client, req *http.Request, key string) ([]byte, error) {
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
@@ -54,6 +86,7 @@ func Get(ctx context.Context, client *http.Client, url, key string) ([]byte, err
 		return nil, &StatusError{
 			Code:   resp.StatusCode,
 			Status: resp.Status,
+			Header: resp.Header,
 			Body:   string(body),
 		}
 	}

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -80,7 +80,7 @@ func (p *Provider) listPage(ctx context.Context, token string) (listResponse, er
 	path := "/v1/accounts/" + url.PathEscape(p.cfg.account) + "/models"
 	endpoint := p.cfg.baseURL + path + "?" + query.Encode()
 
-	body, err := httpget.Get(ctx, p.cfg.httpClient, endpoint, p.cfg.apiKey)
+	body, err := httpapi.Get(ctx, p.cfg.httpClient, endpoint, p.cfg.apiKey)
 	if err != nil {
 		return listResponse{}, err
 	}

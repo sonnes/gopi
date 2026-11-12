@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 )
 
@@ -23,7 +23,7 @@ type keyResponse struct {
 // credit. The list of models is public, so only this call tests the key.
 func (p *Provider) CheckKey(ctx context.Context) (ai.KeyInfo, error) {
 	url := p.cfg.baseURL + "/key"
-	body, err := httpget.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
+	body, err := httpapi.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
 	if err != nil {
 		return ai.KeyInfo{}, fmt.Errorf("openrouter: check key: %w", err)
 	}

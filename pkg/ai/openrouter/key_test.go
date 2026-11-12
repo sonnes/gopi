@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/sonnes/gopi/internal/httpget"
+	"github.com/sonnes/gopi/internal/httpapi"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
 )
@@ -55,7 +55,7 @@ func TestCheckKey_Error(t *testing.T) {
 
 	require.ErrorContains(t, err, "openrouter: check key: 401 Unauthorized: ")
 	require.ErrorContains(t, err, "User not found.")
-	var status *httpget.StatusError
+	var status *httpapi.StatusError
 	require.ErrorAs(t, err, &status)
 	assert.Equal(t, http.StatusUnauthorized, status.Code)
 }
