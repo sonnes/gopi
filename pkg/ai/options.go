@@ -42,8 +42,13 @@ func NewOption[T any]() func(T) Options {
 	}
 }
 
+// questionKey is the key of each [Question] in a joined set. A question
+// is not one value that a later one replaces, so [QuestionsOf] reads
+// each of them.
+var questionKey byte
+
 // JoinOptions merges options into one value. A later value for the same
-// option wins. A nil entry is skipped.
+// option wins. Each [Question] stays, in order. A nil entry is skipped.
 func JoinOptions(opts ...Options) Options {
 	var out set
 	for _, o := range opts {
@@ -52,6 +57,8 @@ func JoinOptions(opts ...Options) Options {
 			out = append(out, v)
 		case set:
 			out = append(out, v...)
+		case Question:
+			out = append(out, option{key: &questionKey, value: v})
 		}
 	}
 	return out

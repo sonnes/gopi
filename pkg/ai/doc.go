@@ -4,8 +4,9 @@
 // that run.
 //
 // A [Model] is metadata. A provider holds the credentials and implements
-// [TextProvider], [ObjectProvider], [ImageProvider], or [TokenCounter].
-// A binding such as [LanguageModel] pairs a model with a provider.
+// [TextProvider], [ObjectProvider], [ImageProvider], [DecisionProvider],
+// or [TokenCounter]. A binding such as [LanguageModel] or
+// [DecisionModel] pairs a model with a provider.
 //
 // A caller must obey these rules:
 //
@@ -19,5 +20,6 @@
 //     type tag, so a store can keep the message without a schema.
 //
 // The reasons are in docs/concepts/ai/message.md,
-// docs/concepts/ai/stream.md, and docs/concepts/ai/provider.md.
+// docs/concepts/ai/stream.md, docs/concepts/ai/provider.md, and
+// docs/concepts/ai/decision.md.
 package ai
