@@ -11,9 +11,9 @@ replace (
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/sonnes/gopi v0.0.3
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.3
-	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.3
+	github.com/sonnes/gopi v0.0.4
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.4
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.4
 )
 
 require (
@@ -29,7 +29,7 @@ require (
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.3 // indirect
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.4 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v0.0.1 // indirect
 	github.com/tidwall/gjson v1.19.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

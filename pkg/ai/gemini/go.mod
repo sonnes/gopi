@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/sonnes/gopi v0.0.3
+	github.com/sonnes/gopi v0.0.4
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/genai v1.77.0
 )

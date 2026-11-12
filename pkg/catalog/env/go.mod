@@ -3,13 +3,13 @@ module github.com/sonnes/gopi/pkg/catalog/env
 go 1.27
 
 require (
-	github.com/sonnes/gopi v0.0.3
-	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.3
-	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.3
-	github.com/sonnes/gopi/pkg/ai/gemini v0.0.3
-	github.com/sonnes/gopi/pkg/ai/openai v0.0.3
-	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.3
-	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.3
+	github.com/sonnes/gopi v0.0.4
+	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.4
+	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.4
+	github.com/sonnes/gopi/pkg/ai/gemini v0.0.4
+	github.com/sonnes/gopi/pkg/ai/openai v0.0.4
+	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.4
+	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.4
 	github.com/stretchr/testify v1.11.1
 )
 
