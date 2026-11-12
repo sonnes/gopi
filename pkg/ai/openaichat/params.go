@@ -229,21 +229,14 @@ func systemMessage(system []string, breakpoint bool) (sdk.ChatCompletionMessageP
 	return sdk.SystemMessage(parts), true
 }
 
-// emptyParameters is the parameters of a tool with no schema. The API
-// needs an object schema for a function tool.
-var emptyParameters = map[string]any{"type": "object", "properties": map[string]any{}}
-
 // convertTools maps each tool to a function tool. The request omits
 // strict, because strict mode needs every property to be required.
 func convertTools(tools []ai.ToolInfo) ([]sdk.ChatCompletionToolUnionParam, error) {
 	var out []sdk.ChatCompletionToolUnionParam
 	for _, t := range tools {
-		parameters, err := transcript.Schema(t.InputSchema)
+		parameters, err := transcript.Parameters(t.InputSchema)
 		if err != nil {
 			return nil, fmt.Errorf("openaichat: tool %q: %w", t.Name, err)
-		}
-		if parameters == nil {
-			parameters = emptyParameters
 		}
 
 		fn := shared.FunctionDefinitionParam{

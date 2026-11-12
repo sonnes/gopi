@@ -355,3 +355,42 @@ func TestSchema(t *testing.T) {
 	_, err = Schema(&jsonschema.Schema{Type: "object", Types: []string{"object"}})
 	require.Error(t, err)
 }
+
+func TestParameters(t *testing.T) {
+	tests := []struct {
+		name   string
+		schema *jsonschema.Schema
+		want   map[string]any
+	}{
+		{
+			name:   "nil schema gives an empty object",
+			schema: nil,
+			want: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			name:   "schema gives the schema",
+			schema: &jsonschema.Schema{Type: "object"},
+			want:   map[string]any{"type": "object"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Parameters(tt.schema)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParameters_NewMapEachCall(t *testing.T) {
+	first, err := Parameters(nil)
+	require.NoError(t, err)
+	first["type"] = "string"
+
+	second, err := Parameters(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "object", second["type"])
+}

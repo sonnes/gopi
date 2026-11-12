@@ -300,3 +300,17 @@ func Schema(schema *jsonschema.Schema) (map[string]any, error) {
 	}
 	return m, nil
 }
+
+// Parameters returns the parameters of a function tool. An API needs an
+// object schema for a function tool, so a tool with no schema gets an
+// empty object. Each call returns a new map, so a caller can change it.
+func Parameters(schema *jsonschema.Schema) (map[string]any, error) {
+	if schema == nil {
+		empty := map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		}
+		return empty, nil
+	}
+	return Schema(schema)
+}

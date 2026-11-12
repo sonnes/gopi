@@ -287,22 +287,15 @@ func reasoningConfig(opts ai.Options) (shared.ReasoningParam, error) {
 	}
 }
 
-// emptyParameters is the parameters of a tool with no schema. The API
-// needs an object schema for a function tool.
-var emptyParameters = map[string]any{"type": "object", "properties": map[string]any{}}
-
 // convertTools maps each tool to a function tool. Strict mode is off,
 // because it needs every property to be required, and a tool input can
 // have optional fields.
 func convertTools(tools []ai.ToolInfo) ([]responses.ToolUnionParam, error) {
 	var out []responses.ToolUnionParam
 	for _, t := range tools {
-		parameters, err := transcript.Schema(t.InputSchema)
+		parameters, err := transcript.Parameters(t.InputSchema)
 		if err != nil {
 			return nil, fmt.Errorf("openai: tool %q: %w", t.Name, err)
-		}
-		if parameters == nil {
-			parameters = emptyParameters
 		}
 
 		tool := &responses.FunctionToolParam{
