@@ -67,3 +67,4 @@ ImageModel{Model, Provider}  -> ImageProvider
 - [Message](message.md)
 - [Stream](stream.md)
 - [OpenAI Providers](openai.md)
+- [Gemini Provider](gemini.md)

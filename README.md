@@ -235,6 +235,7 @@ A provider serves a model call. A driver starts an agent. A model spec names one
 | `openaichat` | provider | API key | `pkg/ai/openaichat` |
 | `chatgpt` | provider | ChatGPT sign-in | `pkg/ai/chatgpt` |
 | `fireworks` | provider | API key | `pkg/ai/fireworks` |
+| `gemini` | provider | API key | `pkg/ai/gemini` |
 | `openrouter` | provider | API key | `pkg/ai/openrouter` |
 | `claude-code` | driver | CLI login | `pkg/agent/claude` |
 | `codex` | driver | CLI login | `pkg/agent/codex` |
@@ -282,7 +283,7 @@ Each abstraction has a concept page in [`docs/concepts/`](docs/concepts/README.m
 ```
 pkg/
 ├── ai/          the model call: messages, options, streams, tools
-│   └── anthropic, openai, openaichat, chatgpt, fireworks, openrouter
+│   └── anthropic, openai, openaichat, chatgpt, fireworks, gemini, openrouter
 ├── tool/        typed Go functions as tools
 ├── mcp/         the tools of MCP servers
 ├── session/     the log, its values, and the store contract

@@ -1,0 +1,93 @@
+---
+title: Gemini
+summary: What the Gemini provider adds to a call on the Gemini Developer API, and what it leaves to you.
+---
+
+import SpecSheet from "../../../components/figures/SpecSheet.astro";
+import Ladder from "../../../components/figures/Ladder.astro";
+
+<SpecSheet
+  alt="The gemini package calls the Interactions API for text and objects, and the models API for images and the model list. It implements TextProvider, ObjectProvider, ImageProvider, ModelLister, and KeyChecker, and not TokenCounter. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are gemini-3.5-flash-lite, gemini-3.8-flash, gemini-4-argon, and gemini-4-carbon, and the image model ID is gemini-nano-banana-2.1. A model and the provider bind into a language model."
+  pkg="pkg/ai/gemini"
+  api="Interactions API and models API"
+  implements={["TextProvider", "ObjectProvider", "ImageProvider", "ModelLister", "KeyChecker"]}
+  lacks={["TokenCounter"]}
+  options={[
+    ["APIKey(key)", "default `GOOGLE_API_KEY`, then `GEMINI_API_KEY`"],
+    ["BaseURL(url)", "a proxy or a test server"],
+    ["HTTPClient(c)", "a recording client"],
+  ]}
+  models={[
+    ["gemini-3.5-flash-lite", "ai"],
+    ["gemini-3.8-flash", "ai"],
+    ["gemini-4-argon", "ai"],
+    ["gemini-4-carbon", "ai"],
+    ["gemini-nano-banana-2.1", "value"],
+  ]}
+  bind={["model + gemini.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
+/>
+
+## Models
+
+Name a model by the ID of the API, such as `ai.Model{ID: "gemini-3.8-flash"}`. [models.json](../../../../../models.json) holds the limits and prices of each ID in the figure. `ListModels` gives each model that the key can call with `generateContent`. `env.Detectors` registers the provider when `GOOGLE_API_KEY` or `GEMINI_API_KEY` is set.
+
+## Thinking
+
+`ai.Thinking` maps to the thinking level of the API. Gemini 3 and Gemini 4 always think, so `ThinkingOff` sends the lowest level. The API rejects a level that the model does not take.
+
+<Ladder
+  alt="ThinkingOff sends the level minimal. Low and Medium send the level of the same name. High, XHigh, and Max send the level high. Each call asks for a thought summary. An unset level sends no level, and the model uses its own level."
+  call="ai.Thinking(level)"
+  note="each level is `ai.Thinking<Name>`"
+  levels={["Off", "Low", "Medium", "High", "XHigh", "Max"]}
+  rows={[
+    {
+      provider: "gemini",
+      field: "thinking level",
+      sends: {
+        unset: "model's level",
+        Off: "minimal",
+        Low: "low",
+        Medium: "medium",
+        High: "high",
+        XHigh: "high",
+        Max: "high",
+      },
+      span: { from: "Off", to: "Max", label: "+ a thought summary" },
+    },
+  ]}
+/>
+
+The API stores nothing. A thinking block carries the thought signature of the model. Send the assistant message back unchanged, and the model keeps its reasoning between tool calls.
+
+## System Messages
+
+The input of the API has no system role. `ai.SystemPrompt` goes to the system instruction of the request. A system message in the history goes as a `<system-reminder>` in a user turn.
+
+## Options
+
+The provider does not send `ai.Temperature`. A tool choice of one tool sends the mode `any` with that tool as the only allowed tool.
+
+## Objects
+
+`ai.GenerateObject` sends the schema of your struct as a JSON response format.
+
+## Images
+
+`GenerateImage` takes a Nano Banana model, with `ai.ImageSize` and `ai.ImageCount`. The image models take the sizes `1K`, `2K`, and `4K`. One request gives one image, so `ai.ImageCount(3)` sends three requests.
+
+```go
+im := ai.ImageModel{Model: ai.Model{ID: "gemini-nano-banana-2.1"}, Provider: gemini.New()}
+resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1K"))
+```
+
+## Errors
+
+A failed answer of the API is a `*gemini.Error`. Read the status code with `errors.As`. With `ai.MaxRetries`, the provider retries before the first event, as the [Anthropic](anthropic.mdx#errors) provider does.
+
+## Related
+
+- [Models](../ai/models.mdx) is the binding that the provider goes into.
+- [Options](../ai/options.mdx) is how a setting reaches the provider.
+
+The design is in [docs/concepts/ai/gemini.md](../../../../../docs/concepts/ai/gemini.md).

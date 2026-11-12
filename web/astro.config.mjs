@@ -162,6 +162,7 @@ export default defineConfig({
             { label: "OpenRouter", slug: "docs/providers/openrouter" },
             { label: "Fireworks", slug: "docs/providers/fireworks" },
             { label: "ChatGPT", slug: "docs/providers/chatgpt" },
+            { label: "Gemini", slug: "docs/providers/gemini" },
             { label: "Write a Provider", slug: "docs/providers/write-a-provider" },
           ],
         },

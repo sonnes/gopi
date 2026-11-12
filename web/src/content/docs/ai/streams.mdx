@@ -120,7 +120,7 @@ messages = append(messages, *msg, ai.UserMessage("And half of that?"))
 msg, err = model.StreamText(ctx, messages, ai.Thinking(ai.ThinkingMedium)).Wait()
 ```
 
-[Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), and [OpenAI Chat](../providers/openai-chat.mdx) give the levels that each provider maps. ChatGPT and OpenRouter use the levels of OpenAI. Fireworks uses the levels of OpenAI Chat.
+[Anthropic](../providers/anthropic.mdx), [OpenAI](../providers/openai.mdx), [OpenAI Chat](../providers/openai-chat.mdx), and [Gemini](../providers/gemini.mdx) give the levels that each provider maps. ChatGPT and OpenRouter use the levels of OpenAI. Fireworks uses the levels of OpenAI Chat.
 
 ## Forward to a Browser
 
