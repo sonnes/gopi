@@ -1,0 +1,55 @@
+httprr trace v1
+1031 2288
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 800
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Use the test tool","type":"text"}],"type":"user_input"},{"signature":"skip_thought_signature_validator","type":"thought"},{"arguments":{},"id":"test_1","name":"test_tool","type":"function_call"},{"call_id":"test_1","name":"test_tool","result":[{"text":"Text with unpaired surrogate: ��� \u003c- should be sanitized","type":"text"}],"type":"function_result"},{"content":[{"text":"What did the tool return?","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant.","tools":[{"description":"A test tool","name":"test_tool","parameters":{"additionalProperties":false,"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:50 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=3765
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EtcCCtQCAWkUfRMknH4IHoGBox5dc4ZjZOh1qHN1yi+CUK4FBpZdR/peRgqcjBU0gznskzIN4w1XG5j7iTlXZi5S/GEbObwX8OVecGvCeqixcWC4LRJ1wMkXRXWczBYcMiStg4mTB1KlRzqNGDpkO35MnsicfBnoHLXBdisSMnhfsOJO3rIziNhpplbklRtg68m2BG9EPGOH4AD2yPUSlo2et5ZkEfsdIJdA25hevLaIaGLmVRdNML1b/wrLsx+yAe/ipH1LDbW8aKDen4BBYV6/sQOZgyV/Y5LHGd6tpVVC+etmQOUtIxFPmZkhNcrMghkaVx2qm/2A2F5d/GsOIrrI2Ra4yAUDt4pcTHa3/eWw7+pCpWVFOjghMdiM7N+T4yOlyTgX2z/9lf02xHoZSZ9R3pFuoUmXwFXPUNgRqwd7czZrxao77g8/lbcfdXWapJWu2+vRi43k9g==","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"The tool returned the following text:\n\n> `\"Text with unpaired surrogate:  <- should be sanitized\"","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"`","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":140,"total_input_tokens":72,"input_tokens_by_modality":[{"modality":"text","tokens":72}],"total_cached_tokens":0,"total_output_tokens":22,"total_tool_use_tokens":0,"total_thought_tokens":46,"initial_input_tokens":72},"created":"2026-11-12T09:43:50Z","updated":"2026-11-12T09:43:50Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

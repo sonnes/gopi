@@ -1,0 +1,58 @@
+httprr trace v1
+1296 2755
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1064
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Use the test tool","type":"text"}],"type":"user_input"},{"signature":"skip_thought_signature_validator","type":"thought"},{"arguments":{},"id":"test_1","name":"test_tool","type":"function_call"},{"call_id":"test_1","name":"test_tool","result":[{"text":"Test with emoji 🙈 and other characters:\n- Thumbs up: 👍\n- Heart: ❤️\n- Thinking face: 🤔\n- Rocket: 🚀\n- Mixed text: Mario Zechner wann? Wo? Bin grad äußersr eventuninformiert 🙈\n- Japanese: こんにちは\n- Chinese: 你好\n- Mathematical symbols: ∑∫∂√\n- Special quotes: \"curly\" 'quotes'","type":"text"}],"type":"function_result"},{"content":[{"text":"Summarize the tool result briefly.","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant.","tools":[{"description":"A test tool","name":"test_tool","parameters":{"additionalProperties":false,"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:41 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=2505
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EpMECpAEAWkUfRPtNhgoYaBbGxp9lu1Ch0NA5ZIdn2f31uVf8b+3UJ2CgCnwXxHOSLJmXocFEGeEiJL68jjk0spRibbQiRMC7uhDXDx+IAEpovtqKYsk078q0i1+VftT/01g/EFx5X6iY0+j2ioa0VRAgPu7c5C0UYxmrMJpavNArqBxnEm1MnEy+IDes2WUFv0KRT/qGKuFirVlrFlHS0frhiJM8YIxRKXRuOghdyQD4Udp1j0CMWSJr02Lf7EGCN46l+2uaoEW+G09zEmIKn+fpQDqtvDy3O81IuhcI2hozrpB1S0w+4W0CY2RmvFMMxJiNMh7l6poC8QGX06qx/SNBeBPJgC+mhBvIvN1+Mt+2wqSiYlFBOrnOyWZ4fygov9g6/GUkdbIBuwRCiEiw+tl8fTuyOvskhMM9QjK5QVQRJHy31O6FkAGwVUcTGISpM28RR1XlAJaDQ0Ue7HhscXb7l7kGcyiqvDku+Lnxj0zA9S1dPycdnVsvOoIOLafEndgIp14c968S+Nj6hPJDy9j1/rmzez8muSwO6B/9mDgQoYAm33tFAB44Bup1aJKPJf0DkhEt4GKzowJtzemJZV3Lo5wkSrUEnm5VbOmixbThDhIByIxTiVIUJdwx8xPp3L0MBDY/DB8cQnOZ0B4xvrsxFqDl2xkqm2ehJD9enYsnOlh8oioyR/ed8jlETDsqiD0iTGG","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"The tool output contains a character test featuring","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" various emojis (🙈, 👍, ❤️, 🤔, 🚀), multilingual text (German, Japanese, and Chinese), mathematical","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" symbols (∑, ∫, ∂, √), and curly quotation marks.","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":286,"total_input_tokens":150,"input_tokens_by_modality":[{"modality":"text","tokens":150}],"total_cached_tokens":0,"total_output_tokens":48,"total_tool_use_tokens":0,"total_thought_tokens":88,"initial_input_tokens":150},"created":"2026-11-12T09:43:42Z","updated":"2026-11-12T09:43:42Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

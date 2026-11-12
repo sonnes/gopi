@@ -1,0 +1,109 @@
+httprr trace v1
+881 2086
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 650
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","tools":[{"description":"Evaluate a mathematical expression","name":"calculate","parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:32 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=3019
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"Ev8BCvwBAWkUfRNtswzokmVheClKB5lwLehZhkF3ydrUgzhIhScL/FcoHrbb4YWse8sn+qjIkzr42kGXtTkguJnVZ3voeqflkexdCmQmJMVLsWaYdNLA0vQi9hxEdvaGjkl4DfCkQBruc7SZdh+/5KM8EYynEhI3ONZsRXU8zt1gWetqOwkgjgAcBVj4pNfeRkEO3I/75DdJ3Z1A56GLWuqr6J9zEjE+YW5rdwkw8WV1aXVqnDicna4HN+xkVhJtXDYqgA1Fb2eaTDEvryiP+ghF1WI7WsGNeeuCDwvBOHDpkzk89nTksPFZ9o57/qnE+G3hgWvig+sYxDpEWGF94wsn","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"id":"call_1552708944148833860","type":"function_call","name":"calculate","arguments":{}},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"arguments":"{\"expression\":\"25 * 18\"}","type":"arguments_delta"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"requires_action","usage":{"total_tokens":141,"total_input_tokens":81,"input_tokens_by_modality":[{"modality":"text","tokens":81}],"total_cached_tokens":0,"total_output_tokens":19,"total_tool_use_tokens":0,"total_thought_tokens":41,"initial_input_tokens":81},"created":"2026-11-12T09:43:32Z","updated":"2026-11-12T09:43:32Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+
+1624 5744
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1392
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"text"}],"type":"user_input"},{"signature":"Ev8BCvwBAWkUfRNtswzokmVheClKB5lwLehZhkF3ydrUgzhIhScL/FcoHrbb4YWse8sn+qjIkzr42kGXtTkguJnVZ3voeqflkexdCmQmJMVLsWaYdNLA0vQi9hxEdvaGjkl4DfCkQBruc7SZdh+/5KM8EYynEhI3ONZsRXU8zt1gWetqOwkgjgAcBVj4pNfeRkEO3I/75DdJ3Z1A56GLWuqr6J9zEjE+YW5rdwkw8WV1aXVqnDicna4HN+xkVhJtXDYqgA1Fb2eaTDEvryiP+ghF1WI7WsGNeeuCDwvBOHDpkzk89nTksPFZ9o57/qnE+G3hgWvig+sYxDpEWGF94wsn","type":"thought"},{"arguments":{"expression":"25 * 18"},"id":"call_1552708944148833860","name":"calculate","type":"function_call"},{"call_id":"call_1552708944148833860","is_error":true,"name":"calculate","result":[{"text":"No result provided","type":"text"}],"type":"function_result"},{"content":[{"text":"Never mind, just tell me what is 2+2?","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","tools":[{"description":"Evaluate a mathematical expression","name":"calculate","parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:36 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=3307
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"content":{"text":"**Deciding Calculator Usage**\n\nI'm wrestling with the instruction \"Use the calculate tool when asked.\" Does that mean I *must* use the tool even for simple math like \"2+2\"? Or can I directly answer \"4\" and save the extra step? I am not entirely sure, I need to resolve this ambiguity, to provide a definitive answer.\n\n\n","type":"text"},"type":"thought_summary"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":0,"delta":{"content":{"text":"**Clarifying Calculation Directive**\n\nI'm now zeroing in on the explicit instruction. It's clear I *should* use the calculator. Even for \"2+2\". However, I'm still weighing edge cases like prior tool failures or a user's direct request. The directive's strictness makes me lean towards invoking the calculator, even with the direct \"Never mind\" request, to avoid violating explicit developer instructions. My current solution is calling the tool `calculate` with `2 + 2`.\n\n\n","type":"text"},"type":"thought_summary"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"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","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"id":"call_4054842369211672973","type":"function_call","name":"calculate","arguments":{}},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"arguments":"{\"expression\":\"2 + 2\"}","type":"arguments_delta"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"requires_action","usage":{"total_tokens":623,"total_input_tokens":164,"input_tokens_by_modality":[{"modality":"text","tokens":164}],"total_cached_tokens":0,"total_output_tokens":17,"total_tool_use_tokens":0,"total_thought_tokens":442,"initial_input_tokens":164},"created":"2026-11-12T09:43:39Z","updated":"2026-11-12T09:43:39Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

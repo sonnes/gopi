@@ -1,0 +1,52 @@
+httprr trace v1
+1279 2167
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1047
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Hi","type":"text"}],"type":"user_input"},{"content":[{"text":"Hello! How can I help?","type":"text"}],"type":"model_output"},{"content":[{"text":"Calculate 15 + 27 using the math_operation tool.","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"tools":[{"description":"Get the current weather in a city","name":"get_weather","parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"},"type":"function"},{"description":"Perform a basic arithmetic operation","name":"math_operation","parameters":{"additionalProperties":false,"properties":{"a":{"description":"The first number","type":"number"},"b":{"description":"The second number","type":"number"},"operation":{"description":"One of add, subtract, multiply, divide","type":"string"}},"required":["a","b","operation"],"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:44:05 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=2294
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EqsCCqgCAWkUfRPEY8GN5zKBBN8Hm1+eRzeyqhJ0R18HCynDsA/jo+2GxqZd9bCStNXb2TY3sBKQNmdYqvfm7icw9UYsGrEYzsw1TC/NHqjGWWKlzUMNsoQj4lVqJz2h2xaQva6ykI+UfWzhg3m12oEiNAlOh6IYfLiJah9TpckDt5itIXuztI2Ltzsdc21kpO1yVbPjTm6UfN1ZlkDKVOxttxD8DihdBj59XDnmKJ79mVt7LWmXNe5bgJfBAfAC46jGMdF/Wh+YYXi3f6I8JB2Du3YGt/DapDgUjMr3jxtCmTe6Rn5lF8oGjaPtO1keLt8Ha5rOZqLlZQh96XXUgVB8Rppc6BmbE7vixlRbRhVka+De8vbYpVuu27HVXstEWoBPbCDSMOdQgMROU4w=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"id":"call_9624445128442269097","type":"function_call","name":"math_operation","arguments":{}},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"arguments":"{\"a\":15,\"b\":27,\"operation\":\"add\"}","type":"arguments_delta"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"requires_action","usage":{"total_tokens":256,"total_input_tokens":174,"input_tokens_by_modality":[{"modality":"text","tokens":174}],"total_cached_tokens":0,"total_output_tokens":26,"total_tool_use_tokens":0,"total_thought_tokens":56,"initial_input_tokens":174},"created":"2026-11-12T09:44:05Z","updated":"2026-11-12T09:44:05Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

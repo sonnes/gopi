@@ -1,0 +1,58 @@
+httprr trace v1
+536 4005
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 305
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Hello, how are you?","type":"text"}],"type":"user_input"},{"content":[{"text":"Please respond this time.","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:18 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=2619
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"content":{"text":"**Assessing User Interaction**\n\nI've just analyzed the user's input. The tone is polite but hints at a past interaction where a response wasn't received. I'm focusing on understanding the subtle implication that a previous response was missed, and will consider the implications of this request.\n\n\n","type":"text"},"type":"thought_summary"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EvoJCvcJAWkUfROYEUsk48uihEblq4cbG7RB0SJBuziLSJeJWLYr6dZqrSND4ES5gqUOGtYFjD1vc8jd0sir8S5bKM1c6XDQZyUxWc1GuWag5EJ5YuK4mculmMSXFxm70PCSbbcb7J7pFAS+/hdL8Ggidf5yu/x10tb69Is18NmSjkNJUgaALpGJaTiSHD5FCiB1j/+QWBhyzFYmbqCqfHNhDe7JW5KJcc/9KWEe/AgnPixNOfXiNdq8XvcReNNjyunzpmDrl3opJ1+4yajLZPYv/3mfYZoiz7TWIMTzjCD/g4kq/OwgQvTYcchI/pnv8tbJ1viJx3iq2/MAlw23i66y2V8iS46I2R5wOHMwGuczjtgq2eEvnr55W6+ZVSMKPDJE/Jl5DWQ0HNd1wj6A0OOMfPw6nHVdPFGSowpHq4szwepA8PaukXIo5qXpgHk2lKguJvmFJVNObiCfuAHN36tPrsJI8ahBR2RaD2vm6RdFq5+rV+coNiOiMO6f5LFlPeVMCVHHVk28Xt/KxsDkdnYc3hUtrQ+slQySSShmRpY9HgUNpfBTPkYVBLmr+yZtFioLifdiOavf9kxknDIYdyHITYTzUwk6djEQ2iqqfjvDIKS+gOzvY3UCk/a2uJBGcnsk1CCSJ+HZ+OaOb4nQmpVyYHYRwlUb/kEGZMghKsMoeEXgaLNmckuby06FkQuldcOyNERfKr1Bp4BxA/h5nc6aqG60MWxF5T9Ke3d2reo/60b9HooW0WA7D/dyan9kAH31xbxvAOucf2dihPk1FyZtE0ThtueVdXFw9cSuRMiT6bMuSel7wk3dmIFM45H4JSvQDvBIUnLApRCumHFATFRJQUAH+e+jZD8rHAUcqAFp5YFaKb3F0h/P2gTfG9CXWOXqqawBMJI3o8KLXxQtJBzXO65rJsPKktcnXe5kHROQf3kDTVxkHj8cNPtnMHUQjdWFaGipPVdsuMzJ5XVuXylgMplcQbYewCAIC/uFnjjOcdLP8sBwhl0UhyDEA2DoC9d5SMAPwN+mDya+DbwJSTFG+4ZEJDSoxCo1Gn9vJosOGuU01O01QsQ8HIVFMgbRcwo9chiaOGgXxN7OFmLbqGz8U5I21n6ebSQYKO5J74RjVuV2MHiyjpGMrivfSZoFpDCE+rdgAdqDQj0XixcMN4Xq3p+iUeajD1nD5EUqyMpcIybUFf8dCWoif2b4zcYMGBucvEpcMZ6+kAX9DxwZtePtN2x7iUgle1oXeaRebCUdameSade0mw/os1wT5/55yiwysyh56iELgnLoa3/lF6X9dJOsNEXvHJw1OZRDKxwfsQ2rZTCyHyvx1PlUOH6DllwsITqXtfzM8WahcMXiKgfAN8nf7R3T+ktTxW8L/mK7EKB814ee6GwItMSWpZfeMW5gz141t2IbDLREYTyg4IQHeCuAFW9vX66JcQ8JaeOk6uRyx7W+lR+tZKySjnkVHbI8HyjfM639LYSyliXTqJkJjnhg6/gfMABdtLDnxip0TWc/KLp7NtgrUU28G3Rh7602Kk7gBOAForDMih0RwSov/FDZbVhuRDOvpHJpF5zA3xq/G12wSWWvAGy0bOFQBaInI+qyz0jdznvqaWqkmqTHUownAIDtCYfc8aEMegPkU+afyyCTzNDDe0a9SklC+jRwquls3vRS00OK8DI58ly935SJf0n3T5zfXiI=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Hello! I'm doing well, thank you for asking. I am","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" definitely here and ready to help. \n\nHow are you doing today? What can I assist you with?","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":316,"total_input_tokens":13,"input_tokens_by_modality":[{"modality":"text","tokens":13}],"total_cached_tokens":0,"total_output_tokens":37,"total_tool_use_tokens":0,"total_thought_tokens":266,"initial_input_tokens":13},"created":"2026-11-12T09:43:19Z","updated":"2026-11-12T09:43:19Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

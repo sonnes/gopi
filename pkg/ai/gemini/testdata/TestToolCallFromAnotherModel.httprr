@@ -1,0 +1,55 @@
+httprr trace v1
+933 1923
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 702
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"What is the weather in Paris? Use the get_weather tool.","type":"text"}],"type":"user_input"},{"signature":"skip_thought_signature_validator","type":"thought"},{"arguments":{"city":"Paris"},"id":"toolu_01","name":"get_weather","type":"function_call"},{"call_id":"toolu_01","name":"get_weather","result":[{"text":"Sunny, 22C in Paris","type":"text"}],"type":"function_result"}],"model":"gemini-3.8-flash","store":false,"stream":true,"tools":[{"description":"Get the weather of a city","name":"get_weather","parameters":{"properties":{"city":{"type":"string"}},"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:44:06 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=1678
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EmkKZwFpFH0Tuf+x8wsIcX2iFvJZlzrBMl6/f2UnYjxjlY+YAI5J5t2ffsJg9wwIMGVI+cIVCeI8ewL1f5XrDw8b9zTTGfPxVmHZFwYr1/4t13KKj2R6o5+0hi0Euq+2c1AsoWv6EuuOcds=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"The weather","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" in Paris is sunny with a temperature of 22°C.","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":100,"total_input_tokens":84,"input_tokens_by_modality":[{"modality":"text","tokens":84}],"total_cached_tokens":0,"total_output_tokens":16,"total_tool_use_tokens":0,"total_thought_tokens":0,"initial_input_tokens":84},"created":"2026-11-12T09:44:06Z","updated":"2026-11-12T09:44:06Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

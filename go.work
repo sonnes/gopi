@@ -8,6 +8,7 @@ use (
 	./pkg/ai/anthropic
 	./pkg/ai/chatgpt
 	./pkg/ai/fireworks
+	./pkg/ai/gemini
 	./pkg/ai/openai
 	./pkg/ai/openaichat
 	./pkg/ai/openrouter

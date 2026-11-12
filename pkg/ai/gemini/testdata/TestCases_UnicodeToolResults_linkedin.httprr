@@ -1,0 +1,52 @@
+httprr trace v1
+1227 2224
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 996
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Use the test tool","type":"text"}],"type":"user_input"},{"signature":"skip_thought_signature_validator","type":"thought"},{"arguments":{},"id":"test_1","name":"linkedin_skill","type":"function_call"},{"call_id":"test_1","name":"linkedin_skill","result":[{"text":"Post: Hab einen \"Generative KI für Nicht-Techniker\" Workshop gebaut.\nComments: [{\"author\": \"Mario Zechner\", \"text\": \"Wann? Wo? Bin grad äußersr eventuninformiert 🙈\"},\n{\"author\": \"Anna\", \"text\": \"Klingt spannend! 👍\"}]","type":"text"}],"type":"function_result"},{"content":[{"text":"How many comments are there?","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant.","tools":[{"description":"A test tool","name":"linkedin_skill","parameters":{"additionalProperties":false,"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:46 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=4624
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EqwDCqkDAWkUfROtq2hOJeA57MPZG0TlmlA162bFQuUVd9va7/nhqs7uSFhu6oQSEjmjrUxkSW+xFZqrXu3DE8NZQFRr5LmdaF3IEoCEj1LEFBvomdSP86IxG8RJrl8SWWe7H88FFBhhVxVKZg8u0CHhQfrP6ro/EA9yDAh0q/GkOI0mvpSWG4mRoKwxTtuhmBJ9PMOtZdzgBJvtKNJ9J1xfMb/AiIdpwBqFMGtCNMKdS61JXvvfiYFuO8iorkqB6nbjHhSuUxadruGpr41hOujIT74PWH0pd2WZjrsN71jpOUgfPDasyE1OkDHP3Pj3JhBxMEsuw2dVufbq8oCw8xIWwoEjKPbZR4qLdkDDmnl6KSlLlqwRYsn9I53+GUrGlkIMPdYAUKxoZxPIx5mTnYssTYaKulXQq6TSW7L0Lfb9CvucBKjYVPXQKIizd4YigSKMdif3Cl4QtUzGGjbeBcxXz7b1vgoSaGkd9CWlgdFKjD27PS6sALvB0OuiOIZr1kcE8Atj7rxRtbD4t6LlbxqAwvKOc3B9/KcvU0kR6WUarfC7ahfjzV7wsH2rtSs=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"There are 2 comments.","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":209,"total_input_tokens":130,"input_tokens_by_modality":[{"modality":"text","tokens":130}],"total_cached_tokens":0,"total_output_tokens":6,"total_tool_use_tokens":0,"total_thought_tokens":73,"initial_input_tokens":130},"created":"2026-11-12T09:43:46Z","updated":"2026-11-12T09:43:46Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

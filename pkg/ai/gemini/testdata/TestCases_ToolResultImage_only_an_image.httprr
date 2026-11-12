@@ -1,0 +1,109 @@
+httprr trace v1
+749 2010
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 518
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Call the get_circle tool to get an image, and describe what you see, shapes, colors, etc.","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant that uses tools when asked.","tools":[{"description":"Returns a circle image","name":"get_circle","parameters":{"additionalProperties":false,"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:21 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=1850
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"Eq4CCqsCAWkUfRO9yTU4lHIenkadUn7/JrZ9FMmoa6SYMfSgOrkjnWjs1PO7SRoG1eUEZVzs7Fvt6EN0+OsBn9081th+Rx+VtukhAQ/pKjIcluEEjuZxysFlImuykFEZeps6J+SaxMCQMw2zRYEpeLzPTTOmSn7LiKWWd0s/1bugo8LfuvxWXoGxcmF4IKVKaHl6UhqpSx3IHtGE0XJPgp3hL6Vb3ZE8kMVMwsxaYBVmVdEEmhd78qGId65HURR/AfNEpxFoFxEC1C4DQ0lM21WYqvh9ZdX2gG73J/4LcIOjw1zY+WKKnI+kKZ0Cbgs/TXw0KexKGiNDUkuCFHO6sJoRceFUg/YLudzbZuAT8gQkfe2ZJijjGknhevHigI1/slfNrdcFD4ii1m18PJN5x+4=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"id":"call_7877265760813807431","type":"function_call","name":"get_circle","arguments":{}},"event_type":"step.start"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"requires_action","usage":{"total_tokens":115,"total_input_tokens":61,"input_tokens_by_modality":[{"modality":"text","tokens":61}],"total_cached_tokens":0,"total_output_tokens":10,"total_tool_use_tokens":0,"total_thought_tokens":44,"initial_input_tokens":61},"created":"2026-11-12T09:43:21Z","updated":"2026-11-12T09:43:21Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+
+4850 3000
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 4618
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Call the get_circle tool to get an image, and describe what you see, shapes, colors, etc.","type":"text"}],"type":"user_input"},{"signature":"Eq4CCqsCAWkUfRO9yTU4lHIenkadUn7/JrZ9FMmoa6SYMfSgOrkjnWjs1PO7SRoG1eUEZVzs7Fvt6EN0+OsBn9081th+Rx+VtukhAQ/pKjIcluEEjuZxysFlImuykFEZeps6J+SaxMCQMw2zRYEpeLzPTTOmSn7LiKWWd0s/1bugo8LfuvxWXoGxcmF4IKVKaHl6UhqpSx3IHtGE0XJPgp3hL6Vb3ZE8kMVMwsxaYBVmVdEEmhd78qGId65HURR/AfNEpxFoFxEC1C4DQ0lM21WYqvh9ZdX2gG73J/4LcIOjw1zY+WKKnI+kKZ0Cbgs/TXw0KexKGiNDUkuCFHO6sJoRceFUg/YLudzbZuAT8gQkfe2ZJijjGknhevHigI1/slfNrdcFD4ii1m18PJN5x+4=","type":"thought"},{"arguments":{},"id":"call_7877265760813807431","name":"get_circle","type":"function_call"},{"call_id":"call_7877265760813807431","name":"get_circle","result":[{"data":"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","mime_type":"image/png","type":"image"}],"type":"function_result"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant that uses tools when asked.","tools":[{"description":"Returns a circle image","name":"get_circle","parameters":{"additionalProperties":false,"type":"object"},"type":"function"}]}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:23 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=2315
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EvkDCvYDAWkUfRMK8T2CQ36UFceIzN/N8ANoJEEEFTj7DK0vVTgr3KwGXNOHEH19pZ4C9cC1SehQnaKB6FyLsoqUkQhUYAQ2jY9GzY1kjCTQTJvfvhBWhXsqIjekkavGppgMvd72ljdfUf5vq2Oe9I2nNgTKilKhtTNwuByHWtcEc+0ceGmzUoyhHT3BTa34Hcqv/1Gxa/jW8ieBEtGaYkajVQBnBArmJjgE4rdiHaAwuBiCiGt0xbgHMayYqlFrJwibrU9O384j88bW9B1syMooE53iyIw50TyEjSvoclXTKcEoHV6HuPEIen8gRQaqanEE4h0wkSZ+rFwinElr1+HRJEzTAeOJ/79FQlL2PgHH3iQCq6aRo1TNT+H6N0JlPaAIM5KrYtNJALxPPEDcbT9zS2rBBVNVRop84N+79cy7NiTndT0gruhp7EYeTuI3rrGU6VR8r1mdSdAKPAbcNP6ZjbF8LcFjWJVz5SG2kKLEZzMaXjHqQhn7zt5sWXGjmIcPkXAO0ZaQ30IevZ+SxhRfAyPldFv4ZYdKg9vPaNEO6QSM5rJayIRdfuWt/UvZaLtjei9wcwXHjrJkZlt0f2lFkGb38DfEgll0WMsKBymvLM9WnBQa3b4MQdqUm5pTNQEu627pmMRW4c+fir1Q1/Pi6aqV/kXD/5GDAA==","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Based on the returned image, here is a description:\n\n* **Shape:**","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" A solid, filled circular disc positioned directly in the center.\n* **Colors:** A vibrant, pure red circle set","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" against a plain, solid white background.\n* **Composition & Style:** The design is minimal, clean, and geometric","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":", closely resembling a red dot or the central disc of the Japanese flag.","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":1369,"total_input_tokens":1212,"input_tokens_by_modality":[{"modality":"image","tokens":1089},{"modality":"text","tokens":123}],"total_cached_tokens":0,"total_output_tokens":79,"total_tool_use_tokens":0,"total_thought_tokens":78,"initial_input_tokens":1212},"created":"2026-11-12T09:43:24Z","updated":"2026-11-12T09:43:24Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

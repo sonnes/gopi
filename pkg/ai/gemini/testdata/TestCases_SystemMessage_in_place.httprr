@@ -1,0 +1,58 @@
+httprr trace v1
+670 4443
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 439
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Say hello in one short sentence.","type":"text"},{"text":"\u003csystem-reminder\u003e\nUpdated system prompt section \"language\":\n\nAnswer only in French.\n\u003c/system-reminder\u003e","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant."}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:55 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=4783
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"content":{"text":"**Defining the Response**\n\nI've determined the core request is a simple greeting and that I need to express it in a concise French sentence. This means \"Hello.\" is the fundamental meaning and I'm currently focused on how to best say it, using few words. Now I'm working on the linguistic translation that best suits the constraints.\n\n\n","type":"text"},"type":"thought_summary"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"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","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Bonjour, j'espère que vous allez bien","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" !","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":394,"total_input_tokens":40,"input_tokens_by_modality":[{"modality":"text","tokens":40}],"total_cached_tokens":0,"total_output_tokens":10,"total_tool_use_tokens":0,"total_thought_tokens":344,"initial_input_tokens":40},"created":"2026-11-12T09:43:57Z","updated":"2026-11-12T09:43:57Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

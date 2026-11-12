@@ -98,6 +98,8 @@ func scrub(host string) func(*http.Request) error {
 			"Anthropic-Version",
 			"OpenAI-Organization",
 			"OpenAI-Project",
+			"X-Goog-Api-Key",
+			"X-Goog-Api-Client",
 		} {
 			req.Header.Del(key)
 		}

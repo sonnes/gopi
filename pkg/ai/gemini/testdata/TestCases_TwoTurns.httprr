@@ -1,0 +1,103 @@
+httprr trace v1
+539 2224
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 308
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Reply with exactly: 'Hello test successful'","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant. Be concise."}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:04 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=1951
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"Eq8DCqwDAWkUfRO4VJE/r2wDtrn7qxZu605qkIkwxIXaLXdpCcWjrgbGSFQ2ntbCS+UTpJMSN87S66gBIp6X9FimRBFmaxJDwHde8aPdXNjRvJy2nC1nqX932eI5Z0yqDn01WI0mhH+Fm3JvCCle016ZnjFFH571q1vJcO0gi+PE6OlQ9v63Kh0czQOJ5GAwMyP3bZ/eTxPvOgJcikTSZrwfFLJSJ5LG1YaTrtlGZJXlPOBXmnmIiKGgZj+xTVKFLV8Q88g8RUz0LtrsXkz6Yx6nPOVwolmj+yohVc7CANtBARtoWogDYXWjoWCMMsdELCvl3UHYXVJAB9iWnad/SSJjIzZ5BAv2rlP/gvbzV9Pb7lbzX4meMCIw4E+uuaZZIjdgDn6Cs6EcGdlxEvySWPghX7nLRnrHe5NFzAO7b5dRrGnrBp6SoI2vDhalRv6Ih6GslCLQKbrwjS11c8UO0JMbIUpWmxk9c3IFphWvOP99b5aWyUMs8NcqeEAxbN/GJbrFQ24JlFyu89WkY3ACKW83o4MtBXGgyPRWD3Vbw6pJQiHIWxJCXilVgNJ6Zf/QhZA=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Hello test successful","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":85,"total_input_tokens":20,"input_tokens_by_modality":[{"modality":"text","tokens":20}],"total_cached_tokens":0,"total_output_tokens":3,"total_tool_use_tokens":0,"total_thought_tokens":62,"initial_input_tokens":20},"created":"2026-11-12T09:43:04Z","updated":"2026-11-12T09:43:04Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+
+1330 2211
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 1098
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Reply with exactly: 'Hello test successful'","type":"text"}],"type":"user_input"},{"signature":"Eq8DCqwDAWkUfRO4VJE/r2wDtrn7qxZu605qkIkwxIXaLXdpCcWjrgbGSFQ2ntbCS+UTpJMSN87S66gBIp6X9FimRBFmaxJDwHde8aPdXNjRvJy2nC1nqX932eI5Z0yqDn01WI0mhH+Fm3JvCCle016ZnjFFH571q1vJcO0gi+PE6OlQ9v63Kh0czQOJ5GAwMyP3bZ/eTxPvOgJcikTSZrwfFLJSJ5LG1YaTrtlGZJXlPOBXmnmIiKGgZj+xTVKFLV8Q88g8RUz0LtrsXkz6Yx6nPOVwolmj+yohVc7CANtBARtoWogDYXWjoWCMMsdELCvl3UHYXVJAB9iWnad/SSJjIzZ5BAv2rlP/gvbzV9Pb7lbzX4meMCIw4E+uuaZZIjdgDn6Cs6EcGdlxEvySWPghX7nLRnrHe5NFzAO7b5dRrGnrBp6SoI2vDhalRv6Ih6GslCLQKbrwjS11c8UO0JMbIUpWmxk9c3IFphWvOP99b5aWyUMs8NcqeEAxbN/GJbrFQ24JlFyu89WkY3ACKW83o4MtBXGgyPRWD3Vbw6pJQiHIWxJCXilVgNJ6Zf/QhZA=","type":"thought"},{"content":[{"text":"Hello test successful","type":"text"}],"type":"model_output"},{"content":[{"text":"Now say 'Goodbye test successful'","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant. Be concise."}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:43:07 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=2380
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EqMDCqADAWkUfRMzPYxRVsbZwZnuV6cI8F6BnsdBR9r+WtJXau4ygt3wNa/RFSFX3+HAXGoBRQLCqoVYi3l8YQ8UTdQ3Hras7bxQFx3jxq48ij6kG45PiXpjafQ6S4lbNwGFpQ4SicpJnABz8DsFMophwETHR9K+zNKLp2m+ujrg9kjhQ/f/n1aNDwuyT5RLI6BaTnAmNt9Ljd1hE2IMD0wC/PvD6gL6gGixe+vgiwwMaoT5GabNAQJqkcVS0Tv90z18ZLxTgzTys0rRQ/Ui6miwKAKY4mQE2/Bh231+2M4rAeSEPGfwHkiPfAJv32Feu1YwKkGrCdpyPp6D6m+VFq+387S7ZRdwwYa+RvSs/KBNmfe6ZeZwUFLOZbKMe/suGFUNkdLGPNP5u5+tzJ/IVmu1o7oZkoppiH+ZiiyU3R2Tq2qelROXFJ767NVG7WX9H0KzzU8pEoV9EsMTwXtf2oaCE9ecCnpUFlpJr4tNF/LlYuuKzxb3WxVIBVClvdufeEr/1Zwe5JLAzLjBSTLZ8gcxQsT1ln6q6MxewGNJ19LcVcqqhmE=","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Goodbye test successful","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":156,"total_input_tokens":94,"input_tokens_by_modality":[{"modality":"text","tokens":94}],"total_cached_tokens":0,"total_output_tokens":3,"total_tool_use_tokens":0,"total_thought_tokens":59,"initial_input_tokens":94},"created":"2026-11-12T09:43:07Z","updated":"2026-11-12T09:43:07Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+

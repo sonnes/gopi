@@ -1,0 +1,58 @@
+httprr trace v1
+670 3916
+POST https://generativelanguage.googleapis.com/v1beta/interactions HTTP/1.1
+Host: generativelanguage.googleapis.com
+User-Agent: Go-http-client/1.1
+Content-Length: 439
+Api-Revision: 2026-05-20
+Content-Type: application/json
+
+{"generation_config":{"max_output_tokens":8192,"thinking_summaries":"auto"},"input":[{"content":[{"text":"Say hello in one short sentence.","type":"text"},{"text":"\u003csystem-reminder\u003e\nUpdated system prompt section \"language\":\n\nAnswer only in French.\n\u003c/system-reminder\u003e","type":"text"}],"type":"user_input"}],"model":"gemini-3.8-flash","store":false,"stream":true,"system_instruction":"You are a helpful assistant."}HTTP/2.0 200 OK
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+Content-Type: text/event-stream
+Date: Thu, 12 Nov 2026 09:44:01 GMT
+Server: scaffolding on HTTPServer2
+Server-Timing: gfet4t7; dur=3425
+Vary: Origin
+Vary: X-Origin
+Vary: Referer
+X-Content-Type-Options: nosniff
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 0
+
+event: interaction.created
+data: {"interaction":{"object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.created"}
+
+event: interaction.status_update
+data: {"status":"in_progress","event_type":"interaction.status_update"}
+
+event: step.start
+data: {"index":0,"step":{"type":"thought"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":0,"delta":{"content":{"text":"**Defining the Goal**\n\nI've got the request parsed. It's a simple directive: say \"hello\" in French, keeping it short. The core lies in linguistic constraints. Now, I'm pivoting toward the content itself, framing the \"hello\" equivalent.\n\n\n","type":"text"},"type":"thought_summary"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":0,"delta":{"signature":"EqMKCqAKAWkUfROkb8oX/2GtMHxypFLRO28xw+BIqPMOTPOvlkBiBR9o1goFxpIwJc6o2CnzkEh0CRHzGd4ac4rZcmHKqGey8YFWtkRo22WY1SM5Wfm5l+FJjk/ZegOBa7aLo2LyfzHxOSACWKLuXp5zrL1GdyNvUgjfe3HaSAcWA2GXZi2ZYmTcXuta0TdWa+tyJ55+Zot6a/BsuivQ4+b/XymRAhiyz5BEVqFvRk3qapJjl1hESMIdStlL8AKUuuRE+2xIPUKhE654vFuVlZ0WsnSZi6nreulYYzz7pWE6F2qsU6Kxvi2AFoouSQDKyxjMoRtytPzELigBTu5ZbdwcD8lzj3GC+IYQ05SqdA3KrhJKfAKgmzp+u/3DcroacFpoz2HMqJu8epKRi6sHH1nUV4yXpjMWu0NnygT2t9BNMz9zYTc/C447PAjSS4bzFBes8k0TsgA2UOD7pIG8d1hmsRHOcB70400Tb+5jim1AYRG87rhTFtY2Fr6pkQiRW60iXny1OnOtEO2dU7mNycWPJhKehGBxjHpHTTxcVBCPHsB2uhDJVE+E5CiJPoqVgE1jb3q0i+2DONjxpODgHLMzUXMdSn1/HRqC6gXS2B7qtke3hZbzL5Eq0Cw3TRnseyItXgQhIEf7sbmXoM65ygrMbTzResBZz+aQDzIUXqBoXGapSpqPOTfm8IxxfPsUxIvB+MbOgMYbCadRkEVGr4yL5obmvrU1/XGZYHY1OB1DlgGVJ9jqf5vOQWq6cDgMnr1+d22vxEvQCxQ2G1zwaa8O+FN92/TAa1FNfYU9Q4jjkY9EnhHZcVcdaZyMh1zdIgnvcVR7VZcuBp1DsHMjCejTqhObF4TjLGE09xC1Im8A4FfSb6K2UVnh7lf7cgcFhbNrwiemyje1ysI2DHk6RmyId94PmLjP9u6KCYfoTir4waAAXDnP0gsSELPGGt6TEKzxQb5OC100BI8/2O19CyfYfu8vLDol5auMIBtDl0AEIzoaUQu/JLwFNB/H6uolQArMFpEqRvixOIXFPIzv9YA9ZCLQACU8fQFQ/RF/cmRdNFY4OXvalAiEmYBCBIIXAY+SUH4Whm5RQy9JFyL4M4+GRk0WrplzeHc5rOhsdpNWV8EPt5U5pmsCY2iqvcClzMyaj7ynrk9XeTwf45aKblCbydHkZNV5kuMgNbAapspyPbttPTPfGqWmpgASGvFmHQHqWVMT/Kt6mCOore4Gg6N7USNXPLuTDRPYPkMExWt3QjE4QHDWpZLGTX1CcdBzBa4u32D6w6ILkiVCdc4+dGTMZgaqNAi8FjE1oU3f7CqvqhOh8yXbaxN9BaSHNxlbvAVVDRCgmIP7XHxBBLdXATOsjCkDcqeb+oIcJ5zL8yEvQ+uUTCs97hXYoX9AGee8aspLvzjNs0LJ/kEEACpxAExQhcu24cmw8XReaQGQT6QRHCg+uujkV6VLBZLGhB4rbbFD/RPJYEnwjS7TOEP1EJd8C1oH4UWRoT0z4vtj/ngl440RPranWFyN5LhtT712yfw1RwEMXk2/5llhcgI7YgKeOvoPIeaYiinmPZi1txw+K3u35JR/+PSH6PeZBCjq8cg66IULDKutc1OeLjMSXtRQwDX8AHb0QdUFVUsL3c9tLQOhDCx42HazD8c0gWzeQ64N+rwe9Uyfj4UZW6RfhK036PnrmXb/f7SICfCd/AjuPBlK5DAtAzncks9rCIoybPXNJSzURobSqSFTuO+8CHMnjq5gXw==","type":"thought_signature"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":0,"event_type":"step.stop"}
+
+event: step.start
+data: {"index":1,"step":{"type":"model_output"},"event_type":"step.start"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":"Bonjour, je","type":"text"},"event_type":"step.delta"}
+
+event: step.delta
+data: {"index":1,"delta":{"text":" vous souhaite une très belle journée !","type":"text"},"event_type":"step.delta"}
+
+event: step.stop
+data: {"index":1,"event_type":"step.stop"}
+
+event: interaction.completed
+data: {"interaction":{"status":"completed","usage":{"total_tokens":316,"total_input_tokens":40,"input_tokens_by_modality":[{"modality":"text","tokens":40}],"total_cached_tokens":0,"total_output_tokens":10,"total_tool_use_tokens":0,"total_thought_tokens":266,"initial_input_tokens":40},"created":"2026-11-12T09:44:02Z","updated":"2026-11-12T09:44:02Z","service_tier":"standard","object":"interaction","model":"gemini-3.8-flash"},"event_type":"interaction.completed"}
+
+event: done
+data: [DONE]
+
