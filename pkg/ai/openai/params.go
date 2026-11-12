@@ -50,7 +50,7 @@ func buildParams(model ai.Model, messages []ai.Message, opts ai.Options) (respon
 	}
 
 	retention := ai.RetentionOf(opts)
-	if key, ok := ai.GetOption(opts, PromptCacheKey); ok && key != "" && retention != ai.CacheNone {
+	if key, ok := promptCacheKey(opts); ok {
 		params.PromptCacheKey = param.NewOpt(key)
 	}
 	if retention == ai.CacheLong {
@@ -74,6 +74,16 @@ func buildParams(model ai.Model, messages []ai.Message, opts ai.Options) (respon
 	}
 
 	return params, nil
+}
+
+// promptCacheKey returns the [PromptCacheKey] of a call. It returns
+// false if the key is empty or the retention is [ai.CacheNone].
+func promptCacheKey(opts ai.Options) (string, bool) {
+	key, ok := ai.GetOption(opts, PromptCacheKey)
+	if !ok || key == "" || ai.RetentionOf(opts) == ai.CacheNone {
+		return "", false
+	}
+	return key, true
 }
 
 // allowedTools limits the model to the allowed tools with an

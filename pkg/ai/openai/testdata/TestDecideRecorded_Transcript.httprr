@@ -1,0 +1,35 @@
+httprr trace v1
+868 1667
+POST https://api.openai.com/v1/decisions HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 708
+Content-Type: application/json
+
+{"model":"gpt-6-luna","input":[{"content":[{"text":"Delete the temp files in /tmp/build.","type":"input_text"}],"role":"user"},{"content":"I will delete them.","role":"assistant"},{"arguments":"{\"command\":\"rm -rf /tmp/build/*.tmp\"}","call_id":"c1","name":"bash","type":"function_call"},{"output":"Removed 12 files.","call_id":"c1","type":"function_call_output"},{"content":"I removed 12 temp files from /tmp/build.","role":"assistant"}],"questions":[{"type":"predicate","name":"done","instructions":"Did the assistant report that it removed the files?"},{"type":"choice","name":"tool","instructions":"Which tool did the agent call?","choices":[{"value":"bash"},{"value":"browser"},{"value":"editor"}]}]}
+HTTP/2.0 200 OK
+Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: x-request-id,retry-after,server-timing-total
+Access-Control-Expose-Headers: CF-Ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a594bf484bdd79e9-HYD
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 10:10:30 GMT
+Openai-Processing-Ms: 289
+Server: cloudflare
+Server-Timing-Total: 289.582
+Set-Cookie: __cf_bm=purHkHKS0zSnhzSvBIe1Qb_oJDU2eU2CMMTnquMm6gw-1794478229.80857-1.0.1.1-rXH50HroqND5_R7CVPABLeFguf56xOmZzRU1oy.PlMr6FPKFeJue7OCMlkBZFu0eIsNXtG3dZytByBRw05fdSymYIC9Ok6d8dkOJRQfpvmpcjk6MDDLBmEYDEOpVbZvD; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=api.openai.com; Expires=Thu, 12 Nov 2026 10:40:30 GMT
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Vary: origin, access-control-request-method, access-control-request-headers
+X-Content-Type-Options: nosniff
+X-Openai-Proxy-Wasm: v0.1
+X-Ratelimit-Limit-Requests: 5000
+X-Ratelimit-Limit-Tokens: 2000000
+X-Ratelimit-Remaining-Requests: 4999
+X-Ratelimit-Remaining-Tokens: 1999655
+X-Ratelimit-Reset-Requests: 12ms
+X-Ratelimit-Reset-Tokens: 10ms
+X-Request-Id: req_9c83d94fd59a4cdeb634bfd16aec7522
+
+{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"done","probability":1.0},{"type":"choice","name":"tool","choice":"bash","probabilities":[{"value":"bash","probability":1.0},{"value":"browser","probability":0.0},{"value":"editor","probability":0.0}],"confidence":1.0}],"usage":{"input_tokens":344,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":344}}

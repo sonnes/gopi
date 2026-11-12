@@ -374,6 +374,7 @@ func TestRequestPath(t *testing.T) {
 		Text:   completed,
 		Object: answer(objectBody),
 		Count:  answer(`{"input_tokens":7}`),
+		Decide: answer(decisionBody),
 	})
 }
 

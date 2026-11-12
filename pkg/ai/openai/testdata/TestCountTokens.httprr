@@ -1,0 +1,31 @@
+httprr trace v1
+706 1082
+POST https://api.openai.com/v1/responses/input_tokens HTTP/1.1
+Host: api.openai.com
+User-Agent: Go-http-client/1.1
+Content-Length: 533
+Content-Type: application/json
+
+{"model":"gpt-6-luna","input":[{"content":[{"text":"You are a helpful assistant.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Hello","type":"input_text"}],"role":"user"}],"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"city":{"description":"The city name","type":"string"}},"required":["city"],"type":"object"},"name":"get_weather","description":"Get the current weather in a city","type":"function"}],"reasoning":{"summary":"auto"}}HTTP/2.0 200 OK
+Access-Control-Expose-Headers: X-Request-ID, Server-Timing-Total, X-OpenAI-Inference-Capacity-Reason
+Access-Control-Expose-Headers: CF-Ray
+Access-Control-Expose-Headers: CF-Ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a5943be47a689aa7-NAG
+Content-Type: application/json
+Date: Thu, 12 Nov 2026 08:40:48 GMT
+Openai-Organization: user-bp7f0qzkncp68hzpwpb4otcv
+Openai-Processing-Ms: 117
+Openai-Project: proj_UXSHGFQCxfsKEg3ybcA8IwM5
+Openai-Version: 2020-10-01
+Server: cloudflare
+Set-Cookie: __cf_bm=Hya5eaIv78MSGUB.ZZM8YgDEnYX3uzN.Tb4JeQI9ukY-1794472848.07224-1.0.1.1-CTG8_XJAqtNdn.66CPGuVd6fZhzdz4pZeYOJCGvf44kN4Dh7Q73GY0DGP4sXKEgvTszzSFDowOO7E7Lg3.R0BdpWJoSOQoR9az9ANFEmZ2VDxI.f_N.RAgMrfvR42fT7; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=api.openai.com; Expires=Thu, 12 Nov 2026 09:10:48 GMT
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Request-Id: req_764d1d0d9d764573bb2ad291b18abfe8
+
+{
+  "object": "response.input_tokens",
+  "input_tokens": 60
+}
