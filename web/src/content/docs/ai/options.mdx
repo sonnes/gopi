@@ -54,7 +54,7 @@ A provider retries only when you set `ai.MaxRetries`, and never after the first 
   lookups={[{ query: "GetOption(opts, ai.Tools)", result: "([c], true)", note: "the whole list, not [a, b, c]" }]}
 />
 
-Put all the tools in one `ai.Tools`.
+Put all the tools in one `ai.Tools`. A question of a [decision](decisions.mdx) is an option too, but each question stays, in order.
 
 Unset is a state of its own. A provider reads a value and a flag.
 

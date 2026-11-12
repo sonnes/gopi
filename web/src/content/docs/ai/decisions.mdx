@@ -1,0 +1,71 @@
+---
+title: Decisions
+summary: A decision asks closed questions about one input, and the model answers each question with probabilities instead of text.
+---
+
+import CheckMatrix from "../../../components/figures/CheckMatrix.astro";
+
+If the answer is a yes or a no, one option of a list, a level on a scale, or a box in an image, use a decision. A call of `StreamText` can answer the same question, but then your code parses text. A decision generates no text, so most of its cost is input tokens. One input serves all of its questions.
+
+<CheckMatrix
+  alt="The question kinds that each decision model answers. openai/gpt-6-luna answers yes or no, choice, and score questions, and the provider rejects a box question before the request. openrouter/typesafe/jev-1.14 answers all four kinds. openrouter/openai/gpt-6-luna-decisions answers yes or no, choice, and score questions, and the API rejects a box question with HTTP 400. gemini/gemini-decision-1 answers yes or no, choice, and score questions, and the provider rejects a box question before the request."
+  corner="model"
+  colWidth="76px"
+  columns={[
+    { label: "Yes or no", sub: "ai.YesNo" },
+    { label: "Choice", sub: "ai.Choice" },
+    { label: "Score", sub: "ai.Score" },
+    { label: "Box", sub: "ai.Box" },
+  ]}
+  rows={[
+    { label: "GPT-6 Luna", code: "openai/gpt-6-luna", cells: ["yes", "yes", "yes", { mark: "no", label: "unsupported" }] },
+    { label: "Jev 1.14", code: "openrouter/typesafe/jev-1.14", cells: ["yes", "yes", "yes", "yes"] },
+    { label: "GPT-6 Luna Decisions", code: "openrouter/openai/gpt-6-luna-decisions", cells: ["yes", "yes", "yes", { mark: "no", label: "HTTP 400" }] },
+    { label: "Gemini Decision 1", code: "gemini/gemini-decision-1", cells: ["yes", "yes", "yes", { mark: "no", label: "unsupported" }] },
+  ]}
+  legend={[["yes", "answers the kind"], ["no", "the call fails"]]}
+/>
+
+## Ask the Questions
+
+Bind a model to a provider that implements `ai.DecisionProvider`. Then give the input and the questions to `Decide`. Each question is an [option](options.mdx), so the questions go in the same list as `ai.MaxRetries`.
+
+```go
+resp, err := dm.Decide(ctx, ticket,
+	ai.YesNo("is_bug", "Does the user report a software defect?").
+		YesWhen("The user describes broken behavior.").
+		NoWhen("The user asks a question."),
+	ai.Choice("team", "Which team owns this ticket?",
+		ai.ChoiceOption{ID: "payments", Description: "Checkout, billing, or payments."},
+		ai.ChoiceOption{ID: "account", Description: "Login, password, or profile."},
+	),
+	urgency,
+	ai.MaxRetries(2),
+)
+```
+
+The input is a list of [messages](messages.mdx), so the transcript of an agent goes in as it is, with its tool calls and its images.
+
+## Read the Answers
+
+Read an answer by its name:
+
+```go
+isBug, err := resp.YesNo("is_bug")
+if errors.Is(err, ai.ErrRefused) {
+	fmt.Println("is_bug: the model refused, so a person triages the ticket")
+	return
+}
+```
+
+`Choice`, `Score`, and `Box` read the other kinds in the same way. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#DecisionResponse) lists the accessors and their errors. If `Decide` returns no error, each question has one answer of its kind, or a refusal.
+
+## Errors Before the Request
+
+`Decide` checks the input and the questions before the provider sends anything. A broken rule gives an error that wraps `ai.ErrInvalidDecision`. If the provider cannot send a question kind or a file, the error wraps `errors.ErrUnsupported`. [GoDoc](https://pkg.go.dev/github.com/sonnes/gopi/pkg/ai#DecisionModel.Decide) lists the rules.
+
+A spec resolves to a decision model with `Catalog.DecisionModel`, as a spec resolves to a language model on [Models](models.mdx). `gopi decide` asks the same questions from a shell, and `gopi decide --help` shows the flags.
+
+The full program is [examples/make-a-decision/main.go](../../../../../examples/make-a-decision/main.go). It needs `OPENROUTER_API_KEY`.
+
+The design is in [docs/concepts/ai/decision.md](../../../../../docs/concepts/ai/decision.md).

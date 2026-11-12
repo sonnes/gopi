@@ -28,6 +28,7 @@ flowchart TD
 ## Design
 
 - Each capability has its own register method, so a provider of the wrong type fails at compile time and not at the call.
+- If a model has an `Output` list, the catalog binds it only to the capabilities in the list. So a decision model of OpenRouter fails as a language model before any call. A model with no `Output` list binds to each capability of its provider, because most model lists do not say what a model gives.
 - A spec names a registered model, so a typo fails when the catalog resolves it, and not at the API after a call with no prices.
 - A bare model ID resolves only when one provider registered it, because a silent choice can send a call to the wrong account.
 - The models of the drivers are separate from the models of the providers, because a driver cannot serve a call to a model. A CLI and its model API often share a model ID, and each keeps its own metadata.

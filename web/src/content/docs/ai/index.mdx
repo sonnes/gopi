@@ -60,33 +60,35 @@ import code from "../../../../../examples/call-a-model/main.go?raw";
 | message     | What one role adds to a conversation, with its content blocks | [Messages](messages.mdx) |
 | option      | One typed setting of a call                                | [Options](options.mdx)   |
 | stream      | The events of one call, read in order, then the message    | [Streams](streams.mdx)   |
+| decision    | Closed questions about one input, answered with probabilities | [Decisions](decisions.mdx) |
 | tool        | One function that a model can call                         | [Tools](../tool/index.mdx)       |
 
 The glossary in [docs/README.md](../../../../../docs/README.md) keeps one name for each thing.
 
 ## The Optional Capabilities
 
-A provider always streams text. It can also do these. `ai.GenerateObject` and `ai.CountTokens` are functions that take a language model and assert the interface on its provider. If the provider lacks the interface, the function returns an error that wraps `errors.ErrUnsupported`. Images have their own binding, `ai.ImageModel`. It takes only a provider that implements `ImageProvider`, so a binding to a provider without it does not compile.
+A provider always streams text. It can also do these. `ai.GenerateObject` and `ai.CountTokens` are functions that take a language model and assert the interface on its provider. If the provider lacks the interface, the function returns an error that wraps `errors.ErrUnsupported`. Images have their own binding, `ai.ImageModel`, and [decisions](decisions.mdx) have `ai.DecisionModel`. Each binding takes only a provider that implements its interface, so a binding to a provider without it does not compile.
 
 <CheckMatrix
-  alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, and image interfaces. OpenAI Chat, OpenRouter, Fireworks, and ChatGPT implement the object interface only. Gemini implements the object and image interfaces."
+  alt="Each optional function needs one interface on the provider. Anthropic implements the object and token count interfaces. OpenAI implements the object, token count, image, and decision interfaces. OpenRouter implements the object and decision interfaces. OpenAI Chat, Fireworks, and ChatGPT implement the object interface only. Gemini implements the object, image, and decision interfaces."
   corner="provider"
   columns={[
     { label: "Objects", sub: ["GenerateObject[T]", "ObjectProvider"] },
     { label: "Token counts", sub: ["CountTokens", "TokenCounter"] },
     { label: "Images", sub: ["GenerateImage", "ImageProvider"] },
+    { label: "Decisions", sub: ["Decide", "DecisionProvider"] },
   ]}
   rows={[
-    { label: "Anthropic", code: "anthropic", cells: ["yes", "yes", "no"] },
-    { label: "OpenAI", code: "openai", cells: ["yes", "yes", "yes"] },
-    { label: "OpenAI Chat", code: "openaichat", cells: ["yes", "no", "no"] },
-    { label: "OpenRouter", code: "openrouter", cells: ["yes", "no", "no"] },
-    { label: "Fireworks", code: "fireworks", cells: ["yes", "no", "no"] },
-    { label: "ChatGPT", code: "chatgpt", cells: ["yes", "no", "no"] },
-    { label: "Gemini", code: "gemini", cells: ["yes", "no", "yes"] },
+    { label: "Anthropic", code: "anthropic", cells: ["yes", "yes", "no", "no"] },
+    { label: "OpenAI", code: "openai", cells: ["yes", "yes", "yes", "yes"] },
+    { label: "OpenAI Chat", code: "openaichat", cells: ["yes", "no", "no", "no"] },
+    { label: "OpenRouter", code: "openrouter", cells: ["yes", "no", "no", "yes"] },
+    { label: "Fireworks", code: "fireworks", cells: ["yes", "no", "no", "no"] },
+    { label: "ChatGPT", code: "chatgpt", cells: ["yes", "no", "no", "no"] },
+    { label: "Gemini", code: "gemini", cells: ["yes", "no", "yes", "yes"] },
   ]}
-  legend={[["yes", "implements the interface"], ["no", "objects and token counts: an error at run time. Images: a compile error"]]}
-  colWidth="112px"
+  legend={[["yes", "implements the interface"], ["no", "objects and token counts: an error at run time. Images and decisions: a compile error"]]}
+  colWidth="96px"
 />
 
 A provider can also list the models that its key can call, with `ModelLister`. The list belongs to the provider and not to one model, so it is a method on the provider and not a function on the binding. Every provider in this repository implements it.

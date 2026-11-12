@@ -8,10 +8,10 @@ import Ladder from "../../../components/figures/Ladder.astro";
 import PrefixBar from "../../../components/figures/PrefixBar.astro";
 
 <SpecSheet
-  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, and ModelLister. New takes APIKey, BaseURL, HTTPClient, and ChatGPTPlan. The model IDs in models.json are gpt-6-luna, gpt-6-sol, gpt-6-astra, and gpt-5.6, and the image model IDs are gpt-image-2, gpt-image-2.5-flare, and gpt-image-2.5-sunburst. A model and the provider bind into a language model."
+  alt="The openai package calls the Responses API. It implements TextProvider, ObjectProvider, TokenCounter, ImageProvider, DecisionProvider, and ModelLister. New takes APIKey, BaseURL, HTTPClient, and ChatGPTPlan. The model IDs in models.json are gpt-6-luna, gpt-6-sol, gpt-6-astra, and gpt-5.6, and the image model IDs are gpt-image-2, gpt-image-2.5-flare, and gpt-image-2.5-sunburst. A model and the provider bind into a language model."
   pkg="pkg/ai/openai"
   api="Responses API"
-  implements={["TextProvider", "ObjectProvider", "TokenCounter", "ImageProvider", "ModelLister"]}
+  implements={["TextProvider", "ObjectProvider", "TokenCounter", "ImageProvider", "DecisionProvider", "ModelLister"]}
   options={[
     ["APIKey(key)", "default `OPENAI_API_KEY`"],
     ["BaseURL(url)", "a proxy or a test server"],
@@ -111,6 +111,10 @@ The provider finds a GPT-6 or GPT-5.6 model by the start of its ID. So a later m
 im := ai.ImageModel{Model: ai.Model{ID: "gpt-image-2"}, Provider: openai.New()}
 resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1024x1024"))
 ```
+
+## Decisions
+
+`Decide` sends a [decision](../ai/decisions.mdx) to the Decisions API of OpenAI, with `gpt-6-luna`. The API takes no box question and no file that is not an image, so the provider returns an error that wraps `errors.ErrUnsupported` before the request. The API has no field for the outcomes of a yes-or-no question, so the provider adds them to the instructions. `openai.PromptCacheKey` applies to a decision too.
 
 ## Other Servers
 

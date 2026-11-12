@@ -1,4 +1,4 @@
-.PHONY: test check modernize build tidy fmt record record-cli models \
+.PHONY: test check modernize build tidy fmt record record-cli models example \
 	site-install site-dev site-build site-preview site-check site-test site-demo site-og \
 	docs-links
 
@@ -96,6 +96,12 @@ record-cli:
 # CLI on the PATH. Review the diff before you commit it.
 models:
 	go run ./cmd/modelsync -file models.json -ids '$(IDS)' $(if $(PRUNE),-prune)
+
+# Build one program of examples/ to .bin and run it, with the keys of
+# .envrc. Set NAME, for example `make example NAME=make-a-decision`.
+example:
+	go build -o .bin/$(NAME) ./examples/$(NAME)
+	@set -a; if [ -f .envrc ]; then . ./.envrc; fi; set +a; .bin/$(NAME)
 
 # The site lives in web/. Its README has the layout.
 site-install:

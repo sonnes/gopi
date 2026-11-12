@@ -7,10 +7,10 @@ import SpecSheet from "../../../components/figures/SpecSheet.astro";
 import Ladder from "../../../components/figures/Ladder.astro";
 
 <SpecSheet
-  alt="The gemini package calls the Interactions API for text and objects, and the models API for images and the model list. It implements TextProvider, ObjectProvider, ImageProvider, ModelLister, and KeyChecker, and not TokenCounter. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are gemini-3.5-flash-lite, gemini-3.8-flash, gemini-4-argon, and gemini-4-carbon, and the image model ID is gemini-nano-banana-2.1. A model and the provider bind into a language model."
+  alt="The gemini package calls the Interactions API for text and objects, the Decisions API for decisions, and the models API for images and the model list. It implements TextProvider, ObjectProvider, DecisionProvider, ImageProvider, ModelLister, and KeyChecker, and not TokenCounter. New takes APIKey, BaseURL, and HTTPClient. The model IDs in models.json are gemini-3.5-flash-lite, gemini-3.8-flash, gemini-4-argon, and gemini-4-carbon, the decision model ID is gemini-decision-1, and the image model ID is gemini-nano-banana-2.1. A model and the provider bind into a language model."
   pkg="pkg/ai/gemini"
-  api="Interactions API and models API"
-  implements={["TextProvider", "ObjectProvider", "ImageProvider", "ModelLister", "KeyChecker"]}
+  api="Interactions API, Decisions API, and models API"
+  implements={["TextProvider", "ObjectProvider", "DecisionProvider", "ImageProvider", "ModelLister", "KeyChecker"]}
   lacks={["TokenCounter"]}
   options={[
     ["APIKey(key)", "default `GOOGLE_API_KEY`, then `GEMINI_API_KEY`"],
@@ -22,6 +22,7 @@ import Ladder from "../../../components/figures/Ladder.astro";
     ["gemini-3.8-flash", "ai"],
     ["gemini-4-argon", "ai"],
     ["gemini-4-carbon", "ai"],
+    ["gemini-decision-1", "value"],
     ["gemini-nano-banana-2.1", "value"],
   ]}
   bind={["model + gemini.New(opts...)", "ai.LanguageModel{ Model, Provider }"]}
@@ -80,6 +81,12 @@ The provider does not send `ai.Temperature`. A tool choice of one tool sends the
 im := ai.ImageModel{Model: ai.Model{ID: "gemini-nano-banana-2.1"}, Provider: gemini.New()}
 resp, err := im.GenerateImage(ctx, "A blue circle", ai.ImageSize("1K"))
 ```
+
+## Decisions
+
+`Decide` sends a [decision](../ai/decisions.mdx) to the Decisions API of Gemini, at `/decisions` under the base URL and the API version of the Go SDK. The API version of the SDK is `v1beta` today, so the path is `/v1beta/decisions`. The decision model is `gemini-decision-1`. The API reads text, images, PDF documents, audio, and video. It has no box question. For a box question or a file of another type, the provider returns an error that wraps `errors.ErrUnsupported` before the request.
+
+The API reads no tool calls, tool results, or thinking blocks. So the provider sends a tool call as text, such as `[tool call read_file] {"path":"a.go"}`, and a tool result as text that names its tool. It drops each thinking block. A safety block is a `*gemini.Error` with the status 400.
 
 ## Errors
 

@@ -6,10 +6,10 @@ summary: The host provider for OpenRouter. It sends each call through the OpenAI
 import SpecSheet from "../../../components/figures/SpecSheet.astro";
 
 <SpecSheet
-  alt="The openrouter package calls the Responses API of OpenRouter. It implements TextProvider, ObjectProvider, and ModelLister, and not TokenCounter or ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The package has no models. A model and the provider bind into a language model."
+  alt="The openrouter package calls the Responses API and the Decisions API of OpenRouter. It implements TextProvider, ObjectProvider, DecisionProvider, and ModelLister, and not TokenCounter or ImageProvider. New takes APIKey, BaseURL, and HTTPClient. The package has no models. A model and the provider bind into a language model."
   pkg="pkg/ai/openrouter"
   api="Responses API of OpenRouter"
-  implements={["TextProvider", "ObjectProvider", "ModelLister"]}
+  implements={["TextProvider", "ObjectProvider", "DecisionProvider", "ModelLister"]}
   lacks={["TokenCounter", "ImageProvider"]}
   options={[
     ["APIKey(key)", "default `OPENROUTER_API_KEY`"],
@@ -33,13 +33,20 @@ The package has no models. Name a model by its OpenRouter ID, such as `ai.Model{
 
 `ListModels` gives the models that OpenRouter serves today:
 
-- It lists only the models with tools.
+- It lists the models with tools, and then the decision models. A decision model has the output `ai.OutputDecisions`, so the catalog binds it only to a decision model.
+- If the list of the decision models fails, the result holds the models with tools only.
 - It skips a model of the Batch API, with the suffix `:batch`.
 - A price is in US dollars for one million tokens. A negative price, such as the price of a router, is unknown and stays zero.
 - A price for a larger prompt becomes a price tier. A price for a time of day is not in the list.
 - The output cap is never larger than the context window.
 
 `FetchModels` of a catalog adds the list to the models of models.json. A model that has prices in the file keeps them.
+
+## Decisions
+
+`Decide` sends a [decision](../ai/decisions.mdx) to the Decisions API of OpenRouter, at `https://openrouter.ai/api/alpha/decisions`. The API serves each decision model of OpenRouter, such as `typesafe/jev-1.14` and `openai/gpt-6-luna-decisions`. The provider makes this URL from the base URL: it replaces the `/v1` at the end with `/alpha/decisions`.
+
+Only some models answer a box question, such as `typesafe/jev-1.14`. The model list does not say which ones. Another model rejects a box question with HTTP 400. The API reads no file that is not an image, so the provider returns an error that wraps `errors.ErrUnsupported` before the request. With a key of your own, the cost is the fee of OpenRouter plus the upstream cost.
 
 ## System Messages
 

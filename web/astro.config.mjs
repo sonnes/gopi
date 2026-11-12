@@ -151,6 +151,7 @@ export default defineConfig({
             { label: "Messages", slug: "docs/ai/messages" },
             { label: "Options", slug: "docs/ai/options" },
             { label: "Streams", slug: "docs/ai/streams" },
+            { label: "Decisions", slug: "docs/ai/decisions" },
           ],
         },
         {

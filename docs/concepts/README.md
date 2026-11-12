@@ -17,6 +17,7 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [OpenAI Providers](ai/openai.md) | How the two OpenAI providers build their requests, keep reasoning between calls, and serve compatible servers. |
 | [Gemini Provider](ai/gemini.md) | How the Gemini provider sends a stateless history to the Interactions API, keeps thought signatures between calls, and calls the models API for images and the model list. |
 | [Host Provider](ai/host-provider.md) | How a provider for a server that copies an OpenAI API sends its calls through the provider of that API, and lists the models of the server with their limits and prices. |
+| [Decision](ai/decision.md) | How a decision model answers closed questions about one input with probabilities, and how each provider maps the questions to its API. |
 | [ChatGPT Plan](ai/chatgpt.md) | How gopi signs in with a ChatGPT account, keeps its rotating tokens, and calls the Responses API on the plan of the user. |
 
 ## catalog

@@ -1,7 +1,7 @@
 ---
 title: Provider
 description: How a provider serves a model call, and how the Anthropic provider builds its requests.
-package: pkg/ai, pkg/ai/anthropic, internal/retry, internal/transcript, internal/family, internal/httpget, internal/providertest
+package: pkg/ai, pkg/ai/anthropic, internal/retry, internal/transcript, internal/family, internal/httpapi, internal/providertest
 read_when:
   - You bind a model to a provider
   - You add an option that one provider reads
@@ -22,7 +22,8 @@ LanguageModel{Model, Provider}
    +-- GenerateObject -> ObjectProvider  (optional)
    +-- CountTokens    -> TokenCounter    (optional)
 
-ImageModel{Model, Provider}  -> ImageProvider
+ImageModel{Model, Provider}     -> ImageProvider
+DecisionModel{Model, Provider}  -> DecisionProvider
 ```
 
 ## Design
@@ -49,11 +50,12 @@ ImageModel{Model, Provider}  -> ImageProvider
 | Bind a model to a provider             | `pkg/ai/text.go`                        |
 | Add an option                          | `pkg/ai/options.go`                     |
 | Add an optional capability             | `pkg/ai/object.go`, `pkg/ai/tokens.go`  |
+| Ask closed questions about an input    | `pkg/ai/decision.go`                    |
 | List the models or check a key         | `pkg/ai/lister.go`                      |
 | Mark what a Claude model accepts       | `pkg/ai/anthropic/compat.go`            |
 | Match a model ID to its family         | `internal/family/family.go`             |
 | Change the retry loop                  | `internal/retry/retry.go`               |
-| Read a list that the SDK does not get  | `internal/httpget/httpget.go`           |
+| Read a list that the SDK does not get  | `internal/httpapi/httpapi.go`           |
 | Change a rule of every provider        | `internal/transcript/transcript.go`     |
 | Add a recorded case of every provider  | `internal/providertest/providertest.go` |
 | Add a case of every provider on a fake API | `internal/providertest/fake.go`     |
