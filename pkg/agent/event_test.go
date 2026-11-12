@@ -65,6 +65,30 @@ func TestEventJSON(t *testing.T) {
 			want:  `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]}}`,
 		},
 		{
+			name: "message_start carries the entry ID",
+			event: agent.EventMessageStart{
+				Message: msg,
+				EntryID: "e1",
+			},
+			want: `{"type":"message_start","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]},"entry_id":"e1"}`,
+		},
+		{
+			name: "message_update carries the entry ID",
+			event: agent.EventMessageUpdate{
+				Message:        msg,
+				AssistantEvent: ai.Event{Type: ai.EventTextDelta, Delta: "hi"},
+				EntryID:        "e1",
+			},
+		},
+		{
+			name: "message_end carries the entry ID",
+			event: agent.EventMessageEnd{
+				Message: msg,
+				EntryID: "e1",
+			},
+			want: `{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"hi"}]},"entry_id":"e1"}`,
+		},
+		{
 			name: "message_end marks an ephemeral message",
 			event: agent.EventMessageEnd{
 				Message:   msg,

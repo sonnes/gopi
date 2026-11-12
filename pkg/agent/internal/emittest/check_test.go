@@ -76,6 +76,32 @@ func TestCheckEventsFails(t *testing.T) {
 			},
 		},
 		{
+			name: "message_end with an entry ID that its start does not have",
+			events: []agent.Event{
+				agent.EventAgentStart{},
+				agent.EventTurnStart{},
+				agent.EventMessageStart{},
+				agent.EventMessageEnd{EntryID: "e1"},
+				agent.EventTurnEnd{},
+				agent.EventAgentEnd{},
+			},
+		},
+		{
+			name: "message_update with another entry ID",
+			events: []agent.Event{
+				agent.EventAgentStart{},
+				agent.EventTurnStart{},
+				agent.EventMessageStart{EntryID: "e1"},
+				agent.EventMessageUpdate{
+					AssistantEvent: ai.Event{Type: ai.EventTextDelta, Delta: "a"},
+					EntryID:        "e2",
+				},
+				agent.EventMessageEnd{EntryID: "e1"},
+				agent.EventTurnEnd{},
+				agent.EventAgentEnd{},
+			},
+		},
+		{
 			name: "agent_end not last",
 			events: []agent.Event{
 				agent.EventAgentStart{},
@@ -102,6 +128,19 @@ func TestCheckEventsUserMessageBetweenTurns(t *testing.T) {
 		agent.EventMessageStart{Message: user},
 		agent.EventMessageEnd{Message: user},
 		agent.EventTurnStart{},
+		agent.EventTurnEnd{},
+		agent.EventAgentEnd{},
+	})
+	assert.False(t, fake.failed)
+}
+
+func TestCheckEventsDroppedMessageHasNoEntryID(t *testing.T) {
+	fake := &failer{TB: t}
+	emittest.CheckEvents(fake, []agent.Event{
+		agent.EventAgentStart{},
+		agent.EventTurnStart{},
+		agent.EventMessageStart{EntryID: "e1"},
+		agent.EventMessageEnd{},
 		agent.EventTurnEnd{},
 		agent.EventAgentEnd{},
 	})

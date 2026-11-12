@@ -31,6 +31,7 @@ flowchart TD
 
 - Each event is one change to the state of the agent. The stream sends the events, also those of tool calls at the same time, in the order that the state applied them, for the reasons in [State](state.md).
 - The log stores each message before its `message_end`, so a consumer that reads a `message_end` knows that the store has the message. An ephemeral message has the `Ephemeral` mark, because the store does not have it.
+- The `message_start`, `message_update`, and `message_end` events of one message carry the ID of its entry. A viewer keys a streamed message by this ID, and the stored entry has the same ID. So the viewer shows one copy of the message. If the log does not keep the message, its `message_end` has no entry ID.
 - The run waits for the consumer only when the stream buffer is full. A consumer that stops reading does not stop the run, and the log still has the messages.
 - The new messages of a turn, with the input of the run, come after its `turn_start` as message events, so a viewer that has only the stream sees every message that the run adds to the history.
 - On every exit, the loop sends the end event of each open scope, then `agent_end` with the error of a failed run. A failed run then fails the stream with the same error.

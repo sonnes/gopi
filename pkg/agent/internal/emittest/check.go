@@ -25,6 +25,10 @@ import (
 //     in a turn. A user or system message that the loop adds between
 //     turns is the exception. A message_update is in an open message and has an
 //     AssistantEvent.
+//   - A message_update has the entry ID of its message_start. A
+//     message_end has it too, or no entry ID if the log does not keep
+//     the message. A message_end with an entry ID has a message_start
+//     with that ID.
 //   - Each tool_execution_start is in a turn, outside a message, and
 //     has one tool_execution_end. Its tool name is not another name of
 //     a well-known tool, so a test of a driver fails if the driver
@@ -48,6 +52,8 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 	var (
 		inTurn bool
 		inMsg  bool
+		// msgID is the entry ID of the open message.
+		msgID  string
 		tools  = map[string]bool{}
 		called = map[string]bool{}
 		subs   = map[string]bool{}
@@ -74,12 +80,18 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 			betweenTurns := ev.Message.Role == ai.RoleUser || ev.Message.Role == ai.RoleSystem
 			assert.True(t, inTurn || betweenTurns, "event %d: message_start outside a turn", i)
 			inMsg = true
+			msgID = ev.EntryID
 		case agent.EventMessageUpdate:
 			assert.True(t, inMsg, "event %d: message_update outside a message", i)
 			assert.NotZero(t, ev.AssistantEvent, "event %d: message_update has a model event", i)
+			assert.Equal(t, msgID, ev.EntryID, "event %d: message_update has the entry ID of its message_start", i)
 		case agent.EventMessageEnd:
 			assert.True(t, inMsg, "event %d: message_end with no message", i)
+			if ev.EntryID != "" {
+				assert.Equal(t, msgID, ev.EntryID, "event %d: message_end has the entry ID of its message_start", i)
+			}
 			inMsg = false
+			msgID = ""
 		case agent.EventToolExecutionStart:
 			assert.True(t, inTurn, "event %d: tool_execution_start outside a turn", i)
 			assert.False(t, inMsg, "event %d: tool_execution_start in a message", i)

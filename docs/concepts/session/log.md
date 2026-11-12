@@ -28,6 +28,7 @@ A log is the live handle on one session. It holds the record of the session, its
 
 - A session is a list of entries. An edit or a retry is a new session that holds the entries that the application keeps.
 - A session has one writer. Two logs on one session interleave their entries, and the result can be a conversation that a provider rejects. A lock across processes belongs to the application that runs them.
+- The log gives an entry its ID at the append, unless the entry has an ID. An agent picks the ID of a message before it streams the message. Then each event of the message carries the ID that the log stores.
 - An ephemeral entry gets an ID and reaches the model in its run, but the store never sees it and the log does not keep it. It is context that is true only now.
 - A custom entry has a kind and JSON data, and no message. The log keeps it in its place among the messages, and `Messages` skips it. An application then stores a fact that it reads back in order, such as the summary of a compaction, and the model never reads it.
 - The log repairs a tool call with no result when it builds the messages. The call is the footprint of a crash, and a provider rejects it. The repair lives in the log because the fact is about the stored entries, not about the loop that reads them.

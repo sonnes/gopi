@@ -12,7 +12,9 @@ import (
 )
 
 // call streams one model response, and emits the message events. The
-// log stores the final message before its message_end. If the stream
+// events carry the ID that the entry of the message gets, so a viewer
+// keys the message by it from message_start. The log stores the final
+// message before its message_end. If the stream
 // fails after it started, call keeps the partial message: see
 // keepPartial.
 func (a *Agent) call(
@@ -40,26 +42,31 @@ func (a *Agent) call(
 	}
 	s := a.lm.StreamText(ctx, r.Messages, r.Options)
 
+	id := session.NewEntryID()
 	started := false
 	inflight := &ai.Message{Role: ai.RoleAssistant}
 	for evt, err := range s.Events() {
 		if err != nil {
-			return a.keepPartial(ctx, inflight, started, err, em)
+			return a.keepPartial(ctx, id, inflight, started, err, em)
 		}
 		partial.Accumulate(inflight, &evt)
 		if !started {
-			em.emit(EventMessageStart{Message: *partial.Snapshot(inflight)})
+			em.emit(EventMessageStart{
+				Message: *partial.Snapshot(inflight),
+				EntryID: id,
+			})
 			started = true
 		}
 		em.emit(EventMessageUpdate{
 			Message:        *partial.Snapshot(inflight),
 			AssistantEvent: evt,
+			EntryID:        id,
 		})
 	}
 
 	final, err := s.Wait()
 	if err != nil {
-		return a.keepPartial(ctx, inflight, started, err, em)
+		return a.keepPartial(ctx, id, inflight, started, err, em)
 	}
 	if final == nil {
 		if started {
@@ -70,7 +77,10 @@ func (a *Agent) call(
 	if !started {
 		// A provider can return a message with no events. The message
 		// still gets its start.
-		em.emit(EventMessageStart{Message: *final})
+		em.emit(EventMessageStart{
+			Message: *final,
+			EntryID: id,
+		})
 	}
 	for _, h := range a.cfg.hooks {
 		ac, ok := h.(AfterCallHook)
@@ -85,17 +95,18 @@ func (a *Agent) call(
 		final = &msg
 	}
 
-	if err := a.endMessage(ctx, em, *final); err != nil {
+	if err := a.endMessage(ctx, em, id, *final); err != nil {
 		return nil, err
 	}
 	return final, nil
 }
 
-// endMessage stores the assistant message m, then sends its message_end. If
-// the store fails, the message_end carries a message with no content,
-// and the run fails.
-func (a *Agent) endMessage(ctx context.Context, em *emitter, m ai.Message) error {
+// endMessage stores the assistant message m in an entry with the ID id,
+// then sends its message_end. If the store fails, the message_end
+// carries a message with no content, and the run fails.
+func (a *Agent) endMessage(ctx context.Context, em *emitter, id string, m ai.Message) error {
 	entry := session.NewEntry(m, session.Author(a.cfg.name))
+	entry.ID = id
 	err := em.commit(ctx, entry, EventMessageEnd{Message: m})
 	if err != nil {
 		em.emit(emptyEnd(m.Usage))
@@ -126,6 +137,7 @@ func emptyEnd(usage ai.Usage) EventMessageEnd {
 // no message.
 func (a *Agent) keepPartial(
 	ctx context.Context,
+	id string,
 	inflight *ai.Message,
 	started bool,
 	cause error,
@@ -146,7 +158,7 @@ func (a *Agent) keepPartial(
 		em.emit(EventMessageEnd{Message: *msg})
 		return nil, cause
 	}
-	if err := a.endMessage(ctx, em, *msg); err != nil {
+	if err := a.endMessage(ctx, em, id, *msg); err != nil {
 		return nil, errors.Join(cause, err)
 	}
 	return msg, cause

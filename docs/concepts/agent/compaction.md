@@ -32,7 +32,7 @@ flowchart TD
 
 - The state keeps the full history, and only the request uses the view. So the sections, the tools, and the search reload read the same system messages after a compaction.
 - An edit names entries by ID, because a message has no ID. An edit addresses ranges and not indexes, so a compaction stays valid when it runs next to later messages.
-- A replacement gets the ID `First.N`, so a later edit can name it. The log sets the ID of an entry at the append, so a replacement ID cannot use the ID of its compaction.
+- A replacement gets the ID `First.N`, so a later edit can name it. The log gives the compaction entry its ID at the append, so a replacement ID cannot use the ID of its compaction.
 - A system message or an ephemeral entry in a range stays after the replacement. The cost: the order of the view differs from the order of the log.
 - `CheckEdits` refuses an edit that breaks a request: a call with no result, a result with no call, or a change to the base. It also refuses a replacement with a thinking block, because a signature is valid only for the original message.
 - An edit changes the prefix of each later turn, so Anthropic drops the thinking of those turns: the provider sends the `drop_block` control, and the request passes. The cost: the model loses that reasoning, and it keeps the text and the tool calls.

@@ -75,6 +75,12 @@ type EventTurnEnd struct {
 // that the loop adds in the middle of a run.
 type EventMessageStart struct {
 	Message ai.Message
+	// EntryID is the ID of the entry that the log stores for the
+	// message. The message_update and message_end events of the
+	// message have the same ID. A viewer can then key the message by
+	// it from the first event. It is empty if the message gets no
+	// entry.
+	EntryID string
 }
 
 // EventMessageUpdate carries one model event and a snapshot of the
@@ -84,6 +90,9 @@ type EventMessageUpdate struct {
 	Message ai.Message
 	// AssistantEvent is the model event behind the update.
 	AssistantEvent ai.Event
+	// EntryID is the ID of the entry of the message, as in
+	// [EventMessageStart].
+	EntryID string
 }
 
 // EventMessageEnd carries the final message. The log stores it before
@@ -96,8 +105,9 @@ type EventMessageEnd struct {
 	// it in this run, and the store does not keep it. [State.Apply]
 	// removes it at agent_end.
 	Ephemeral bool
-	// EntryID is the ID of the entry of the message. An edit of a
-	// compaction names it. It is empty if the message has no entry.
+	// EntryID is the ID of the entry of the message, as in
+	// [EventMessageStart]. An edit of a compaction names it. It is
+	// empty if the message has no entry.
 	EntryID string
 }
 
@@ -214,8 +224,9 @@ type eventJSON struct {
 	// message_update
 	AssistantEvent *ai.Event `json:"assistant_event,omitempty"`
 	// message_end
-	Ephemeral bool   `json:"ephemeral,omitempty"`
-	EntryID   string `json:"entry_id,omitempty"`
+	Ephemeral bool `json:"ephemeral,omitempty"`
+	// message_start, message_update, and message_end
+	EntryID string `json:"entry_id,omitempty"`
 
 	// compaction, with error
 	Compaction *session.Compaction `json:"compaction,omitempty"`
@@ -258,12 +269,17 @@ func marshalEvent(e Event) ([]byte, error) {
 			ToolResults: v.ToolResults,
 		}
 	case EventMessageStart:
-		w = eventJSON{Type: typeMessageStart, Message: &v.Message}
+		w = eventJSON{
+			Type:    typeMessageStart,
+			Message: &v.Message,
+			EntryID: v.EntryID,
+		}
 	case EventMessageUpdate:
 		w = eventJSON{
 			Type:           typeMessageUpdate,
 			Message:        &v.Message,
 			AssistantEvent: &v.AssistantEvent,
+			EntryID:        v.EntryID,
 		}
 	case EventMessageEnd:
 		w = eventJSON{
@@ -347,11 +363,15 @@ func UnmarshalEvent(data []byte) (Event, error) {
 	case typeTurnEnd:
 		return EventTurnEnd{Message: w.Message, ToolResults: w.ToolResults}, nil
 	case typeMessageStart:
-		return EventMessageStart{Message: deref(w.Message)}, nil
+		return EventMessageStart{
+			Message: deref(w.Message),
+			EntryID: w.EntryID,
+		}, nil
 	case typeMessageUpdate:
 		return EventMessageUpdate{
 			Message:        deref(w.Message),
 			AssistantEvent: deref(w.AssistantEvent),
+			EntryID:        w.EntryID,
 		}, nil
 	case typeMessageEnd:
 		return EventMessageEnd{

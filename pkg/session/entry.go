@@ -81,8 +81,8 @@ func Ephemeral() Option {
 	return func(e *Entry) { e.Ephemeral = true }
 }
 
-// NewEntry returns an entry for m with opts applied. The log sets ID
-// and CreatedAt on append.
+// NewEntry returns an entry for m with opts applied. The log sets
+// CreatedAt on append, and the ID if the entry has none.
 func NewEntry(m ai.Message, opts ...Option) Entry {
 	e := Entry{Message: m}
 	for _, opt := range opts {

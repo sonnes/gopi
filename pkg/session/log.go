@@ -262,9 +262,11 @@ func repairToolCalls(entries []Entry, mark int) ([]Entry, int) {
 	return out, moved
 }
 
-// Append sets ID and CreatedAt on each entry, writes the entries to the
-// store, and adds them to the log. It returns every entry with its
-// fields set, in the order given.
+// Append sets CreatedAt on each entry, and an ID on each entry that has
+// none. Then it writes the entries to the store, and adds them to the
+// log. It returns every entry with its fields set, in the order given.
+// A caller that sends the events of a message before its append sets
+// the ID from [NewEntryID], so the events and the entry share the ID.
 //
 // An ephemeral entry gets an ID, and Append returns it, but Append
 // never writes it and the log does not keep it.
@@ -278,7 +280,9 @@ func (l *Log) Append(ctx context.Context, entries ...Entry) ([]Entry, error) {
 	out := make([]Entry, 0, len(entries))
 	stored := make([]Entry, 0, len(entries))
 	for _, e := range entries {
-		e.ID = newEntryID()
+		if e.ID == "" {
+			e.ID = NewEntryID()
+		}
 		e.CreatedAt = now
 		out = append(out, e)
 
@@ -337,8 +341,8 @@ func (l *Log) deleteValue(ctx context.Context, addr address) error {
 	return nil
 }
 
-// newEntryID returns a random hex ID.
-func newEntryID() string {
+// NewEntryID returns a random hex ID for an entry.
+func NewEntryID() string {
 	b := make([]byte, entryIDBytes)
 	if _, err := rand.Read(b); err != nil {
 		panic("session: crypto/rand failed: " + err.Error())

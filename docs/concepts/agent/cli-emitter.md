@@ -15,7 +15,7 @@ The emitter of a [CLI agent](cli-agent.md) turns the output of the CLI into the 
 ## Design
 
 - The emitter keeps the event order of the [loop](loop.md). The input goes in turn 1, the log stores each message before its `message_end`, and every run that starts ends with `agent_end`.
-- A `message_end` has the ID of its entry, and the state of the agent starts from `agent.NewState`, as the loop does. So the state of a CLI agent keeps the entry ID of each message, and an edit of a compaction can name it.
+- Each message event has the ID of the entry of its message, as in the [run stream](run-stream.md). The state of the agent starts from `agent.NewState`, as the loop does. So the state of a CLI agent keeps the entry ID of each message, and an edit of a compaction can name it.
 - A tool call of the CLI becomes a tool call in an assistant message, then a tool result message, so a consumer shows a CLI tool as it shows a gopi tool. If a run fails with a tool call open, the call gets the result of `session.Interrupted`.
 - If a run fails or stops during an assistant message, the log stores the blocks that the CLI completed, because the CLI conversation keeps them. The block in flight is not stored.
 - A file of the input that the CLI does not read becomes a text note, so the model knows that the file was there. The run does not fail, because the text can still answer.

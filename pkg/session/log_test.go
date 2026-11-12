@@ -64,6 +64,22 @@ func TestAppendSetsIDAndTime(t *testing.T) {
 	assert.Equal(t, got, l.Entries())
 }
 
+func TestAppendKeepsAnIDThatIsSet(t *testing.T) {
+	ctx := context.Background()
+	l := session.New()
+	id := session.NewEntryID()
+	set := session.Text("a")
+	set.ID = id
+
+	got, err := l.Append(ctx, set, session.Text("b"))
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+	assert.Equal(t, id, got[0].ID)
+	assert.NotEmpty(t, got[1].ID)
+	assert.NotEqual(t, id, got[1].ID)
+	assert.Equal(t, id, l.Entries()[0].ID)
+}
+
 func TestAppendSkipsEphemeral(t *testing.T) {
 	ctx := context.Background()
 	store := session.NewMemoryStore()

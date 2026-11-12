@@ -341,7 +341,7 @@ func (em *emitter) emit(e Event) {
 }
 
 // commit appends en to the log, then applies events to the state and
-// pushes them. A message_end gets the ID of the entry. If the append
+// pushes them. Each message event gets the ID of the entry. If the append
 // fails, the state and the stream do not change, and commit returns the
 // error. The append ignores the cancellation of ctx, so a run that
 // stops keeps what it finished.
@@ -353,11 +353,7 @@ func (em *emitter) commit(ctx context.Context, en session.Entry, events ...Event
 		return err
 	}
 	for _, e := range events {
-		if end, ok := e.(EventMessageEnd); ok {
-			end.EntryID = stored[0].ID
-			e = end
-		}
-		em.apply(e)
+		em.apply(withEntryID(e, stored[0].ID))
 	}
 	return nil
 }
@@ -383,4 +379,21 @@ func (a *Agent) start(push func(Event)) error {
 	a.mu.Unlock()
 	push(start)
 	return nil
+}
+
+// withEntryID returns ev with the entry ID id if ev is a message event.
+// Any other event comes back as it is.
+func withEntryID(ev Event, id string) Event {
+	switch m := ev.(type) {
+	case EventMessageStart:
+		m.EntryID = id
+		return m
+	case EventMessageUpdate:
+		m.EntryID = id
+		return m
+	case EventMessageEnd:
+		m.EntryID = id
+		return m
+	}
+	return ev
 }

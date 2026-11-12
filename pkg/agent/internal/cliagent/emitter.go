@@ -69,6 +69,9 @@ type Emitter struct {
 	turn []ai.Message
 	// msg is the open assistant message, or nil.
 	msg *ai.Message
+	// msgID is the entry ID of the open assistant message. Its events
+	// carry it before the log stores the message.
+	msgID string
 	// tools holds the open tool calls, by call ID, in start order.
 	tools []toolCall
 	// usage is the sum of the usage of each assistant message that the
@@ -160,6 +163,7 @@ func (e *Emitter) Update(evt ai.Event) {
 	e.emit(agent.EventMessageUpdate{
 		Message:        *partial.Snapshot(e.msg),
 		AssistantEvent: evt,
+		EntryID:        e.msgID,
 	})
 }
 
@@ -185,7 +189,11 @@ func (e *Emitter) Begin() {
 	}
 	e.openTurn()
 	e.msg = &ai.Message{Role: ai.RoleAssistant}
-	e.emit(agent.EventMessageStart{Message: *partial.Snapshot(e.msg)})
+	e.msgID = session.NewEntryID()
+	e.emit(agent.EventMessageStart{
+		Message: *partial.Snapshot(e.msg),
+		EntryID: e.msgID,
+	})
 }
 
 // End stores the final assistant message and sends message_end. If no
@@ -198,6 +206,7 @@ func (e *Emitter) End(ctx context.Context, final ai.Message) error {
 	e.usage = e.usage.Add(final.Usage)
 
 	entry := session.NewEntry(final)
+	entry.ID = e.msgID
 	if err := e.commit(ctx, entry, agent.EventMessageEnd{Message: final}); err != nil {
 		e.emit(emptyEnd(final.Usage))
 		return err
@@ -378,8 +387,8 @@ func (e *Emitter) closeTool(id string) (string, bool) {
 	return "", false
 }
 
-// commit appends en to the log, then sends events. A message_end gets
-// the ID of the entry. If the append fails, no event goes out. The
+// commit appends en to the log, then sends events. Each message event
+// gets the ID of the entry. If the append fails, no event goes out. The
 // append ignores the cancel of ctx, so a run that stops keeps the
 // messages that it finished.
 func (e *Emitter) commit(ctx context.Context, en session.Entry, events ...agent.Event) error {
@@ -388,11 +397,7 @@ func (e *Emitter) commit(ctx context.Context, en session.Entry, events ...agent.
 		return err
 	}
 	for _, ev := range events {
-		if end, ok := ev.(agent.EventMessageEnd); ok {
-			end.EntryID = stored[0].ID
-			ev = end
-		}
-		e.emit(ev)
+		e.emit(withEntryID(ev, stored[0].ID))
 	}
 	return nil
 }
@@ -459,4 +464,21 @@ func appendText(out []ai.Content, t ai.Text) []ai.Content {
 // there.
 func Unread(f ai.File) ai.Text {
 	return ai.Text{Text: "[A file of type " + f.MediaType + " is not sent, because the CLI does not read it.]"}
+}
+
+// withEntryID returns ev with the entry ID id if ev is a message event.
+// Any other event comes back as it is.
+func withEntryID(ev agent.Event, id string) agent.Event {
+	switch m := ev.(type) {
+	case agent.EventMessageStart:
+		m.EntryID = id
+		return m
+	case agent.EventMessageUpdate:
+		m.EntryID = id
+		return m
+	case agent.EventMessageEnd:
+		m.EntryID = id
+		return m
+	}
+	return ev
 }
