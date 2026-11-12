@@ -1,267 +1,391 @@
 httprr trace v1
-938 6506
+931 9150
 POST https://api.openai.com/v1/responses HTTP/1.1
 Host: api.openai.com
 User-Agent: Go-http-client/1.1
-Content-Length: 778
+Content-Length: 771
 Content-Type: application/json
 
-{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"name":"calculate","description":"Evaluate a mathematical expression","type":"function"}],"stream":true}HTTP/2.0 200 OK
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"input_text"}],"role":"user"}],"model":"gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"name":"calculate","description":"Evaluate a mathematical expression","type":"function"}],"stream":true}HTTP/2.0 200 OK
 Connection: close
-Access-Control-Allow-Origin: *
-Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
-Cache-Control: no-cache
-Cf-Ray: a46d12dd5df33d3f-BOM
-Content-Type: text/event-stream
-Date: Wed, 07 Oct 2026 12:57:49 GMT
-Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
-Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Access-Control-Expose-Headers: X-Request-ID, Server-Timing-Total, X-OpenAI-Inference-Capacity-Reason
+Access-Control-Expose-Headers: CF-Ray
+Access-Control-Expose-Headers: CF-Ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a5943b16589e9a93-NAG
+Content-Type: text/event-stream; charset=utf-8
+Date: Thu, 12 Nov 2026 08:40:15 GMT
+Openai-Organization: user-bp7f0qzkncp68hzpwpb4otcv
+Openai-Processing-Ms: 227
+Openai-Project: proj_UXSHGFQCxfsKEg3ybcA8IwM5
+Openai-Version: 2020-10-01
 Server: cloudflare
-Set-Cookie: __cf_bm=ERteio6g4_pI8imJha7oyocGVYiK6iF7SFV9ueE.988-1791377868.3754282-1.0.1.1-5L.YhOR.KlXY4S7VCgACpdWO6slOJjm3tSxs5c.2VXHH6kzqRMOZ81HncfG3ItxzIfq.dvXIPRgiX8u5gCud1l3b9IBDPDujAyqtOlvOz18gDIC3CWNLB4AdlY9xxTRR; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:49 GMT
+Set-Cookie: __cf_bm=RLv1qf62DdoWRn9XyAPt6s.LRSMDVc__7AbMO3x9Cbs-1794472815.1011052-1.0.1.1-lKo_SDGjeil2nCkGZGe6.97o5JfAP2nE9WtCD87JLXKYzYMzKedlcr_kdlFG1ssBySq.aUE5_XVw3Az7y5nkS62Nicb8INahVBBcmrYdfkN0iJpkD9uzRPm5XKD5.HIo; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=api.openai.com; Expires=Thu, 12 Nov 2026 09:10:15 GMT
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
-X-Generation-Id: gen-1791377868-d8pqjXoVOrHzqbeit8oH
+X-Ratelimit-Limit-Requests: 5000
+X-Ratelimit-Limit-Tokens: 2000000
+X-Ratelimit-Remaining-Requests: 4999
+X-Ratelimit-Remaining-Tokens: 1999486
+X-Ratelimit-Reset-Requests: 12ms
+X-Ratelimit-Reset-Tokens: 15ms
+X-Request-Id: req_fd6112dd0d054361a0cc97aaec904eca
 
-data: {"type":"response.created","response":{"id":"gen-1791377868-d8pqjXoVOrHzqbeit8oH","object":"response","created_at":1791377868,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_04e0cc5fe32288b5016af57b6f3ad887d2a37d23d97a72106d","object":"response","created_at":1794472815,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
 
-data: {"type":"response.in_progress","response":{"id":"gen-1791377868-d8pqjXoVOrHzqbeit8oH","object":"response","created_at":1791377868,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_04e0cc5fe32288b5016af57b6f3ad887d2a37d23d97a72106d","object":"response","created_at":1794472815,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
 
-data: {"type":"response.output_item.added","output_index":0,"item":{"id":"fc_tmp_ucysg6q7y0o","type":"function_call","status":"in_progress","call_id":"call_SZhE0hJeXZuroWzImNxma8O1","name":"calculate","arguments":""},"sequence_number":2}
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","type":"function_call","status":"in_progress","arguments":"","call_id":"call_wOxpXtvgjhIvwB9MESC92Eni","name":"calculate"},"output_index":0,"sequence_number":2}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"{\"","sequence_number":3}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"{\"","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"PrBKJVSkWUvX44","output_index":0,"sequence_number":3}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"expression","sequence_number":4}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"expression","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"69yEuq","output_index":0,"sequence_number":4}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"\":\"","sequence_number":5}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"\":\"","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"DsihqzJ6kvv9O","output_index":0,"sequence_number":5}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"25","sequence_number":6}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"25","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"4JgcbjR6in6KDO","output_index":0,"sequence_number":6}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":" *","sequence_number":7}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"*","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"UMDf12lrwY6TVml","output_index":0,"sequence_number":7}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":" ","sequence_number":8}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"18","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"07lYk6Yok4qpA5","output_index":0,"sequence_number":8}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"18","sequence_number":9}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"\"}","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","obfuscation":"A1fY8sKfx39Krp","output_index":0,"sequence_number":9}
 
-data: {"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","delta":"\"}","sequence_number":10}
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","arguments":"{\"expression\":\"25*18\"}","item_id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","output_index":0,"sequence_number":10}
 
-data: {"type":"response.function_call_arguments.done","output_index":0,"item_id":"fc_tmp_ucysg6q7y0o","name":"calculate","arguments":"{\"expression\":\"25 * 18\"}","sequence_number":11}
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","type":"function_call","status":"completed","arguments":"{\"expression\":\"25*18\"}","call_id":"call_wOxpXtvgjhIvwB9MESC92Eni","name":"calculate"},"output_index":0,"sequence_number":11}
 
-data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_tmp_ucysg6q7y0o","type":"function_call","status":"completed","call_id":"call_SZhE0hJeXZuroWzImNxma8O1","name":"calculate","arguments":"{\"expression\":\"25 * 18\"}"},"sequence_number":12}
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_04e0cc5fe32288b5016af57b6f3ad887d2a37d23d97a72106d","object":"response","created_at":1794472815,"status":"completed","access_programs":null,"background":false,"completed_at":1794472815,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[{"id":"fc_04e0cc5fe32288b5016af57b6fe0a887d290299b79814ccff7","type":"function_call","status":"completed","arguments":"{\"expression\":\"25*18\"}","call_id":"call_wOxpXtvgjhIvwB9MESC92Eni","name":"calculate"}],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"default","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":{"input_tokens":79,"input_tokens_details":{"cache_write_tokens":0,"cache_write_tokens_details":{"ttl_12h_tokens":0,"ttl_30m_tokens":0},"cached_tokens":0},"output_tokens":19,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":98},"user":null,"metadata":{}},"sequence_number":12}
 
-data: {"type":"response.completed","response":{"id":"gen-1791377868-d8pqjXoVOrHzqbeit8oH","object":"response","created_at":1791377868,"model":"openai/gpt-6-luna","status":"completed","completed_at":1791377869,"output":[{"id":"fc_tmp_ucysg6q7y0o","type":"function_call","status":"completed","call_id":"call_SZhE0hJeXZuroWzImNxma8O1","name":"calculate","arguments":"{\"expression\":\"25 * 18\"}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"detailed","context":"all_turns","effort":"medium","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":79,"input_tokens_details":{"cached_tokens":0},"output_tokens":20,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":99,"cost":0.0000179,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000179,"upstream_inference_input_cost":0.0000079,"upstream_inference_output_cost":0.00001}}},"sequence_number":13}
-
-data: [DONE]
-
-1269 27631
+1260 38096
 POST https://api.openai.com/v1/responses HTTP/1.1
 Host: api.openai.com
 User-Agent: Go-http-client/1.1
-Content-Length: 1108
+Content-Length: 1099
 Content-Type: application/json
 
-{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"input_text"}],"role":"user"},{"arguments":"{\"expression\":\"25 * 18\"}","call_id":"call_SZhE0hJeXZuroWzImNxma8O1","name":"calculate","type":"function_call"},{"output":"No result provided","call_id":"call_SZhE0hJeXZuroWzImNxma8O1","type":"function_call_output"},{"content":[{"text":"Never mind, just tell me what is 2+2?","type":"input_text"}],"role":"user"}],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"name":"calculate","description":"Evaluate a mathematical expression","type":"function"}],"stream":true}HTTP/2.0 200 OK
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"input":[{"content":[{"text":"You are a helpful assistant. Use the calculate tool when asked to perform calculations.","prompt_cache_breakpoint":{"mode":"explicit"},"type":"input_text"}],"role":"developer"},{"content":[{"text":"Please calculate 25 * 18 using the calculate tool.","type":"input_text"}],"role":"user"},{"arguments":"{\"expression\":\"25*18\"}","call_id":"call_wOxpXtvgjhIvwB9MESC92Eni","name":"calculate","type":"function_call"},{"output":"No result provided","call_id":"call_wOxpXtvgjhIvwB9MESC92Eni","type":"function_call_output"},{"content":[{"text":"Never mind, just tell me what is 2+2?","type":"input_text"}],"role":"user"}],"model":"gpt-6-luna","reasoning":{"summary":"auto"},"tools":[{"strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"name":"calculate","description":"Evaluate a mathematical expression","type":"function"}],"stream":true}HTTP/2.0 200 OK
 Connection: close
-Access-Control-Allow-Origin: *
-Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
-Cache-Control: no-cache
-Cf-Ray: a46d12e56bf73d3f-BOM
-Content-Type: text/event-stream
-Date: Wed, 07 Oct 2026 12:57:50 GMT
-Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
-Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Access-Control-Expose-Headers: X-Request-ID, Server-Timing-Total, X-OpenAI-Inference-Capacity-Reason
+Access-Control-Expose-Headers: CF-Ray
+Access-Control-Expose-Headers: CF-Ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a5943b1e4ae99a93-NAG
+Content-Type: text/event-stream; charset=utf-8
+Date: Thu, 12 Nov 2026 08:40:16 GMT
+Openai-Organization: user-bp7f0qzkncp68hzpwpb4otcv
+Openai-Processing-Ms: 234
+Openai-Project: proj_UXSHGFQCxfsKEg3ybcA8IwM5
+Openai-Version: 2020-10-01
 Server: cloudflare
-Set-Cookie: __cf_bm=SX1_WwQ_XZCEFDNn9C76JPp5YEJHCJcZ1uAOAiEgTis-1791377869.6720607-1.0.1.1-RWZRxDcukqhpXoA9WnkrUq4t.5f.zhpZNmq_BQk.Q70L6yrtmUfSE5sS5lLlZ1Kjo2mi3LC1jvU.X2RvUU.u2E.EKvRWjMoYzVHhINDiO_ZV80fB9JAL2kOBctsTTNO2; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:50 GMT
+Set-Cookie: __cf_bm=RBKyPGK674_zrXnHCFlNvbaNaJkwZLbNYG2Zs52j9no-1794472816.3728297-1.0.1.1-q0zz0.r3zDKovlYhgW6Fr99Cg5GtNdZbbfPhwxBrmpkqRwPLCUJHvxLrJJQdmwtZAEf_kgiNKMNP.oGAs9DdVT_QvkreYvYq8u23ANpbbDBGOssxlMvvVCvLIPk82H92; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=api.openai.com; Expires=Thu, 12 Nov 2026 09:10:16 GMT
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
-X-Generation-Id: gen-1791377869-MONGEe4J32g5ORJPvW3q
+X-Ratelimit-Limit-Requests: 5000
+X-Ratelimit-Limit-Tokens: 2000000
+X-Ratelimit-Remaining-Requests: 4999
+X-Ratelimit-Remaining-Tokens: 1999437
+X-Ratelimit-Reset-Requests: 12ms
+X-Ratelimit-Reset-Tokens: 16ms
+X-Request-Id: req_bb1f1e9c2a374601ace7d2f91d78616c
 
-data: {"type":"response.created","response":{"id":"gen-1791377869-MONGEe4J32g5ORJPvW3q","object":"response","created_at":1791377869,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":0}
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_005143d38d637dd9016af57b708d2087d29b7d7ff2f13413e8","object":"response","created_at":1794472816,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":0}
 
-data: {"type":"response.in_progress","response":{"id":"gen-1791377869-MONGEe4J32g5ORJPvW3q","object":"response","created_at":1791377869,"model":"openai/gpt-6-luna","status":"in_progress","completed_at":null,"output":[],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"auto","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"auto"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":null},"sequence_number":1}
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_005143d38d637dd9016af57b708d2087d29b7d7ff2f13413e8","object":"response","created_at":1794472816,"status":"in_progress","access_programs":null,"background":false,"completed_at":null,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"auto","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":null,"user":null,"metadata":{}},"sequence_number":1}
 
-data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","type":"reasoning","status":"in_progress","summary":[]},"sequence_number":2}
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","type":"reasoning","content":[],"encrypted_content":"gAAAAABq9XtxaxCF3kbQ-0uaMsZqrV40BzrkZ5N3Zjj12Ki_teXwWN_kyYx-RIbT3OQP7SzDf-SPgrZ6pm2lR9_N_-p4DJXU_XyHy_DWekW-SldNFs0ogRruYWvFzXBEqM7b_93PxBFey00qR3f0G2WzMCQq_mwI1PsU2fJ_dkbXAHYHUVJBaZiroeWuvti_lHzy2pF5_jKsCbhEVQfpMKiG6-wJ-0xaVudVcOuOEePlkMuf33FuQ9792iuZj1Xz10BL3n6OQ0nDLDLTvxa51-FLrwlpd-5zUUdsCF272ngIZ__1PAOyeVWPJacp7fGONJ7k-h3_OUJrR97ytBlNrH1A-H7-nJvbwg5d0x-fr2TySP0NsVN4vEiungWS9fHqJfE8zkLl42srgJggxPRKL321sS32sdtS2zfbMneLMo6hpXbUhvjcxl74gEERa7uSO8lCD0hRxIDCGn3XdX1FYt39labtphcArlvPBNUmBJ54zH7PrEQhoIcCIgtfKlMQ54XEGiz-iRjsNcGXMCr3uwavnrkT9E58T4XlxDonTX1YdBzmsJe3LdSHxdcgrLtcB21bZ7dlZNOEfX7TZkriOvx4RnUPSQB-5aSkw5ZKiqYf_XXHX_kCjqcNRPExYQ1IfAwjUgVSnKVXqMcB_QF9kbq2KCBQ-0H1K6TvoBhCMoNAprhnGv9U3VwAeLg4eN49Ft-LiEHL_LuglgnC9SwxVVvfxdA9y4WW1mHoqqIfwA0E5ePm8yn948C_gVMsN05r0MCDMQOTfmBfk3i06YnsUX4A4349hgmOwX-Fr9xnDFiAKWey9bvHca3GB16bATugbRxyhEeDnNaLxlvhij5cENWzIiQBM_XltQib34Lbg6CWuRowy9hhf9qSX_yDwUd_W6mlsMUKuu4XyVUJqIHPiu8LmCl7shyx2-mVZUsKYqpPqcPxsJUMrLlECKLYiEMNd10e04vS0Z7hpeDXoygucsEOYiEqdinH2rdA67jGWDhhRcoPx6BPr9a4aGOGicBEr2UEknFB9hawPURxHB4fz1mA9d_1HTEsuI8PNeQ2J8EW3yengpx1hv42nJU3OXMrK1eD8gb03r3X1wuHKPFmCgUi25dOx_l4Tm3BGIeYx53bKZhQpX7BzAdkB4itvLGjX-xuyTeFfXF3cCxnurv3uain7gIc1XfccPbtnWc_Cumb0zuKW1AEQ7EXOp7UKO634yW-V0ue2UYLAHYFNIE8utJagl_YpIrRLVgfp4yIG-JAOf05PgnFhw3Hpj8nkJ-U8_Q_cpK_t-8gveiFVBDlT1ctv97ZWMQ7Jikgnbpj0HOt-VObR9loeoP8KktpDa9jAWcpB7TI-xBn82G3cw8MlegEe5ItHCff0jq6ZHW5KXr9sSf2rGLPGqw=","summary":[]},"output_index":0,"sequence_number":2}
 
-data: {"type":"response.reasoning_summary_part.added","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"part":{"type":"summary_text","text":""},"sequence_number":3}
+event: response.reasoning_summary_part.added
+data: {"type":"response.reasoning_summary_part.added","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","output_index":0,"part":{"type":"summary_text","text":""},"sequence_number":3,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"**Considering calculation methods**\n\nI","sequence_number":4}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"**Using calculation tool**\n\nI","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"DdE","output_index":0,"sequence_number":4,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"’m","sequence_number":5}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" see","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"gtoIOWBGeO6g","output_index":0,"sequence_number":5,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" thinking","sequence_number":6}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" it","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"mprK8ohwTb2OM","output_index":0,"sequence_number":6,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" about","sequence_number":7}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" needs","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"tRJoxd7s9v","output_index":0,"sequence_number":7,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" how","sequence_number":8}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" a","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"CAMNi7ga8v2KFu","output_index":0,"sequence_number":8,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" to","sequence_number":9}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" simple","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"BCKTVdM8l","output_index":0,"sequence_number":9,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" approach","sequence_number":10}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" answer","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"jdXdDro07","output_index":0,"sequence_number":10,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" this","sequence_number":11}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":",","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"M8gPHau15hsmAPL","output_index":0,"sequence_number":11,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" arithmetic","sequence_number":12}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" but","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"vvtM3aIM6DBl","output_index":0,"sequence_number":12,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" question","sequence_number":13}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"1DAx1caTeuwzwe","output_index":0,"sequence_number":13,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":".","sequence_number":14}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" must","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"ZO4RMoZQqMP","output_index":0,"sequence_number":14,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" Do","sequence_number":15}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" remember","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"YIxYN9G","output_index":0,"sequence_number":15,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" I","sequence_number":16}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" that","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"dI9AugptQhE","output_index":0,"sequence_number":16,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" really","sequence_number":17}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" the","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"CKQWMRWcaKTD","output_index":0,"sequence_number":17,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" need","sequence_number":18}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" developer","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"BAi1i3","output_index":0,"sequence_number":18,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" a","sequence_number":19}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" specified","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"JiQfs5","output_index":0,"sequence_number":19,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" tool","sequence_number":20}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"D0tfYxpjavPcf1","output_index":0,"sequence_number":20,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" for","sequence_number":21}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" should","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"VAi919bdt","output_index":0,"sequence_number":21,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" something","sequence_number":22}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" use","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"07ID7hLK5aDp","output_index":0,"sequence_number":22,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" simple","sequence_number":23}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" the","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"ZWdeGc6BWDNS","output_index":0,"sequence_number":23,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" like","sequence_number":24}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" calculation","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"AXyV","output_index":0,"sequence_number":24,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" 2","sequence_number":25}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" tool","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"IbGDGNUvfTJ","output_index":0,"sequence_number":25,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"+","sequence_number":26}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" whenever","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"zI778Ks","output_index":0,"sequence_number":26,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"2","sequence_number":27}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" calculations","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Esy","output_index":0,"sequence_number":27,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"?","sequence_number":28}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" are","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"B68Rd0Oz33RT","output_index":0,"sequence_number":28,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" I","sequence_number":29}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" involved","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"EYbACww","output_index":0,"sequence_number":29,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" realize","sequence_number":30}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":".","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"FPt5s1ctgn8ZKOI","output_index":0,"sequence_number":30,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" the","sequence_number":31}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" Since","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Yew4j8UwGH","output_index":0,"sequence_number":31,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" developer","sequence_number":32}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" this","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"dV6gjoys329","output_index":0,"sequence_number":32,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" suggests","sequence_number":33}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" is","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"s1M0dhh5A0lPy","output_index":0,"sequence_number":33,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" using","sequence_number":34}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" a","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"9CRqvl9nO5UAZq","output_index":0,"sequence_number":34,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" the","sequence_number":35}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" calculation","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"UNeR","output_index":0,"sequence_number":35,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" calculate","sequence_number":36}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":",","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"cGOzyStlmzjf19d","output_index":0,"sequence_number":36,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" tool","sequence_number":37}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" it","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Za2CpyQwgjHRN","output_index":0,"sequence_number":37,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" whenever","sequence_number":38}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" makes","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"wuJwEfpIgQ","output_index":0,"sequence_number":38,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" there","sequence_number":39}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" sense","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"z67mBFsq17","output_index":0,"sequence_number":39,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"’s","sequence_number":40}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" that","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"CWxJDSDW8yv","output_index":0,"sequence_number":40,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" a","sequence_number":41}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"dKJ6skwX3cTb7j","output_index":0,"sequence_number":41,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" request","sequence_number":42}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" should","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"3ay10pM5z","output_index":0,"sequence_number":42,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" for","sequence_number":43}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" go","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"utzmgXu0iTP3C","output_index":0,"sequence_number":43,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" calculations","sequence_number":44}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" ahead","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"kvZrJ6idkw","output_index":0,"sequence_number":44,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":".","sequence_number":45}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" and","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Igj17mhrQCaP","output_index":0,"sequence_number":45,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" So","sequence_number":46}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" utilize","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"4DRqSVPj","output_index":0,"sequence_number":46,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":",","sequence_number":47}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" that","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"YmaezPBdrD6","output_index":0,"sequence_number":47,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" I","sequence_number":48}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" tool","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"0qjFe5WSGbr","output_index":0,"sequence_number":48,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" guess","sequence_number":49}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":".","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"t4HLFLvYQwKC4EW","output_index":0,"sequence_number":49,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" I'll","sequence_number":50}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" It","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"HtVlxToMfGCyN","output_index":0,"sequence_number":50,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" go","sequence_number":51}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"’s","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"nPyDafau86fRtO","output_index":0,"sequence_number":51,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" ahead","sequence_number":52}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" clear","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Pi8y50SsDe","output_index":0,"sequence_number":52,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" and","sequence_number":53}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"TaeLR7y6WakVbg","output_index":0,"sequence_number":53,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" use","sequence_number":54}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" just","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"PFuK56DgW95","output_index":0,"sequence_number":54,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" it","sequence_number":55}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" need","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"3KevcszGbEY","output_index":0,"sequence_number":55,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" for","sequence_number":56}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" to","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"O6phKjCLX3XI6","output_index":0,"sequence_number":56,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" this","sequence_number":57}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" stick","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"kxFp7Ug7QC","output_index":0,"sequence_number":57,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" one","sequence_number":58}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" to","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"VZIhkOOBHPpdX","output_index":0,"sequence_number":58,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":",","sequence_number":59}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" the","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"tUXFrCOqvuZL","output_index":0,"sequence_number":59,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" even","sequence_number":60}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" guidelines","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"UvOjY","output_index":0,"sequence_number":60,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" if","sequence_number":61}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" and","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"9TYf5OC0zIzq","output_index":0,"sequence_number":61,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" it","sequence_number":62}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" follow","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"iw1pe1I10","output_index":0,"sequence_number":62,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" seems","sequence_number":63}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" the","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"XEiteqf19e1B","output_index":0,"sequence_number":63,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" straightforward","sequence_number":64}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" right","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"qe4IPzIw03","output_index":0,"sequence_number":64,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":".","sequence_number":65}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" approach","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"QiMfkgu","output_index":0,"sequence_number":65,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" It's","sequence_number":66}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":",","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"DYw4vvnBXXVYlAN","output_index":0,"sequence_number":66,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" probably","sequence_number":67}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" so","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"ihnBGv6NXBsnr","output_index":0,"sequence_number":67,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" better","sequence_number":68}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"OA6nmtxVSM2Wns","output_index":0,"sequence_number":68,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" to","sequence_number":69}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" don","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Z0uUXpGk2bnY","output_index":0,"sequence_number":69,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" stick","sequence_number":70}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"’t","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"IHmOEetJuuRD6D","output_index":0,"sequence_number":70,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" with","sequence_number":71}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" over","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"W5AYJHZHUKv","output_index":0,"sequence_number":71,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" the","sequence_number":72}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"think","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"lqLtOKu6ETI","output_index":0,"sequence_number":72,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" guidelines","sequence_number":73}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" it","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"wqwerw9VGqSXj","output_index":0,"sequence_number":73,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" and","sequence_number":74}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":".","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"tP3ypsYRGY82E7P","output_index":0,"sequence_number":74,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" ensure","sequence_number":75}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" I","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"Ftj3F7y8J4OudB","output_index":0,"sequence_number":75,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" everything","sequence_number":76}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"’ll","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"tTUWSQMGNds5s","output_index":0,"sequence_number":76,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"’s","sequence_number":77}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" get","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"nbKVZJFbjhxh","output_index":0,"sequence_number":77,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" handled","sequence_number":78}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" to","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"J1zbTOCpMUEh2","output_index":0,"sequence_number":78,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":" correctly","sequence_number":79}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":" it","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"jHvwsd8SMIlm2","output_index":0,"sequence_number":79,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"delta":"!","sequence_number":80}
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"!","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","obfuscation":"QeQuypVpRhxLqWO","output_index":0,"sequence_number":80,"summary_index":0}
 
-data: {"type":"response.reasoning_summary_text.done","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"text":"**Considering calculation methods**\n\nI’m thinking about how to approach this arithmetic question. Do I really need a tool for something simple like 2+2? I realize the developer suggests using the calculate tool whenever there’s a request for calculations. So, I guess I'll go ahead and use it for this one, even if it seems straightforward. It's probably better to stick with the guidelines and ensure everything’s handled correctly!","sequence_number":81}
+event: response.reasoning_summary_text.done
+data: {"type":"response.reasoning_summary_text.done","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","output_index":0,"sequence_number":81,"summary_index":0,"text":"**Using calculation tool**\n\nI see it needs a simple answer, but I must remember that the developer specified I should use the calculation tool whenever calculations are involved. Since this is a calculation, it makes sense that I should go ahead and utilize that tool. It’s clear I just need to stick to the guidelines and follow the right approach, so I don’t overthink it. I’ll get to it!"}
 
-data: {"type":"response.reasoning_summary_part.done","output_index":0,"item_id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","summary_index":0,"part":{"type":"summary_text","text":"**Considering calculation methods**\n\nI’m thinking about how to approach this arithmetic question. Do I really need a tool for something simple like 2+2? I realize the developer suggests using the calculate tool whenever there’s a request for calculations. So, I guess I'll go ahead and use it for this one, even if it seems straightforward. It's probably better to stick with the guidelines and ensure everything’s handled correctly!"},"sequence_number":82}
+event: response.reasoning_summary_part.done
+data: {"type":"response.reasoning_summary_part.done","item_id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","output_index":0,"part":{"type":"summary_text","text":"**Using calculation tool**\n\nI see it needs a simple answer, but I must remember that the developer specified I should use the calculation tool whenever calculations are involved. Since this is a calculation, it makes sense that I should go ahead and utilize that tool. It’s clear I just need to stick to the guidelines and follow the right approach, so I don’t overthink it. I’ll get to it!"},"sequence_number":82,"summary_index":0}
 
-data: {"type":"response.output_item.done","output_index":0,"item":{"id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"**Considering calculation methods**\n\nI’m thinking about how to approach this arithmetic question. Do I really need a tool for something simple like 2+2? I realize the developer suggests using the calculate tool whenever there’s a request for calculations. So, I guess I'll go ahead and use it for this one, even if it seems straightforward. It's probably better to stick with the guidelines and ensure everything’s handled correctly!"}],"encrypted_content":"gAAAAABqxkHPGKk_ubcF-Zs220HoO1CtuwmoR9uY8iz7anlGL-oYHCs7ft6RQfuPN8DvOJJ4KwMVCk_D3hFZXXcc4nZZt4WwZXdSVIYSdn1SZdhJ576NKpGkptDgF5L9a4mVpVdiUBAWYBFaXBi_TYUC5qboXh4nweJU4gdEZvD9UkTx2OkmK31PVRHKfu_ooVRXb-DeWf6lcOc3_OsyuOP1RWMjwtenKKHdF0gAGLbNEmvqv8lT0XtaREbgRrjoe-PUxZzNPCq7ZM1RhWNNbGS3LFB1UGUj3y3-490FGAv07IQnO1MIWbj-g4MNgq6f-I5u9e6nzIGHjah2u1U3maDbxRWEseknBJ302HTLu5NwW86fvzMj6H9C4Vj7693q1Kq91bZpGiv1Rwt3kkCfVVS3n8bFWL_qx7AmiP1Dh-9dvnFjva9c_iYKTHvHfBNJSvXixiGQKtP1GCO98XJo3D4sYaUqXA_a6-4peu57LWVKO6y9bqjYlmOXJwVDjFyftLuPulAOE8js701MHJyGqJud1BgliD36q7MAmj7ATI6Eotw5fdeTIF5MgYDJDGjS77EuFYHagJsYrlC_UlO_1dFOj5Z6TqF9GXKaPOrBM3z1XpZlsPkGPhOeq9mrhj87bLPQhwERkUqcue0B96uof9zxzmu97BRsNHCcIDvQM-FbwuMPn1LunH5AONC5j8jsVfBhqpalJyPPsmeERabMFfgiebowFLEY4pk0Add9H3T7DkIi59lxJEeXStihFa-ZL0WkwZdR-WcPLAJ4tqAt7nHJbFfIkT83CAtLQ68YCRZPjQnugU1GXn2lsEfFJqpU2ICMjnYK3C6hqY0-AoF3gmILp4mpZ4_Oe6m4OadX1DPP-Ez2PpLZCGxChpvU7qs00jkWhDZOHTRrjrg7EmaoHTLT2NOLincM4JVe4_e1edBxGoyDcNqKxyprTjOKVmfzxyrku8McBbxfE4ZiU3oeUlVz2dto1wFTVTcUM-OugyRUm6AIpUtuwaamrKjHYKTC5oLmwitAOSy_SAXiNnbMSAw3XKA8rhOgHBirGTJdEBiNmoLqCz5FKAWzhuHnQbC9YK-HlF7VfSIlAGEYa_47EKNc3g1nE40DVcPr9xz9-8otqxRlUdgSuc3KLKUuob4G1QFIx4LVKkvXlT1UhDcwFaRwPN0k3eFmwhXHn2DacT7a2ILPeBvO1y0YixDFydhfbKhYTUDMceiTmKDgO8qv-iG57ObiItBN2pwVC6gf7gLXK0xuMpI9NPTckPTg8shddPw7ok3y_SiREJxqAegNI3Vgea8VI-qKw71FuDKqBU401y8j6wFIQtEFw3VrEUqSdTvF9koPFb-UK1OmS1z8_jIJf_2oL7D-Lb3rO3QM-vspJsU0d6oCSppJZS4iGJ0Uy5toZJqGKbIbgUnWFddjcstP6wyWNsquwiiyt_cp1XKkPLay-POd-Zu2OWY_6HM4UgkzzoDPnevpSG-l35FwwTaG-FC6H-FX8jcavbRQqiIpF2hly6xPSds=.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1"},"sequence_number":83}
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","type":"reasoning","content":[],"encrypted_content":"gAAAAABq9XtyQFrOHVTquJW5z_vrwRAizCDg8eW5WwS22cuiPhDqAF8p1cIYWoW8A__oclvdeD6Fk8vnFiPYoyO45wlsPckZQkjcZQTfGDujJiqEXYmCENpc-wPyahINUEn2Simalh09lQjJG2E_nOdi3J-dHZsZJI7QuSPo0fujtLKIXHGhdwzKQXWxrieT41LFEUutFF_Sum4siufQ5GldfCPF0hZZTlmvYYuJkk2PBORybUS-0r2L_ZPARkrWLEIp0g_PrreRBMy3y259qcDtKoFYGVWB3Kn0qLNYYXufH8Oibtrq8N6e7VdxebIUT9pzvid3IuZyDefVjdkeGxnoLxDuws0QeQ1jakLj7SMNfG3UiVs1RTPOUUbXwgY6Rt7KgmkR7AGNaaxzv8iCkb984ttbZK965MEUww8NZhr0Zon7lwSQH1yEyxHCqUOaLslBSTdZX2yBs1Ybk66X8xezE2IjWvfwL1dW-OgvX1gnr_lvtaY-TpkSrF2fRvbjkEUR0j-6K1VkaDPNZ2Q6Qi3BOMluPmbCrtuTq2aexywq-UD6n0THlnotB6UBuUrtX46KOA4M5LoyopmgV_UYlXSj9hO7odyn-HSojVb8_h_WH9qWGPXfLjYoa1g2gUg2smsr4ftiwopcbT1-pY_LoIcnB053yO_b33MBQF77Oj_nMtv4jefk8Ae6iAK9qCdd5khta7ap_9dEZxkawt8D5RaE0tDSlfuoA1ShS_0IQQjIFhv8A-NJXXwVAQ1CntY_lrfKuFCStXRAy1zsvWhcBz99G-Gsm8olJX8piOHaBwfwPtcXlPmLaCiCcHwgR1HYDGZirsvOnqLjDFmcNAsOUKR2zKXwluyVckT_p_xooJDUClJ5w7payEtAsufbMC5GMNaWlq3lhq14R-TogVJu0umr9RHIZ6g3K1bfnrrqCOOUkoZ3b32UWGh2ZDFgqYgVZzsDoBzUhfvz0rlr0SX9AMNDvbBZCRvAa5R_Q2OE92P73m2BSb2zAmWn3uRespOwbnjCW2cxoRR0hD4pxLWL5fVQHtwY-UnWsvG5dBbRwRC6Z0vDIqSBVbHtDmcJZxP7yltwsBOwT0t1lz0neDKD1Ofups7BDm6KtEKGWNVRILe-xhkKZoQ3UvCoOTIKlXG6iy9i0f2t24qGURstJO9_Sjq5QLyb0UAJK5X8dwVOFE0R1YlUgYhm1vTAqKPemQY2Wv3UyYmF22MAMF_fUwThanQtuPM8Q4NUorhjCx5W2STDGd9ipOsPEykvnz1LSqbU-Russ60Bbo2xTNm4BsmGQ3hD9-Bb7yALYQXFs-Q5kqieCxIoxwXb62zdbIYu5X5IGpSk6zbi8wH43f45OzDH5ORF0Lp595yec6NiQ0QsggEk6B6DYU0FTEUCz41bawP7qT-dXv50FZPbwLXAynFxXNv19Onrj8qN_JqL5AF4PyfEnq4psqJ8LhJfEux8-gdcspIKjrcHwa9yJHhVY-6CMcin72fyVph-hbm5VtfgkKCkPn6pVFJ045nYsF9LTLepUPDBNBQuhpbCuGEev1Ou0Gr_JEKYDdhqvjWTAO6qun3L-uJz8-opnE3r_oWnWn-O2euqeb-e0YWlnJ6SbJlAhqybpheKMnnyitfu_kNtg2U6b6I45p8965aFLKJLwwDcTR2C2dO8s0_Pst7aFqVMPoTHvSiYUdF65heKwR2VcrCmvQpzgo5U_ukhpve0gr13s_o429VabM_Sx4e3xNvFRbSUQohdTkWLCMK7GDzDyyewz0UziKCWXRjlppVqEPtPVi1lBmtOqJPIPZ4gxpLWZ42AN9yvTGT-hg17lT5ph3Ayem9sTo7jUr8Zk5FbAsH88iFuAVZc9t0yR7xu2dECma4jcAYYNLWx1hCRnRntiKC4LO773J84noCPkh0jt6TTwO8eUy2fVIT8k1cpWrp1MtFww5E5dLt29w==","summary":[{"type":"summary_text","text":"**Using calculation tool**\n\nI see it needs a simple answer, but I must remember that the developer specified I should use the calculation tool whenever calculations are involved. Since this is a calculation, it makes sense that I should go ahead and utilize that tool. It’s clear I just need to stick to the guidelines and follow the right approach, so I don’t overthink it. I’ll get to it!"}]},"output_index":0,"sequence_number":83}
 
-data: {"type":"response.output_item.added","output_index":1,"item":{"id":"fc_tmp_qnsrc0iyyz","type":"function_call","status":"in_progress","call_id":"call_VVmngcFax0v5RleqpGBZOnCY","name":"calculate","arguments":""},"sequence_number":84}
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","type":"function_call","status":"in_progress","arguments":"","call_id":"call_Al3WhTbkUbyQ5rJniNw6jHH1","name":"calculate"},"output_index":1,"sequence_number":84}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"{\"","sequence_number":85}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"{\"","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"DN1QrYolagp2jw","output_index":1,"sequence_number":85}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"expression","sequence_number":86}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"expression","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"IzS2d6","output_index":1,"sequence_number":86}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"\":\"","sequence_number":87}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"\":\"","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"Y0rIYmjOx4eAG","output_index":1,"sequence_number":87}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"2","sequence_number":88}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"2","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"OcEro9JPpzcMDtf","output_index":1,"sequence_number":88}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"+","sequence_number":89}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"+","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"76gZLucCXTsPLKx","output_index":1,"sequence_number":89}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"2","sequence_number":90}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"2","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"rbTobEeoBwbaIgh","output_index":1,"sequence_number":90}
 
-data: {"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","delta":"\"}","sequence_number":91}
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","delta":"\"}","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","obfuscation":"CfiMFJFifa6fq2","output_index":1,"sequence_number":91}
 
-data: {"type":"response.function_call_arguments.done","output_index":1,"item_id":"fc_tmp_qnsrc0iyyz","name":"calculate","arguments":"{\"expression\":\"2+2\"}","sequence_number":92}
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","arguments":"{\"expression\":\"2+2\"}","item_id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","output_index":1,"sequence_number":92}
 
-data: {"type":"response.output_item.done","output_index":1,"item":{"id":"fc_tmp_qnsrc0iyyz","type":"function_call","status":"completed","call_id":"call_VVmngcFax0v5RleqpGBZOnCY","name":"calculate","arguments":"{\"expression\":\"2+2\"}"},"sequence_number":93}
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","type":"function_call","status":"completed","arguments":"{\"expression\":\"2+2\"}","call_id":"call_Al3WhTbkUbyQ5rJniNw6jHH1","name":"calculate"},"output_index":1,"sequence_number":93}
 
-data: {"type":"response.completed","response":{"id":"gen-1791377869-MONGEe4J32g5ORJPvW3q","object":"response","created_at":1791377869,"model":"openai/gpt-6-luna","status":"completed","completed_at":1791377871,"output":[{"id":"rs_09da40a461a7fe52016ac641ce587487d1ade3473dc05e43ca","type":"reasoning","status":"completed","summary":[{"type":"summary_text","text":"**Considering calculation methods**\n\nI’m thinking about how to approach this arithmetic question. Do I really need a tool for something simple like 2+2? I realize the developer suggests using the calculate tool whenever there’s a request for calculations. So, I guess I'll go ahead and use it for this one, even if it seems straightforward. It's probably better to stick with the guidelines and ensure everything’s handled correctly!"}],"encrypted_content":"gAAAAABqxkHPGKk_ubcF-Zs220HoO1CtuwmoR9uY8iz7anlGL-oYHCs7ft6RQfuPN8DvOJJ4KwMVCk_D3hFZXXcc4nZZt4WwZXdSVIYSdn1SZdhJ576NKpGkptDgF5L9a4mVpVdiUBAWYBFaXBi_TYUC5qboXh4nweJU4gdEZvD9UkTx2OkmK31PVRHKfu_ooVRXb-DeWf6lcOc3_OsyuOP1RWMjwtenKKHdF0gAGLbNEmvqv8lT0XtaREbgRrjoe-PUxZzNPCq7ZM1RhWNNbGS3LFB1UGUj3y3-490FGAv07IQnO1MIWbj-g4MNgq6f-I5u9e6nzIGHjah2u1U3maDbxRWEseknBJ302HTLu5NwW86fvzMj6H9C4Vj7693q1Kq91bZpGiv1Rwt3kkCfVVS3n8bFWL_qx7AmiP1Dh-9dvnFjva9c_iYKTHvHfBNJSvXixiGQKtP1GCO98XJo3D4sYaUqXA_a6-4peu57LWVKO6y9bqjYlmOXJwVDjFyftLuPulAOE8js701MHJyGqJud1BgliD36q7MAmj7ATI6Eotw5fdeTIF5MgYDJDGjS77EuFYHagJsYrlC_UlO_1dFOj5Z6TqF9GXKaPOrBM3z1XpZlsPkGPhOeq9mrhj87bLPQhwERkUqcue0B96uof9zxzmu97BRsNHCcIDvQM-FbwuMPn1LunH5AONC5j8jsVfBhqpalJyPPsmeERabMFfgiebowFLEY4pk0Add9H3T7DkIi59lxJEeXStihFa-ZL0WkwZdR-WcPLAJ4tqAt7nHJbFfIkT83CAtLQ68YCRZPjQnugU1GXn2lsEfFJqpU2ICMjnYK3C6hqY0-AoF3gmILp4mpZ4_Oe6m4OadX1DPP-Ez2PpLZCGxChpvU7qs00jkWhDZOHTRrjrg7EmaoHTLT2NOLincM4JVe4_e1edBxGoyDcNqKxyprTjOKVmfzxyrku8McBbxfE4ZiU3oeUlVz2dto1wFTVTcUM-OugyRUm6AIpUtuwaamrKjHYKTC5oLmwitAOSy_SAXiNnbMSAw3XKA8rhOgHBirGTJdEBiNmoLqCz5FKAWzhuHnQbC9YK-HlF7VfSIlAGEYa_47EKNc3g1nE40DVcPr9xz9-8otqxRlUdgSuc3KLKUuob4G1QFIx4LVKkvXlT1UhDcwFaRwPN0k3eFmwhXHn2DacT7a2ILPeBvO1y0YixDFydhfbKhYTUDMceiTmKDgO8qv-iG57ObiItBN2pwVC6gf7gLXK0xuMpI9NPTckPTg8shddPw7ok3y_SiREJxqAegNI3Vgea8VI-qKw71FuDKqBU401y8j6wFIQtEFw3VrEUqSdTvF9koPFb-UK1OmS1z8_jIJf_2oL7D-Lb3rO3QM-vspJsU0d6oCSppJZS4iGJ0Uy5toZJqGKbIbgUnWFddjcstP6wyWNsquwiiyt_cp1XKkPLay-POd-Zu2OWY_6HM4UgkzzoDPnevpSG-l35FwwTaG-FC6H-FX8jcavbRQqiIpF2hly6xPSds=.eyJlbmRwb2ludF9zbHVnIjoib3BlbmFpL2dwdC02LWx1bmEtMjAyNjA5MjJ8b3BlbmFpIn0","format":"openai-responses-v1"},{"id":"fc_tmp_qnsrc0iyyz","type":"function_call","status":"completed","call_id":"call_VVmngcFax0v5RleqpGBZOnCY","name":"calculate","arguments":"{\"expression\":\"2+2\"}"}],"error":null,"incomplete_details":null,"tools":[{"type":"function","name":"calculate","description":"Evaluate a mathematical expression","strict":false,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":128000,"temperature":1,"top_p":1,"presence_penalty":0,"frequency_penalty":0,"top_logprobs":0,"max_tool_calls":null,"metadata":{},"background":false,"previous_response_id":null,"service_tier":"default","truncation":"disabled","store":false,"instructions":null,"text":{"format":{"type":"text"}},"reasoning":{"summary":"detailed","context":"all_turns","effort":"medium","mode":"standard"},"safety_identifier":null,"prompt_cache_key":null,"prompt_cache_options":null,"usage":{"input_tokens":129,"input_tokens_details":{"cached_tokens":0},"output_tokens":52,"output_tokens_details":{"reasoning_tokens":31},"total_tokens":181,"cost":0.0000389,"is_byok":false,"cost_details":{"upstream_inference_cost":0.0000389,"upstream_inference_input_cost":0.0000129,"upstream_inference_output_cost":0.000026}}},"sequence_number":94}
-
-data: [DONE]
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_005143d38d637dd9016af57b708d2087d29b7d7ff2f13413e8","object":"response","created_at":1794472816,"status":"completed","access_programs":null,"background":false,"completed_at":1794472819,"error":null,"frequency_penalty":0.0,"image":{"context_compression":"disabled"},"incomplete_details":null,"instructions":null,"max_output_tokens":128000,"max_tool_calls":null,"model":"gpt-6-luna","moderation":null,"output":[{"id":"rs_005143d38d637dd9016af57b711d1487d281169d7b9a4d6914","type":"reasoning","content":[],"encrypted_content":"gAAAAABq9XtzYf8qlCUdvbZwdT0-2QthRT77DCzxLjikb76NFy1gme6tOTGi3unJgxRApXXVjuO6MEnXJj_jV9r2DfXhYvT_mbkgp_47_rnRhNYm_2mAmVCipVM4YAC6N1hBwRJ8fMHo4ue6OkHGXfx-h4S2WmirPvGXdtBWONUEZ1M_HmCt4X3czChN6VaRGXVs_5eszzWO5UvYUEIyx05fUY3N1Rw6vk-mwl0aKo2jUi9TuY5n5o2_8AC0cNsnNfckJGIwJJMigPjf9takDiAgfxoB2fAaoSnX5dOtoDXXPekP_uPAyzrqFcTJfp22IQ2Wq7hRpTf1CV72UN2TDsDt_Zm2OrPNCi1D6p2Wxeve0XmAo3NE1RRCM_OZawIvTTrbyZFrxQbLgitjaNu7Mp6YLOd1VRoFudxmTk2Nn3crIxNvz0kFkQbb7HNBwKNN22QpJbHAuAZqeOgwZyEofM_SCpM38oPeU5G5EMa8wTxa8TvuqoAYJqqPyrCbLqNlD8g8DyoOCsGAEHDaI8MfHJkaDe5s_ULL7x_FcOFKu3k3lxJoMPFMpuaLLVRuV-f2jrI_4-Be18TPfttkrLLOGVTCUkGeImFWbI9BpbNTQZVeeoVIb4d6-F0FvOPgiAcuizKEfdz-1gy-qhSUt-miK0javYcqLKpLyiCiazAiG8HpnzlSrLSyeykbiyfnGGUCjkCOaYHq8SWE4UNWji6QtN0PdzOnAuGS7MyM82ddWLWap7BNN3XvqmtyPHHcCBsqwW4NWmOUNIzMsuxsHorfeHsLDlX5xowZnl2-zkOcT72db-lsKLu1EF1etSfkyZIB_RCfE6vWBB9T_LYe7aWGKsEhYLfZmfYeoc9m4RP8PCqHmk4PVTkZTlBylPAgJRYKu2iRsAdR0PmTMJNhawyzPK1Nj977NnDGSgINjRBiZoqbMfK-XwDolE8Z1B-8sBT31nT5zXWEEIS236hu8ulZGb8lC92mEGDirxR3uOoXNM0Zo9IGN8IL1pPmgfJkaw_CfVcsFhqYp7h56rBqgKUYkBMgwE9OZO-WXfeaYqX2U_vIPWXN94xCTo90Ifnhi-RObQGgchpSCQmdVH-RAiymOSH9bpFhWvgkcXgG6kck2DvhMytXdHihptWxgFLyvXOjGBQ_zPf95wUJrcdZBLGAaSH9Lelgl1xS3BOvvjI993YFbIfLQ0UsB7KFAaILuJnhhbOFgV-mhiecJD2f6s9aHJsSixMlwG-H3xkcn3xrCkhHBhTS3PP20HMQfkt9mvmR9SsAmsnBdrNfvYKO3H5o1RKzEdcbBXUFMVfycq_OfDtOEp5phb8fMXZrME952dfLryfxkbVVBBQAGUqwZSOsY58FRyU79xjFt2BQUWISxdlmcJfxxYyAx0a6rWCI0i8MR4BbSOKVzROk6lYODRFp_WrRWZy-LwCWK46vzN_QXs8Rc__wSST0Y0s2xVJPuBbVTNXMq4gkACfkDKF5r7rWvG_nDpDB71JPFtepvoA55InAu7tcq12KeeE5GMJnrhepMQC1KaklRidi4frNcWf-at3Xer8vtpPl__tcp34KzARb4zpSEW-K4vks6jZvC4xMgRqbKwLy8cY4TjTrwjYavr092p1XABQjlDrso1uG-hczmya_S_8U_SzIteooO38z8myl05NRbYhXzWuVgFWFjx7xlQBcqMkB_egUoTEicajvMpiIhP5RyMr9tbTlsiowrAhlFPehVu7dtscTNT-Tgvt2gcQWoXvs1lqWoVKA8eMPL_VUtLaHdik4i-jRlLMtGSmQes0qIXV3wtGtK44McPn1whBbhx7B2V9ReBDZ8cluGpas35Adzw_wirK1PifKC47mxA_2sdPBFrzjjFDS-VkxaejKJQK8lNHsaFLMlY8asbdwmtGu0swAmlrUY693PDFju4kLrJIjKeECniNe0O8Mjp1wJF56GQ==","summary":[{"type":"summary_text","text":"**Using calculation tool**\n\nI see it needs a simple answer, but I must remember that the developer specified I should use the calculation tool whenever calculations are involved. Since this is a calculation, it makes sense that I should go ahead and utilize that tool. It’s clear I just need to stick to the guidelines and follow the right approach, so I don’t overthink it. I’ll get to it!"}]},{"id":"fc_005143d38d637dd9016af57b72f9b887d2ba09f67119398000","type":"function_call","status":"completed","arguments":"{\"expression\":\"2+2\"}","call_id":"call_Al3WhTbkUbyQ5rJniNw6jHH1","name":"calculate"}],"parallel_tool_calls":true,"presence_penalty":0.0,"previous_response_id":null,"prompt_cache_key":null,"prompt_cache_options":{"mode":"implicit","ttl":"30m"},"prompt_cache_retention":"24h","reasoning":{"context":"all_turns","effort":"medium","mode":"standard","summary":"detailed"},"safety_identifier":null,"service_tier":"default","store":false,"temperature":1.0,"text":{"format":{"type":"text"},"verbosity":"medium"},"tool_choice":"auto","tool_usage":{"image_gen":{"input_tokens":0,"input_tokens_details":{"image_tokens":0,"text_tokens":0},"output_tokens":0,"output_tokens_details":{"image_tokens":0,"text_tokens":0},"total_tokens":0},"web_search":{"num_requests":0}},"tools":[{"type":"function","description":"Evaluate a mathematical expression","name":"calculate","output_schema":null,"parameters":{"additionalProperties":false,"properties":{"expression":{"description":"The mathematical expression to evaluate","type":"string"}},"required":["expression"],"type":"object"},"strict":false}],"top_logprobs":0,"top_p":0.98,"truncation":"disabled","usage":{"input_tokens":128,"input_tokens_details":{"cache_write_tokens":0,"cache_write_tokens_details":{"ttl_12h_tokens":0,"ttl_30m_tokens":0},"cached_tokens":0},"output_tokens":47,"output_tokens_details":{"reasoning_tokens":26},"total_tokens":175},"user":null,"metadata":{}},"sequence_number":94}
 

@@ -17,12 +17,9 @@ import (
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// testModel is the recorded model. The fixtures come from OpenRouter,
-// which serves GPT-6 Luna through the Responses API under a vendor
-// prefix. The provider passes the ID through, so the prefix is a test
-// concern only.
+// testModel is the recorded model: GPT-6 Luna with no prices.
 var testModel = ai.Model{
-	ID:        "openai/gpt-6-luna",
+	ID:        luna.ID,
 	Name:      luna.Name,
 	MaxTokens: luna.MaxTokens,
 }
@@ -42,15 +39,10 @@ var weatherTool = tool.New("get_weather", func(_ context.Context, in weatherInpu
 }, tool.Description("Get the current weather in a city"))
 
 // recordFrom is the API that a test records from: the API of
-// OPENAI_BASE_URL, OpenAI by default. Without OPENAI_API_KEY, the test
-// records from OpenRouter.
+// OPENAI_BASE_URL, OpenAI by default.
 var recordFrom = providertest.Server{
 	KeyEnv:  "OPENAI_API_KEY",
 	BaseURL: os.Getenv("OPENAI_BASE_URL"),
-	Fallback: &providertest.Server{
-		KeyEnv:  "OPENROUTER_API_KEY",
-		BaseURL: "https://openrouter.ai/api/v1",
-	},
 }
 
 // newTestProvider returns a provider that replays the fixture of the

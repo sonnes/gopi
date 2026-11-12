@@ -1,22 +1,36 @@
 httprr trace v1
-317 955
+310 1227
 POST https://api.openai.com/v1/responses HTTP/1.1
 Host: api.openai.com
 User-Agent: Go-http-client/1.1
-Content-Length: 157
+Content-Length: 150
 Content-Type: application/json
 
-{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"model":"openai/gpt-6-luna","reasoning":{"summary":"auto"},"stream":true}HTTP/2.0 400 Bad Request
-Connection: close
-Access-Control-Allow-Origin: *
-Access-Control-Expose-Headers: X-Generation-Id,X-Provider-Name,request-id,cf-ray
-Cf-Ray: a46d128f6c7d3d3f-BOM
+{"max_output_tokens":128000,"store":false,"include":["reasoning.encrypted_content"],"model":"gpt-6-luna","reasoning":{"summary":"auto"},"stream":true}HTTP/2.0 400 Bad Request
+Content-Length: 175
+Access-Control-Expose-Headers: X-Request-ID, Server-Timing-Total, X-OpenAI-Inference-Capacity-Reason
+Access-Control-Expose-Headers: CF-Ray
+Access-Control-Expose-Headers: CF-Ray
+Alt-Svc: h3=":443"; ma=86400
+Cf-Cache-Status: DYNAMIC
+Cf-Ray: a5943ad44c139a93-NAG
 Content-Type: application/json
-Date: Wed, 07 Oct 2026 12:57:35 GMT
-Permissions-Policy: payment=(self "https://checkout.stripe.com" "https://connect-js.stripe.com" "https://js.stripe.com" "https://*.js.stripe.com" "https://hooks.stripe.com")
-Referrer-Policy: no-referrer, strict-origin-when-cross-origin
+Date: Thu, 12 Nov 2026 08:40:04 GMT
+Openai-Organization: user-bp7f0qzkncp68hzpwpb4otcv
+Openai-Processing-Ms: 15
+Openai-Project: proj_UXSHGFQCxfsKEg3ybcA8IwM5
+Openai-Version: 2020-10-01
 Server: cloudflare
-Set-Cookie: __cf_bm=HOJFGRFmhpjn8G9ChvYNk2cDx4WzNJfleHPY3k4wlAg-1791377855.9103296-1.0.1.1-DdeGurYGwTfcgrlBYOrN0XGuWz5rfH0uGJV7byRf41K_qO5VmEdJCj2PnTYathJwWYJ6OxTVS1YbjB3AHvST8XLvba.RzgqJ7l1DQUCUCw.yyZgPD6mH.QB9rIqmeZCP; HttpOnly; SameSite=None; Secure; Path=/; Domain=openrouter.ai; Expires=Wed, 07 Oct 2026 13:27:35 GMT
+Set-Cookie: __cf_bm=3.OLQhGsqv2UY8l5otgtHERnWUPt0i3XpzBdoLa3t9g-1794472804.5289345-1.0.1.1-FGMr1xJcFpwiT9ZX8c7oJx68BM1Ozh9sJSrxdqEf4fAwHow1FaWaPaYTDyu9PZlami3SB90Xb3W1ipSEEg00s9MS_4Aka6cawciEF1AS4tdPIEFNhxUhJv8gSWegE1GR; HttpOnly; SameSite=None; Partitioned; Secure; Path=/; Domain=api.openai.com; Expires=Thu, 12 Nov 2026 09:10:04 GMT
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 X-Content-Type-Options: nosniff
+X-Request-Id: req_dc6e7efe00b746d7994252a1cc65fd3c
 
-{"error":{"code":"invalid_prompt","message":"No input provided"},"metadata":null}
+{
+  "error": {
+    "message": "Missing required parameter: 'input'.",
+    "type": "invalid_request_error",
+    "param": "input",
+    "code": "missing_required_parameter"
+  }
+}

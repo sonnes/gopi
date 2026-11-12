@@ -9,7 +9,7 @@ import (
 
 // reminderModel takes no developer message in the conversation. The
 // provider does not know its ID, so it gets a system-reminder.
-var reminderModel = ai.Model{ID: "openai/gpt-5.4-mini", MaxTokens: 16_000}
+var reminderModel = ai.Model{ID: "gpt-5.4-mini", MaxTokens: 16_000}
 
 func TestCases(t *testing.T) {
 	providertest.Run(t, providertest.Suite{
