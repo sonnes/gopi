@@ -143,7 +143,21 @@ type options struct {
 }
 
 func main() {
-	cmd := &cli.Command{
+	cmd := rootCommand()
+	err := cmd.Run(context.Background(), os.Args)
+	if errors.Is(err, errShown) {
+		os.Exit(1)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "gopi:", err)
+		os.Exit(1)
+	}
+}
+
+// rootCommand returns the "gopi" command with its flags and its
+// subcommands.
+func rootCommand() *cli.Command {
+	return &cli.Command{
 		Name:      "gopi",
 		Usage:     "a test drive of the gopi SDK",
 		ArgsUsage: "[prompt]",
@@ -177,7 +191,7 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:  "json",
-				Usage: "print each event as one line of JSON instead of the tree",
+				Usage: "print JSON instead of text",
 			},
 			&cli.StringFlag{
 				Name:    "session-id",
@@ -212,6 +226,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			modelsCommand(),
+			decideCommand(),
 			hookCommand(),
 			loginCommand(),
 			logoutCommand(),
@@ -237,15 +252,6 @@ func main() {
 			}
 			return run(ctx, opts, c.Args().Slice())
 		},
-	}
-
-	err := cmd.Run(context.Background(), os.Args)
-	if errors.Is(err, errShown) {
-		os.Exit(1)
-	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "gopi:", err)
-		os.Exit(1)
 	}
 }
 

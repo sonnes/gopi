@@ -132,7 +132,7 @@ agent  fake/model
 │  ├─ Lisbon is warmer.
 │  │
 │  │  It is 21 degrees.
-└─ usage  in=300 out=42 cache_read=10 $0.0031
+└─ usage  in=300 out=42 cache_read=10 $0.003100
 `,
 		},
 		{

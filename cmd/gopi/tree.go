@@ -314,7 +314,7 @@ func usage(u ai.Usage) string {
 		fields = append(fields, fmt.Sprintf("cache_write=%d", u.CacheWrite))
 	}
 	if cost := u.Cost.Total(); cost > 0 {
-		fields = append(fields, fmt.Sprintf("$%.4f", cost))
+		fields = append(fields, fmt.Sprintf("$%.6f", cost))
 	}
 	return strings.Join(fields, " ")
 }
