@@ -17,7 +17,7 @@ import (
 )
 
 // taskTypeAgent is the task type of a subagent. The CLI also reports a
-// background shell as a task, with the type local_bash.
+// background shell as a task, with the type [taskTypeShell].
 const taskTypeAgent = "local_agent"
 
 // defaultChildName is the name of a child whose Agent call names no
@@ -73,6 +73,9 @@ type subagents struct {
 	// open are the children that run, by the ID of their call. A child
 	// in the background stays open between runs.
 	open map[string]*child
+	// tasks are the open background tasks that are not subagents, in
+	// the order of their start. They stay open between runs.
+	tasks []task
 }
 
 // call is one tool call of the carrier, and the runner that started it.
@@ -182,6 +185,7 @@ func (s *subagents) callStarted(ctx context.Context, owner *runner, tc ai.ToolCa
 		owner: owner,
 		tc:    tc,
 	}
+	s.taskCall(tc)
 	l, ok := s.started[tc.ID]
 	if !ok {
 		return nil
@@ -191,9 +195,14 @@ func (s *subagents) callStarted(ctx context.Context, owner *runner, tc ai.ToolCa
 }
 
 // taskStarted opens the child of a task_started line, or keeps the line
-// until its call starts. A task that is not a subagent opens nothing.
+// until its call starts. A task that is not a subagent opens a
+// background task.
 func (s *subagents) taskStarted(ctx context.Context, l *line) error {
-	if l.TaskType != taskTypeAgent || l.ToolUseID == "" {
+	if l.TaskType != taskTypeAgent {
+		s.openTask(l)
+		return nil
+	}
+	if l.ToolUseID == "" {
 		return nil
 	}
 	if _, ok := s.calls[l.ToolUseID]; !ok {
@@ -312,9 +321,12 @@ func (s *subagents) line(ctx context.Context, callID string, l *line) error {
 	return nil
 }
 
-// taskEnded ends the child of a task_notification line. The summary is
-// the last text of the child.
+// taskEnded ends the child or the background task of a
+// task_notification line. The summary is the last text of the child.
 func (s *subagents) taskEnded(ctx context.Context, l *line) error {
+	if s.closeTask(l.TaskID) {
+		return nil
+	}
 	c, ok := s.open[l.ToolUseID]
 	if !ok {
 		return nil

@@ -3,6 +3,7 @@ package agent_test
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,6 +144,26 @@ func TestEventJSON(t *testing.T) {
 				Text:       "no access",
 			},
 			want: `{"type":"subagent_end","tool_call_id":"c1","session_id":"s1.helper-01","status":"failed","text":"no access"}`,
+		},
+		{
+			name: "background carries the open tasks",
+			event: agent.EventBackground{
+				Tasks: []agent.Task{
+					{
+						ID:        "b1",
+						Kind:      agent.TaskWakeup,
+						Title:     "Check the build",
+						StartedAt: time.Date(2026, 11, 18, 9, 0, 0, 0, time.UTC),
+						Due:       time.Date(2026, 11, 18, 9, 30, 0, 0, time.UTC),
+					},
+				},
+			},
+			want: `{"type":"background","tasks":[{"id":"b1","kind":"wakeup","title":"Check the build","started_at":"2026-11-18T09:00:00Z","due":"2026-11-18T09:30:00Z"}]}`,
+		},
+		{
+			name:  "background with no task keeps an empty list",
+			event: agent.EventBackground{Tasks: []agent.Task{}},
+			want:  `{"type":"background","tasks":[]}`,
 		},
 	}
 	for _, tt := range tests {

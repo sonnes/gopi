@@ -63,6 +63,11 @@ type Session struct {
 	// oldest first. Two or more calls can wait at the same time. It is
 	// set only while Status is [StatusRequiresAction].
 	Waiting []agent.ApprovalRequest `json:"waiting,omitempty"`
+	// Background are the open background tasks of the agent, such as a
+	// command or a wakeup of a Claude Code agent, from its last
+	// [agent.EventBackground]. A session with an open task younger than
+	// the [HoldLimit] keeps its agent. It is empty while no agent runs.
+	Background []agent.Task `json:"background,omitempty"`
 	// StopReason is why the last run ended. It is set only while Status
 	// is [StatusIdle], and is empty before the first run.
 	StopReason StopReason `json:"stop_reason,omitempty"`
@@ -92,6 +97,7 @@ type Session struct {
 // clone returns a copy of i that shares no slice with i.
 func (i Session) clone() Session {
 	i.Waiting = slices.Clone(i.Waiting)
+	i.Background = slices.Clone(i.Background)
 	i.UsageByModel = maps.Clone(i.UsageByModel)
 	if i.Parent != nil {
 		p := *i.Parent
@@ -170,8 +176,10 @@ func (h *Host) recover(ctx context.Context, snap session.Snapshot) (Session, err
 	} else {
 		sess.setConfig(config)
 	}
-	stopped := !ok || sess.Status == StatusIdle
+	// No background task survives its agent.
+	stopped := (!ok || sess.Status == StatusIdle) && len(sess.Background) == 0
 	sess.Status = StatusIdle
+	sess.Background = nil
 	if stopped {
 		return sess, nil
 	}

@@ -166,8 +166,11 @@ func (s *hosted) execute(ctx context.Context, start func(context.Context, agent.
 		if err != nil {
 			break
 		}
-		if e, ok := ev.(agent.EventAgentEnd); ok {
+		switch e := ev.(type) {
+		case agent.EventAgentEnd:
 			end = e
+		case agent.EventBackground:
+			s.setTasks(e)
 		}
 		// The child exists before a reader of the parent sees its start.
 		s.host.relay(s.id, ev)

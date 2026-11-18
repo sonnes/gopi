@@ -159,6 +159,7 @@ func (a *Agent) readIdle(proc *process, ir *idleReader) {
 			}
 			if a.idleLine(ctx, l) && !woke {
 				woke = true
+				a.subs.woke()
 				a.signalWake()
 			}
 		}
@@ -189,8 +190,14 @@ func (a *Agent) idleLine(ctx context.Context, l *line) bool {
 		s.fail(ctx, id, s.line(ctx, id, l))
 		return false
 	}
+	notice := l.Type == "system" && l.Subtype == "task_notification"
+	// The end of a background task reaches the Idle function now. The
+	// line stays kept, for the turn that the CLI starts about it.
+	if notice {
+		s.closeTask(l.TaskID)
+	}
 	_, open := s.open[l.ToolUseID]
-	ends := l.Type == "system" && l.Subtype == "task_notification" && open
+	ends := notice && open
 	if ends {
 		s.fail(ctx, l.ToolUseID, s.taskEnded(ctx, l))
 		return false
@@ -256,9 +263,13 @@ func (a *Agent) sendIdle(ev agent.Event) {
 	}
 }
 
-// endBackground ends each child in the background as interrupted, on
-// the Idle function: the CLI that ran them is gone.
+// endBackground ends each child in the background as interrupted, and
+// each background task, on the Idle function: the CLI that ran them is
+// gone. The log gets an [agent.KindStopped] entry that names the tasks.
+// A failed write of the entry is dropped: the CLI is gone either way.
 func (a *Agent) endBackground() {
+	ctx := context.Background()
 	a.subs.carry(a.sendIdle)
-	a.releaseIdle(context.Background(), false)
+	_ = a.subs.stopTasks(ctx, a.Log())
+	a.releaseIdle(ctx, false)
 }

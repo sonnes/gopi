@@ -170,6 +170,7 @@ func (d *fakeDriver) Start(ctx context.Context, c agent.Config) (agent.Runner, e
 	if d.wakes {
 		w := &wakeRunner{
 			Runner: r,
+			d:      d,
 			wake:   c.Wake,
 			idle:   c.Idle,
 		}
@@ -209,11 +210,19 @@ func (d *fakeDriver) closes() int {
 
 // wakeRunner is a runner that wakes, as the Claude Code agent does. Its
 // Continue runs a turn with the text "continue". wake and idle are the
-// Wake and Idle functions of its config.
+// Wake and Idle functions of its config. Its driver counts each Close.
 type wakeRunner struct {
 	agent.Runner
+	d    *fakeDriver
 	wake func()
 	idle func(agent.Event)
+}
+
+func (w *wakeRunner) Close() error {
+	w.d.mu.Lock()
+	w.d.closed++
+	w.d.mu.Unlock()
+	return w.Runner.Close()
 }
 
 func (w *wakeRunner) Continue(ctx context.Context) *agent.Stream {

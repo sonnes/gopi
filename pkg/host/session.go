@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -310,6 +311,7 @@ func (s *hosted) stop() error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.endTasksLocked()
 	return errors.Join(err, s.writeErr)
 }
 
@@ -330,12 +332,34 @@ func (h *Host) Release(_ context.Context, id string) error {
 	if err := s.writable(); err != nil {
 		return err
 	}
-	return s.release()
+	return s.release(false)
 }
 
-// release stops the agent of s if s is idle. It holds startMu to the end
-// of the stop, so a message waits, and then starts a new agent.
-func (s *hosted) release() error {
+// EndBackground stops the agent of the idle session id, also while it
+// runs a child in the background or has an open background task, as a
+// stop of a person does. The close of the agent ends the children and
+// the tasks. The session and its log stay, and the next message starts
+// the agent again.
+//
+// If the session runs or holds a message, EndBackground returns
+// [ErrBusy]: [Host.Interrupt] stops a run. If the host does not know the
+// session, EndBackground returns [ErrNotFound]. A child has no agent of
+// its own, so EndBackground returns [ErrChild].
+func (h *Host) EndBackground(_ context.Context, id string) error {
+	s, err := h.session(id)
+	if err != nil {
+		return err
+	}
+	if err := s.writable(); err != nil {
+		return err
+	}
+	return s.release(true)
+}
+
+// release stops the agent of s if s is idle. With force, a child in the
+// background and an open task do not keep the agent. It holds startMu to
+// the end of the stop, so a message waits, and then starts a new agent.
+func (s *hosted) release(force bool) error {
 	s.startMu.Lock()
 	defer s.startMu.Unlock()
 	// The host lock comes before the lock of s, so the check of the
@@ -343,10 +367,11 @@ func (s *hosted) release() error {
 	children := s.host.RunsChildren(s.id)
 
 	s.mu.Lock()
+	background := !force && (children || s.holdsLocked(now()))
 	busy := s.run != nil ||
 		len(s.queue) > 0 ||
 		s.wakePending ||
-		children
+		background
 	switch {
 	case s.closing || s.runner == nil:
 		s.mu.Unlock()
@@ -361,10 +386,45 @@ func (s *hosted) release() error {
 	s.stopIdleLocked()
 	s.mu.Unlock()
 
-	if err := runner.Close(); err != nil {
+	err := runner.Close()
+	s.mu.Lock()
+	s.endTasksLocked()
+	s.mu.Unlock()
+	if err != nil {
 		return fmt.Errorf("host: session %s: stop the agent: %w", s.id, err)
 	}
 	return nil
+}
+
+// holdsLocked reports whether s has an open background task that
+// started less than the [HoldLimit] before t. The caller holds mu.
+func (s *hosted) holdsLocked(t time.Time) bool {
+	for _, task := range s.sess.Background {
+		if t.Sub(task.StartedAt) < s.host.holdLimit {
+			return true
+		}
+	}
+	return false
+}
+
+// setTasks sets the open background tasks of s from an
+// [agent.EventBackground].
+func (s *hosted) setTasks(e agent.EventBackground) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sess.Background = slices.Clone(e.Tasks)
+	s.updateLocked()
+}
+
+// endTasksLocked drops the background tasks of s after the close of its
+// agent, which stopped them. An agent that sends no last
+// [agent.EventBackground] leaves none behind. The caller holds mu.
+func (s *hosted) endTasksLocked() {
+	if len(s.sess.Background) == 0 {
+		return
+	}
+	s.sess.Background = nil
+	s.updateLocked()
 }
 
 // armIdleLocked starts the idle timer of s again, if the host has an
@@ -391,7 +451,7 @@ func (s *hosted) stopIdleLocked() {
 // background, waits one more idle time. A run starts the timer again at
 // its end.
 func (s *hosted) idleRelease() {
-	err := s.release()
+	err := s.release(false)
 	if !errors.Is(err, ErrBusy) {
 		return
 	}

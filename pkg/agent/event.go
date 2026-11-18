@@ -24,7 +24,8 @@ type Stream = stream.Stream[Event, []ai.Message]
 // [EventTurnEnd], [EventMessageStart], [EventMessageUpdate],
 // [EventMessageEnd], [EventToolExecutionStart],
 // [EventToolExecutionEnd], [EventSubagentStart], [EventSubagent], and
-// [EventSubagentEnd], [EventCompactionStart], and [EventCompaction].
+// [EventSubagentEnd], [EventCompactionStart], [EventCompaction], and
+// [EventBackground].
 // Each event carries what [State.Apply] needs.
 // [State.Apply] ignores the subagent events, because the state of a
 // child is in its own session.
@@ -199,6 +200,7 @@ const (
 	typeSubagentStart      = "subagent_start"
 	typeSubagent           = "subagent"
 	typeSubagentEnd        = "subagent_end"
+	typeBackground         = "background"
 	typeCompactionStart    = "compaction_start"
 	typeCompaction         = "compaction"
 )
@@ -246,6 +248,10 @@ type eventJSON struct {
 	Event     json.RawMessage `json:"event,omitempty"`
 	Status    string          `json:"status,omitempty"`
 	Text      string          `json:"text,omitempty"`
+
+	// background. A list with no task encodes as [], so the decode
+	// keeps the end of the last task.
+	Tasks *[]Task `json:"tasks,omitempty"`
 }
 
 func marshalEvent(e Event) ([]byte, error) {
@@ -339,6 +345,15 @@ func marshalEvent(e Event) ([]byte, error) {
 			Status:     v.Status,
 			Text:       v.Text,
 		}
+	case EventBackground:
+		tasks := v.Tasks
+		if tasks == nil {
+			tasks = []Task{}
+		}
+		w = eventJSON{
+			Type:  typeBackground,
+			Tasks: &tasks,
+		}
 	default:
 		return nil, fmt.Errorf("agent: unknown event type %T", e)
 	}
@@ -424,6 +439,8 @@ func UnmarshalEvent(data []byte) (Event, error) {
 			Status:     w.Status,
 			Text:       w.Text,
 		}, nil
+	case typeBackground:
+		return EventBackground{Tasks: deref(w.Tasks)}, nil
 	default:
 		return nil, fmt.Errorf("agent: unknown event type %q", w.Type)
 	}

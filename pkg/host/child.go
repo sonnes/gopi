@@ -212,6 +212,9 @@ func (s *hosted) idle(ev agent.Event) {
 	if closing {
 		return
 	}
+	if e, ok := ev.(agent.EventBackground); ok {
+		s.setTasks(e)
+	}
 	s.host.relay(s.id, ev)
 	s.agents.publish(ev)
 }

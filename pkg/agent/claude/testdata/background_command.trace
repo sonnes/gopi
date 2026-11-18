@@ -1,0 +1,22 @@
+stdiorr trace v1
+# A run starts a shell command in the background, a Monitor, and a
+# ScheduleWakeup, and ends. Between runs, the command ends, and the CLI
+# starts a turn about it. The monitor and the wakeup stay open.
+> {"type":"control_request","request_id":"req_1","request":{"subtype":"initialize"}}
+< {"type":"control_response","response":{"subtype":"success","request_id":"req_1","response":{}}}
+> {"type":"user","message":{"role":"user","content":[{"type":"text","text":"Build in the background."}]},"parent_tool_use_id":null,"session_id":""}
+< {"type":"system","subtype":"init","session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_1","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_b","name":"Bash","input":{"command":"make build","description":"Build the app","run_in_background":true}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"system","subtype":"task_started","session_id":"sess-1","task_id":"b1","tool_use_id":"toolu_b","task_type":"local_bash","description":"Build the app"}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_b","content":"Command running in background with ID: b1","is_error":false}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_2","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_m","name":"Monitor","input":{"command":"tail -f dist.log","description":"Watch the log"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"system","subtype":"task_started","session_id":"sess-1","task_id":"m1","tool_use_id":"toolu_m","task_type":"local_bash","description":"Watch the log"}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_m","content":"Monitor started with ID: m1","is_error":false}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_3","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"tool_use","id":"toolu_w","name":"ScheduleWakeup","input":{"delaySeconds":1800,"prompt":"Check the build.","reason":"Check the build"}}],"stop_reason":"tool_use","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_w","content":"Next wakeup scheduled for 15:42:00 (in 1800s).","is_error":false}]},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_4","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"STARTED"}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"STARTED","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":20,"output_tokens":10}}
+< {"type":"system","subtype":"task_notification","session_id":"sess-1","task_id":"b1","tool_use_id":"toolu_b","status":"completed","summary":"Background command \"Build the app\" completed (exit code 0)"}
+< {"type":"system","subtype":"init","session_id":"sess-1"}
+< {"type":"assistant","message":{"id":"msg_5","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"The build passed."}],"stop_reason":"end_turn","usage":{"input_tokens":10,"output_tokens":5}},"parent_tool_use_id":null,"session_id":"sess-1"}
+< {"type":"result","subtype":"success","is_error":false,"result":"The build passed.","session_id":"sess-1","num_turns":1,"usage":{"input_tokens":20,"output_tokens":10}}

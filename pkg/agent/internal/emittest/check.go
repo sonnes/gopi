@@ -118,6 +118,8 @@ func CheckEvents(t testing.TB, events []agent.Event) {
 			delete(subs, key)
 		case agent.EventCompactionStart, agent.EventCompaction:
 			// A compaction can come at any point of a run.
+		case agent.EventBackground:
+			// A background task can start or end at any point of a run.
 		default:
 			assert.Fail(t, "unknown event type", "event %d: %T", i, ev)
 		}

@@ -69,6 +69,8 @@ type Host struct {
 	newID func() string
 	// idleTimeout is the time of [IdleTimeout], or 0.
 	idleTimeout time.Duration
+	// holdLimit is the time of [HoldLimit].
+	holdLimit time.Duration
 	// hub has each session, and sends each change.
 	hub *hub[State, Event]
 
@@ -153,10 +155,25 @@ func IDs(fn func() string) Option {
 // IdleTimeout stops the agent of a session that stays idle for d, as
 // [Host.Release] does, so the agent of a CLI frees its process. The next
 // message starts the agent again, and the driver resumes the log. A
-// session that runs a child in the background keeps its agent. Without
+// session that runs a child in the background, or that has an open
+// background task within its [HoldLimit], keeps its agent. Without
 // IdleTimeout, an agent runs until [Host.Close].
 func IdleTimeout(d time.Duration) Option {
 	return func(h *Host) { h.idleTimeout = d }
+}
+
+// DefaultHoldLimit is the [HoldLimit] of a host that sets none. It is
+// longer than a slow build with a notarization, and shorter than the
+// life of a dev server that an agent forgot.
+const DefaultHoldLimit = 4 * time.Hour
+
+// HoldLimit is how long an open background task of an idle session, such
+// as a command or a wakeup of a Claude Code agent, keeps its agent from
+// [Host.Release] and the [IdleTimeout]. After d from the start of the
+// task, the session releases as if the task had ended, and the close of
+// the agent stops the task. The default is [DefaultHoldLimit].
+func HoldLimit(d time.Duration) Option {
+	return func(h *Host) { h.holdLimit = d }
 }
 
 // Open returns a host that resolves the model spec of each session with
@@ -169,9 +186,10 @@ func IdleTimeout(d time.Duration) Option {
 // a session that ran or waited becomes idle, with [StopRestarted].
 func Open(ctx context.Context, cat *catalog.Catalog, opts ...Option) (*Host, error) {
 	h := &Host{
-		cat:      cat,
-		newID:    uuid.NewString,
-		sessions: make(map[string]*hosted),
+		cat:       cat,
+		newID:     uuid.NewString,
+		holdLimit: DefaultHoldLimit,
+		sessions:  make(map[string]*hosted),
 		hub: newHub(
 			State{Sessions: make(map[string]Session)},
 			(*State).Apply,
