@@ -23,6 +23,8 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
     + Steerer ......... the harness and claude-code
     + Waker ........... claude-code only
   Checker ............. claude-code and codex
+  Loginer ............. claude-code and codex
+    + LinkReader ...... claude-code and codex
 ```
 
 ## Design
@@ -48,6 +50,8 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 - The approve function and the hook points have the same types for each driver, so a caller writes them once. The approve function takes one `agent.ApprovalRequest`, so an agent can add a field with no change to each approve function. Each driver gives the gopi name of a tool, as [Tool Name](../tool/name.md) describes, so a rule and a hook also match on each driver.
 - A driver of a CLI reads the model ID of the resolved model, and the harness resolves the spec in its own catalog.
 - A checker reports its [driver status](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Status) with the setup of the driver, so a caller checks what a session starts with.
+- A loginer returns the sign-in command of its CLI and does not start it. The caller starts the command on a PTY and shows the screens of the CLI to the person. So the caller names no flag of a CLI. When ctx ends, the command stops with its whole process group, so no helper of the CLI stays. Claude Code runs `claude auth login --claudeai`. Codex runs `codex login --device-auth`.
+- A link reader finds the link of a sign-in in the output, after it removes the escape sequences of the terminal. Claude Code prints a link with no code. Codex prints a link and a code that the person types on the page of the link. The reader gets no token, because the CLI keeps the sign-in in its own config folder.
 
 ## Map
 
@@ -60,6 +64,7 @@ A driver starts an agent of one kind for one session. The harness, the Claude Co
 | Find the hook points of a CLI agent     | `pkg/agent/<cli>/hooks.go`   |
 | Change how a CLI lists its models       | `pkg/agent/<cli>/models.go`  |
 | Change the driver status of a CLI       | `pkg/agent/<cli>/check.go`   |
+| Change the sign-in of a CLI             | `pkg/agent/<cli>/login.go`   |
 | Add a case that each CLI driver passes  | `pkg/agent/internal/drivertest/drivertest.go` |
 
 ## Related Concepts

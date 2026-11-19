@@ -43,7 +43,7 @@ var clouds = map[string]string{
 // its JSON, so a check reads the JSON and not the exit code.
 func (d driver) Check(ctx context.Context) (agent.Status, error) {
 	c := newOptions(d.opts)
-	env := cliproc.Environ(dropped, c.env)
+	env := c.environ()
 
 	out, stderr, err := cliproc.Command(ctx, c.binary, env, "--version")
 	if err != nil {

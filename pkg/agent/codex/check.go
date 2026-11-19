@@ -27,7 +27,7 @@ const loggedInPrefix = "Logged in using "
 // the plan, the email, and the organization.
 func (d driver) Check(ctx context.Context) (agent.Status, error) {
 	c := newOptions(d.opts)
-	env := cliproc.Environ(nil, c.env)
+	env := c.environ()
 
 	out, stderr, err := cliproc.Command(ctx, c.binary, env, "--version")
 	if err != nil {

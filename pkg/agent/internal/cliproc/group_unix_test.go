@@ -3,6 +3,8 @@
 package cliproc
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"os/exec"
 	"strconv"
@@ -52,5 +54,22 @@ func TestKillEndsTheChildrenOfTheCLI(t *testing.T) {
 
 	p.Kill()
 
+	waitGone(t, pid)
+}
+
+func TestLoginCmdEndsTheGroupWhenCtxEnds(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cmd := LoginCmd(ctx, "sh", nil, "-c", "sleep 60 & echo $!; wait")
+	out, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
+	line, err := bufio.NewReader(out).ReadString('\n')
+	require.NoError(t, err)
+	pid, err := strconv.Atoi(strings.TrimSpace(line))
+	require.NoError(t, err)
+
+	cancel()
+
+	require.Error(t, cmd.Wait())
 	waitGone(t, pid)
 }

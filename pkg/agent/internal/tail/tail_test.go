@@ -37,6 +37,12 @@ func TestText(t *testing.T) {
 			want: "2026 ERROR failed",
 		},
 		{
+			name: "strips private modes and two-byte escapes",
+			in:   "\x1b[>4;1m\x1b7ready\x1b8\x1b[?25l",
+			max:  64,
+			want: "ready",
+		},
+		{
 			name: "strips links and cursor codes",
 			in:   "\x1b]8;;https://x.dev\x07docs\x1b]8;;\x07 \x1b[?25lread",
 			max:  64,

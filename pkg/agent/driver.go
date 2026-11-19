@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os/exec"
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/ai"
@@ -134,6 +135,34 @@ type Checker interface {
 	// A driver with no account signed in gives LoggedIn false and no
 	// error.
 	Check(ctx context.Context) (Status, error)
+}
+
+// Loginer is a [Driver] that can sign in to its CLI. The Claude Code and
+// Codex drivers implement it. A caller asks with a type assertion, as for
+// [Checker]. The command uses the binary and the environment of the
+// driver, so the sign-in goes to the config folder of the account.
+type Loginer interface {
+	// Login returns the command that signs in, not started. The caller
+	// starts it on a PTY, so the CLI shows the same screens as in a
+	// terminal. When ctx ends, the command stops with its whole process
+	// group.
+	Login(ctx context.Context) *exec.Cmd
+}
+
+// Link is the link that a sign-in prints for the person to open. Code
+// is the code that the person types on the page of the link. It is
+// empty if the sign-in has no code.
+type Link struct {
+	URL  string
+	Code string
+}
+
+// LinkReader is a [Loginer] whose sign-in prints a link. ReadLink finds
+// the link in the output of the sign-in. It reports false until the
+// output holds the whole link. The Claude Code and Codex drivers
+// implement it.
+type LinkReader interface {
+	ReadLink(output []byte) (Link, bool)
 }
 
 // Status is what a [Checker] reports about its driver. It never holds a

@@ -162,6 +162,10 @@ func newOptions(opts []Option) config {
 	return c
 }
 
+func (c config) environ() []string {
+	return cliproc.Environ(nil, c.env)
+}
+
 // newConfig returns the config of an agent of c with opts. It does no
 // I/O.
 func newConfig(c agent.Config, opts []Option) (config, error) {
@@ -481,7 +485,7 @@ func appServer(c config) *exec.Cmd {
 	args := append([]string{"app-server"}, permissionArgs(c)...)
 	cmd := exec.Command(c.binary, args...)
 	cmd.Dir = c.Dir
-	cmd.Env = cliproc.Environ(nil, c.env)
+	cmd.Env = c.environ()
 	return cmd
 }
 

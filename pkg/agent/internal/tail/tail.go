@@ -16,7 +16,12 @@ import (
 // ansi matches an ANSI escape sequence of a terminal: a CSI sequence,
 // such as a color code, an OSC sequence, such as a link, or a
 // two-byte escape.
-var ansi = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[@-_]`)
+var ansi = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[0-~]`)
+
+// StripANSI returns b with no ANSI escape sequence.
+func StripANSI(b []byte) []byte {
+	return ansi.ReplaceAll(b, nil)
+}
 
 // Plain returns s with no ANSI escape sequence and no space at its ends.
 func Plain(s string) string {
