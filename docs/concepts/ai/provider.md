@@ -38,6 +38,7 @@ DecisionModel{Model, Provider}  -> DecisionProvider
 - A provider keys its table of model features by family, such as `gpt-6`, and the longest family that starts the model ID wins. A later model of a known family then gets the features with no change to the code. If a later model drops a feature, that model needs its own key.
 - A tool with a schema that does not encode fails the call. With empty parameters, the model can call the tool with any input.
 - If a provider does not implement an optional capability, the call returns an error that wraps `errors.ErrUnsupported`.
+- A model that makes SVG images has the output `vector` and not `image`, and `catalog.VectorModel` resolves it. A caller that asks for a raster image cannot use an SVG, so `catalog.ImageModel` refuses a vector model. Both bind the same `ImageProvider`.
 - Each provider is its own module under `pkg/ai`, so a program that uses one provider does not download the SDK of another.
 - Anthropic object generation uses structured outputs, because Claude Fable 5.1, Opus 5.5, and Sonnet 5.5 reject a forced tool call.
 - A model that manages its effort gets the same effort at the top of each request. An effort message goes before each assistant message and at the end, so a change of level changes only the end of the request.

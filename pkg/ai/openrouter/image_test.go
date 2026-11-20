@@ -103,7 +103,8 @@ func TestGenerateImage_Error(t *testing.T) {
 }
 
 // TestListModels_ImageModels checks that the list holds the models of
-// GET /images/models with an image output, the vector models too.
+// GET /images/models with an image output, and a vector model with the
+// vector output.
 func TestListModels_ImageModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -141,7 +142,7 @@ func TestListModels_ImageModels(t *testing.T) {
 			ID:     "recraft/recraft-v4.1-vector",
 			Name:   "Recraft V4.1 Vector",
 			Input:  []ai.Modality{ai.ModalityText},
-			Output: []ai.Output{ai.OutputImage},
+			Output: []ai.Output{ai.OutputVector},
 		},
 	}, got)
 }

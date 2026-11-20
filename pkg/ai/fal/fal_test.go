@@ -275,11 +275,11 @@ func TestListModels(t *testing.T) {
 		ID:     "fal-ai/recraft/v4.1/text-to-vector",
 		Name:   "Recraft V4.1 Vector",
 		Input:  []ai.Modality{ai.ModalityText},
-		Output: []ai.Output{ai.OutputImage},
+		Output: []ai.Output{ai.OutputVector},
 	}, "a vector model gives an SVG")
 	for _, m := range got {
 		assert.NotEmpty(t, m.Name, m.ID)
-		assert.Equal(t, []ai.Output{ai.OutputImage}, m.Output, m.ID)
+		assert.Len(t, m.Output, 1, m.ID)
 	}
 }
 

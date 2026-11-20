@@ -81,6 +81,7 @@ var modalities = map[string]ai.Modality{
 var outputOrder = []ai.Output{
 	ai.OutputText,
 	ai.OutputImage,
+	ai.OutputVector,
 	ai.OutputDecisions,
 }
 
@@ -169,11 +170,17 @@ func (p *Provider) listModels(ctx context.Context, query string) ([]listedModel,
 // list of GET /models leaves out the models that make only images.
 const imageModelsRoute = "/images/models"
 
+// vectorSuffix ends the ID of a model that returns an SVG, such as
+// recraft/recraft-v4.1-vector. The list of OpenRouter gives a vector
+// model the image output, so the ID is the only sign.
+const vectorSuffix = "-vector"
+
 // listImageModels returns the models of GET /images/models, each with
-// the image output only. The Images API returns an image, even for a
-// model that also gives text in a chat. A vector model, such as
-// recraft/recraft-v4.1-vector, returns an SVG. The list has no prices,
-// because OpenRouter prices an image by the call, not by the token.
+// one output: the vector output for a model with [vectorSuffix], and
+// the image output for every other model. The Images API returns an
+// image, even for a model that also gives text in a chat. The list has
+// no prices, because OpenRouter prices an image by the call, not by the
+// token.
 func (p *Provider) listImageModels(ctx context.Context) ([]listedModel, error) {
 	url := p.cfg.baseURL + imageModelsRoute
 	body, err := httpapi.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
@@ -184,8 +191,12 @@ func (p *Provider) listImageModels(ctx context.Context) ([]listedModel, error) {
 	if err := json.Unmarshal(body, &list); err != nil {
 		return nil, fmt.Errorf("openrouter: list image models: %w", err)
 	}
-	for i := range list.Data {
-		list.Data[i].Architecture.OutputModalities = []string{string(ai.OutputImage)}
+	for i, m := range list.Data {
+		output := ai.OutputImage
+		if strings.HasSuffix(m.ID, vectorSuffix) {
+			output = ai.OutputVector
+		}
+		list.Data[i].Architecture.OutputModalities = []string{string(output)}
 	}
 	return list.Data, nil
 }

@@ -313,7 +313,7 @@ func (c *Catalog) LanguageModel(spec string) (ai.LanguageModel, error) {
 
 // ImageModel resolves spec to a model bound to its image provider. If
 // the provider of spec has no image generation, or the
-// [ai.Model.Output] of the model has no image, the error wraps
+// [ai.Model.Output] of the model has no [ai.OutputImage], the error wraps
 // [errors.ErrUnsupported].
 func (c *Catalog) ImageModel(spec string) (ai.ImageModel, error) {
 	m, id, err := c.resolve(spec)
@@ -325,6 +325,25 @@ func (c *Catalog) ImageModel(spec string) (ai.ImageModel, error) {
 		return ai.ImageModel{}, unsupported(id, "image generation")
 	}
 	if err := checkOutput(id, m, ai.OutputImage); err != nil {
+		return ai.ImageModel{}, err
+	}
+	return ai.ImageModel{Model: m, Provider: p}, nil
+}
+
+// VectorModel resolves spec to a model bound to its image provider, for
+// a model that makes SVG images. If the provider of spec has no image
+// generation, or the [ai.Model.Output] of the model has no
+// [ai.OutputVector], the error wraps [errors.ErrUnsupported].
+func (c *Catalog) VectorModel(spec string) (ai.ImageModel, error) {
+	m, id, err := c.resolve(spec)
+	if err != nil {
+		return ai.ImageModel{}, err
+	}
+	p := c.providersOf(id).image
+	if p == nil {
+		return ai.ImageModel{}, unsupported(id, "image generation")
+	}
+	if err := checkOutput(id, m, ai.OutputVector); err != nil {
 		return ai.ImageModel{}, err
 	}
 	return ai.ImageModel{Model: m, Provider: p}, nil

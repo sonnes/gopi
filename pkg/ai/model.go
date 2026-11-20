@@ -49,8 +49,12 @@ type Output string
 const (
 	// OutputText is text, for a [LanguageModel].
 	OutputText Output = "text"
-	// OutputImage is an image, for an [ImageModel].
+	// OutputImage is a raster image, such as a PNG, for an [ImageModel].
 	OutputImage Output = "image"
+	// OutputVector is an SVG image, for an [ImageModel]. A vector model
+	// has this output and not [OutputImage], because a caller that asks
+	// for a raster image cannot use an SVG.
+	OutputVector Output = "vector"
 	// OutputDecisions is the answers of a decision, for a
 	// [DecisionModel].
 	OutputDecisions Output = "decisions"

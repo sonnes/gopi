@@ -25,6 +25,9 @@ type endpoint struct {
 	resolutions []string
 	// count reports that the endpoint takes the field "num_images".
 	count bool
+	// vector reports that the endpoint gives an SVG, so its model has
+	// the output [ai.OutputVector].
+	vector bool
 	// syncMode reports that the endpoint takes the field "sync_mode".
 	// Without it, the answer holds a URL and no data.
 	syncMode bool
@@ -70,10 +73,10 @@ var endpoints = []endpoint{
 		size: sizeImageSize,
 	},
 	{
-		// The vector model gives an SVG.
-		id:   "fal-ai/recraft/v4.1/text-to-vector",
-		name: "Recraft V4.1 Vector",
-		size: sizeImageSize,
+		id:     "fal-ai/recraft/v4.1/text-to-vector",
+		name:   "Recraft V4.1 Vector",
+		size:   sizeImageSize,
+		vector: true,
 	},
 	{
 		id:          "microsoft/mai-image-2.7/text-to-image",

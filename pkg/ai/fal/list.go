@@ -19,11 +19,15 @@ const pricingRoute = "/v1/models/pricing"
 func (p *Provider) ListModels(context.Context) ([]ai.Model, error) {
 	models := make([]ai.Model, 0, len(endpoints))
 	for _, e := range endpoints {
+		output := ai.OutputImage
+		if e.vector {
+			output = ai.OutputVector
+		}
 		models = append(models, ai.Model{
 			ID:     e.id,
 			Name:   e.name,
 			Input:  []ai.Modality{ai.ModalityText},
-			Output: []ai.Output{ai.OutputImage},
+			Output: []ai.Output{output},
 		})
 	}
 	return models, nil

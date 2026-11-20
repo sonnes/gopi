@@ -112,3 +112,22 @@ func TestCatalog_DriverRefusesMediaModel(t *testing.T) {
 
 	assert.ErrorIs(t, err, errors.ErrUnsupported, "an image model starts no agent")
 }
+
+// TestCatalog_VectorModel checks that a vector model resolves only as a
+// vector model, and an image model only as an image model, so a picker
+// of one never gives the other.
+func TestCatalog_VectorModel(t *testing.T) {
+	c := catalog.New()
+	paints := ai.Model{ID: "paints", Output: []ai.Output{ai.OutputImage}}
+	draws := ai.Model{ID: "draws", Output: []ai.Output{ai.OutputVector}}
+	require.NoError(t, c.RegisterProvider("paint", imageProvider{}, paints, draws))
+
+	vector, err := c.VectorModel("paint/draws")
+	require.NoError(t, err)
+	assert.Equal(t, draws, vector.Model)
+
+	_, err = c.VectorModel("paint/paints")
+	assert.ErrorIs(t, err, errors.ErrUnsupported, "an image model makes no SVG")
+	_, err = c.ImageModel("paint/draws")
+	assert.ErrorIs(t, err, errors.ErrUnsupported, "a vector model makes no raster image")
+}

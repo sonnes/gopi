@@ -51,6 +51,7 @@ var (
 	knownOutput = []ai.Output{
 		ai.OutputText,
 		ai.OutputImage,
+		ai.OutputVector,
 		ai.OutputDecisions,
 		ai.OutputSpeech,
 		ai.OutputTranscript,
