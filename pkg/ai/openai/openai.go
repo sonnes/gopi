@@ -1,7 +1,8 @@
 // Package openai is the provider for the OpenAI Responses API. It
 // implements [ai.TextProvider], [ai.ObjectProvider], [ai.TokenCounter],
-// [ai.ImageProvider], [ai.DecisionProvider], [ai.ModelLister], and
-// [ai.KeyChecker]. It also
+// [ai.ImageProvider], [ai.DecisionProvider], [ai.SpeechProvider],
+// [ai.TranscriptionProvider], [ai.ModelLister], and [ai.KeyChecker]. It
+// also
 // serves a compatible Responses API, such as the one of OpenRouter,
 // through [BaseURL].
 //

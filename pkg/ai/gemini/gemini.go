@@ -1,5 +1,6 @@
 // Package gemini is the provider for the Gemini Developer API. It
-// implements [ai.TextProvider] and [ai.ObjectProvider] on the
+// implements [ai.TextProvider], [ai.ObjectProvider],
+// [ai.SpeechProvider], and [ai.TranscriptionProvider] on the
 // Interactions API, [ai.DecisionProvider] on the Decisions API, and
 // [ai.ImageProvider], [ai.ModelLister], and [ai.KeyChecker] on the
 // models API. It does not implement [ai.TokenCounter], because the

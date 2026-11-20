@@ -222,6 +222,34 @@ var ImageSize = NewOption[string]()
 // API of the provider picks the number.
 var ImageCount = NewOption[int]()
 
+// AspectRatio sets the ratio of the width to the height of a generated
+// image, for example "9:16". A provider sends it as it is, or maps it to
+// a ratio that the model takes. If the model does not take the ratio,
+// the call can fail. If it is unset, the API of the provider picks the
+// ratio.
+var AspectRatio = NewOption[string]()
+
+// ImageResolution sets the size class of a generated image: "1K", "2K",
+// or "4K". A provider sends it as it is, or maps it to a class that the
+// model takes. If the model does not take the class, the call can fail.
+// If it is unset, the API of the provider picks the class.
+var ImageResolution = NewOption[string]()
+
+// Character sets the ID of a character that the owner trained with the
+// provider, such as a Soul ID of Higgsfield. A provider with no trained
+// characters returns an error that wraps [errors.ErrUnsupported].
+var Character = NewOption[string]()
+
+// Voice sets the voice of a [SpeechModel], by the name or the ID that
+// the provider gives it, for example "marin" for OpenAI. If it is
+// unset, the provider picks its default voice.
+var Voice = NewOption[string]()
+
+// Language sets the language of the speech of a [TranscriptionModel],
+// as an ISO 639-1 code, for example "en". If it is unset, the API
+// detects the language.
+var Language = NewOption[string]()
+
 // MaxRetries sets how many times a provider sends a request again after
 // an error that can pass, such as a rate limit or an overload. A
 // provider retries only before the first event of the stream. If it is

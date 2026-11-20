@@ -434,3 +434,15 @@ func TestGenerateImage_Retry(t *testing.T) {
 	require.Len(t, resp.Images, 1)
 	assert.Equal(t, int32(2), s.calls.Load())
 }
+
+func TestTranscribe_Retry(t *testing.T) {
+	s := &sequence{handlers: []http.HandlerFunc{retryLater, answer(`{"text":"again"}`)}}
+	p := sequenceProvider(t, s)
+	audio := ai.File{MediaType: "audio/mpeg", Data: []byte("sound")}
+
+	got, err := p.Transcribe(t.Context(), ai.Model{ID: "gpt-transcribe"}, audio, ai.MaxRetries(1))
+
+	require.NoError(t, err)
+	assert.Equal(t, "again", got.Text)
+	assert.Equal(t, int32(2), s.calls.Load())
+}

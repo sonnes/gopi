@@ -7,8 +7,11 @@ go 1.27
 replace (
 	github.com/sonnes/gopi => ../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../pkg/ai/anthropic
+	github.com/sonnes/gopi/pkg/ai/elevenlabs => ../../pkg/ai/elevenlabs
+	github.com/sonnes/gopi/pkg/ai/fal => ../../pkg/ai/fal
 	github.com/sonnes/gopi/pkg/ai/fireworks => ../../pkg/ai/fireworks
 	github.com/sonnes/gopi/pkg/ai/gemini => ../../pkg/ai/gemini
+	github.com/sonnes/gopi/pkg/ai/higgsfield => ../../pkg/ai/higgsfield
 	github.com/sonnes/gopi/pkg/ai/openai => ../../pkg/ai/openai
 	github.com/sonnes/gopi/pkg/ai/openaichat => ../../pkg/ai/openaichat
 	github.com/sonnes/gopi/pkg/ai/openrouter => ../../pkg/ai/openrouter
@@ -17,6 +20,8 @@ replace (
 
 require (
 	github.com/sonnes/gopi v0.0.4
+	github.com/sonnes/gopi/pkg/ai/fal v0.0.4
+	github.com/sonnes/gopi/pkg/ai/higgsfield v0.0.4
 	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.4
 	github.com/sonnes/gopi/pkg/catalog/env v0.0.4
 	github.com/stretchr/testify v1.11.1
@@ -44,6 +49,7 @@ require (
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.4 // indirect
+	github.com/sonnes/gopi/pkg/ai/elevenlabs v0.0.4 // indirect
 	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.4 // indirect
 	github.com/sonnes/gopi/pkg/ai/gemini v0.0.4 // indirect
 	github.com/sonnes/gopi/pkg/ai/openai v0.0.4 // indirect

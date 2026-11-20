@@ -19,6 +19,9 @@ One page for each abstraction in gopi. A page holds the design rules of the abst
 | [Host Provider](ai/host-provider.md) | How a provider for a server that copies an OpenAI API sends its calls through the provider of that API, and lists the models of the server with their limits and prices. |
 | [Decision](ai/decision.md) | How a decision model answers closed questions about one input with probabilities, and how each provider maps the questions to its API. |
 | [ChatGPT Plan](ai/chatgpt.md) | How gopi signs in with a ChatGPT account, keeps its rotating tokens, and calls the Responses API on the plan of the user. |
+| [ElevenLabs Provider](ai/elevenlabs.md) | How the ElevenLabs provider speaks a text and transcribes an audio file with plain HTTP requests, with no text generation. |
+| [Higgsfield Provider](ai/higgsfield.md) | How the Higgsfield provider generates images with the SOUL models through an asynchronous API, and waits for each request to end. |
+| [fal Provider](ai/fal.md) | How the fal provider generates images with a sync call to a fixed list of text-to-image endpoints, and maps the size options to the fields of each endpoint. |
 
 ## catalog
 

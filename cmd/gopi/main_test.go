@@ -42,7 +42,7 @@ func detector(id string, found bool, models ...ai.Model) catalog.Detector {
 		Provider: id,
 		Source:   strings.ToUpper(id) + "_KEY",
 		Models:   models,
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			return lister{}, found
 		},
 	}
@@ -60,7 +60,7 @@ func countingDetector(id string, listed []ai.Model, err error, calls *int) catal
 	return catalog.Detector{
 		Provider: id,
 		Source:   strings.ToUpper(id) + "_KEY",
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			p := lister{
 				models: listed,
 				err:    err,

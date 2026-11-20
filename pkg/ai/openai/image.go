@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"strconv"
+	"strings"
 
 	sdk "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/packages/param"
@@ -16,7 +18,10 @@ import (
 const defaultImageFormat = "png"
 
 // GenerateImage generates images of prompt with the Images API. It reads
-// [ai.ImageSize] and [ai.ImageCount]. The request does not set a
+// [ai.ImageSize], [ai.AspectRatio], and [ai.ImageCount]. An exact size
+// wins over the ratio. The API takes three sizes, so the ratio picks the
+// square, the portrait, or the landscape size. The provider ignores
+// [ai.ImageResolution]. The request does not set a
 // response format, because a GPT Image model always returns base64
 // data.
 func (p *Provider) GenerateImage(
@@ -61,6 +66,37 @@ func (p *Provider) GenerateImage(
 	return &ai.ImageResponse{Images: images}, nil
 }
 
+// The three sizes of the Images API.
+const (
+	squareSize    = "1024x1024"
+	portraitSize  = "1024x1536"
+	landscapeSize = "1536x1024"
+)
+
+// sizeOfRatio returns the size of the Images API that is nearest to a
+// ratio such as "9:16". It returns "" for a ratio that it cannot read,
+// so the API picks the size.
+func sizeOfRatio(ratio string) string {
+	w, h, ok := strings.Cut(ratio, ":")
+	if !ok {
+		return ""
+	}
+	width, errW := strconv.ParseFloat(w, 64)
+	height, errH := strconv.ParseFloat(h, 64)
+	readable := errW == nil && errH == nil && width > 0 && height > 0
+	if !readable {
+		return ""
+	}
+	switch {
+	case width > height:
+		return landscapeSize
+	case width < height:
+		return portraitSize
+	default:
+		return squareSize
+	}
+}
+
 // buildImageParams builds the request of an image call.
 func buildImageParams(model ai.Model, prompt string, opts ai.Options) sdk.ImageGenerateParams {
 	params := sdk.ImageGenerateParams{
@@ -68,7 +104,12 @@ func buildImageParams(model ai.Model, prompt string, opts ai.Options) sdk.ImageG
 		Model:  sdk.ImageModel(model.ID),
 	}
 
-	if size, ok := ai.GetOption(opts, ai.ImageSize); ok && size != "" {
+	size, _ := ai.GetOption(opts, ai.ImageSize)
+	if size == "" {
+		ratio, _ := ai.GetOption(opts, ai.AspectRatio)
+		size = sizeOfRatio(ratio)
+	}
+	if size != "" {
 		params.Size = sdk.ImageGenerateParamsSize(size)
 	}
 	if n, ok := ai.GetOption(opts, ai.ImageCount); ok && n > 0 {

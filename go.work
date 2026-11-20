@@ -7,8 +7,11 @@ use (
 	./examples
 	./pkg/ai/anthropic
 	./pkg/ai/chatgpt
+	./pkg/ai/elevenlabs
+	./pkg/ai/fal
 	./pkg/ai/fireworks
 	./pkg/ai/gemini
+	./pkg/ai/higgsfield
 	./pkg/ai/openai
 	./pkg/ai/openaichat
 	./pkg/ai/openrouter

@@ -1,6 +1,10 @@
 package catalog
 
 import (
+	"cmp"
+	"errors"
+	"fmt"
+
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 )
@@ -20,8 +24,9 @@ type Detector struct {
 	// [ModelFile.Of] returns the models of models.json in this order.
 	Models []ai.Model
 	// Detect builds the provider. If the credential is absent, it
-	// returns false.
-	Detect func() (ai.TextProvider, bool)
+	// returns false. The provider implements one or more of the
+	// capabilities that [Catalog.RegisterProvider] takes.
+	Detect func() (any, bool)
 }
 
 // DriverDetector builds a driver from one source, such as a CLI on the
@@ -48,9 +53,7 @@ type Detection struct {
 }
 
 // Detect runs ds in order and registers each provider that a detector
-// builds. It registers the provider for images too, if the provider
-// implements [ai.ImageProvider], and for decisions, if it implements
-// [ai.DecisionProvider].
+// builds, with [Catalog.RegisterProvider].
 //
 // Order is precedence. If two detectors have the same Provider, the
 // first one that finds its credential wins, and Detect skips the rest.
@@ -67,7 +70,9 @@ func (c *Catalog) Detect(ds ...Detector) []Detection {
 			continue
 		}
 		done[d.Provider] = true
-		c.register(d.Provider, p, d.Models)
+		if err := c.RegisterProvider(d.Provider, p, d.Models...); err != nil {
+			continue
+		}
 		found = append(found, Detection{
 			Provider: d.Provider,
 			Source:   d.Source,
@@ -100,12 +105,36 @@ func (c *Catalog) DetectDrivers(ds ...DriverDetector) []Detection {
 	return found
 }
 
-func (c *Catalog) register(id string, p ai.TextProvider, models []ai.Model) {
-	c.RegisterTextProvider(id, p, models...)
-	if ip, ok := p.(ai.ImageProvider); ok {
-		c.RegisterImageProvider(id, ip)
+// RegisterProvider registers p under id for each capability that it
+// implements: [ai.TextProvider], [ai.ImageProvider],
+// [ai.DecisionProvider], [ai.SpeechProvider], and
+// [ai.TranscriptionProvider]. It keeps a capability of id that p does
+// not implement. It adds models to the model index. If p
+// implements none of them, it registers nothing and the error wraps
+// [errors.ErrUnsupported].
+func (c *Catalog) RegisterProvider(id string, p any, models ...ai.Model) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	var e providers
+	e.text, _ = p.(ai.TextProvider)
+	e.image, _ = p.(ai.ImageProvider)
+	e.decision, _ = p.(ai.DecisionProvider)
+	e.speech, _ = p.(ai.SpeechProvider)
+	e.transcribe, _ = p.(ai.TranscriptionProvider)
+	if e == (providers{}) {
+		return fmt.Errorf(
+			"catalog: provider %q of type %T has no capability: %w",
+			id,
+			p,
+			errors.ErrUnsupported,
+		)
 	}
-	if dp, ok := p.(ai.DecisionProvider); ok {
-		c.RegisterDecisionProvider(id, dp)
-	}
+	got := c.entryLocked(id)
+	got.text = cmp.Or(e.text, got.text)
+	got.image = cmp.Or(e.image, got.image)
+	got.decision = cmp.Or(e.decision, got.decision)
+	got.speech = cmp.Or(e.speech, got.speech)
+	got.transcribe = cmp.Or(e.transcribe, got.transcribe)
+	addModels(c.models, id, models)
+	return nil
 }

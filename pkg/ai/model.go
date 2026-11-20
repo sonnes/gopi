@@ -40,6 +40,7 @@ const (
 	ModalityText  Modality = "text"
 	ModalityImage Modality = "image"
 	ModalityPDF   Modality = "pdf"
+	ModalityAudio Modality = "audio"
 )
 
 // Output is a kind of result that a model gives.
@@ -53,6 +54,11 @@ const (
 	// OutputDecisions is the answers of a decision, for a
 	// [DecisionModel].
 	OutputDecisions Output = "decisions"
+	// OutputSpeech is audio of a text, for a [SpeechModel].
+	OutputSpeech Output = "speech"
+	// OutputTranscript is the text of an audio file, for a
+	// [TranscriptionModel].
+	OutputTranscript Output = "transcript"
 )
 
 // tokensPerPriceUnit is the number of tokens that a price is for.

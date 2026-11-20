@@ -16,8 +16,9 @@ var _ ai.ImageProvider = (*Provider)(nil)
 // such as gemini-nano-banana-2.1. Imagen is shut down, so the image
 // models are the only image API. One request gives one image, so for
 // [ai.ImageCount] images the provider sends that number of requests.
-// The provider sends [ai.ImageSize] as it is. If the model does not take
-// the size, the API returns a [*Error].
+// The provider sends [ai.AspectRatio] and [ai.ImageResolution] as they
+// are. With no resolution, it sends [ai.ImageSize] as the size class. If
+// the model does not take a value, the API returns a [*Error].
 func (p *Provider) GenerateImage(
 	ctx context.Context,
 	model ai.Model,
@@ -31,8 +32,16 @@ func (p *Provider) GenerateImage(
 	config := &genai.GenerateContentConfig{
 		ResponseModalities: []string{string(genai.ModalityImage)},
 	}
-	if size, ok := ai.GetOption(opts, ai.ImageSize); ok {
-		config.ImageConfig = &genai.ImageConfig{ImageSize: size}
+	ratio, _ := ai.GetOption(opts, ai.AspectRatio)
+	size, _ := ai.GetOption(opts, ai.ImageSize)
+	if res, ok := ai.GetOption(opts, ai.ImageResolution); ok && res != "" {
+		size = res
+	}
+	if ratio != "" || size != "" {
+		config.ImageConfig = &genai.ImageConfig{
+			AspectRatio: ratio,
+			ImageSize:   size,
+		}
 	}
 	if headers, ok := ai.GetOption(opts, ai.Headers); ok {
 		h := make(http.Header, len(headers))

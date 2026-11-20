@@ -35,6 +35,8 @@ ai.LanguageModel --+
 - Neither provider sends `prompt_cache_options`, because OpenRouter rejects it.
 - On a known GPT model, a removal keeps the tool list and limits the model with an `allowed_tools` tool choice, so the cache holds. On Responses, an addition on that model goes in place as an `additional_tools` item for the same reason. The form of each other change is in [Tool Change](../agent/tool-change.md).
 - `openaichat` sends only the fields that OpenAI, OpenRouter, and Fireworks all accept, because Fireworks rejects an unknown field. The cache breakpoint goes only with `CacheBreakpoints` of `openaichat.New`, and the cache key and the long retention go only when the call sets them.
+- `openai` asks the speech API for mp3, and the voice is `marin` when the call sets no `ai.Voice`. OpenAI names `marin` and `cedar` as the voices with the best quality.
+- `openai` sends the audio of a transcription with a file name that ends in the extension of its media type, such as `audio.mp3`. The API reads the format of the audio from the file name.
 - `openaichat` sends a thinking block back as `reasoning_content`. Fireworks needs it for a model with interleaved thinking, and OpenRouter reads it as its reasoning field. OpenAI sends no reasoning text on this API, so an OpenAI response has no thinking block.
 
 ## Map
@@ -45,6 +47,7 @@ ai.LanguageModel --+
 | Convert messages to Responses items   | `pkg/ai/openai/convert.go`                                             |
 | Read a Responses stream               | `pkg/ai/openai/openai.go`                                              |
 | Generate an image                     | `pkg/ai/openai/image.go`                                               |
+| Speak a text or transcribe audio      | `pkg/ai/openai/audio.go`                                               |
 | Shape a request for the ChatGPT plan  | `pkg/ai/openai/plan.go`                                                |
 | Build a Chat Completions request      | `pkg/ai/openaichat/params.go`                                          |
 | Convert messages for Chat Completions | `pkg/ai/openaichat/convert.go`                                         |

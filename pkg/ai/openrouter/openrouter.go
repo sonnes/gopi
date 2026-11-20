@@ -1,9 +1,10 @@
 // Package openrouter is the provider for OpenRouter. It calls the
 // Responses API of OpenRouter through the provider of package openai,
-// answers closed questions with its Decisions API, lists the models of
-// OpenRouter with their limits and prices, and checks a key with its
-// credit. It implements [ai.TextProvider], [ai.ObjectProvider],
-// [ai.DecisionProvider], [ai.ModelLister], and [ai.KeyChecker].
+// answers closed questions with its Decisions API, makes images with
+// its Images API, lists the models of OpenRouter with their limits and
+// prices, and checks a key with its credit. It implements
+// [ai.TextProvider], [ai.ObjectProvider], [ai.DecisionProvider],
+// [ai.ImageProvider], [ai.ModelLister], and [ai.KeyChecker].
 //
 // A caller must obey these rules:
 //

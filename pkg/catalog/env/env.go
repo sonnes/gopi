@@ -26,10 +26,12 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/agent/claude"
 	"github.com/sonnes/gopi/pkg/agent/codex"
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/anthropic"
+	"github.com/sonnes/gopi/pkg/ai/elevenlabs"
+	"github.com/sonnes/gopi/pkg/ai/fal"
 	"github.com/sonnes/gopi/pkg/ai/fireworks"
 	"github.com/sonnes/gopi/pkg/ai/gemini"
+	"github.com/sonnes/gopi/pkg/ai/higgsfield"
 	"github.com/sonnes/gopi/pkg/ai/openai"
 	"github.com/sonnes/gopi/pkg/ai/openaichat"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
@@ -48,6 +50,11 @@ import (
 //     models that come from models.dev.
 //   - gemini, from GOOGLE_API_KEY, or else GEMINI_API_KEY. The Google
 //     SDKs read the two variables in this order.
+//   - elevenlabs, from ELEVENLABS_API_KEY. It has speech and
+//     transcription, and no text.
+//   - fal, from FAL_KEY. It has images, and no text.
+//   - higgsfield, from HF_KEY, as "id:secret". It has images, and no
+//     text. The Python SDK of Higgsfield reads the same variable.
 //   - openaichat, from OPENAI_API_KEY. It registers no models, because
 //     it serves any server at OPENAI_BASE_URL. Call
 //     [catalog.Catalog.FetchModels] to list the models of the server.
@@ -60,7 +67,7 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			Provider: "anthropic",
 			Source:   "ANTHROPIC_API_KEY",
 			Models:   file.Of("anthropic"),
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				if os.Getenv("ANTHROPIC_API_KEY") == "" {
 					return nil, false
 				}
@@ -71,7 +78,7 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			Provider: "openai",
 			Source:   "OPENAI_API_KEY",
 			Models:   file.Of("openai"),
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				if os.Getenv("OPENAI_API_KEY") == "" {
 					return nil, false
 				}
@@ -82,7 +89,7 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			Provider: "openrouter",
 			Source:   "OPENROUTER_API_KEY",
 			Models:   file.Of("openrouter"),
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				key := os.Getenv("OPENROUTER_API_KEY")
 				if key == "" {
 					return nil, false
@@ -94,7 +101,7 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			Provider: "fireworks",
 			Source:   "FIREWORKS_API_KEY",
 			Models:   file.Of("fireworks"),
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				key := os.Getenv("FIREWORKS_API_KEY")
 				if key == "" {
 					return nil, false
@@ -106,7 +113,7 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			Provider: "gemini",
 			Source:   "GOOGLE_API_KEY or GEMINI_API_KEY",
 			Models:   file.Of("gemini"),
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				key := cmp.Or(os.Getenv("GOOGLE_API_KEY"), os.Getenv("GEMINI_API_KEY"))
 				if key == "" {
 					return nil, false
@@ -115,9 +122,45 @@ func Detectors(file catalog.ModelFile) []catalog.Detector {
 			},
 		},
 		{
+			Provider: "elevenlabs",
+			Source:   "ELEVENLABS_API_KEY",
+			Models:   file.Of("elevenlabs"),
+			Detect: func() (any, bool) {
+				key := os.Getenv("ELEVENLABS_API_KEY")
+				if key == "" {
+					return nil, false
+				}
+				return elevenlabs.New(elevenlabs.APIKey(key)), true
+			},
+		},
+		{
+			Provider: "fal",
+			Source:   "FAL_KEY",
+			Models:   file.Of("fal"),
+			Detect: func() (any, bool) {
+				key := os.Getenv("FAL_KEY")
+				if key == "" {
+					return nil, false
+				}
+				return fal.New(fal.APIKey(key)), true
+			},
+		},
+		{
+			Provider: "higgsfield",
+			Source:   "HF_KEY",
+			Models:   file.Of("higgsfield"),
+			Detect: func() (any, bool) {
+				key := os.Getenv("HF_KEY")
+				if key == "" {
+					return nil, false
+				}
+				return higgsfield.New(higgsfield.APIKey(key)), true
+			},
+		},
+		{
 			Provider: "openaichat",
 			Source:   "OPENAI_API_KEY",
-			Detect: func() (ai.TextProvider, bool) {
+			Detect: func() (any, bool) {
 				if os.Getenv("OPENAI_API_KEY") == "" {
 					return nil, false
 				}

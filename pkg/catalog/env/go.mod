@@ -5,8 +5,11 @@ go 1.27
 require (
 	github.com/sonnes/gopi v0.0.4
 	github.com/sonnes/gopi/pkg/ai/anthropic v0.0.4
+	github.com/sonnes/gopi/pkg/ai/elevenlabs v0.0.4
+	github.com/sonnes/gopi/pkg/ai/fal v0.0.4
 	github.com/sonnes/gopi/pkg/ai/fireworks v0.0.4
 	github.com/sonnes/gopi/pkg/ai/gemini v0.0.4
+	github.com/sonnes/gopi/pkg/ai/higgsfield v0.0.4
 	github.com/sonnes/gopi/pkg/ai/openai v0.0.4
 	github.com/sonnes/gopi/pkg/ai/openaichat v0.0.4
 	github.com/sonnes/gopi/pkg/ai/openrouter v0.0.4
@@ -63,8 +66,11 @@ require (
 replace (
 	github.com/sonnes/gopi => ../../..
 	github.com/sonnes/gopi/pkg/ai/anthropic => ../../ai/anthropic
+	github.com/sonnes/gopi/pkg/ai/elevenlabs => ../../ai/elevenlabs
+	github.com/sonnes/gopi/pkg/ai/fal => ../../ai/fal
 	github.com/sonnes/gopi/pkg/ai/fireworks => ../../ai/fireworks
 	github.com/sonnes/gopi/pkg/ai/gemini => ../../ai/gemini
+	github.com/sonnes/gopi/pkg/ai/higgsfield => ../../ai/higgsfield
 	github.com/sonnes/gopi/pkg/ai/openai => ../../ai/openai
 	github.com/sonnes/gopi/pkg/ai/openaichat => ../../ai/openaichat
 	github.com/sonnes/gopi/pkg/ai/openrouter => ../../ai/openrouter

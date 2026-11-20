@@ -31,7 +31,7 @@ const smallFile = `{
   }
 }`
 
-// knownLevels and knownInput are the values of the ai package that the
+// knownLevels, knownInput, and knownOutput are the values of the ai package that the
 // file can hold.
 var (
 	knownLevels = []ai.ThinkingLevel{
@@ -42,7 +42,19 @@ var (
 		ai.ThinkingXHigh,
 		ai.ThinkingMax,
 	}
-	knownInput = []ai.Modality{ai.ModalityText, ai.ModalityImage, ai.ModalityPDF}
+	knownInput = []ai.Modality{
+		ai.ModalityText,
+		ai.ModalityImage,
+		ai.ModalityPDF,
+		ai.ModalityAudio,
+	}
+	knownOutput = []ai.Output{
+		ai.OutputText,
+		ai.OutputImage,
+		ai.OutputDecisions,
+		ai.OutputSpeech,
+		ai.OutputTranscript,
+	}
 )
 
 func TestReadModelFile_Path(t *testing.T) {
@@ -155,6 +167,9 @@ func TestRepoFile(t *testing.T) {
 				}
 				for _, mod := range m.Input {
 					assert.Contains(t, knownInput, mod, m.ID)
+				}
+				for _, out := range m.Output {
+					assert.Contains(t, knownOutput, out, m.ID)
 				}
 				checkPricing(t, m.ID, m.Pricing)
 				checkLimits(t, m.Model)

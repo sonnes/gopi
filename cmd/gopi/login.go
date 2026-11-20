@@ -15,7 +15,6 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/ai/chatgpt"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
@@ -47,7 +46,7 @@ func detectors(home string, set catalog.ModelFile) []catalog.Detector {
 		Provider: loginProviderID,
 		Source:   "gopi login chatgpt",
 		Models:   set.Of(loginProviderID),
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			path := authPath(home)
 			a, err := chatgpt.LoadAccount(path)
 			if err != nil || !a.SignedIn() {

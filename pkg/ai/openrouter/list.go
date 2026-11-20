@@ -110,14 +110,16 @@ const toolModels = "supported_parameters=tools"
 // GET /models does not hold it.
 const decisionModels = "output_modalities=decisions"
 
-// ListModels lists the text models with tools of GET /models, and then
-// the decision models, with their limits, their input modalities, their
-// outputs, their thinking levels, and their prices. A model of both
-// lists is in the result once. It skips the models of the Batch API.
+// ListModels lists the text models with tools of GET /models, then
+// the decision models, and then the image models of GET /images/models,
+// with their limits, their input modalities, their outputs, their
+// thinking levels, and their prices. A model of two lists is in the
+// result once, as the first list gives it. It skips the models of the
+// Batch API.
 //
-// The list of the decision models is best effort. If it fails, the
-// result holds the text models only, because a failed list of decision
-// models must not stop a text session.
+// The lists of the decision models and of the image models are best
+// effort. If one fails, the result holds the other models, because a
+// failed list of these models must not stop a text session.
 //
 // A price that OpenRouter gives as negative, such as the price of a
 // router, is unknown and stays zero. The output cap is at most the
@@ -131,6 +133,10 @@ func (p *Provider) ListModels(ctx context.Context) ([]ai.Model, error) {
 	deciders, err := p.listModels(ctx, decisionModels)
 	if err == nil {
 		listed = append(listed, deciders...)
+	}
+	painters, err := p.listImageModels(ctx)
+	if err == nil {
+		listed = append(listed, painters...)
 	}
 
 	var models []ai.Model
@@ -155,6 +161,31 @@ func (p *Provider) listModels(ctx context.Context, query string) ([]listedModel,
 	var list listResponse
 	if err := json.Unmarshal(body, &list); err != nil {
 		return nil, fmt.Errorf("openrouter: list models: %w", err)
+	}
+	return list.Data, nil
+}
+
+// imageModelsRoute is the route of the list of the image models. The
+// list of GET /models leaves out the models that make only images.
+const imageModelsRoute = "/images/models"
+
+// listImageModels returns the models of GET /images/models, each with
+// the image output only. The Images API returns an image, even for a
+// model that also gives text in a chat. A vector model, such as
+// recraft/recraft-v4.1-vector, returns an SVG. The list has no prices,
+// because OpenRouter prices an image by the call, not by the token.
+func (p *Provider) listImageModels(ctx context.Context) ([]listedModel, error) {
+	url := p.cfg.baseURL + imageModelsRoute
+	body, err := httpapi.Get(ctx, p.cfg.httpClient, url, p.cfg.apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("openrouter: list image models: %w", err)
+	}
+	var list listResponse
+	if err := json.Unmarshal(body, &list); err != nil {
+		return nil, fmt.Errorf("openrouter: list image models: %w", err)
+	}
+	for i := range list.Data {
+		list.Data[i].Architecture.OutputModalities = []string{string(ai.OutputImage)}
 	}
 	return list.Data, nil
 }

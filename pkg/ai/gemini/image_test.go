@@ -109,3 +109,34 @@ func TestGenerateImage_Retries(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), calls.Load())
 }
+
+// TestGenerateImage_RatioAndResolution checks that the provider sends
+// [ai.AspectRatio] and [ai.ImageResolution] in the image config, and
+// that the resolution wins over [ai.ImageSize].
+func TestGenerateImage_RatioAndResolution(t *testing.T) {
+	p, body := fakeProvider(t, answer(imageBody))
+
+	_, err := p.GenerateImage(
+		t.Context(),
+		imageModel,
+		"A red circle",
+		ai.JoinOptions(
+			ai.AspectRatio("9:16"),
+			ai.ImageResolution("4K"),
+			ai.ImageSize("1K"),
+		),
+	)
+	require.NoError(t, err)
+
+	var got struct {
+		Config struct {
+			Image struct {
+				Ratio string `json:"aspectRatio"`
+				Size  string `json:"imageSize"`
+			} `json:"imageConfig"`
+		} `json:"generationConfig"`
+	}
+	require.NoError(t, json.Unmarshal(body(), &got))
+	assert.Equal(t, "9:16", got.Config.Image.Ratio)
+	assert.Equal(t, "4K", got.Config.Image.Size)
+}

@@ -17,7 +17,7 @@ func found(provider, source string, p ai.TextProvider, models ...ai.Model) catal
 		Provider: provider,
 		Source:   source,
 		Models:   models,
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			return p, true
 		},
 	}
@@ -28,7 +28,7 @@ func missing(provider, source string) catalog.Detector {
 	return catalog.Detector{
 		Provider: provider,
 		Source:   source,
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			return nil, false
 		},
 	}

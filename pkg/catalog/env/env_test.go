@@ -30,6 +30,9 @@ var variables = []string{
 	"FIREWORKS_API_KEY",
 	"GEMINI_API_KEY",
 	"GOOGLE_API_KEY",
+	"ELEVENLABS_API_KEY",
+	"FAL_KEY",
+	"HF_KEY",
 }
 
 // geminiSource is the source of the gemini detector. The Google SDKs
@@ -89,6 +92,27 @@ func TestDetectors(t *testing.T) {
 			},
 		},
 		{
+			name: "elevenlabs",
+			set:  []string{"ELEVENLABS_API_KEY"},
+			want: []catalog.Detection{
+				{Provider: "elevenlabs", Source: "ELEVENLABS_API_KEY"},
+			},
+		},
+		{
+			name: "fal",
+			set:  []string{"FAL_KEY"},
+			want: []catalog.Detection{
+				{Provider: "fal", Source: "FAL_KEY"},
+			},
+		},
+		{
+			name: "higgsfield",
+			set:  []string{"HF_KEY"},
+			want: []catalog.Detection{
+				{Provider: "higgsfield", Source: "HF_KEY"},
+			},
+		},
+		{
 			name: "all, in chain order",
 			set:  variables,
 			want: []catalog.Detection{
@@ -97,6 +121,9 @@ func TestDetectors(t *testing.T) {
 				{Provider: "openrouter", Source: "OPENROUTER_API_KEY"},
 				{Provider: "fireworks", Source: "FIREWORKS_API_KEY"},
 				{Provider: "gemini", Source: geminiSource},
+				{Provider: "elevenlabs", Source: "ELEVENLABS_API_KEY"},
+				{Provider: "fal", Source: "FAL_KEY"},
+				{Provider: "higgsfield", Source: "HF_KEY"},
 				{Provider: "openaichat", Source: "OPENAI_API_KEY"},
 			},
 		},
@@ -147,9 +174,37 @@ func TestDetectors_Capabilities(t *testing.T) {
 	_, err := c.LanguageModel("openaichat/llama-4")
 	require.ErrorIs(t, err, catalog.ErrUnknownModel)
 
-	// OpenRouter and Fireworks have no image API.
-	c.RegisterModel("openrouter", ai.Model{ID: "openai/gpt-image-2"})
-	_, err = c.ImageModel("openrouter/openai/gpt-image-2")
+	// ElevenLabs has speech and transcription, and no text.
+	c.RegisterModel("elevenlabs", ai.Model{ID: "eleven_v4"})
+	_, err = c.SpeechModel("elevenlabs/eleven_v4")
+	require.NoError(t, err)
+	_, err = c.TranscriptionModel("elevenlabs/eleven_v4")
+	require.NoError(t, err)
+	_, err = c.LanguageModel("elevenlabs/eleven_v4")
+	require.ErrorIs(t, err, errors.ErrUnsupported)
+
+	// OpenRouter, fal, and Higgsfield make images.
+	painter := []ai.Output{ai.OutputImage}
+	c.RegisterModel("openrouter", ai.Model{ID: "openai/gpt-image-2", Output: painter})
+	c.RegisterModel("fal", ai.Model{ID: "google/nano-banana-2.1", Output: painter})
+	c.RegisterModel("higgsfield", ai.Model{ID: "higgsfield-ai/soul/v2/standard", Output: painter})
+	for _, spec := range []string{
+		"openrouter/openai/gpt-image-2",
+		"fal/google/nano-banana-2.1",
+		"higgsfield/higgsfield-ai/soul/v2/standard",
+	} {
+		_, err = c.ImageModel(spec)
+		require.NoError(t, err, spec)
+	}
+
+	// fal and Higgsfield have no text.
+	c.RegisterModel("fal", ai.Model{ID: "m"})
+	_, err = c.LanguageModel("fal/m")
+	require.ErrorIs(t, err, errors.ErrUnsupported)
+
+	// Fireworks has no image API.
+	c.RegisterModel("fireworks", ai.Model{ID: "flux"})
+	_, err = c.ImageModel("fireworks/flux")
 	require.ErrorIs(t, err, errors.ErrUnsupported)
 }
 

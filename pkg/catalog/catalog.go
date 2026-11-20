@@ -126,9 +126,11 @@ type Catalog struct {
 
 // providers holds the providers registered under one ID.
 type providers struct {
-	text     ai.TextProvider
-	image    ai.ImageProvider
-	decision ai.DecisionProvider
+	text       ai.TextProvider
+	image      ai.ImageProvider
+	decision   ai.DecisionProvider
+	speech     ai.SpeechProvider
+	transcribe ai.TranscriptionProvider
 }
 
 // New returns an empty catalog.
@@ -187,6 +189,32 @@ func (c *Catalog) RegisterImageProvider(
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.entryLocked(id).image = p
+	addModels(c.models, id, models)
+}
+
+// RegisterSpeechProvider registers p for speech under id, and adds
+// models to the model index.
+func (c *Catalog) RegisterSpeechProvider(
+	id string,
+	p ai.SpeechProvider,
+	models ...ai.Model,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entryLocked(id).speech = p
+	addModels(c.models, id, models)
+}
+
+// RegisterTranscriptionProvider registers p for transcription under id,
+// and adds models to the model index.
+func (c *Catalog) RegisterTranscriptionProvider(
+	id string,
+	p ai.TranscriptionProvider,
+	models ...ai.Model,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entryLocked(id).transcribe = p
 	addModels(c.models, id, models)
 }
 
@@ -321,6 +349,43 @@ func (c *Catalog) DecisionModel(spec string) (ai.DecisionModel, error) {
 	return ai.DecisionModel{Model: m, Provider: p}, nil
 }
 
+// SpeechModel resolves spec to a model bound to its speech provider. If
+// the provider of spec has no speech, or the [ai.Model.Output] of the
+// model has no speech, the error wraps [errors.ErrUnsupported].
+func (c *Catalog) SpeechModel(spec string) (ai.SpeechModel, error) {
+	m, id, err := c.resolve(spec)
+	if err != nil {
+		return ai.SpeechModel{}, err
+	}
+	p := c.providersOf(id).speech
+	if p == nil {
+		return ai.SpeechModel{}, unsupported(id, "speech")
+	}
+	if err := checkOutput(id, m, ai.OutputSpeech); err != nil {
+		return ai.SpeechModel{}, err
+	}
+	return ai.SpeechModel{Model: m, Provider: p}, nil
+}
+
+// TranscriptionModel resolves spec to a model bound to its
+// transcription provider. If the provider of spec has no transcription,
+// or the [ai.Model.Output] of the model has no transcript, the error
+// wraps [errors.ErrUnsupported].
+func (c *Catalog) TranscriptionModel(spec string) (ai.TranscriptionModel, error) {
+	m, id, err := c.resolve(spec)
+	if err != nil {
+		return ai.TranscriptionModel{}, err
+	}
+	p := c.providersOf(id).transcribe
+	if p == nil {
+		return ai.TranscriptionModel{}, unsupported(id, "transcription")
+	}
+	if err := checkOutput(id, m, ai.OutputTranscript); err != nil {
+		return ai.TranscriptionModel{}, err
+	}
+	return ai.TranscriptionModel{Model: m, Provider: p}, nil
+}
+
 // Driver resolves spec to the driver that starts its agent, and to its
 // model. The model must be registered. A provider with a driver uses
 // it, with the model of the driver.
@@ -364,6 +429,9 @@ func (c *Catalog) Driver(spec string) (agent.Driver, ai.Model, error) {
 			id,
 			ErrNoDriver,
 		)
+	}
+	if err := checkOutput(id, m, ai.OutputText); err != nil {
+		return nil, ai.Model{}, err
 	}
 	if c.defaultDriver == nil {
 		return nil, ai.Model{}, fmt.Errorf(

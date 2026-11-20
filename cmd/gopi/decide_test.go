@@ -44,7 +44,7 @@ func judgeDetector(j *judge) catalog.Detector {
 		Provider: "judge",
 		Source:   "JUDGE_KEY",
 		Models:   []ai.Model{{ID: "jev"}},
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			return j, true
 		},
 	}

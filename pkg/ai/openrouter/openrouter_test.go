@@ -65,7 +65,11 @@ func TestListModels(t *testing.T) {
 			query: "output_modalities=decisions",
 			auth:  "Bearer test-key",
 		},
-	}, *seen, "the list asks for the models with tools and for the decision models")
+		{
+			path: "/api/v1/images/models",
+			auth: "Bearer test-key",
+		},
+	}, *seen, "the list asks for the models with tools, the decision models, and the image models")
 	all := []ai.ThinkingLevel{
 		ai.ThinkingOff,
 		ai.ThinkingLow,
@@ -395,8 +399,7 @@ func TestProvider_Capabilities(t *testing.T) {
 	assert.Implements(t, (*ai.TextProvider)(nil), p)
 	assert.Implements(t, (*ai.ObjectProvider)(nil), p)
 	assert.Implements(t, (*ai.ModelLister)(nil), p)
-	_, image := p.(ai.ImageProvider)
+	assert.Implements(t, (*ai.ImageProvider)(nil), p)
 	_, tokens := p.(ai.TokenCounter)
-	assert.False(t, image, "OpenRouter has no image API")
 	assert.False(t, tokens, "OpenRouter has no token count API")
 }

@@ -26,6 +26,8 @@ import (
 
 	"github.com/sonnes/gopi/internal/modelsfile"
 	"github.com/sonnes/gopi/pkg/ai"
+	"github.com/sonnes/gopi/pkg/ai/fal"
+	"github.com/sonnes/gopi/pkg/ai/higgsfield"
 	"github.com/sonnes/gopi/pkg/ai/openrouter"
 	"github.com/sonnes/gopi/pkg/catalog"
 	"github.com/sonnes/gopi/pkg/catalog/env"
@@ -135,6 +137,10 @@ func rules() map[string]source {
 		},
 		// The model list of OpenRouter is public, so a list needs no key.
 		"openrouter": {List: openrouter.New(openrouter.APIKey("")).ListModels},
+		// The lists of fal and Higgsfield are fixed lists in their
+		// packages, so a list needs no key.
+		"fal":        {List: fal.New(fal.APIKey("")).ListModels},
+		"higgsfield": {List: higgsfield.New(higgsfield.APIKey("")).ListModels},
 		"fireworks": {
 			Skip:    "models.dev is the source, because the list of Fireworks has no prices",
 			Dev:     "fireworks-ai",

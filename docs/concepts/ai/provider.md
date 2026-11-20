@@ -70,3 +70,6 @@ DecisionModel{Model, Provider}  -> DecisionProvider
 - [Stream](stream.md)
 - [OpenAI Providers](openai.md)
 - [Gemini Provider](gemini.md)
+- [ElevenLabs Provider](elevenlabs.md)
+- [Higgsfield Provider](higgsfield.md)
+- [fal Provider](fal.md)

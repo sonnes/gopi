@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/jsonschema-go/jsonschema"
+	sdk "github.com/openai/openai-go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -573,6 +574,32 @@ func TestBuildParams_BadToolSchema(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := buildParams(testModel, tt.messages, tt.opts)
 			require.ErrorContains(t, err, `tool "bad"`)
+		})
+	}
+}
+
+// TestBuildImageParams_Size checks the size of an image call. An exact
+// [ai.ImageSize] wins. Else [ai.AspectRatio] picks one of the three
+// sizes of GPT Image.
+func TestBuildImageParams_Size(t *testing.T) {
+	tests := []struct {
+		name string
+		opts ai.Options
+		want string
+	}{
+		{name: "no size", opts: nil, want: ""},
+		{name: "exact size", opts: ai.JoinOptions(ai.ImageSize("1536x1024"), ai.AspectRatio("9:16")), want: "1536x1024"},
+		{name: "square", opts: ai.AspectRatio("1:1"), want: "1024x1024"},
+		{name: "portrait", opts: ai.AspectRatio("9:16"), want: "1024x1536"},
+		{name: "near portrait", opts: ai.AspectRatio("4:5"), want: "1024x1536"},
+		{name: "landscape", opts: ai.AspectRatio("16:9"), want: "1536x1024"},
+		{name: "bad ratio", opts: ai.AspectRatio("wide"), want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			params := buildImageParams(ai.Model{ID: "gpt-image-2"}, "a cube", tt.opts)
+
+			assert.Equal(t, sdk.ImageGenerateParamsSize(tt.want), params.Size)
 		})
 	}
 }

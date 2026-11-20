@@ -50,7 +50,7 @@ func ExampleDetectors() {
 		Provider: "anthropic",
 		Source:   "VAULT_ANTHROPIC_KEY",
 		Models:   file.Of("anthropic"),
-		Detect: func() (ai.TextProvider, bool) {
+		Detect: func() (any, bool) {
 			key := os.Getenv("VAULT_ANTHROPIC_KEY")
 			return anthropic.New(anthropic.APIKey(key)), key != ""
 		},

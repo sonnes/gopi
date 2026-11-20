@@ -421,7 +421,7 @@ func scriptModels(t *testing.T, p ai.TextProvider) models {
 		Provider: "fake",
 		Source:   "FAKE_KEY",
 		Models:   []ai.Model{{ID: "test"}},
-		Detect:   func() (ai.TextProvider, bool) { return p, true },
+		Detect:   func() (any, bool) { return p, true },
 	}})
 	require.NoError(t, err)
 	return m
