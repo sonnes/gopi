@@ -32,6 +32,7 @@ sequenceDiagram
 - Skills merge by qualified name, so a skill of a later folder replaces a skill of an earlier folder with the same name. The caller sets the qualifier, and a store of files leaves it empty.
 - One skill gets the bare name: the last one in the order of the sources. The others keep their qualified names, so no skill is lost on a clash. A driver of a CLI writes each name as a folder name, so a qualified name with a slash fails its start.
 - The caller lists the skill tool with `SkillTool`. It binds only in an assembly with a skill that the model can call, because a tool with nothing to load only makes the model call it for no result. Without the skill tool, the prompt lists no skill, so it names no tool that the model cannot call.
+- The `skills` section of the harness holds only the list. The [host](../host/host.md) owns the rules to use a skill, in the section `skill-rules`, because a session of a CLI needs the same rules and gets no section of the harness.
 - A skill that the model cannot call stays in the assembly, so a slash call can still load it.
 - A slash call loads the skill in each driver, so a caller sends the text of the user as it is. The harness adds the body of the skill tool before the text of the call at each model call. The log keeps the text of the user, and the body is the same at each call, so the start of the request stays cached.
 - A slash call loads a skill only in the input of a parent. The input of a subagent is the text of the model, and the model cannot load a skill that it cannot call.
@@ -58,3 +59,4 @@ sequenceDiagram
 - [Definition](../def/definition.md)
 - [Tool](../tool/tool.md)
 - [Section](../agent/section.md)
+- [Host](../host/host.md)

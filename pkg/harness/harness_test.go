@@ -34,7 +34,10 @@ func TestNewAssemblesTheAgent(t *testing.T) {
 	require.Len(t, sections, 2)
 	assert.Equal(t, ai.Section{Name: harness.SystemSection, Text: "You are a test agent."}, sections[0])
 	assert.Equal(t, "skills", sections[1].Name)
-	assert.Contains(t, sections[1].Text, "- deploy: Deploy the service.")
+	wantSkills := "## Skills\n\n" +
+		"A skill is a set of instructions that you load with the `skill` tool.\n\n" +
+		"- deploy: Deploy the service."
+	assert.Equal(t, wantSkills, sections[1].Text, "the list holds no rules, because the host gives them")
 	assert.Equal(t, []string{"skill", "echo"}, toolNames(a), "the order of the tool list")
 	assert.Equal(t, []string{"one"}, p.called())
 }

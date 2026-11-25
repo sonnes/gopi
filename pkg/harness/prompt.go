@@ -46,9 +46,10 @@ const (
 	agentsSection       = "agents"
 )
 
-// skillsIntro tells the model how to use the skill list.
-const skillsIntro = "A skill is a set of instructions that you load with the `skill` tool. " +
-	"Before you start a task that matches a skill, load the skill."
+// skillsIntro tells the model what the skill list is. It holds no rule
+// to use a skill, because the host owns the rules, in the section
+// host.SkillRulesSection, for each driver.
+const skillsIntro = "A skill is a set of instructions that you load with the `skill` tool."
 
 // agentsIntro tells the model how to use the subagent list.
 const agentsIntro = "A subagent does a task in its own context with the `agent` tool, " +

@@ -239,8 +239,9 @@ type Config struct {
 	// go after Deny, and its skills go after Skills. Create reads these
 	// once, so an edit of them changes only the sessions that start
 	// after it. The prompt of the file is the section [AgentSection],
-	// before the sections of [Sections]. The host reads the prompt
-	// before each run, so an edit of the prompt reaches the next run.
+	// before [SkillRulesSection] and the sections of [Sections]. The host
+	// reads the prompt before each run, so an edit of the prompt reaches
+	// the next run.
 	// The host does not read the maxTurns key of the file.
 	Agent string `json:"agent,omitempty"`
 	// Model is the model spec, such as "claude-code/claude-opus-5-5".

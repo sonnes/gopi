@@ -224,6 +224,10 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 	s.rules = config.rules()
 	s.dir = config.Dir
 	s.mu.Unlock()
+	skillRules, err := h.skillRules(ctx, config)
+	if err != nil {
+		return nil, agent.State{}, fmt.Errorf("host: session %s: %w", s.id, err)
+	}
 	var hooks []agent.Hook
 	if h.needsRulesHook(config) {
 		hooks = []agent.Hook{rulesHook(s)}
@@ -240,7 +244,7 @@ func (s *hosted) newRunner(ctx context.Context) (agent.Runner, agent.State, erro
 		Mode:      config.Mode,
 		Dir:       config.Dir,
 		AddDirs:   config.AddDirs,
-		Sections:  h.sectionsOf(config, s.id),
+		Sections:  h.sectionsOf(config, s.id, skillRules),
 		Defs:      h.configDefs(config),
 		Skills:    config.Skills,
 		Effort:    config.Effort,
