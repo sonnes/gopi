@@ -151,7 +151,8 @@ func (s *hosted) log(ctx context.Context) (session.Writer, error) {
 
 // startAgent starts the agent of the session from its config value, if
 // no agent runs. The driver resumes the log. A start that fails leaves
-// the session idle with [StopError].
+// the session idle with [StopError], or [StopLost] for a lost
+// conversation of the CLI.
 func (s *hosted) startAgent(ctx context.Context) error {
 	s.startMu.Lock()
 	defer s.startMu.Unlock()
@@ -192,7 +193,7 @@ func (s *hosted) startAgentLocked(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err != nil {
-		s.sess.StopReason = StopError
+		s.sess.StopReason = failedOf(err)
 		s.sess.Error = err.Error()
 		s.updateLocked()
 		return err

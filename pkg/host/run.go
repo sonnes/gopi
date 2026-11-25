@@ -248,6 +248,15 @@ func (s *hosted) finish(ctx context.Context, end agent.EventAgentEnd, err error)
 	s.startRunLocked(next)
 }
 
+// failedOf returns the stop reason of a run or a start that failed with
+// err: [StopLost] for a lost conversation of the CLI, else [StopError].
+func failedOf(err error) StopReason {
+	if errors.Is(err, agent.ErrNoConversation) {
+		return StopLost
+	}
+	return StopError
+}
+
 // stopOf returns the stop reason and the error of a run that ended with
 // err. A run that a caller canceled reports the cause, such as
 // [ErrInterrupted], and not context.Canceled.
@@ -263,6 +272,6 @@ func stopOf(cause, err error) (StopReason, string) {
 	case canceled:
 		return StopError, cause.Error()
 	default:
-		return StopError, err.Error()
+		return failedOf(err), err.Error()
 	}
 }

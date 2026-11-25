@@ -3,6 +3,7 @@ package host_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -169,4 +170,32 @@ func TestTheSessionGivesItsDir(t *testing.T) {
 	got, ok := f.h.Get("s1")
 	require.True(t, ok)
 	assert.Equal(t, dir, got.Dir, "a recovered session gives the Dir of its config")
+}
+
+func TestARunThatLostItsConversation(t *testing.T) {
+	f := newFixture(t)
+	f.model.fail = fmt.Errorf("claude: %w", agent.ErrNoConversation)
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+
+	f.send(t, "s1", "a")
+
+	end := runEnd(t, events)
+	assert.Equal(t, host.StatusIdle, end.Status)
+	assert.Equal(t, host.StopLost, end.StopReason)
+	assert.Contains(t, end.Error, "no conversation to resume")
+}
+
+func TestAStartThatLostItsConversation(t *testing.T) {
+	f := newFixture(t)
+	f.create(t, host.Config{ID: "s1"})
+	require.NoError(t, f.h.Release(context.Background(), "s1"))
+	f.driver.setErr(fmt.Errorf("codex: %w", agent.ErrNoConversation))
+
+	err := f.h.Send(context.Background(), "s1", host.Text("a"))
+
+	require.ErrorIs(t, err, agent.ErrNoConversation)
+	got, _ := f.h.Get("s1")
+	assert.Equal(t, host.StopLost, got.StopReason)
+	assert.Contains(t, got.Error, "no conversation to resume")
 }

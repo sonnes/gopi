@@ -42,6 +42,12 @@ const (
 	// StopRestarted: the host closed during the run, or the program
 	// stopped. [Open] sets it, because no agent survives a restart.
 	StopRestarted StopReason = "restarted"
+	// StopLost: the agent cannot find its conversation of the CLI to
+	// resume, as [agent.ErrNoConversation] says. [Session.Error] has the
+	// error. The agent forgets the conversation, so the next run starts
+	// a new one with an empty context. A caller can give that run the
+	// context again.
+	StopLost StopReason = "lost"
 )
 
 // Session is a session as the host knows it. The host keeps it in the
@@ -71,7 +77,8 @@ type Session struct {
 	// StopReason is why the last run ended. It is set only while Status
 	// is [StatusIdle], and is empty before the first run.
 	StopReason StopReason `json:"stop_reason,omitempty"`
-	// Error is the error of a run that ended with [StopError].
+	// Error is the error of a run that ended with [StopError] or
+	// [StopLost].
 	Error string `json:"error,omitempty"`
 	// Usage is the usage of every model call of the last run, summed.
 	Usage ai.Usage `json:"usage,omitzero"`
