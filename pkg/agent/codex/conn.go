@@ -64,18 +64,8 @@ type conn struct {
 	// the approve function gets the same call as the log.
 	items map[string]ai.ToolCall
 
-	// hooks serves the hooks of the agent for the process, or is nil.
-	hooks *hookServer
 	// skills are the skills that the process got.
 	skills def.Set
-}
-
-// bindHooks gives the hooks of the process the context of a run, or
-// nil after the run.
-func (c *conn) bindHooks(ctx context.Context) {
-	if c.hooks != nil {
-		c.hooks.bind(ctx)
-	}
 }
 
 // dial starts the reader of p. approve answers the approval requests,
@@ -411,37 +401,21 @@ func (c *conn) alive() bool {
 // block on a full pipe.
 func (c *conn) close() error {
 	c.stop()
-	err := c.p.Stop()
-	c.closeHooks()
-	return err
+	return c.p.Stop()
 }
 
 // kill stops the process at once.
 func (c *conn) kill() {
 	c.stop()
 	c.p.Kill()
-	c.closeHooks()
 }
 
-// stop ends the reader, the ctx of the approve function, and the ctx of
-// the hooks in flight.
+// stop ends the reader and the ctx of the approve function.
 func (c *conn) stop() {
 	c.doneOnce.Do(func() {
 		close(c.done)
 		c.cancel()
-		if c.hooks != nil {
-			c.hooks.cancel()
-		}
 	})
-}
-
-// closeHooks waits for the hooks in flight and removes the socket.
-// Call it after the process stops, so that the wait does not delay the
-// stop of the process.
-func (c *conn) closeHooks() {
-	if c.hooks != nil {
-		c.hooks.close()
-	}
 }
 
 // isResponse reports whether m is the response to the request id.

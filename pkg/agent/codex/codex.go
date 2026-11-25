@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
@@ -83,15 +81,10 @@ type config struct {
 	agent.Config
 	binary string
 	env    []string
-	// hookCommand is the gopi binary that relays a hook.
-	hookCommand string
 	// policy and sandbox are the permissions of the thread. An empty
 	// sandbox keeps the configured mode of the CLI.
 	policy  approvalPolicy
 	sandbox sandboxMode
-	// hooks are the Hooks of the config, then the hooks that block the
-	// tools that the config leaves out.
-	hooks []agent.Hook
 }
 
 // Option sets how an agent starts the CLI. [New], [Durable], and
@@ -130,11 +123,9 @@ func New(c agent.Config, opts ...Option) *Agent {
 // [session.MemoryStore]. If the session has a thread, the agent resumes
 // it. Otherwise the first Run starts a thread.
 //
-// Durable fails before it opens the session if c is not valid: a hook
-// at a point that the CLI does not call, a mode that
-// [permission.ParseMode] does not know, the limit BlockReadsOutside, a
-// Deny rule that does not parse, a name of ToolNames that names a tool
-// of the caller, or a name of Skills that no skill has.
+// Durable fails before it opens the session if c is not valid: a mode
+// that [permission.ParseMode] does not know, the limit
+// BlockReadsOutside, or a name of Skills that no skill has.
 func Durable(ctx context.Context, c agent.Config, opts ...Option) (*Agent, error) {
 	cfg, err := newConfig(c, opts)
 	if err != nil {
@@ -152,10 +143,7 @@ func Durable(ctx context.Context, c agent.Config, opts ...Option) (*Agent, error
 
 // newOptions applies opts over the defaults.
 func newOptions(opts []Option) config {
-	c := config{
-		binary:      defaultBinary,
-		hookCommand: defaultHookCommand,
-	}
+	c := config{binary: defaultBinary}
 	for _, opt := range opts {
 		opt(&c)
 	}
@@ -171,10 +159,6 @@ func (c config) environ() []string {
 func newConfig(c agent.Config, opts []Option) (config, error) {
 	cfg := newOptions(opts)
 	cfg.Config = c
-	rules, err := ruleHooks(c)
-	if err != nil {
-		return config{}, fmt.Errorf("codex: %w", err)
-	}
 	if _, err := permission.ParseMode(string(c.Mode)); err != nil {
 		return config{}, fmt.Errorf("codex: %w", err)
 	}
@@ -184,11 +168,6 @@ func newConfig(c agent.Config, opts []Option) (config, error) {
 			errors.ErrUnsupported,
 		)
 	}
-	hooks := append(slices.Clip(c.Hooks), rules...)
-	if err := checkHooks(hooks); err != nil {
-		return config{}, err
-	}
-	cfg.hooks = hooks
 	cfg.policy, cfg.sandbox = permissions(c)
 	return cfg, nil
 }
@@ -224,9 +203,7 @@ func (a *Agent) Run(ctx context.Context, entries ...session.Entry) *agent.Stream
 	})
 }
 
-// Close stops the process. The next Run starts a new process. The
-// context of a hook in flight ends, and Close waits for the hook to
-// return.
+// Close stops the process. The next Run starts a new process.
 func (a *Agent) Close() error {
 	a.mu.Lock()
 	c := a.conn
@@ -266,7 +243,6 @@ func (a *Agent) run(
 		return e.Finish(ctx, ai.Usage{}, err)
 	}
 	t := a.newTurn(c, e, threadID)
-	c.bindHooks(ctx)
 	usage, err := t.run(ctx, userInputs(cliagent.Input(entries), c.skills))
 	// Codex does not start a turn when a child ends after the turn of
 	// the run completed, so the run gives the model the result itself.
@@ -307,14 +283,10 @@ func (a *Agent) newTurn(c *conn, e *cliagent.Emitter, threadID string) *turn {
 	return t
 }
 
-// endTurns ends the children and the hooks of a run, and returns err
-// with the error of a hook and the errors of the logs of the children.
+// endTurns ends the children of a run, and returns err with the errors
+// of the logs of the children.
 func (a *Agent) endTurns(ctx context.Context, c *conn, t *turn, err error) error {
 	endErr := t.subs.endAll(context.WithoutCancel(ctx))
-	c.bindHooks(nil)
-	if err == nil {
-		err = a.core.Stops().Take()
-	}
 	err = errors.Join(err, endErr)
 	if t.dead {
 		a.drop(c)
@@ -346,33 +318,14 @@ func (a *Agent) connect(ctx context.Context) (*conn, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("codex: %w", err)
 	}
-	var (
-		hooks       *hookServer
-		hookCommand string
-	)
-	if len(a.cfg.hooks) > 0 {
-		hookCommand, err = a.findHookCommand()
-		if err != nil {
-			return nil, "", err
-		}
-		hooks, err = startHookServer(a.cfg.hooks, a.State, a.cfg.Approve, a.core.Stops())
-		if err != nil {
-			return nil, "", err
-		}
-	}
-
 	cmd := a.command()
 	p, err := start(cmd)
 	if err != nil {
-		if hooks != nil {
-			hooks.close()
-		}
 		return nil, "", fmt.Errorf("codex: start %s: %w", cmd.Path, err)
 	}
 	c = dial(p, a.cfg.Approve, a.cfg.Dir)
-	c.hooks = hooks
 	c.skills = skills
-	res, err := c.handshake(ctx, a.threadParams(threadID, hooks, hookCommand, roles), skillRoot)
+	res, err := c.handshake(ctx, a.threadParams(threadID, roles), skillRoot)
 	if err != nil {
 		c.kill()
 		if threadID != "" && lostThread(err) {
@@ -490,11 +443,9 @@ func appServer(c config) *exec.Cmd {
 }
 
 // threadParams returns the parameters of thread/start, or of
-// thread/resume if thread is set. With a hook server, the config adds
-// the hooks of the agent to the thread, and each hook runs the program
-// hookCommand. roles is the agents table of the config, from
-// [Agent.writeDefs].
-func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand string, roles map[string]any) threadParams {
+// thread/resume if thread is set. roles is the agents table of the
+// config, from [Agent.writeDefs].
+func (a *Agent) threadParams(threadID string, roles map[string]any) threadParams {
 	p := threadParams{
 		ThreadID:              threadID,
 		Model:                 a.cfg.Model.ID,
@@ -502,9 +453,6 @@ func (a *Agent) threadParams(threadID string, hooks *hookServer, hookCommand str
 		ApprovalPolicy:        a.cfg.policy,
 		Sandbox:               a.cfg.sandbox,
 		DeveloperInstructions: sections.Text(a.core.Log().Messages()),
-	}
-	if hooks != nil {
-		p.Config = hookConfig(hookCommand, hooks.socket, a.cfg.hooks)
 	}
 	if a.cfg.AutoCompact > 0 {
 		if p.Config == nil {
@@ -594,20 +542,6 @@ func mcpServers(servers []agent.MCPServer) map[string]any {
 		out[s.Name] = entry
 	}
 	return out
-}
-
-// findHookCommand returns the absolute path of the hook command. The
-// reasons are in the doc comment of [HookCommand].
-func (a *Agent) findHookCommand() (string, error) {
-	path, err := exec.LookPath(a.cfg.hookCommand)
-	if err != nil {
-		return "", fmt.Errorf("codex: find the hook command: %w", err)
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("codex: find the hook command: %w", err)
-	}
-	return abs, nil
 }
 
 // effort returns the reasoning effort of the CLI for level, or "" for

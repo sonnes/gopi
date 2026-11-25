@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/sonnes/gopi/pkg/ai"
-	"github.com/sonnes/gopi/pkg/permission"
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
@@ -27,31 +26,6 @@ func OnlyTools(names []string) Hook {
 	return BeforeTool(func(_ context.Context, _ State, c ai.ToolCall) (ai.ToolCall, error) {
 		if !slices.Contains(names, c.Name) {
 			return c, fmt.Errorf("the tool %q is not one of the tools of this agent", c.Name)
-		}
-		return c, nil
-	})
-}
-
-// DenyTools returns a BeforeTool hook that blocks each call of a tool
-// that a rule names, with a [DenyError]. A driver of a CLI adds it for a
-// tool that the CLI cannot remove, such as a tool of Codex that
-// [Config.ToolNames] leaves out.
-//
-// Each rule names a whole tool, with no content, in the format of
-// [permission.Rules]: a gopi name, a Claude Code name such as "Read", a
-// prefix such as "mcp__github__*", or an MCP server such as
-// "mcp__github". A rule that does not parse blocks each call.
-func DenyTools(rules []string) Hook {
-	deny := permission.Rules{Deny: rules}
-	return BeforeTool(func(_ context.Context, _ State, c ai.ToolCall) (ai.ToolCall, error) {
-		// A rule with no content reads no path, so the folder of the
-		// paths does not matter.
-		match, rule, err := deny.Check(c, "")
-		if err != nil {
-			return c, Deny(err.Error())
-		}
-		if match == permission.DenyMatch {
-			return c, Deny(permission.DenyReason(rule, c.Name))
 		}
 		return c, nil
 	})

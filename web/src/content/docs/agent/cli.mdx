@@ -33,16 +33,15 @@ The CLI must be installed and logged in. The first run starts the CLI, and `Clos
 
 ```go
 a := codex.New(agent.Config{
-	Dir:   ".",
-	Mode:  permission.AcceptEdits,
-	Tools: codex.Tools(),
+	Dir:  ".",
+	Mode: permission.AcceptEdits,
 })
 defer a.Close()
 
 msgs, err := a.Run(ctx, session.Text("Add a test for Parse.")).Wait()
 ```
 
-`New` and `Durable` take the [`agent.Config`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Config) of the session, as a driver does. `claude.New` takes the same config. Without `Tools`, the agent blocks the built-in tools of the CLI. `codex.Tools` and `claude.Tools` give each tool of the CLI. The package docs of [codex](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex) and [claude](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude) say how the agent reads each field.
+`New` and `Durable` take the [`agent.Config`](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent#Config) of the session, as a driver does. `claude.New` takes the same config. Without `Tools`, the Claude Code agent blocks the built-in tools of the CLI, and `claude.Tools` gives each of them. Codex runs each of its tools, and ignores `Tools`, `ToolNames`, `Deny`, and `Hooks`. The package docs of [codex](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/codex) and [claude](https://pkg.go.dev/github.com/sonnes/gopi/pkg/agent/claude) say how the agent reads each field.
 
 ## Options
 
@@ -52,7 +51,6 @@ An option sets how the agent starts the CLI. Each other setting is a field of th
 | -------------------- | ------- | ------------------------------------ | ------- |
 | `Binary(path)`       | both    | The path of the CLI                  | `codex` or `claude` on `PATH` |
 | `Env(kv...)`         | both    | More variables for the CLI           | None |
-| `HookCommand(path)`  | codex   | The `gopi` binary that relays a hook | `gopi` on `PATH` |
 
 ## Tools and Approvals
 

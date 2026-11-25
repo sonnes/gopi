@@ -1,4 +1,4 @@
-// Package clihook holds the hook wire that the agent CLIs share: the
+// Package clihook holds the hook wire of the Claude Code agent: the
 // input of a hook event, its answer, and the text of the values of a
 // gopi hook. A CLI takes only text from a hook, so a hook of a CLI
 // agent gives text entries only.
@@ -17,7 +17,7 @@ import (
 	"github.com/sonnes/gopi/pkg/tool"
 )
 
-// The hook events that Claude Code and Codex both send.
+// The hook events of the CLI.
 const (
 	EventPreToolUse  = "PreToolUse"
 	EventPostToolUse = "PostToolUse"
@@ -26,7 +26,7 @@ const (
 
 // AskTimeout is the time limit, in seconds, that an agent gives the CLI
 // for a PreToolUse hook: 24 hours. A BeforeTool hook can ask a person,
-// and the hook waits for the answer. When a hook times out, each CLI
+// and the hook waits for the answer. When a hook times out, the CLI
 // runs the call. So the limit must be longer than a person takes to
 // answer. A cancel of the run still ends the wait. The other hook
 // events keep the default limit of the CLI.
@@ -60,14 +60,13 @@ type Output struct {
 	Continue   *bool  `json:"continue,omitempty"`
 	StopReason string `json:"stopReason,omitempty"`
 	// Decision "block" with a Reason continues a stop, or replaces a
-	// tool result. Each CLI says which.
+	// tool result. The event says which.
 	Decision           string    `json:"decision,omitempty"`
 	Reason             string    `json:"reason,omitempty"`
 	HookSpecificOutput *Specific `json:"hookSpecificOutput,omitempty"`
 }
 
-// Specific is the part of an [Output] for one hook event. Codex reads
-// no UpdatedToolOutput and no AdditionalContext.
+// Specific is the part of an [Output] for one hook event.
 type Specific struct {
 	HookEventName            string          `json:"hookEventName"`
 	PermissionDecision       string          `json:"permissionDecision,omitempty"`
