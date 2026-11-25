@@ -18,6 +18,10 @@ import (
 // as a subAgentActivity item.
 const toolSpawnAgent = "spawn_agent"
 
+// toolImageGeneration is the built-in image tool of the CLI. The CLI
+// reports it as an imageGeneration item.
+const toolImageGeneration = "image_generation"
+
 // reasoningSeparator joins the parts of a reasoning item.
 const reasoningSeparator = "\n\n"
 
@@ -542,7 +546,8 @@ func (t *turn) compaction() session.Compaction {
 
 // itemStarted opens a text block for an agent message, or starts the
 // tool of a tool item. A reasoning item gets its block with its first
-// text, because it often has none.
+// text, because it often has none. An image generation starts its tool
+// when it completes.
 func (t *turn) itemStarted(ctx context.Context, it item) error {
 	if it.Type == itemContextCompaction {
 		t.compacting = true
@@ -551,6 +556,11 @@ func (t *turn) itemStarted(ctx context.Context, it item) error {
 	}
 	if it.Type == itemAgentMessage {
 		t.block(it.ID, ai.EventTextStart)
+		return nil
+	}
+	if it.Type == itemImageGeneration {
+		// The started item has no prompt and no path, and the stored
+		// call cannot change. So the call starts at item/completed.
 		return nil
 	}
 	tc, ok := toolCall(it)
@@ -799,6 +809,13 @@ func toolCall(it item) (ai.ToolCall, bool) {
 	case itemWebSearch:
 		name = tool.WebSearch
 		input = map[string]string{"query": it.Query}
+	case itemImageGeneration:
+		// The input leaves out Result, the image data.
+		name = toolImageGeneration
+		input = map[string]*string{
+			"prompt": it.RevisedPrompt,
+			"path":   it.SavedPath,
+		}
 	case itemCollabAgentToolCall:
 		name = collabToolName(it.Tool)
 		input = map[string][]string{"receiver_thread_ids": it.ReceiverThreadIDs}
@@ -840,6 +857,9 @@ func toolResult(it item) ai.ToolResult {
 		failed = failed || it.Error != nil
 	case itemWebSearch:
 		text = it.Query
+	case itemImageGeneration:
+		text = imageText(it)
+		failed = failed || it.Failure != nil
 	case itemCollabAgentToolCall:
 		if len(it.AgentsStates) > 0 && string(it.AgentsStates) != emptyObject {
 			text = string(it.AgentsStates)
@@ -872,17 +892,33 @@ func fileChanges(raw json.RawMessage) string {
 	return strings.Join(lines, "\n")
 }
 
+// imageText returns the failure of an imageGeneration item, or the
+// path of its image file.
+func imageText(it item) string {
+	if it.Failure != nil {
+		if it.Failure.LimitID == "" {
+			return it.Failure.Type
+		}
+		return it.Failure.Type + ": " + it.Failure.LimitID
+	}
+	if it.SavedPath == nil {
+		return ""
+	}
+	return *it.SavedPath
+}
+
 // mcpText returns the error of an MCP tool call, or the text of its
 // result. A content block that is not text stays as JSON.
 func mcpText(it item) string {
 	if it.Error != nil {
 		return it.Error.Message
 	}
-	if it.Result == nil {
-		return ""
+	var result struct {
+		Content []json.RawMessage `json:"content"`
 	}
-	parts := make([]string, 0, len(it.Result.Content))
-	for _, raw := range it.Result.Content {
+	_ = json.Unmarshal(it.Result, &result)
+	parts := make([]string, 0, len(result.Content))
+	for _, raw := range result.Content {
 		var block struct {
 			Type string `json:"type"`
 			Text string `json:"text"`

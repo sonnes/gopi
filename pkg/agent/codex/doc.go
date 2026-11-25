@@ -110,7 +110,8 @@
 //     The hooks of the caller check it, as the host does.
 //   - bash or apply_patch gets a Deny rule if Tools or ToolNames leaves
 //     it out. So without Tools, the agent blocks both. The hooks of the
-//     CLI do not see web_search and agent, so the agent keeps them.
+//     CLI do not see web_search, agent, and image_generation, so the
+//     agent keeps them.
 //     ToolNames also blocks a call of each other tool, such as an MCP
 //     tool, in that hook. The model still sees the tool.
 //   - A hook that returns an [agent.AskError] asks the Approve function

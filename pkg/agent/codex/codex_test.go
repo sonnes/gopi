@@ -252,6 +252,25 @@ func TestRunTool(t *testing.T) {
 	}
 }
 
+func TestRunImageGeneration(t *testing.T) {
+	useTraces(t, []string{"image.trace"})
+	a := newAgent(t, agent.Config{})
+
+	events, msgs, err := collect(a.Run(context.Background(), session.Text("Draw a fox.")))
+	require.NoError(t, err)
+	emittest.CheckEvents(t, events)
+	checkLog(t, a)
+
+	require.Len(t, msgs, 3)
+	calls := msgs[0].ToolCalls()
+	require.Len(t, calls, 1)
+	assert.Equal(t, "image_generation", calls[0].Name)
+	assert.JSONEq(t, `{"prompt":"a red fox","path":"/home/me/.codex/generated_images/th1/ig1.png"}`, string(calls[0].Input),
+		"the call has the prompt and the path of the completed item")
+	assert.Equal(t, []ai.Content{ai.Text{Text: "/home/me/.codex/generated_images/th1/ig1.png"}}, msgs[1].Content)
+	assert.Equal(t, "Done.", msgs[2].Text())
+}
+
 func TestRunEphemeralInput(t *testing.T) {
 	useTraces(t, []string{"ephemeral.trace"})
 	a := newAgent(t, agent.Config{

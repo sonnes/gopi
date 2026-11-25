@@ -198,19 +198,25 @@ type item struct {
 	// fileChange
 	Changes json.RawMessage `json:"changes"`
 
-	// mcpToolCall
+	// mcpToolCall, imageGeneration. Result is an object with the
+	// content blocks for mcpToolCall, and the image data for
+	// imageGeneration.
 	Server    string          `json:"server"`
 	Tool      string          `json:"tool"`
 	Arguments json.RawMessage `json:"arguments"`
-	Result    *struct {
-		Content []json.RawMessage `json:"content"`
-	} `json:"result"`
-	Error *struct {
+	Result    json.RawMessage `json:"result"`
+	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 
 	// webSearch
 	Query string `json:"query"`
+
+	// imageGeneration. SavedPath is the image file in the folder
+	// generated_images of the Codex home.
+	RevisedPrompt *string          `json:"revisedPrompt"`
+	SavedPath     *string          `json:"savedPath"`
+	Failure       *imageGenFailure `json:"failure"`
 
 	// collabAgentToolCall, with Tool and Status. Tool is the call in
 	// camel case, such as wait or sendInput.
@@ -226,6 +232,13 @@ type item struct {
 	Model         *string `json:"model"`
 }
 
+// imageGenFailure is the failure of an imageGeneration item. Type is
+// the kind of the failure, such as usageLimitExceeded.
+type imageGenFailure struct {
+	Type    string `json:"type"`
+	LimitID string `json:"limitId"`
+}
+
 // The item types that the agent maps.
 const (
 	itemAgentMessage      = "agentMessage"
@@ -235,6 +248,7 @@ const (
 	itemFileChange        = "fileChange"
 	itemMcpToolCall       = "mcpToolCall"
 	itemWebSearch         = "webSearch"
+	itemImageGeneration   = "imageGeneration"
 	// itemCollabAgentToolCall is a call of the model to a subagent,
 	// such as wait.
 	itemCollabAgentToolCall = "collabAgentToolCall"
