@@ -15,6 +15,7 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox/read"
 	"github.com/sonnes/gopi/pkg/sandbox/write"
 	"github.com/sonnes/gopi/pkg/tool"
+	"github.com/sonnes/gopi/pkg/tool/askquestion"
 	"github.com/sonnes/gopi/pkg/tool/todowrite"
 )
 
@@ -94,6 +95,26 @@ func Coding() []tool.Tool {
 		Sandboxed(grep.New),
 		Sandboxed(find.New),
 		todowrite.New(),
+	}
+}
+
+// AskTool returns the ask_user_question tool for a session whose host
+// shows the questions in its approve function, as Claude Code does. The
+// tool is [askquestion.ViaApprover]. It gives no tool to an assembly
+// with no approve function in its config, because only the approver
+// can answer. Each call of the tool goes to approve as a safety check,
+// in each mode, with the answers of the model removed. The reasons are
+// in docs/concepts/permission/permission.md.
+func AskTool() Binder {
+	return unbound{
+		name: tool.AskUserQuestion,
+		bind: func(a *Assembly) (tool.Tool, error) {
+			if a.h.cfg.Approve == nil {
+				return nil, nil
+			}
+			a.askApprover = true
+			return askquestion.ViaApprover(), nil
+		},
 	}
 }
 

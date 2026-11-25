@@ -1,9 +1,16 @@
 // Package askquestion provides the ask_user_question tool. The model sends
-// one batch of multiple-choice questions. The tool validates the batch
-// and then blocks until a [Responder] gives the answers.
+// one batch of multiple-choice questions, and the tool validates the
+// batch. The answers come in one of two ways:
 //
-// The tool does not show the questions. The caller gives a [Responder]
-// that shows them on a surface, such as a terminal prompt or a web form.
+//   - [New] blocks until a [Responder] gives the answers. Use it when the
+//     caller shows the questions on its own surface, such as a terminal
+//     prompt or a web form.
+//   - [ViaApprover] reads the answers from the input of the call. Use it
+//     when a host shows the questions in its approval of the call, and
+//     the approver allows the call with the answers in a new input, as
+//     [WithAnswers] makes it.
+//
+// The tool does not show the questions.
 package askquestion
 
 import (
@@ -118,6 +125,135 @@ func New(responder Responder) tool.Tool {
 	)
 }
 
+// ViaApprover returns the ask_user_question tool for a host that
+// answers it with its approver, as Claude Code does. The tool does not
+// ask a [Responder]. The approver allows the call with a new input that
+// [WithAnswers] makes: the input of the model with an "answers" key.
+// The key maps the text of each question to the answer of the user: the
+// label that the user picked, or the free text that the user wrote. For
+// a question with multi_select, the answer joins the picked labels with
+// ", ", as Claude Code does. The tool then returns these answers. A call
+// with no answer for a question fails, so the model can ask again.
+//
+// The "answers" key is not in the input schema, so only the approver
+// gives it. The caller must ask the approver about each call, even in a
+// mode that allows each call, and must remove the answers of the model
+// with [WithoutAnswers] before it asks, so the model cannot answer its
+// own question. harness.AskTool does both.
+func ViaApprover() tool.Tool {
+	schema, err := jsonschema.For[Input](nil)
+	if err != nil {
+		panic(fmt.Sprintf("askquestion: input schema: %v", err))
+	}
+
+	return tool.Func(
+		Name,
+		answered,
+		tool.InputSchema(schema),
+		tool.Description(Description),
+		tool.Sequential(),
+	)
+}
+
+// answersKey is the key of the input that holds the answers of the
+// approver.
+const answersKey = "answers"
+
+// WithAnswers returns input with answers as its "answers" key, as the
+// tool of [ViaApprover] reads them. answers maps the text of each
+// question to its answer. An "answers" key of input is replaced. An
+// input that is not a JSON object fails.
+func WithAnswers(input json.RawMessage, answers map[string]string) (json.RawMessage, error) {
+	fields, err := inputFields(input)
+	if err != nil {
+		return nil, err
+	}
+
+	raw, err := json.Marshal(answers)
+	if err != nil {
+		return nil, fmt.Errorf("askquestion: marshal the answers: %w", err)
+	}
+	fields[answersKey] = raw
+
+	return json.Marshal(fields)
+}
+
+// WithoutAnswers returns input with no "answers" key. An input that is
+// not a JSON object fails.
+func WithoutAnswers(input json.RawMessage) (json.RawMessage, error) {
+	fields, err := inputFields(input)
+	if err != nil {
+		return nil, err
+	}
+	delete(fields, answersKey)
+
+	return json.Marshal(fields)
+}
+
+// inputFields returns the fields of the JSON object input. An empty
+// input has no fields.
+func inputFields(input json.RawMessage) (map[string]json.RawMessage, error) {
+	fields := map[string]json.RawMessage{}
+	if len(input) == 0 {
+		return fields, nil
+	}
+	if err := json.Unmarshal(input, &fields); err != nil {
+		return nil, fmt.Errorf("askquestion: the input is not a JSON object: %w", err)
+	}
+
+	return fields, nil
+}
+
+// answered returns the answers that the approver added to the input of
+// call. It looks up each answer by the text of its question, and the
+// result gives each answer with the header of its question. It reads
+// the "answers" key apart from the questions, so a bad shape of the
+// answers is an error of the approver and not of the model.
+func answered(_ context.Context, call ai.ToolCall) (ai.ToolResult, error) {
+	var in Input
+	if err := json.Unmarshal(call.Input, &in); err != nil {
+		msg := fmt.Sprintf("askquestion: invalid input: %s. %s", err, shapeExample)
+		return errorResult(msg), nil
+	}
+
+	if err := validate(in); err != nil {
+		return errorResult(err.Error() + ". " + shapeExample), nil
+	}
+
+	fields, err := inputFields(call.Input)
+	if err != nil {
+		return errorResult(err.Error()), nil
+	}
+	var given map[string]string
+	if raw, ok := fields[answersKey]; ok {
+		if err := json.Unmarshal(raw, &given); err != nil {
+			msg := fmt.Sprintf("askquestion: the approver gave the answers in a bad shape: %s", err)
+			return errorResult(msg), nil
+		}
+	}
+
+	answers := make([]Answer, 0, len(in.Questions))
+	for _, q := range in.Questions {
+		answer, ok := given[q.Question]
+		if !ok {
+			return errorResult(fmt.Sprintf("askquestion: the user gave no answer to %q", q.Question)), nil
+		}
+		answers = append(answers, Answer{
+			Header: q.Header,
+			Answer: answer,
+		})
+	}
+
+	payload, err := json.Marshal(Output{Answers: answers})
+	if err != nil {
+		return errorResult("askquestion: marshal answers: " + err.Error()), nil
+	}
+
+	return ai.ToolResult{
+		Content: []ai.Content{ai.Text{Text: string(payload)}},
+	}, nil
+}
+
 // ask validates the questions of call and then waits for the answers. A
 // failure becomes an error result, so the model can correct the call. A
 // canceled or expired context is the exception. Ask returns it as a Go
@@ -169,6 +305,7 @@ func validate(in Input) error {
 	}
 
 	headers := make(map[string]bool, len(in.Questions))
+	texts := make(map[string]bool, len(in.Questions))
 	for i, question := range in.Questions {
 		if err := validateQuestion(i, question); err != nil {
 			return err
@@ -177,6 +314,11 @@ func validate(in Input) error {
 			return fmt.Errorf("askquestion: headers must be unique: %q", question.Header)
 		}
 		headers[question.Header] = true
+		// An approver gives each answer by the text of its question.
+		if texts[question.Question] {
+			return fmt.Errorf("askquestion: questions must be unique: %q", question.Question)
+		}
+		texts[question.Question] = true
 	}
 
 	return nil

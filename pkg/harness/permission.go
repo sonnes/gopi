@@ -7,14 +7,28 @@ import (
 	"github.com/sonnes/gopi/pkg/agent"
 	"github.com/sonnes/gopi/pkg/ai"
 	"github.com/sonnes/gopi/pkg/permission"
+	"github.com/sonnes/gopi/pkg/tool"
+	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
 // policyHook returns a BeforeTool hook that checks each tool call with
 // policy, before the call runs. It asks approve about each call that the
 // policy asks about. If approve is nil, each such call is denied.
-func policyHook(policy permission.Policy, approve agent.ApproveFunc) agent.Hook {
+//
+// With askApprover, the ask_user_question tool is the tool of
+// [AskTool]. The hook then asks approve about each call of it that no
+// Deny rule matches, as a safety check, because only a person answers
+// it. It first removes the answers of the model from the input, so only
+// the decision of approve can give them.
+func policyHook(policy permission.Policy, approve agent.ApproveFunc, askApprover bool) agent.Hook {
 	return agent.BeforeTool(func(ctx context.Context, _ agent.State, c ai.ToolCall) (ai.ToolCall, error) {
 		d := policy.Decide(c)
+		askPerson := askApprover &&
+			c.Name == tool.AskUserQuestion &&
+			d.Match != permission.DenyMatch
+		if askPerson {
+			return askQuestion(ctx, policy, approve, c)
+		}
 		switch d.Match {
 		case permission.DenyMatch:
 			return c, agent.Deny(d.Reason)
@@ -23,6 +37,21 @@ func policyHook(policy permission.Policy, approve agent.ApproveFunc) agent.Hook 
 		}
 		return c, nil
 	})
+}
+
+// askQuestion sends the ask_user_question call c to approve as a safety
+// check, without the answers of the model. An input that is not a JSON
+// object goes as it is, and the tool rejects it.
+func askQuestion(
+	ctx context.Context,
+	policy permission.Policy,
+	approve agent.ApproveFunc,
+	c ai.ToolCall,
+) (ai.ToolCall, error) {
+	if input, err := askquestion.WithoutAnswers(c.Input); err == nil {
+		c.Input = input
+	}
+	return requestApproval(ctx, policy, approve, c, true)
 }
 
 // requestApproval gets a decision on c from approve. safety marks the

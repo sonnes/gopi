@@ -54,6 +54,10 @@ type Assembly struct {
 	names []string
 	// tools are the tools that go to the agent, deferred or not.
 	tools []tool.Tool
+	// askApprover reports that the ask_user_question tool of the
+	// assembly is the tool of [AskTool], so each call of it goes to the
+	// approver.
+	askApprover bool
 	// box is the sandbox of the tools of [Sandboxed]. It is nil until
 	// the first of them binds.
 	box sandbox.Sandbox
@@ -321,7 +325,7 @@ func (a *Assembly) prepare() (ai.LanguageModel, []agent.Option, error) {
 
 	approve := a.h.cfg.Approve
 	opts := []agent.Option{
-		agent.Hooks(policyHook(a.h.policy(a.Dir), approve)),
+		agent.Hooks(policyHook(a.h.policy(a.Dir), approve, a.askApprover)),
 		agent.Approve(approve),
 		// The first option, so [AgentDefaults] can replace it.
 		agent.Compaction(compact.Summarize()),

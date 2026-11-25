@@ -18,6 +18,7 @@ import (
 	"github.com/sonnes/gopi/pkg/sandbox"
 	"github.com/sonnes/gopi/pkg/session"
 	"github.com/sonnes/gopi/pkg/tool"
+	"github.com/sonnes/gopi/pkg/tool/askquestion"
 )
 
 // callEcho runs an agent of c whose model calls echo once, with opts
@@ -295,4 +296,166 @@ func TestAProtectedEditAsksForASafetyCheck(t *testing.T) {
 
 	require.Len(t, asked, 1)
 	assert.True(t, asked[0].Safety)
+}
+
+// question is the input of an ask_user_question call with one question.
+const question = `{"questions":[{"header":"Area","question":"Which area?","options":[{"label":"Alfama"},{"label":"Baixa"}]}]}`
+
+// eachMode holds the modes of a test that must behave the same in each
+// mode.
+var eachMode = []permission.Mode{
+	permission.Default,
+	permission.AcceptEdits,
+	permission.Bypass,
+}
+
+// answerAlfama is an approver that records each request in asked and
+// answers each question with Alfama.
+func answerAlfama(t *testing.T, asked *[]agent.ApprovalRequest) agent.ApproveFunc {
+	return func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		*asked = append(*asked, req)
+		input, err := askquestion.WithAnswers(req.Call.Input, map[string]string{"Which area?": "Alfama"})
+		require.NoError(t, err)
+		return agent.Decision{Allow: true, Input: input}, nil
+	}
+}
+
+// askAgent returns an agent whose model calls ask_user_question once
+// with input, with tools and c.
+func askAgent(t *testing.T, input string, tools []tool.Tool, c agent.Config) *agent.Agent {
+	t.Helper()
+	p := &script{responses: []ai.Message{
+		callTool("c1", tool.AskUserQuestion, input),
+		reply("done"),
+	}}
+	c.Spec = "fake/one"
+	h := harness.New(with(base(p), harness.Toolset(harness.Tools(tools...)))...)
+	a, err := h.New(context.Background(), c)
+	require.NoError(t, err)
+	return a
+}
+
+func TestTheQuestionToolOfTheApproverAsksAPersonInEachMode(t *testing.T) {
+	for _, mode := range eachMode {
+		t.Run(string(mode), func(t *testing.T) {
+			var asked []agent.ApprovalRequest
+			a := askAgent(t, question, []tool.Tool{harness.AskTool()}, agent.Config{
+				Mode:    mode,
+				Approve: answerAlfama(t, &asked),
+			})
+
+			run(t, a, "go")
+
+			require.Len(t, asked, 1)
+			assert.True(t, asked[0].Safety)
+			m := toolResult(t, a)
+			assert.False(t, m.IsError, m.Text())
+			assert.Contains(t, m.Text(), "Alfama")
+		})
+	}
+}
+
+func TestTheQuestionToolOfTheApproverNeedsAnApprover(t *testing.T) {
+	opts := with(base(&script{}), harness.Toolset(harness.Tools(harness.AskTool())))
+
+	withApprover := assemblyOf(t, opts, agent.Config{
+		Spec:    "fake/one",
+		Approve: answerAlfama(t, nil),
+	})
+	noApprover := assemblyOf(t, opts, agent.Config{Spec: "fake/one"})
+
+	assert.Len(t, withApprover.Tools, 1)
+	assert.Empty(t, noApprover.Tools)
+}
+
+// answerDayjs answers each question with dayjs.
+type answerDayjs struct{}
+
+func (answerDayjs) Ask(_ context.Context, _ string, questions []askquestion.Question) ([]askquestion.Answer, error) {
+	var out []askquestion.Answer
+	for _, q := range questions {
+		out = append(out, askquestion.Answer{Header: q.Header, Answer: "dayjs"})
+	}
+	return out, nil
+}
+
+func TestTheQuestionToolOfAResponderRunsWithNoApproverInEachMode(t *testing.T) {
+	for _, mode := range eachMode {
+		t.Run(string(mode), func(t *testing.T) {
+			a := askAgent(t, question, []tool.Tool{askquestion.New(answerDayjs{})}, agent.Config{
+				Mode: mode,
+			})
+
+			run(t, a, "go")
+
+			m := toolResult(t, a)
+			assert.False(t, m.IsError, m.Text())
+			assert.Contains(t, m.Text(), "dayjs")
+		})
+	}
+}
+
+func TestTheModelCannotAnswerItsOwnQuestion(t *testing.T) {
+	input := `{"questions":[{"header":"Area","question":"Which area?","options":[{"label":"Alfama"},{"label":"Baixa"}]}],"answers":{"Which area?":"Baixa"}}`
+	var asked []agent.ApprovalRequest
+	approve := func(_ context.Context, req agent.ApprovalRequest) (agent.Decision, error) {
+		asked = append(asked, req)
+		return agent.Decision{Allow: true}, nil
+	}
+	a := askAgent(t, input, []tool.Tool{harness.AskTool()}, agent.Config{
+		Mode:    permission.Bypass,
+		Approve: approve,
+	})
+
+	run(t, a, "go")
+
+	require.Len(t, asked, 1)
+	fields := map[string]any{}
+	require.NoError(t, json.Unmarshal(asked[0].Call.Input, &fields))
+	assert.NotContains(t, fields, "answers", "the approver sees no answer of the model")
+	m := toolResult(t, a)
+	assert.True(t, m.IsError)
+	assert.Contains(t, m.Text(), "no answer")
+}
+
+func TestADenyRuleDeniesTheQuestionToolOfTheApprover(t *testing.T) {
+	var asked []agent.ApprovalRequest
+	a := askAgent(t, question, []tool.Tool{harness.AskTool()}, agent.Config{
+		Mode:    permission.Bypass,
+		Deny:    []string{tool.AskUserQuestion},
+		Approve: answerAlfama(t, &asked),
+	})
+
+	run(t, a, "go")
+
+	assert.Empty(t, asked)
+	assert.True(t, toolResult(t, a).IsError)
+}
+
+func TestAQuestionOfASubagentReachesTheApproverOfTheParent(t *testing.T) {
+	p := &script{responses: []ai.Message{
+		callTool("c1", "agent", `{"agent":"reviewer","prompt":"Pick an area"}`),
+		callTool("c2", tool.AskUserQuestion, question),
+		reply("Alfama it is"),
+		reply("done"),
+	}}
+	h := harness.New(with(
+		base(p),
+		harness.Toolset(harness.Tools(harness.AgentTool(), harness.AskTool())),
+		harness.Defs(def.Set{Agents: []def.Agent{reviewer}}),
+	)...)
+	var asked []agent.ApprovalRequest
+	a, err := h.New(context.Background(), agent.Config{
+		Spec:    "fake/one",
+		Mode:    permission.Bypass,
+		Approve: answerAlfama(t, &asked),
+	})
+	require.NoError(t, err)
+
+	run(t, a, "go")
+
+	require.Len(t, asked, 1)
+	assert.Equal(t, tool.AskUserQuestion, asked[0].Call.Name)
+	assert.True(t, asked[0].Safety)
+	assert.Contains(t, toolResult(t, a).Text(), "Alfama it is")
 }

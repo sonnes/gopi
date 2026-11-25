@@ -166,6 +166,15 @@ func TestRun_RejectsInvalidQuestions(t *testing.T) {
 			want: "headers must be unique",
 		},
 		{
+			name: "duplicate questions",
+			change: func(in *Input) {
+				question := in.Questions[0]
+				question.Header = "Other"
+				in.Questions = append(in.Questions, question)
+			},
+			want: "questions must be unique",
+		},
+		{
 			name: "too few options",
 			change: func(in *Input) {
 				in.Questions[0].Options = in.Questions[0].Options[:1]
@@ -263,4 +272,111 @@ func TestRun_StopsWhenTheContextIsCanceled(t *testing.T) {
 	case <-time.After(runTimeout):
 		t.Fatal("Run did not return after the context was canceled")
 	}
+}
+
+// answeredCall returns the call of in with answers in its input, as an
+// approver adds them.
+func answeredCall(t *testing.T, in Input, answers map[string]string) ai.ToolCall {
+	t.Helper()
+
+	c := toolCall(t, in)
+	raw, err := WithAnswers(c.Input, answers)
+	require.NoError(t, err)
+	c.Input = raw
+
+	return c
+}
+
+func TestViaApprover_ReturnsTheAnswersOfTheInput(t *testing.T) {
+	in := validInput()
+	c := answeredCall(t, in, map[string]string{
+		"Which library should we use?": "dayjs",
+	})
+
+	res, err := ViaApprover().Run(t.Context(), c)
+	require.NoError(t, err)
+
+	assert.False(t, res.IsError)
+	var out Output
+	require.NoError(t, json.Unmarshal([]byte(resultText(t, res)), &out))
+	assert.Equal(t, []Answer{{Header: "Library", Answer: "dayjs"}}, out.Answers)
+}
+
+func TestViaApprover_FailsWithNoAnswer(t *testing.T) {
+	res, err := ViaApprover().Run(t.Context(), toolCall(t, validInput()))
+	require.NoError(t, err)
+
+	assert.True(t, res.IsError)
+	assert.Contains(t, resultText(t, res), "Which library should we use?")
+}
+
+func TestViaApprover_RejectsInvalidQuestions(t *testing.T) {
+	in := validInput()
+	in.Questions[0].Question = "No question mark"
+
+	res, err := ViaApprover().Run(t.Context(), toolCall(t, in))
+	require.NoError(t, err)
+
+	assert.True(t, res.IsError)
+}
+
+func TestViaApprover_ReportsABadShapeOfTheAnswersToTheApprover(t *testing.T) {
+	c := toolCall(t, validInput())
+	fields := map[string]any{}
+	require.NoError(t, json.Unmarshal(c.Input, &fields))
+	fields["answers"] = []string{"dayjs"}
+	raw, err := json.Marshal(fields)
+	require.NoError(t, err)
+	c.Input = raw
+
+	res, err := ViaApprover().Run(t.Context(), c)
+	require.NoError(t, err)
+
+	assert.True(t, res.IsError)
+	text := resultText(t, res)
+	assert.Contains(t, text, "the approver gave the answers in a bad shape")
+	assert.NotContains(t, text, "Expected shape", "the model did not make the mistake")
+}
+
+func TestViaApprover_ReadsOnlyTheAnswersKey(t *testing.T) {
+	c := toolCall(t, validInput())
+	fields := map[string]any{}
+	require.NoError(t, json.Unmarshal(c.Input, &fields))
+	fields["Answers"] = map[string]string{"Which library should we use?": "dayjs"}
+	raw, err := json.Marshal(fields)
+	require.NoError(t, err)
+	c.Input = raw
+
+	res, err := ViaApprover().Run(t.Context(), c)
+	require.NoError(t, err)
+
+	assert.True(t, res.IsError, "a key in another case is not the answers")
+}
+
+func TestViaApprover_HasTheNameOfTheTool(t *testing.T) {
+	assert.Equal(t, Name, ViaApprover().Info().Name)
+}
+
+func TestWithAnswersReplacesTheAnswersOfTheInput(t *testing.T) {
+	input := json.RawMessage(`{"questions":[],"answers":{"Which?":"mine"}}`)
+
+	got, err := WithAnswers(input, map[string]string{"Which?": "yours"})
+	require.NoError(t, err)
+
+	assert.JSONEq(t, `{"questions":[],"answers":{"Which?":"yours"}}`, string(got))
+}
+
+func TestWithAnswersFailsOnAnInputThatIsNotAnObject(t *testing.T) {
+	_, err := WithAnswers(json.RawMessage(`[1]`), map[string]string{"Which?": "yours"})
+
+	assert.Error(t, err)
+}
+
+func TestWithoutAnswersRemovesTheAnswersOfTheInput(t *testing.T) {
+	input := json.RawMessage(`{"questions":[],"answers":{"Which?":"mine"}}`)
+
+	got, err := WithoutAnswers(input)
+	require.NoError(t, err)
+
+	assert.JSONEq(t, `{"questions":[]}`, string(got))
 }
