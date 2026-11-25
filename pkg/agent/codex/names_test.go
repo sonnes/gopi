@@ -46,6 +46,13 @@ func TestImageGeneration(t *testing.T) {
 			wantText:  "usageLimitExceeded: images",
 			wantError: true,
 		},
+		{
+			name:      "a failure with no limit has no separator",
+			item:      `{"type":"imageGeneration","id":"ig1","status":"failed","revisedPrompt":null,"result":"","savedPath":null,"failure":{"type":"contentPolicy","limitId":null,"resetsAt":null}}`,
+			wantInput: `{"prompt":null,"path":null}`,
+			wantText:  "contentPolicy",
+			wantError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

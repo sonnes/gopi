@@ -546,7 +546,8 @@ func (t *turn) compaction() session.Compaction {
 
 // itemStarted opens a text block for an agent message, or starts the
 // tool of a tool item. A reasoning item gets its block with its first
-// text, because it often has none.
+// text, because it often has none. An image generation starts its tool
+// when it completes.
 func (t *turn) itemStarted(ctx context.Context, it item) error {
 	if it.Type == itemContextCompaction {
 		t.compacting = true
@@ -555,6 +556,11 @@ func (t *turn) itemStarted(ctx context.Context, it item) error {
 	}
 	if it.Type == itemAgentMessage {
 		t.block(it.ID, ai.EventTextStart)
+		return nil
+	}
+	if it.Type == itemImageGeneration {
+		// The started item has no prompt and no path, and the stored
+		// call cannot change. So the call starts at item/completed.
 		return nil
 	}
 	tc, ok := toolCall(it)
@@ -890,6 +896,9 @@ func fileChanges(raw json.RawMessage) string {
 // path of its image file.
 func imageText(it item) string {
 	if it.Failure != nil {
+		if it.Failure.LimitID == "" {
+			return it.Failure.Type
+		}
 		return it.Failure.Type + ": " + it.Failure.LimitID
 	}
 	if it.SavedPath == nil {
