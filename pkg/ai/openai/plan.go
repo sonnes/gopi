@@ -18,8 +18,9 @@ const planNamespaceDescription = "The tools of the agent."
 // plan, as Sign in with ChatGPT gives it. The caller also sets an
 // [HTTPClient] that sends the OAuth token of the plan. With this option:
 //
-//   - A request has no max_output_tokens, temperature, or
-//     prompt_cache_retention, because the route refuses them.
+//   - A request has no max_output_tokens, temperature,
+//     prompt_cache_retention, or prompt_cache_breakpoint, because the
+//     route refuses them.
 //   - The function tools go into one namespace, "gopi", and each
 //     function call of the history carries that namespace.
 //   - [Provider.GenerateObject] reads its response from a stream,
@@ -40,6 +41,20 @@ func toPlan(params *responses.ResponseNewParams) {
 	for _, item := range params.Input.OfInputItemList {
 		if call := item.OfFunctionCall; call != nil {
 			call.Namespace = param.NewOpt(planNamespace)
+		}
+		if msg := item.OfMessage; msg != nil {
+			removeBreakpoints(msg.Content.OfInputItemContentList)
+		}
+	}
+}
+
+// removeBreakpoints removes the cache breakpoint of each text part of
+// parts. The route of the plan refuses a prompt_cache_breakpoint with a
+// 400, also on a model that takes one through an API key.
+func removeBreakpoints(parts responses.ResponseInputMessageContentListParam) {
+	for _, part := range parts {
+		if text := part.OfInputText; text != nil {
+			text.PromptCacheBreakpoint = responses.ResponseInputTextPromptCacheBreakpointParam{}
 		}
 	}
 }

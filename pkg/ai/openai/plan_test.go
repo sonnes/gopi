@@ -142,6 +142,29 @@ func TestChatGPTPlan_Request(t *testing.T) {
 	assert.Equal(t, "gopi", calls[0]["namespace"])
 }
 
+func TestChatGPTPlan_NoCacheBreakpoint(t *testing.T) {
+	p, bodies := planServer(t, planTextEvents)
+	system := ai.SystemPrompt([]ai.Content{
+		ai.Text{Text: "Be brief."},
+		ai.Section{Name: "rules", Text: "<rules>Cite.</rules>"},
+	})
+
+	stream := p.StreamText(
+		t.Context(),
+		luna,
+		[]ai.Message{ai.UserMessage("Hi")},
+		system,
+	)
+	_, err := stream.Wait()
+	require.NoError(t, err)
+
+	require.Len(t, *bodies, 1)
+	data, err := json.Marshal((*bodies)[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "Cite.")
+	assert.NotContains(t, string(data), "prompt_cache_breakpoint", "the plan route refuses a cache breakpoint")
+}
+
 func TestChatGPTPlan_GenerateObject(t *testing.T) {
 	p, bodies := planServer(t, planTextEvents)
 	schema := &jsonschema.Schema{
