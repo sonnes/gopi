@@ -33,7 +33,7 @@ flowchart LR
 - A tool that needs the session is a `harness.Binder`: the skill tool, the agent tool, and each tool of `Sandboxed`. One list then serves sessions with different folders, skills, and subagents.
 - The harness picks the subset before it binds, so a name passes also when its tool binds to nothing, and a left-out tool makes no sandbox. A subagent narrows the subset of its parent with no check, because its file removes tools such as the agent tool.
 - `tool.Named` stands for a tool that only a CLI runs, such as `apply_patch`. The presets `harness.Coding`, `claude.Tools`, and `codex.Tools` are lists that the caller spreads into `host.Tools`, so the list stays explicit.
-- The hooks of Codex see only `bash` and `apply_patch`, so the Codex driver can remove only them, and a Codex agent always keeps `web_search` and `agent`.
+- The hooks of Codex see only `bash` and `apply_patch`, so the Codex driver can remove only them, and a Codex agent always keeps `web_search`, `agent`, and `image_generation`.
 - A default-driver harness takes no `Toolset`, because the host list comes on top of it. It takes `Sandbox`.
 - The host keeps the names of a config, and not the list, because a tool is code. A session that names a tool of an earlier list fails at its next start.
 
