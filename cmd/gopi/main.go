@@ -227,7 +227,6 @@ func rootCommand() *cli.Command {
 		Commands: []*cli.Command{
 			modelsCommand(),
 			decideCommand(),
-			hookCommand(),
 			loginCommand(),
 			logoutCommand(),
 		},

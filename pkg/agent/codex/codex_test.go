@@ -1112,6 +1112,33 @@ func TestApproveBeforeItem(t *testing.T) {
 	}
 }
 
+// userHookScrub empties the entries of a hook of the user config, such
+// as the context that a SessionStart hook of the machine adds.
+func userHookScrub(line []byte) []byte {
+	var m struct {
+		Method string         `json:"method"`
+		Params map[string]any `json:"params"`
+	}
+	if err := json.Unmarshal(line, &m); err != nil || !strings.HasPrefix(m.Method, "hook/") {
+		return line
+	}
+	run, ok := m.Params["run"].(map[string]any)
+	if !ok || run["source"] != "user" {
+		return line
+	}
+	run["entries"] = []any{}
+	var full map[string]any
+	if err := json.Unmarshal(line, &full); err != nil {
+		return line
+	}
+	full["params"] = m.Params
+	out, err := json.Marshal(full)
+	if err != nil {
+		return line
+	}
+	return out
+}
+
 // TestRecordedApproval runs the real CLI with the approval policy that
 // the driver sets for an Approve function. To record it again:
 //

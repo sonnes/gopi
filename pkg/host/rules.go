@@ -46,7 +46,7 @@ func Rules(r RulesReader) Option {
 // needsRulesHook reports if a session with config can have a Deny rule
 // or an Ask rule. The rules hook then checks each call before it runs.
 // An Allow rule and a grant need no hook, because the host checks them
-// in approve. A session with no hook needs no hook command on Codex.
+// in approve.
 func (h *Host) needsRulesHook(config Config) bool {
 	return h.rules != nil || len(config.Ask) > 0 || len(config.Deny) > 0
 }

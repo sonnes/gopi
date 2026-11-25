@@ -65,7 +65,12 @@
 //   - Each folder of AddDirs is a writable root of the workspace-write
 //     sandbox, as Dir is. The read-only sandbox stays read-only, and
 //     the full access sandbox has no limits.
-//   - The agent ignores Compaction, Idle, and Wake.
+//   - The agent ignores Compaction, Idle, Wake, Hooks, Deny, Tools,
+//     and ToolNames. Codex has no hook callback over its protocol and
+//     no rules for each tool, so the agent cannot run a hook or block a
+//     tool. The CLI runs only its own tools, and the model sees each
+//     tool of the CLI and of MCP. An approval request still reaches
+//     Approve, so a caller can check its own rules there.
 //
 // The Mode sets the approval policy and the sandbox of the thread:
 //
@@ -102,27 +107,6 @@
 // Input declines it. Codex has no field for the Message of a decision,
 // so the model does not read it.
 //
-// Codex has no rules for each tool, so the agent blocks the tools of
-// the config itself, in a hook of the CLI at PreToolUse:
-//
-//   - A Deny rule with no content, such as "web_fetch", blocks each
-//     call of its tool. The agent does not check a rule with content.
-//     The hooks of the caller check it, as the host does.
-//   - bash or apply_patch gets a Deny rule if Tools or ToolNames leaves
-//     it out. So without Tools, the agent blocks both. The hooks of the
-//     CLI do not see web_search, agent, and image_generation, so the
-//     agent keeps them.
-//     ToolNames also blocks a call of each other tool, such as an MCP
-//     tool, in that hook. The model still sees the tool.
-//   - A hook that returns an [agent.AskError] asks the Approve function
-//     in the hook, and the hook waits for the answer.
-//
-// The agent skips a well-known tool of Tools that Codex does not have,
-// such as read_file, and a tool of the caller, because the CLI runs
-// only its own tools. A tool of the caller that ToolNames names fails
-// [Durable]. A Deny rule with no content, a left-out tool, ToolNames,
-// or a hook of the config needs the hook command of [HookCommand].
-//
 // The agent loads Defs and writes the skills and the agents to a folder
 // for each session at each start of the CLI, so an edit reaches the
 // next process. It removes the folder at Close. A
@@ -142,34 +126,6 @@
 // start of the CLI, because the name is a file name. The agent does not
 // read the instructions of Defs. The CLI also keeps the skills and the
 // agents of its own folders.
-//
-// # Hooks
-//
-// The CLI calls the Hooks of the config at its own hook events. Codex
-// has no hook callback over its protocol, so the agent adds a command
-// hook to each thread through the config of thread/start, with the
-// hook trust bypassed. The command, [HookCommand], relays each call to
-// a socket of the agent:
-//
-//   - BeforeTool at PreToolUse. An error denies the call with its text.
-//     A new input allows the call with it. A new name denies the call.
-//     For Bash and apply_patch, a new input must be an object with a
-//     string command. A new input of another shape denies the call.
-//   - AfterTool at PostToolUse. A new text, or the text of an error,
-//     replaces the output that the model reads.
-//   - BeforeStop at Stop. The text of the entries continues the turn.
-//     An error stops the turn and fails the run.
-//
-// If the command fails or times out, Codex runs the tool. The command
-// at PreToolUse has a time limit of 24 hours, and the other commands
-// keep the limit of the CLI. If the command cannot reach the agent, it
-// denies a call at PreToolUse, gives the error as the output at
-// PostToolUse, and ends the turn at Stop.
-// The hooks do not see a hosted tool, such as web search. A hook gives
-// only text entries. A hook that uses BeforeCall, AfterCall, or
-// AfterTurn, or that implements no point, fails [Durable] and each run
-// of an agent of [New]. The error for a point wraps
-// [errors.ErrUnsupported].
 //
 // The reasons are in docs/concepts/agent/cli-agent.md,
 // docs/concepts/agent/cli-request.md, and

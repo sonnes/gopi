@@ -17,27 +17,25 @@
 // [State.View]. The log keeps each original message.
 //
 // A [Driver] starts an agent of one kind: the loop of the harness, or
-// an agent CLI. Each driver calls the hook points that its agent has,
-// and rejects a hook at another point:
+// an agent CLI. The harness and the Claude Code driver call the hook
+// points that their agent has, and reject a hook at another point:
 //
-//	             harness   claude-code          codex
-//	BeforeCall   yes       no                   no
-//	AfterCall    yes       no                   no
-//	BeforeTool   yes       PreToolUse           PreToolUse (1)
-//	AfterTool    yes       PostToolUse (2)(3)   PostToolUse (1)(2)
-//	AfterTurn    yes       PostToolBatch        no
-//	BeforeStop   yes       Stop                 Stop
+//	             harness   claude-code
+//	BeforeCall   yes       no
+//	AfterCall    yes       no
+//	BeforeTool   yes       PreToolUse
+//	AfterTool    yes       PostToolUse (1)(2)
+//	AfterTurn    yes       PostToolBatch
+//	BeforeStop   yes       Stop
 //
 // A CLI has no hook at a model call. Claude Code calls AfterTurn only
-// after a turn with tool calls. Codex runs a hook through the gopi
-// binary, and runs the tool if the hook fails. If the binary is
-// missing, the run fails. A hook of a CLI agent
-// gives text entries only, and cannot rename a tool call.
+// after a turn with tool calls. A hook of a CLI agent gives text
+// entries only, and cannot rename a tool call. The Codex driver calls
+// no hook, and ignores the hooks of its config.
 //
-//  1. Codex calls no hook for a hosted tool, such as web search.
-//  2. On a CLI agent, the model reads only the text of the result that
+//  1. On a CLI agent, the model reads only the text of the result that
 //     AfterTool returns.
-//  3. Claude Code also calls AfterTool after a failed call, at
+//  2. Claude Code also calls AfterTool after a failed call, at
 //     PostToolUseFailure. The model reads the original error, and the
 //     text of the hook comes after it as context.
 //

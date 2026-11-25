@@ -33,8 +33,7 @@ func (stopHook) BeforeStop(context.Context, agent.State) ([]session.Entry, error
 	return nil, nil
 }
 
-// allTools are the tools of the CLI, so a config with them needs no
-// hook that removes a tool.
+// allTools are the tools of the CLI.
 var allTools = []tool.Tool{
 	tool.Named(tool.Bash),
 	tool.Named(tool.ApplyPatch),
@@ -134,7 +133,7 @@ func TestDriverMode(t *testing.T) {
 				Approve: approve,
 			})
 
-			p := a.threadParams("", nil, "", nil)
+			p := a.threadParams("", nil)
 			assert.Equal(t, tt.wantPolicy, p.ApprovalPolicy)
 			assert.Equal(t, tt.wantSandbox, p.Sandbox)
 		})
@@ -192,7 +191,7 @@ func TestDriverLimits(t *testing.T) {
 				Limits: tt.limits,
 			})
 
-			p := a.threadParams("", nil, "", nil)
+			p := a.threadParams("", nil)
 			assert.Equal(t, tt.wantSandbox, p.Sandbox)
 		})
 	}
@@ -303,7 +302,7 @@ func TestDriverGivesTheAddDirsAsWritableRoots(t *testing.T) {
 	})
 
 	args := a.command().Args
-	p := a.threadParams("", nil, "", nil)
+	p := a.threadParams("", nil)
 
 	assert.Contains(t, args, `sandbox_workspace_write.writable_roots=["/lw/repos"]`)
 	assert.NotContains(t, p.Config, "sandbox_workspace_write", "the config of the thread would replace the table of -c")
@@ -357,10 +356,10 @@ func TestAppServerPinsThePermissionKeys(t *testing.T) {
 
 func TestDriverConformance(t *testing.T) {
 	drivertest.Run(t, drivertest.Suite{
-		Driver:          Driver(),
-		Tools:           allTools,
-		UnsupportedHook: turnHook{},
-		SkillDir:        skillsDir,
+		Driver:           Driver(),
+		Tools:            allTools,
+		IgnoresToolNames: true,
+		SkillDir:         skillsDir,
 		WriteDefs: func(t *testing.T, r agent.Runner) {
 			a, ok := r.(*Agent)
 			require.True(t, ok, "the driver starts a *codex.Agent")
@@ -379,7 +378,7 @@ func TestDriverGivesTheRolesToTheCLI(t *testing.T) {
 
 	_, _, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
-	p := a.threadParams("", nil, "", roles)
+	p := a.threadParams("", roles)
 
 	roleFile := filepath.Join(root, "s1", "codex", "agents", "reviewer.toml")
 	assert.Equal(t, map[string]any{
@@ -415,7 +414,7 @@ func TestDriverWithNoDefsGivesNoRoles(t *testing.T) {
 
 	_, _, roles, err := a.writeDefs(context.Background())
 	require.NoError(t, err)
-	p := a.threadParams("", nil, "", roles)
+	p := a.threadParams("", roles)
 
 	assert.NotContains(t, p.Config, "agents")
 }
@@ -427,11 +426,6 @@ func TestDriverRejects(t *testing.T) {
 		unsupported bool
 		errText     string
 	}{
-		{
-			name:    "a rule that does not parse",
-			config:  agent.Config{Deny: []string{"bash(rm *"}},
-			errText: `codex: permission: rule "bash(rm *": the content has no closing parenthesis`,
-		},
 		{
 			name:        "a block on reads outside the roots",
 			config:      agent.Config{Limits: permission.Limits{BlockReadsOutside: true}},
@@ -449,55 +443,25 @@ func TestDriverRejects(t *testing.T) {
 	}
 }
 
-func TestLeftOutTools(t *testing.T) {
-	tests := []struct {
-		name   string
-		config agent.Config
-		want   []string
-	}{
-		{name: "each tool of the CLI", config: agent.Config{Tools: allTools}, want: nil},
-		{
-			name:   "a tool of the caller is skipped",
-			config: agent.Config{Tools: append([]tool.Tool{tool.Func("lookup", nil)}, allTools...)},
-			want:   nil,
-		},
-		{
-			name:   "a well-known tool that the CLI does not have",
-			config: agent.Config{Tools: append([]tool.Tool{tool.Named(tool.ReadFile)}, allTools...)},
-			want:   nil,
-		},
-		{
-			name:   "a short list",
-			config: agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ReadFile)}},
-			want:   []string{tool.ApplyPatch},
-		},
-		{
-			name:   "ToolNames keeps one tool",
-			config: agent.Config{Tools: allTools, ToolNames: []string{"Bash"}},
-			want:   []string{tool.ApplyPatch},
-		},
-		{name: "no tools", config: agent.Config{}, want: []string{tool.Bash, tool.ApplyPatch}},
-		{
-			name: "a named tool of another CLI",
-			config: agent.Config{
-				Tools:     append([]tool.Tool{tool.Named("DesignSync")}, allTools...),
-				ToolNames: []string{"bash", "apply_patch", "DesignSync"},
-			},
-			want: nil,
-		},
-		{
-			name:   "web_search and agent are not removed",
-			config: agent.Config{Tools: []tool.Tool{tool.Named(tool.Bash), tool.Named(tool.ApplyPatch)}},
-			want:   nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := leftOutTools(tt.config)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+func TestDriverIgnoresWhatCodexCannotEnforce(t *testing.T) {
+	t.Setenv("PATH", "")
+	useTraces(t, []string{"text.trace"})
+	a := startAgent(t, Driver(), agent.Config{
+		Model:     ai.Model{ID: "gpt-5-codex"},
+		Dir:       workDir,
+		Sections:  agent.SystemText("Be brief."),
+		Mode:      permission.Default,
+		Effort:    ai.ThinkingHigh,
+		Hooks:     []agent.Hook{stopHook{}, agent.BaseHook{}},
+		Deny:      []string{"apply_patch", "bash(rm *"},
+		Tools:     []tool.Tool{tool.Func("lookup", nil)},
+		ToolNames: []string{"lookup", "mcp__docs__search"},
+	})
+
+	_, msgs, err := collect(a.Run(context.Background(), session.Text("Say hello.")))
+	require.NoError(t, err, "the thread gets no hooks, the Deny rules, or the tools")
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "Hello", msgs[0].Text())
 }
 
 func TestDriver_ListModels(t *testing.T) {
@@ -647,18 +611,7 @@ func TestDriverMCP(t *testing.T) {
 	t.Run("the config of the thread holds the servers", func(t *testing.T) {
 		a := startAgent(t, Driver(), agent.Config{MCP: servers})
 
-		p := a.threadParams("", nil, "", nil)
+		p := a.threadParams("", nil)
 		assert.Equal(t, wantServers, p.Config["mcp_servers"])
-	})
-
-	t.Run("the servers go next to the hooks", func(t *testing.T) {
-		a := startAgent(t, Driver(), agent.Config{
-			MCP:   servers,
-			Hooks: []agent.Hook{stopHook{}},
-		})
-
-		p := a.threadParams("", &hookServer{socket: "/tmp/hooks.sock"}, "gopi-hook", nil)
-		assert.Equal(t, wantServers, p.Config["mcp_servers"])
-		assert.Contains(t, p.Config, "hooks")
 	})
 }

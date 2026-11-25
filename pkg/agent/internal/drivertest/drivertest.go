@@ -31,8 +31,13 @@ type Suite struct {
 	// Tools are the tools of the config of each case that names no tools
 	// of its own.
 	Tools []tool.Tool
-	// UnsupportedHook is a hook at a point that the CLI does not have.
+	// UnsupportedHook is a hook at a point that the CLI does not have. A
+	// driver that ignores Hooks leaves it nil, and the cases of the hooks
+	// do not run.
 	UnsupportedHook agent.Hook
+	// IgnoresToolNames is set for a driver that ignores ToolNames, so the
+	// cases of ToolNames do not run.
+	IgnoresToolNames bool
 	// SkillDir is the folder of the skills in the folder of the
 	// definitions of a session.
 	SkillDir string
@@ -49,7 +54,7 @@ func Run(t *testing.T, s Suite) {
 
 func (s Suite) rejects(t *testing.T) {
 	bash := tool.Named(tool.Bash)
-	tests := []struct {
+	type test struct {
 		name   string
 		config agent.Config
 		// wantIs is the error that the error of Start wraps, or nil.
@@ -57,43 +62,46 @@ func (s Suite) rejects(t *testing.T) {
 		// wantText is a part of the error of Start, for an error with no
 		// sentinel.
 		wantText string
-	}{
+	}
+	tests := []test{
 		{
 			name:     "a skill that the Defs do not have",
 			config:   agent.Config{Skills: []string{"deploy"}},
 			wantText: `"deploy"`,
 		},
 		{
+			name:     "an unknown mode",
+			config:   agent.Config{Mode: "auto"},
+			wantText: `"auto"`,
+		},
+	}
+	if !s.IgnoresToolNames {
+		tests = append(tests, test{
 			name: "a tool of the caller that ToolNames names",
 			config: agent.Config{
 				Tools:     []tool.Tool{bash, tool.Func("echo", nil)},
 				ToolNames: []string{"bash", "echo"},
 			},
 			wantIs: tool.ErrUnknownTool,
-		},
-		{
+		}, test{
 			name: "a name outside the tools",
 			config: agent.Config{
 				Tools:     []tool.Tool{bash},
 				ToolNames: []string{"web_search"},
 			},
 			wantIs: tool.ErrUnknownTool,
-		},
-		{
+		})
+	}
+	if s.UnsupportedHook != nil {
+		tests = append(tests, test{
 			name:   "a hook at a point that the CLI does not have",
 			config: agent.Config{Hooks: []agent.Hook{s.UnsupportedHook}},
 			wantIs: errors.ErrUnsupported,
-		},
-		{
+		}, test{
 			name:     "a hook with no point",
 			config:   agent.Config{Hooks: []agent.Hook{agent.BaseHook{}}},
 			wantText: "implements no point",
-		},
-		{
-			name:     "an unknown mode",
-			config:   agent.Config{Mode: "auto"},
-			wantText: `"auto"`,
-		},
+		})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
