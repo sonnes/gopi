@@ -82,3 +82,27 @@ func TestUsageByModelOfAResumedSession(t *testing.T) {
 		},
 		map[string]float64{"claude-sonnet-5-5": 0.01, "claude-haiku-5-5": 0.001})
 }
+
+// A CLI that resumes a conversation can start its sums from zero, below the
+// saved base. The run then has the sums of its result line, not a negative
+// difference.
+func TestUsageByModelAfterTheSumsOfTheCLIStartAgain(t *testing.T) {
+	ctx := context.Background()
+	store := session.NewMemoryStore()
+	claude.Replay(t, nil, "testdata/model_usage_first.trace", "testdata/model_usage_reset.trace")
+
+	first, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
+	require.NoError(t, err)
+	_, _, err = run(ctx, first, "Say hello")
+	require.NoError(t, err)
+	require.NoError(t, first.Close())
+
+	second, err := claude.Durable(ctx, agent.Config{SessionID: "s1", Store: store})
+	require.NoError(t, err)
+	defer closeAgent(t, second)
+	events, _, err := run(ctx, second, "Again")
+	require.NoError(t, err)
+	checkByModel(t, runEnd(t, events),
+		map[string]ai.Usage{"claude-sonnet-5-5": {Input: 40, Output: 5, CacheRead: 100}},
+		map[string]float64{"claude-sonnet-5-5": 0.004})
+}
