@@ -70,6 +70,22 @@ func (h *Host) Send(ctx context.Context, id string, m Message) error {
 	return nil
 }
 
+// TakeHeld removes the held messages of the session id, and returns
+// them, the oldest first. A run that ended with [StopLost] starts no
+// held message, so a caller can give them to a new session. If the host
+// does not know the session, TakeHeld returns [ErrNotFound].
+func (h *Host) TakeHeld(id string) ([]Message, error) {
+	s, err := h.session(id)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	held := s.queue
+	s.queue = nil
+	return held, nil
+}
+
 // Compact compacts the session id now, in a run of its own. The events of
 // the run go to the agent stream, as the events of each run do. A held
 // message runs after it. The instructions go to the strategy or the CLI of
@@ -200,7 +216,7 @@ func (s *hosted) stream(ctx context.Context, runner agent.Runner, m Message) *ag
 }
 
 // finish ends the active run, and starts the run of the next held
-// message.
+// message. After [StopLost], it starts none.
 func (s *hosted) finish(ctx context.Context, end agent.EventAgentEnd, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -235,6 +251,12 @@ func (s *hosted) finish(ctx context.Context, end agent.EventAgentEnd, err error)
 		if len(unread) > 0 {
 			s.queue = slices.Insert(s.queue, 0, Message(unread))
 		}
+	}
+	// A lost conversation has no context for a held message or a wake.
+	// The held messages wait for [Host.TakeHeld], and the wake goes.
+	if reason == StopLost {
+		s.wakePending = false
+		return
 	}
 	if len(s.queue) == 0 {
 		if s.wakePending {

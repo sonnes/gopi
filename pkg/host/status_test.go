@@ -199,3 +199,28 @@ func TestAStartThatLostItsConversation(t *testing.T) {
 	assert.Equal(t, host.StopLost, got.StopReason)
 	assert.Contains(t, got.Error, "no conversation to resume")
 }
+
+func TestALostRunStartsNoHeldMessage(t *testing.T) {
+	f, gate := gated(t)
+	f.model.fail = fmt.Errorf("claude: %w", agent.ErrNoConversation)
+	f.create(t, host.Config{ID: "s1"})
+	_, events := f.watch(t)
+	f.send(t, "s1", "a")
+	f.model.waitCalls(t, 1)
+	f.send(t, "s1", "b")
+
+	close(gate)
+
+	assert.Equal(t, host.StopLost, runEnd(t, events).StopReason)
+	held, err := f.h.TakeHeld("s1")
+	require.NoError(t, err)
+	require.Len(t, held, 1, "the steer that the lost run did not read waits")
+	assert.Equal(t, "b", held[0][len(held[0])-1].Message.Text())
+	got, _ := f.h.Get("s1")
+	assert.Equal(t, host.StatusIdle, got.Status, "no held message runs in a lost conversation")
+	assert.Equal(t, []string{"a"}, f.model.texts())
+
+	held, err = f.h.TakeHeld("s1")
+	require.NoError(t, err)
+	assert.Empty(t, held, "TakeHeld removes the held messages")
+}

@@ -139,7 +139,7 @@ for e, err := range events {
 }
 ```
 
-A run ends with the status `idle` and a stop reason: `end_turn`, `interrupted`, `error`, `restarted`, or `lost`. A run that the end of the program cut short reads as `restarted` after the next `Open`. A run of a CLI agent that cannot find its conversation to resume reads as `lost`. The next run of that session starts a new conversation with an empty context.
+A run ends with the status `idle` and a stop reason: `end_turn`, `interrupted`, `error`, `restarted`, or `lost`. A run that the end of the program cut short reads as `restarted` after the next `Open`. A run of a CLI agent that cannot find its conversation to resume reads as `lost`. The next run of that session starts a new conversation with an empty context. After `lost`, no held message starts. `TakeHeld` gives the held messages back to the caller.
 
 ## Follow a Session
 
