@@ -67,11 +67,16 @@ const (
 
 // runUsage returns the usage of each model of one run, from the
 // modelUsage of its result line. It keeps cur as the base of the next
-// run of the process. A model that the run did not call has no key.
+// run of the process. A model that the run did not call has no key. If a
+// sum of cur is below the base, the CLI started its sums again, so the
+// usage of the run is cur.
 func (p *process) runUsage(cur map[string]wireModelUsage) map[string]ai.Usage {
 	out := map[string]ai.Usage{}
 	for model, c := range cur {
 		prev := p.models[model]
+		if c.below(prev) {
+			prev = wireModelUsage{}
+		}
 		u := ai.Usage{
 			Input:      c.InputTokens - prev.InputTokens,
 			Output:     c.OutputTokens - prev.OutputTokens,
@@ -86,6 +91,15 @@ func (p *process) runUsage(cur map[string]wireModelUsage) map[string]ai.Usage {
 	}
 	p.models = cur
 	return out
+}
+
+// below reports whether a sum of u is below the same sum of base.
+func (u wireModelUsage) below(base wireModelUsage) bool {
+	return u.InputTokens < base.InputTokens ||
+		u.OutputTokens < base.OutputTokens ||
+		u.CacheReadInputTokens < base.CacheReadInputTokens ||
+		u.CacheCreationInputTokens < base.CacheCreationInputTokens ||
+		u.CostUSD < base.CostUSD
 }
 
 // splitCost splits total over the token kinds of u by their weights.
