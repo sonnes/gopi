@@ -49,6 +49,32 @@ func TestStopEndsTheChildrenOfTheCLI(t *testing.T) {
 	waitGone(t, pid)
 }
 
+func TestStopIsCleanWhenTheCLIFailsAfterItsInputEnds(t *testing.T) {
+	// The Claude Code CLI exits with status 1 when its input ends.
+	p, _ := startChild(t, "cat; exit 1")
+
+	require.NoError(t, p.Stop())
+}
+
+func TestStopIsCleanWhenTheCLIEndsAtTheSignal(t *testing.T) {
+	// The CLI does not read stdin, so only SIGTERM ends it.
+	p, _ := startChild(t, "exec sleep 60")
+
+	require.NoError(t, p.Stop())
+}
+
+func TestStopReturnsTheExitOfACLIThatFailedBeforeTheStop(t *testing.T) {
+	pipes, err := Start(exec.Command("sh", "-c", "exit 3"))
+	require.NoError(t, err)
+	p := Open(pipes)
+	for range p.Lines() {
+	}
+
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, p.Stop(), &exitErr)
+	require.Equal(t, 3, exitErr.ExitCode())
+}
+
 func TestKillEndsTheChildrenOfTheCLI(t *testing.T) {
 	p, pid := startChild(t, "sleep 60")
 

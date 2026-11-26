@@ -209,8 +209,25 @@ func Environ(drop, extra []string) []string {
 // [killTimeout] after that, Stop kills it. After the CLI exits, Stop
 // kills each process that the CLI left, such as a command of a tool
 // that runs in the background.
+//
+// The exit that the stop causes is not an error. For example, the
+// Claude Code CLI exits with status 1 when its input ends. If stdout
+// ended before the stop, the CLI exited by itself, and Stop returns the
+// error of the exit.
 func (pr *Proc) Stop() error {
 	pr.stopOnce.Do(func() {
+		var exitedBefore bool
+		select {
+		case <-pr.readDone:
+			exitedBefore = true
+		default:
+		}
+		defer func() {
+			var exitErr *exec.ExitError
+			if !exitedBefore && errors.As(pr.stopErr, &exitErr) {
+				pr.stopErr = nil
+			}
+		}()
 		pr.pipes.Stdin.Close()
 		go pr.drain()
 		done := make(chan error, 1)
