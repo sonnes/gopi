@@ -34,6 +34,10 @@ const (
 	LSP              = "lsp"
 	Monitor          = "monitor"
 	TaskStop         = "task_stop"
+	TaskCreate       = "task_create"
+	TaskUpdate       = "task_update"
+	TaskList         = "task_list"
+	TaskGet          = "task_get"
 	SendMessage      = "send_message"
 	CronCreate       = "cron_create"
 	CronDelete       = "cron_delete"
@@ -187,6 +191,12 @@ var knownNames = []Known{
 	},
 	{Name: Monitor, Claude: []string{"Monitor"}},
 	{Name: TaskStop, Claude: []string{"TaskStop"}},
+	// Claude Code replaced TodoWrite with the task tools. They are off
+	// with --print unless --tools names them.
+	{Name: TaskCreate, Claude: []string{"TaskCreate"}, Kind: KindRead},
+	{Name: TaskUpdate, Claude: []string{"TaskUpdate"}, Kind: KindRead},
+	{Name: TaskList, Claude: []string{"TaskList"}, Kind: KindRead},
+	{Name: TaskGet, Claude: []string{"TaskGet"}, Kind: KindRead},
 	{Name: SendMessage, Claude: []string{"SendMessage"}},
 	{Name: CronCreate, Claude: []string{"CronCreate"}},
 	{Name: CronDelete, Claude: []string{"CronDelete"}},

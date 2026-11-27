@@ -74,6 +74,10 @@ func TestLookup(t *testing.T) {
 		{in: "apply_patch", name: "apply_patch", claude: "", kind: tool.KindEdit, content: tool.ContentPath},
 		{in: "Task", name: "agent", claude: "Agent", kind: tool.KindRead, content: tool.ContentNone},
 		{in: "web_fetch", name: "web_fetch", claude: "WebFetch", kind: tool.KindOther, content: tool.ContentDomain},
+		{in: "TaskCreate", name: "task_create", claude: "TaskCreate", kind: tool.KindRead, content: tool.ContentNone},
+		{in: "task_update", name: "task_update", claude: "TaskUpdate", kind: tool.KindRead, content: tool.ContentNone},
+		{in: "TaskList", name: "task_list", claude: "TaskList", kind: tool.KindRead, content: tool.ContentNone},
+		{in: "TaskGet", name: "task_get", claude: "TaskGet", kind: tool.KindRead, content: tool.ContentNone},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
